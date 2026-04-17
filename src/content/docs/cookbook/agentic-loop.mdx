@@ -42,15 +42,29 @@ export async function streamAssistant(params: {
   systemPrompt: string;
   messages: ModelMessage[];
   tools: Record<string, Tool>;
+  mcpClient: McpClient;
   maxSteps?: number;
 }) {
   const agent = new ToolLoopAgent({
     model: openai("gpt-4o-mini"),
     instructions: params.systemPrompt,
-    tools: params.tools,
+    tools: {
+      ...params.tools,
+      // Built-in web search with user location for localized results
+      web_search: openai.tools.webSearch({
+        searchContextSize: "medium",
+        userLocation: {
+          type: "approximate",
+          country: params.userContext?.countryCode,
+          timezone: params.userContext?.timezone,
+        },
+      }),
+    },
     stopWhen: stepCountIs(params.maxSteps ?? 10),
     // Optional: semantic tool selection
     prepareStep: buildPrepareStep({ maxTools: 12 }),
+    // Guaranteed cleanup: close MCP client connections
+    onFinish: () => params.mcpClient.close(),
   });
 
   return agent.stream({
@@ -62,11 +76,13 @@ export async function streamAssistant(params: {
 
 **Key features**:
 
-- **`tools`**: Flat object of tool definitions (`{ [name]: Tool }`).
-- **`stopWhen`**: Predicate that receives step count; return `true` to halt.
+- **`tools`**: Flat object of tool definitions (`{ [name]: Tool }`). Merge MCP tools with built-in provider tools (e.g., `openai.tools.webSearch`).
+- **`stopWhen`**: Predicate that receives step count; return `true` to halt. 10 steps is a proven default for multi-tool workflows.
 - **`prepareStep`**: Hook to select which tools are exposed per turn (enables semantic selection).
+- **`onFinish`**: Guaranteed cleanup callback — close MCP client connections, flush logs, release resources. Runs whether the agent succeeds or fails.
 - **`experimental_transform`**: Smooths token emission for better UX.
 - **No explicit loop**: `ToolLoopAgent` manages request/response cycles internally.
+- **User location**: Inject approximate location into web search for localized results (country, timezone).
 
 **Execution flow**:
 
@@ -233,6 +249,29 @@ async function runOpenAIAgent(userMessage: string) {
 ```
 
 **Status**: Beta; API may change.
+
+---
+
+## Resource Lifecycle
+
+Production agents hold connections (MCP clients, database pools, Redis) that must be cleaned up. Use `onFinish` to guarantee cleanup regardless of how the agent exits:
+
+```typescript
+const agent = new ToolLoopAgent({
+  model: openai("gpt-4o-mini"),
+  instructions: systemPrompt,
+  tools: allTools,
+  stopWhen: stepCountIs(10),
+  onFinish: async () => {
+    // Close MCP client (releases tool server connections)
+    await mcpClient.close();
+    // Flush any pending analytics
+    await analytics.flush();
+  },
+});
+```
+
+Without `onFinish`, crashed or timed-out agents leak connections. This is especially important when each request creates a new MCP client instance scoped to the user's permissions.
 
 ---
 

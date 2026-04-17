@@ -63,11 +63,18 @@ export async function ensureToolIndex(ctx: McpContext) {
     embeddingModel: openai.embeddingModel("text-embedding-3-small"),
     // Cache embeddings to disk; reuse across restarts
     embeddingCache: fileCache(".toolpick-cache.json"),
-    // Define related-tool groups for discovery
+    // Cross-domain dependency graph: when tool A is selected,
+    // its related tools are pre-loaded even if embeddings wouldn't
+    // have picked them. Prevents mid-workflow discovery gaps.
     relatedTools: {
-      customer_create: ["customer_get", "customer_list"],
-      order_create: ["customer_get", "product_list"],
-      invoice_create: ["customer_list", "order_list"],
+      invoices_create: ["customers_list"],          // Need customer to invoice
+      invoices_create_from_tracker: ["customers_list"],
+      invoice_recurring_create: ["customers_list"],
+      tracker_timer_start: ["tracker_projects_list"], // Need project to track time
+      tracker_entries_create: ["tracker_projects_list"],
+      tracker_entries_list: ["tracker_projects_list"],
+      tracker_projects_list: ["tracker_entries_list"],
+      transactions_update: ["categories_list"],     // Need category to categorize
     },
   });
 
@@ -166,6 +173,20 @@ export async function streamAssistant(params: {
 4. If model calls a tool, framework executes it.
 5. Result appended to conversation; loop continues.
 6. At the next turn, `prepareStep` re-runs with the updated conversation; different tools may be selected.
+
+---
+
+## Why relatedTools Matters
+
+Without `relatedTools`, the agent hits a common failure mode: it starts creating an invoice, then discovers mid-workflow that it needs a customer ID but `customers_list` wasn't in the top-12 selection. It either halts or wastes a step calling `search_tools`.
+
+The `relatedTools` map is a **dependency injection for multi-step workflows**. When `invoices_create` is selected by embeddings, `customers_list` is automatically pre-loaded — even if the user's message ("create an invoice for $500") has zero semantic similarity to "list customers."
+
+**Guidelines for building the map**:
+- Map write tools to the read tools they depend on (create invoice → list customers)
+- Map bidirectional relationships (projects ↔ time entries)
+- Keep it minimal — only add dependencies you've observed agents needing in practice
+- Don't add transitive dependencies (if A→B and B→C, don't add A→C unless agents actually need C when calling A)
 
 ---
 

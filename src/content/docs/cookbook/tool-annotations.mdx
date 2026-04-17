@@ -55,6 +55,38 @@ export const DESTRUCTIVE_ANNOTATIONS = {
 
 ---
 
+## Pattern: Scope-Based Tool Registration
+
+Before registering tools, check the caller's scopes. This prevents unauthorized tools from being visible at all — the model can't call what it can't see:
+
+```typescript
+// mcp/tools/customers.ts
+export const registerCustomerTools: RegisterTools = (server, ctx) => {
+  const { db, teamId } = ctx;
+
+  const hasReadScope = hasScope(ctx, "customers.read");
+  const hasWriteScope = hasScope(ctx, "customers.write");
+
+  // If no scopes at all, skip registration entirely
+  if (!hasReadScope && !hasWriteScope) return;
+
+  // Only register tools the caller has access to
+  if (hasReadScope) {
+    server.registerTool("customers_list", { /* ... */ });
+    server.registerTool("customers_get", { /* ... */ });
+  }
+
+  if (hasWriteScope) {
+    server.registerTool("customer_create", { /* ... */ });
+    server.registerTool("customer_delete", { /* ... */ });
+  }
+};
+```
+
+**Why not runtime authorization?** Scope-based registration means the model's tool list reflects exactly what this user can do. No wasted tokens describing tools they can't use. No confusing "unauthorized" errors mid-workflow.
+
+---
+
 ## Pattern: Tool Registry with Annotations
 
 ```typescript
@@ -180,6 +212,86 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
     }
   );
 }
+```
+
+---
+
+## Pattern: withErrorHandling Wrapper
+
+Every tool handler should be wrapped in a consistent error handler. This prevents uncaught exceptions from crashing the agent and ensures the model always receives structured feedback:
+
+```typescript
+// mcp/utils.ts
+export function withErrorHandling<Args extends any[], R>(
+  handler: (...args: Args) => Promise<R>,
+  fallbackMessage: string
+): (...args: Args) => Promise<R> {
+  return async (...args: Args) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: error instanceof Error ? error.message : fallbackMessage,
+        }],
+        isError: true,
+      } as R;
+    }
+  };
+}
+
+// Usage in tool registration
+server.registerTool(
+  "customers_list",
+  { title: "List Customers", annotations: READ_ONLY_ANNOTATIONS, /* ... */ },
+  withErrorHandling(async (params) => {
+    const result = await db.getCustomers(ctx.teamId, params);
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  }, "Failed to list customers")
+);
+```
+
+The `isError: true` flag tells the model the tool failed — it can retry or try an alternative. Without it, the model may treat error text as a successful result.
+
+---
+
+## Pattern: Response Truncation
+
+Large list responses can overflow the model's context. Truncate at the tool level with a hard character limit:
+
+```typescript
+// mcp/utils.ts
+const MCP_TEXT_LIMIT = 25_000; // Characters, not tokens
+
+export function truncateListResponse<T>(response: PaginatedResponse<T>) {
+  let text = JSON.stringify(response);
+  const data = [...response.data];
+
+  while (data.length > 1 && text.length > MCP_TEXT_LIMIT) {
+    data.pop();
+    text = JSON.stringify({
+      ...response,
+      meta: { ...response.meta, truncated: true },
+      data,
+    });
+  }
+
+  return { text, structuredContent: response };
+}
+```
+
+When truncated, the response includes `meta.truncated: true` — the model sees this and can tell the user "Showing first N results. Use filters or pagination for more."
+
+Combine with Zod schema sanitization to strip internal fields before they reach the model:
+
+```typescript
+// Strip internal fields via output schema
+const result = sanitizeArray(mcpCustomerListItemSchema, rawData);
+const { text, structuredContent } = truncateListResponse({
+  meta: { cursor, hasNextPage, hasPreviousPage },
+  data: result,
+});
 ```
 
 ---

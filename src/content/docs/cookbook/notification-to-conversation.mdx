@@ -36,11 +36,15 @@ import Redis from "redis";
 const redis = Redis.createClient();
 
 export interface NotificationContext {
+  eventType: string;              // e.g., "transaction", "invoice_paid", "invoice_overdue"
   type: "order" | "invoice" | "customer" | "record"; // Entity type
-  entityId: string;
-  summary: string; // Short summary of what the notification was about
-  timestamp: number; // When the notification was sent
-  action?: string; // Suggested action: "approve", "review", "send"
+  entityIds: string[];            // Support multiple entities (batch notifications)
+  summary: string;                // Short summary of what the notification was about
+  timestamp: number;              // When the notification was sent
+  action?: string;                // Suggested action: "approve", "review", "send"
+  sourcePlatform: string;         // Which platform received the notification
+  sourceMessageId?: string;       // Platform message ID for threading
+  suggestedPrompts: string[];     // Follow-up suggestions shown to user
 }
 
 export async function storeNotificationContext(
@@ -66,6 +70,85 @@ export async function clearNotificationContext(userId: string): Promise<void> {
   await redis.del(key);
 }
 ```
+
+---
+
+## Per-Event-Type Batch Windows
+
+Not all events are equally urgent. Use different batching windows by event type to balance responsiveness with noise:
+
+| Event Type | Batch Window | Rationale |
+|-----------|-------------|-----------|
+| Receipt/document match | Immediate | User just uploaded; wants confirmation now |
+| New transactions | 10 min | Frequent but not urgent; batch avoids spam |
+| Invoice paid | 10 min | Good news, not time-sensitive |
+| Invoice overdue | 30 min | Important but action isn't instant |
+| Recurring invoice upcoming | 60 min | Awareness only; no immediate action needed |
+
+```typescript
+const BATCH_WINDOWS_MS: Record<string, number> = {
+  document_match: 0,                       // Immediate
+  transaction: 10 * 60 * 1000,             // 10 minutes
+  invoice_paid: 10 * 60 * 1000,            // 10 minutes
+  invoice_overdue: 30 * 60 * 1000,         // 30 minutes
+  recurring_invoice_upcoming: 60 * 60 * 1000, // 60 minutes
+};
+```
+
+**Immediate events** skip the batch queue entirely — they're sent the moment they occur. Everything else accumulates during its window, then a single summary notification is dispatched.
+
+---
+
+## Suggested Follow-Up Prompts
+
+Include `suggestedPrompts` in the notification context. These serve two purposes: (1) shown as quick-reply buttons on mobile platforms, and (2) injected into the system prompt to guide the model's understanding of what the user might want:
+
+```typescript
+await storeNotificationContext(userId, {
+  eventType: "transaction",
+  type: "record",
+  entityIds: newTransactionIds,
+  summary: `You have ${count} new transactions totaling ${total}`,
+  timestamp: Date.now(),
+  suggestedPrompts: [
+    "Show me them",
+    "Which ones need receipts?",
+    "Categorize them",
+  ],
+  sourcePlatform: "whatsapp",
+});
+```
+
+When injecting into the prompt:
+
+```typescript
+function formatNotificationContextForPrompt(
+  context: NotificationContext | null
+): string {
+  if (!context) return "";
+  const prompts = context.suggestedPrompts.join(", ");
+  return `The user's latest notification: "${context.summary}". ` +
+    `Suggested follow-ups: ${prompts}.`;
+}
+```
+
+---
+
+## Platform Session Constraints
+
+Some platforms impose session windows. WhatsApp, for example, only allows free-form messages within 24 hours of the last user-initiated message. Outside this window, you must use pre-approved template messages:
+
+```typescript
+function isWithinWhatsAppSessionWindow(
+  lastUserMessageAt: Date | null
+): boolean {
+  if (!lastUserMessageAt) return false;
+  const elapsed = Date.now() - lastUserMessageAt.getTime();
+  return elapsed < 24 * 60 * 60 * 1000; // 24 hours
+}
+```
+
+Factor this into your notification dispatch — if outside the session window, send a template message (which has limited formatting) instead of a free-form AI-generated message.
 
 ---
 

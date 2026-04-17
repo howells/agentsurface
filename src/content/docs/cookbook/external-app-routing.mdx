@@ -244,6 +244,22 @@ that the user has connected.
 
 ## Advanced: Caching & Ranking
 
+Use tiered caching: an LRU cache for per-user tool sessions, and a short-lived cache for the external app catalog:
+
+```typescript
+// composio/client.ts
+import { LRUCache } from "lru-cache";
+
+// Per-user tool cache: 500 users max, 20 min TTL
+const userToolsCache = new LRUCache<string, Record<string, unknown>>({
+  max: 500,
+  ttl: 20 * 60 * 1000,
+});
+
+// Global toolkit catalog cache: 2 min TTL (external API metadata)
+const TOOLKIT_CACHE_TTL_S = 120;
+```
+
 For frequently-used actions, cache search results:
 
 ```typescript

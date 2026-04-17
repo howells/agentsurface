@@ -250,6 +250,31 @@ export async function generateWeeklyInsights(teamId: string, executionId: string
 
 ## Batching: Prevent Notification Spam
 
+Different events warrant different urgency levels. Categorize into immediate (user expects instant feedback) and batched (aggregate then summarize):
+
+| Event | Category | Window | Rationale |
+|-------|----------|--------|-----------|
+| Receipt matched to transaction | **Immediate** | 0 | User just uploaded; wants confirmation |
+| New transactions synced | Batched | 10 min | Frequent; batch avoids notification fatigue |
+| Invoice paid | Batched | 10 min | Good news but not time-critical |
+| Invoice overdue | Batched | 30 min | Important; user needs awareness, not instant action |
+| Recurring invoice upcoming | Batched | 60 min | Advance notice only |
+| Weekly insights generated | Batched | N/A | Scheduled; no batching needed |
+
+**Timezone-aware scheduling**: For user-facing summaries (weekly insights, daily digests), schedule relative to the user's local time, not UTC. A "Monday morning" digest at 7am should arrive at 7am in *their* timezone:
+
+```typescript
+// Schedule insights for 7am in each user's timezone
+const userLocalHour = new Date().toLocaleString("en-US", {
+  timeZone: user.timezone,
+  hour: "numeric",
+  hour12: false,
+});
+if (parseInt(userLocalHour) === 7) {
+  await generateWeeklyInsights(user.teamId);
+}
+```
+
 Instead of 10 notifications, collect changes and send one summary:
 
 ```typescript

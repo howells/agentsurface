@@ -77,6 +77,8 @@ export function buildSystemPrompt(ctx: UserContext): string {
 - Timezone: ${dateCtx.timezone}
 - Current time: ${currentTime}
 - Today: ${dateCtx.date} (Q${dateCtx.quarter} ${dateCtx.year})
+- This month: ${dateCtx.monthStart} to ${dateCtx.date}
+- This quarter: ${dateCtx.quarterStart} to ${dateCtx.date}
 - Date format: ${ctx.dateFormat ?? "locale default"}
 - Time format: ${timeLabel}
 
@@ -98,12 +100,44 @@ export function buildSystemPrompt(ctx: UserContext): string {
 
 **Search tools**: If you can't find a tool for a task, call \`search_tools\` with a short query (e.g., "list invoices", "send email"). It returns matching tools.
 
+## Parallel Execution
+
+- ALWAYS call multiple tools in parallel when requests are independent.
+- Example: "What's my revenue and how many customers do I have?" → call \`reports_revenue\` and \`customers_list\` simultaneously.
+- Sequential only when one tool's output feeds into another's input.
+
 ## Formatting
 
 - **Tables**: For 3+ items, use markdown tables with clear headers.
-- **Entity links**: Make entity names/IDs clickable: \`[Order #123](#order:ID)\`, \`[Customer Name](#cust:ID)\`.
+- **Entity links**: Make entity names/IDs clickable: \`[INV-001](#inv:UUID)\`, \`[Customer Name](#cust:UUID)\`.
 - **No preamble**: After tools return, present results directly. No "Here are the results:" or "I found the following:".
 - **Tone**: Concise, professional. No emojis. No exclamation marks.
+- **First response**: Before calling tools, emit one short sentence acknowledging the request (dashboard only; suppress on mobile platforms).
+\`;
+  // Conditionally append upload context
+  + buildRecentUploadsSection(ctx.recentUploadSummaries)
+}
+\`\`\`
+
+### Conditional Sections: Upload Context
+
+When users upload documents (receipts, invoices, contracts), the pipeline OCRs them before the chat response. Inject summaries into the prompt so the agent has immediate context:
+
+\`\`\`typescript
+function buildRecentUploadsSection(
+  summaries: UploadSummary[] | undefined
+): string {
+  if (!summaries?.length) return "";
+
+  return \`\\n## Recently Uploaded Documents\\n\\n\` +
+    summaries.map(s =>
+      \`- **\${s.filename}** (\${s.type}): \${s.summary}\`
+    ).join("\\n") +
+    \`\\n\\nThe user may ask about these documents. Use the data above to answer.\`;
+}
+\`\`\`
+
+This turns document uploads into conversation starters — the user drops a receipt and asks "categorize this" without having to describe its contents.
 
 ## Example Interactions
 
@@ -121,6 +155,31 @@ export function buildSystemPrompt(ctx: UserContext): string {
 `;
 }
 ```
+
+---
+
+## DateTime Normalization
+
+Agents frequently pass dates between tools. Without normalization, timezone mismatches corrupt data. Force ISO 8601 at the tool boundary:
+
+```typescript
+// mcp/utils.ts
+const HAS_TZ = /[Zz]|[+-]\d{2}:\d{2}$/;
+
+export function normalizeDateTime(value: string): string {
+  let trimmed = value.trim();
+  if (!HAS_TZ.test(trimmed)) {
+    trimmed = `${trimmed}Z`; // Assume UTC if no timezone
+  }
+  const parsed = parseISO(trimmed);
+  if (!isValid(parsed)) {
+    throw new Error(`Invalid datetime: "${value}". Use ISO 8601 format.`);
+  }
+  return parsed.toISOString();
+}
+```
+
+Pre-computing date ranges in the prompt (this month, this quarter) eliminates an entire class of model errors where the agent calculates "last 30 days" incorrectly across month/year boundaries.
 
 ---
 

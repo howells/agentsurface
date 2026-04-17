@@ -77,8 +77,20 @@ A tool's output should be consumable by downstream tools.
 - Return data in a consistent, normalized format (e.g., always a `{ id, ...fields }` shape for entities)
 - Include reference IDs (e.g., `customerId`, `invoiceId`) so the agent can chain tools without parsing
 - Avoid embedding irrelevant context; be terse
+- Sanitize output through a schema (e.g., Zod) to strip internal fields before they reach the model
 
 **Principle**: Output is the next tool's input. Design for chaining.
+
+### 4a. Response Truncation
+
+List responses can overflow the model's context window. Every list tool should enforce a character limit and signal truncation:
+
+- Set a hard limit (e.g., 25,000 characters) on serialized response size
+- Drop items from the end until the response fits, preserving pagination metadata
+- Set a `truncated: true` flag so the agent can inform the user ("Showing first N results")
+- Include cursor/pagination info so the agent can request the next page if needed
+
+**Pattern**: Truncate at the tool layer, not the agent layer. The tool knows its data shape; the agent shouldn't have to guess what to cut.
 
 ### 5. Observable Execution
 
@@ -92,6 +104,25 @@ This allows you to:
 - Debug agent reasoning ("why did it call this tool with these params?")
 - Measure tool performance (slow tool → optimize or decompose)
 - Audit access patterns (for security and compliance)
+
+---
+
+## The "Every CRUD" Philosophy
+
+Production agentic apps don't just expose a few high-level tools — they wrap *every* business operation as a tool. A financial platform with 14 transaction tools, 12 invoice tools, 13 report tools, and 12 time-tracking tools (100+ total) gives the agent comprehensive coverage of the domain.
+
+**Why this works**:
+- The agent becomes a universal controller, not a limited assistant
+- Users can compose arbitrary workflows through natural language
+- New capabilities emerge from tool combinations the developers didn't anticipate
+
+**What makes it viable**:
+- Semantic tool selection (embedding-based filtering to ~12 per turn) prevents token overload
+- Tool annotations (READ_ONLY/WRITE/DESTRUCTIVE) encode safety without per-tool logic
+- Scope-based registration gates tool visibility by user permissions
+- A `withErrorHandling` wrapper provides consistent error formatting across all tools
+
+Without these scaling patterns, 100+ tools would be unmanageable. With them, each new tool is just a registration call with a schema and annotation.
 
 ---
 

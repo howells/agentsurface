@@ -94,21 +94,37 @@ Users should feel the agent is part of their workflow, not a hidden background p
 
 Collecting work into batches reduces per-task overhead and improves agent efficiency.
 
-**Example: Invoice Agent**
-- Without batching: Process each invoice immediately (1s/invoice if serialized)
-- With batching: Collect invoices created in the last hour, process 100 at once in a single agent run (50ms/invoice)
-
-**Batching windows**:
-- Hourly: Good for high-frequency events (daily for medium-frequency)
-- Daily: Good for expensive operations (reconciliation, tax calculations)
-- Adaptive: If queue grows beyond threshold, trigger early
+**Categorize events by urgency, not source**:
+- **Immediate** (0 delay): User-initiated matches (e.g., receipt just uploaded → matched to transaction). User expects instant feedback.
+- **Short window** (10 min): Frequent background events (new transactions synced, invoices paid). Batch to avoid spam.
+- **Medium window** (30 min): Important but non-urgent (overdue invoices). User needs awareness, not instant action.
+- **Long window** (60 min): Advance notices (upcoming recurring invoices). Awareness only.
 
 **Pattern**:
 ```typescript
-// Every hour, or when queue size > 100:
-const batch = await queue.dequeueBatch(maxSize: 100, maxAge: 1h);
-await agent.processBatch(batch);
+const BATCH_WINDOWS: Record<string, number> = {
+  document_match: 0,                // Immediate
+  transaction: 10 * 60 * 1000,      // 10 min
+  invoice_paid: 10 * 60 * 1000,     // 10 min
+  invoice_overdue: 30 * 60 * 1000,  // 30 min
+  recurring_upcoming: 60 * 60 * 1000, // 60 min
+};
 ```
+
+### 4a. Notification-to-Conversation Bridge
+
+Most apps send notifications as dead-ends. Proactive agents should store **notification context** and include **suggested follow-up prompts** so that when the user replies, the agent knows what they're responding to:
+
+```typescript
+// When dispatching a notification:
+await storeContext(userId, {
+  summary: "You have 3 new transactions totaling $2,450",
+  entityIds: ["tx_1", "tx_2", "tx_3"],
+  suggestedPrompts: ["Show me them", "Which need receipts?", "Categorize them"],
+});
+```
+
+When the user replies "show me them," the agent reads the stored context and knows exactly which transactions to display. This turns every notification into a conversation entry point.
 
 ### 5. Graceful Degradation and Catchup
 
