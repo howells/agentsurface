@@ -36,7 +36,7 @@ const agent = new ToolLoopAgent({
 });
 ```
 
-**Cost**: ~500 tokens just listing tool definitions. The model wastes context parsing irrelevant tools (order tools when asking about customers).
+**Cost**: ~500 tokens listing tool definitions alone. The model wastes context parsing irrelevant tools (order tools when asking about customers).
 
 ---
 
@@ -46,9 +46,9 @@ The production app uses the `toolpick` library with OpenAI embeddings:
 
 ```typescript
 // chat/tools.ts
-import { createToolIndex, fileCache } from "toolpick";
+import { createToolIndex, fileCache, type ToolIndex } from "toolpick";
 import { openai } from "@ai-sdk/openai";
-import type { PrepareStepFunction, Tool } from "ai";
+import type { PrepareStepFunction } from "ai";
 
 let cachedIndex: ToolIndex | null = null;
 
@@ -69,7 +69,7 @@ export async function ensureToolIndex(ctx: McpContext) {
     relatedTools: {
       invoices_create: ["customers_list"],          // Need customer to invoice
       invoices_create_from_tracker: ["customers_list"],
-      invoice_recurring_create: ["customers_list"],
+      invoices_recurring_create: ["customers_list"],
       tracker_timer_start: ["tracker_projects_list"], // Need project to track time
       tracker_entries_create: ["tracker_projects_list"],
       tracker_entries_list: ["tracker_projects_list"],
@@ -136,9 +136,10 @@ export async function streamAssistant(params: {
   systemPrompt: string;
   messages: ModelMessage[];
   tools: Record<string, Tool>;
+  ctx: McpContext;
 }) {
   // Ensure tool index is warm
-  await ensureToolIndex(ctx);
+  await ensureToolIndex(params.ctx);
 
   // Get all tools (needed for execution)
   const allTools = params.tools;
@@ -184,7 +185,7 @@ The `relatedTools` map is a **dependency injection for multi-step workflows**. W
 
 **Guidelines for building the map**:
 - Map write tools to the read tools they depend on (create invoice → list customers)
-- Map bidirectional relationships (projects ↔ time entries)
+- Map bidirectional relationships where either side needs the other (`tracker_projects_list` ↔ `tracker_entries_list` above — listing projects often leads to listing entries, and vice versa)
 - Keep it minimal — only add dependencies you've observed agents needing in practice
 - Don't add transitive dependencies (if A→B and B→C, don't add A→C unless agents actually need C when calling A)
 
@@ -193,7 +194,7 @@ The `relatedTools` map is a **dependency injection for multi-step workflows**. W
 ## Trade-offs
 
 ### Pros
-- **Token savings**: ~500 tokens per request (tool list shrinks 50→12).
+- **Token savings**: Tool list shrinks from ~500 tokens (50 tools) to ~120 tokens (12 tools) per request.
 - **Model clarity**: Model focuses on relevant tools; less distraction.
 - **Discovery**: Related tools are suggested via `relatedTools` config.
 
@@ -256,10 +257,10 @@ Example:
 
 ```typescript
 // apps/api/src/index.ts (server startup)
-import { warmToolIndex } from "@api/chat/tools";
+import { ensureToolIndex } from "@api/chat/tools";
 
 // On server startup, pre-warm the tool index
-warmToolIndex().catch((err) => {
+ensureToolIndex(createStubMcpContext()).catch((err) => {
   logger.warn("Tool index warm-up failed (will retry on first request)", { error: err.message });
 });
 
@@ -268,7 +269,7 @@ app.listen(3000, () => {
 });
 ```
 
-**What `warmToolIndex` does**:
+**What the warm-up does**:
 1. Creates a stub MCP context.
 2. Calls `ensureToolIndex` to trigger embedding computation.
 3. If embeddings are cached, returns immediately (~10ms).
@@ -307,7 +308,7 @@ Start at 12; measure token usage and model accuracy; adjust ±3 based on results
 
 ## Caching Strategy
 
-The embedded cache is critical for performance:
+The embedding cache is critical for performance:
 
 ```typescript
 // .toolpick-cache.json (auto-managed by fileCache)
@@ -325,9 +326,9 @@ The embedded cache is critical for performance:
 - For production, consider caching in Redis instead of disk:
 
 ```typescript
-import Redis from "redis";
+import { createClient } from "redis";
 
-const redis = Redis.createClient();
+const redis = createClient();
 const embeddingCache = redisCache(redis, "toolpick:embeddings");
 
 const index = await createToolIndex(toolDefinitions, {
@@ -340,38 +341,15 @@ const index = await createToolIndex(toolDefinitions, {
 
 ## Monitoring and Observability
 
-Log tool selection to debug misses:
+Add logging inside `buildPrepareStep` (from the earlier code) to debug selection misses:
 
 ```typescript
-// chat/tools.ts
-export function buildPrepareStep(options: {
-  maxTools: number;
-  alwaysActive?: string[];
-}): PrepareStepFunction {
-  const base = cachedIndex.prepareStep({ maxTools: options.maxTools });
-
-  return async (stepOptions: any) => {
-    const step = await base(stepOptions);
-
-    // Log tool selection for debugging
-    logger.debug("[toolpick] Selected tools", {
-      userMessage: stepOptions.messages[stepOptions.messages.length - 1]?.content?.slice(0, 100),
-      selectedTools: step.activeTools,
-      count: step.activeTools.length,
-    });
-
-    // Append always-active
-    if (step?.activeTools) {
-      for (const name of options.alwaysActive ?? []) {
-        if (!step.activeTools.includes(name)) {
-          step.activeTools.push(name);
-        }
-      }
-    }
-
-    return step;
-  };
-}
+// Inside the returned function from buildPrepareStep, after `const step = await base(stepOptions)`:
+logger.debug("[toolpick] Selected tools", {
+  userMessage: stepOptions.messages[stepOptions.messages.length - 1]?.content?.slice(0, 100),
+  selectedTools: step.activeTools,
+  count: step.activeTools.length,
+});
 ```
 
 **Metrics to track**:
@@ -401,5 +379,5 @@ export function buildPrepareStep(options: {
 
 - [Agentic Loop](/docs/cookbook/agentic-loop) — prepareStep integration.
 - [External-App Routing](/docs/cookbook/external-app-routing) — meta-tools for discovery.
-- [Tool Design](/docs/tool-design) — tool description best practices.
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) — tool description best practices (embedding quality depends on description quality).
 

@@ -34,15 +34,16 @@ The most common pattern in the profiled production app.
 
 ```typescript
 // apps/api/src/chat/assistant-runtime.ts
-import { ToolLoopAgent } from "ai";
+import { ToolLoopAgent, stepCountIs, smoothStream } from "ai";
 import { openai } from "@ai-sdk/openai";
-import type { ModelMessage } from "ai";
+import type { ModelMessage, Tool } from "ai";
 
 export async function streamAssistant(params: {
   systemPrompt: string;
   messages: ModelMessage[];
   tools: Record<string, Tool>;
   mcpClient: McpClient;
+  userContext?: { countryCode?: string; timezone?: string };
   maxSteps?: number;
 }) {
   const agent = new ToolLoopAgent({
@@ -79,7 +80,7 @@ export async function streamAssistant(params: {
 - **`tools`**: Flat object of tool definitions (`{ [name]: Tool }`). Merge MCP tools with built-in provider tools (e.g., `openai.tools.webSearch`).
 - **`stopWhen`**: Predicate that receives step count; return `true` to halt. 10 steps is a proven default for multi-tool workflows.
 - **`prepareStep`**: Hook to select which tools are exposed per turn (enables semantic selection).
-- **`onFinish`**: Guaranteed cleanup callback — close MCP client connections, flush logs, release resources. Runs whether the agent succeeds or fails.
+- **`onFinish`**: Guaranteed cleanup callback — runs whether the agent succeeds or fails. See [Resource Lifecycle](#resource-lifecycle) below.
 - **`experimental_transform`**: Smooths token emission for better UX.
 - **No explicit loop**: `ToolLoopAgent` manages request/response cycles internally.
 - **User location**: Inject approximate location into web search for localized results (country, timezone).
@@ -102,6 +103,7 @@ For batch/non-streaming scenarios (background workers, bulk operations).
 // apps/worker/src/processors/insights-generator.ts
 import { generateText, stepCountIs } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
 
 export async function generateMonthlyInsights(params: {
   userId: string;
@@ -132,7 +134,7 @@ export async function generateMonthlyInsights(params: {
         },
       },
     },
-    stopWhen: stepCountIs(5), // Max 5 tool calls
+    stopWhen: stepCountIs(5), // Max 5 steps
     maxSteps: 10, // Safety limit
   });
 
@@ -277,7 +279,7 @@ Without `onFinish`, crashed or timed-out agents leak connections. This is especi
 
 ## Handling Tool Execution
 
-All frameworks accept a `tools` object where each tool has:
+In Vercel AI SDK, each tool follows this shape:
 
 ```typescript
 interface Tool {
@@ -287,7 +289,7 @@ interface Tool {
 }
 ```
 
-**Framework difference**: Vercel AI and Claude SDK execute tools in-band; OpenAI Agents may return tool calls for client-side execution.
+**Framework difference**: Vercel AI SDK uses Zod schemas and `execute` handlers. Claude Agent SDK uses JSON Schema via `input_schema` (tools execute server-side). OpenAI Agents may return tool calls for client-side execution.
 
 ### Error Handling
 
@@ -330,7 +332,7 @@ const tools = {
 
 **Framework behavior**:
 - Tools that return `isError: true` are shown to the model as failures; the model can retry.
-- Use `isError` to distinguish recoverable errors (not found, validation) from fatal ones (network timeout).
+- Return `isError: true` for recoverable errors (not found, validation) so the model can retry or adjust. Throw exceptions for truly fatal errors (auth failure, missing config) that should halt the agent.
 
 ---
 
@@ -404,17 +406,19 @@ async function chatLoop(userMessage: string) {
       })),
     });
 
-    if (response.stop_reason === "end_turn") break;
+    const choice = response.choices[0];
+    if (choice.finish_reason === "stop") break;
     
-    for (const call of response.tool_calls ?? []) {
+    for (const call of choice.message.tool_calls ?? []) {
       const result = await executeTool(call.function.name, call.function.arguments);
       messages.push({
         role: "assistant",
-        content: response.content ?? "",
+        content: choice.message.content ?? "",
         tool_calls: [call],
       });
       messages.push({
-        role: "user",
+        role: "tool",
+        tool_call_id: call.id,
         content: JSON.stringify(result),
       });
     }

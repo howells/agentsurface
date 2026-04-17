@@ -107,24 +107,17 @@ const BATCH_WINDOWS: Record<string, number> = {
   transaction: 10 * 60 * 1000,      // 10 min
   invoice_paid: 10 * 60 * 1000,     // 10 min
   invoice_overdue: 30 * 60 * 1000,  // 30 min
-  recurring_upcoming: 60 * 60 * 1000, // 60 min
+  recurring_invoice_upcoming: 60 * 60 * 1000, // 60 min
 };
 ```
 
 ### 4a. Notification-to-Conversation Bridge
 
-Most apps send notifications as dead-ends. Proactive agents should store **notification context** and include **suggested follow-up prompts** so that when the user replies, the agent knows what they're responding to:
+Most apps send notifications as dead-ends. Proactive agents should store **notification context** — entity IDs, a summary, and suggested follow-up prompts — so that when the user replies, the agent knows what they're responding to. When a user says "show me them" in reply to a notification about new transactions, the agent reads the stored context and resolves the reference without asking for clarification.
 
-```typescript
-// When dispatching a notification:
-await storeContext(userId, {
-  summary: "You have 3 new transactions totaling $2,450",
-  entityIds: ["tx_1", "tx_2", "tx_3"],
-  suggestedPrompts: ["Show me them", "Which need receipts?", "Categorize them"],
-});
-```
+**Principle**: Every notification is a potential conversation entry point. Store enough context to make replies work without round-trips.
 
-When the user replies "show me them," the agent reads the stored context and knows exactly which transactions to display. This turns every notification into a conversation entry point.
+See the [Notification-to-Conversation Continuity](/docs/cookbook/notification-to-conversation) cookbook for implementation details.
 
 ### 5. Graceful Degradation and Catchup
 
@@ -187,7 +180,6 @@ Agent makes a mistake (e.g., approves an invalid invoice). Human corrects it. Ag
 
 ## See Also
 
-- `/references/scheduling-cookbook.md` — Temporal, Trigger.dev, Inngest setups for proactive agents
-- `/references/state-management.md` — Workflow state, checkpointing, resumption patterns
-- `/references/notifications.md` — Email, webhook, in-app notification patterns
+- `/cookbook/autonomous-background-agents` — Scheduled workers, batching, idempotency implementation
+- `/cookbook/notification-to-conversation` — Notification context storage and conversation continuity
 - `/disciplines/orchestration.md` — Scheduling, queues, and event streams

@@ -49,6 +49,12 @@ async function chat(userMessage: string, platform: "web" | "whatsapp") {
 // chat/prompt.ts
 import { getDateContext } from "@api/mcp/utils";
 
+interface UploadSummary {
+  filename: string;
+  type: string;
+  summary: string;
+}
+
 export interface UserContext {
   fullName: string | null;
   locale: string;
@@ -59,6 +65,7 @@ export interface UserContext {
   teamName: string | null;
   countryCode: string | null;
   localTime: string | null;
+  recentUploadSummaries?: UploadSummary[];
 }
 
 export function buildSystemPrompt(ctx: UserContext): string {
@@ -113,31 +120,6 @@ export function buildSystemPrompt(ctx: UserContext): string {
 - **No preamble**: After tools return, present results directly. No "Here are the results:" or "I found the following:".
 - **Tone**: Concise, professional. No emojis. No exclamation marks.
 - **First response**: Before calling tools, emit one short sentence acknowledging the request (dashboard only; suppress on mobile platforms).
-\`;
-  // Conditionally append upload context
-  + buildRecentUploadsSection(ctx.recentUploadSummaries)
-}
-\`\`\`
-
-### Conditional Sections: Upload Context
-
-When users upload documents (receipts, invoices, contracts), the pipeline OCRs them before the chat response. Inject summaries into the prompt so the agent has immediate context:
-
-\`\`\`typescript
-function buildRecentUploadsSection(
-  summaries: UploadSummary[] | undefined
-): string {
-  if (!summaries?.length) return "";
-
-  return \`\\n## Recently Uploaded Documents\\n\\n\` +
-    summaries.map(s =>
-      \`- **\${s.filename}** (\${s.type}): \${s.summary}\`
-    ).join("\\n") +
-    \`\\n\\nThe user may ask about these documents. Use the data above to answer.\`;
-}
-\`\`\`
-
-This turns document uploads into conversation starters — the user drops a receipt and asks "categorize this" without having to describe its contents.
 
 ## Example Interactions
 
@@ -152,9 +134,31 @@ This turns document uploads into conversation starters — the user drops a rece
 
 **User**: "What's the price of X product?"
 **You**: (Call web_search if you don't have current pricing; present the result with source)
-`;
+`
+  // Conditionally append upload context
+  + buildRecentUploadsSection(ctx.recentUploadSummaries);
 }
 ```
+
+### Conditional Sections: Upload Context
+
+When users upload documents (receipts, invoices, contracts), the pipeline OCRs them before the chat response. Inject summaries into the prompt so the agent has immediate context:
+
+```typescript
+function buildRecentUploadsSection(
+  summaries: UploadSummary[] | undefined
+): string {
+  if (!summaries?.length) return "";
+
+  return `\n## Recently Uploaded Documents\n\n` +
+    summaries.map(s =>
+      `- **${s.filename}** (${s.type}): ${s.summary}`
+    ).join("\n") +
+    `\n\nThe user may ask about these documents. Use the data above to answer.`;
+}
+```
+
+This turns document uploads into conversation starters — the user drops a receipt and asks "categorize this" without having to describe its contents.
 
 ---
 
@@ -164,6 +168,8 @@ Agents frequently pass dates between tools. Without normalization, timezone mism
 
 ```typescript
 // mcp/utils.ts
+import { parseISO, isValid } from "date-fns";
+
 const HAS_TZ = /[Zz]|[+-]\d{2}:\d{2}$/;
 
 export function normalizeDateTime(value: string): string {
@@ -262,7 +268,7 @@ Treat prompts as versioned code:
 
 ```typescript
 // chat/prompts/__tests__/prompt.test.ts
-import { buildSystemPrompt } from "../prompt";
+import { buildSystemPrompt, buildSystemPromptForPlatform } from "../prompt";
 
 describe("buildSystemPrompt", () => {
   const mockUserCtx = {

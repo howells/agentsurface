@@ -32,6 +32,7 @@ Background agents run on schedules (hourly, daily, weekly) independent of user r
 // apps/worker/src/processors/insights-generator.ts
 import { ToolLoopAgent } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
 import { db } from "@midday/db";
 
 export async function generateWeeklyInsights(teamId: string) {
@@ -96,7 +97,7 @@ Keep it under 200 words.
   const insights = result.content[0].text;
 
   // 5. Store and notify
-  await db.createInsight(teamId, {
+  const insight = await db.createInsight(teamId, {
     type: "weekly_summary",
     content: insights,
     generatedAt: new Date(),
@@ -254,26 +255,12 @@ Different events warrant different urgency levels. Categorize into immediate (us
 
 | Event | Category | Window | Rationale |
 |-------|----------|--------|-----------|
-| Receipt matched to transaction | **Immediate** | 0 | User just uploaded; wants confirmation |
+| Receipt/document match | **Immediate** | 0 | User just uploaded; wants confirmation |
 | New transactions synced | Batched | 10 min | Frequent; batch avoids notification fatigue |
 | Invoice paid | Batched | 10 min | Good news but not time-critical |
 | Invoice overdue | Batched | 30 min | Important; user needs awareness, not instant action |
 | Recurring invoice upcoming | Batched | 60 min | Advance notice only |
 | Weekly insights generated | Batched | N/A | Scheduled; no batching needed |
-
-**Timezone-aware scheduling**: For user-facing summaries (weekly insights, daily digests), schedule relative to the user's local time, not UTC. A "Monday morning" digest at 7am should arrive at 7am in *their* timezone:
-
-```typescript
-// Schedule insights for 7am in each user's timezone
-const userLocalHour = new Date().toLocaleString("en-US", {
-  timeZone: user.timezone,
-  hour: "numeric",
-  hour12: false,
-});
-if (parseInt(userLocalHour) === 7) {
-  await generateWeeklyInsights(user.teamId);
-}
-```
 
 Instead of 10 notifications, collect changes and send one summary:
 
@@ -319,6 +306,21 @@ export async function batchNotifyNewRecords() {
 
 // Cron: every 10 minutes
 new CronJob("*/10 * * * *", batchNotifyNewRecords).start();
+```
+
+**Timezone-aware scheduling**: For user-facing summaries (weekly insights, daily digests), schedule relative to the user's local time, not UTC. A "Monday morning" digest at 7am should arrive at 7am in *their* timezone. Run the cron job hourly and check each user's local hour:
+
+```typescript
+// Schedule insights for 7am in each user's timezone
+// Runs hourly; only triggers for users whose local time is 7am
+const userLocalHour = new Date().toLocaleString("en-US", {
+  timeZone: user.timezone,
+  hour: "numeric",
+  hour12: false,
+});
+if (parseInt(userLocalHour) === 7) {
+  await generateWeeklyInsights(user.teamId);
+}
 ```
 
 ---

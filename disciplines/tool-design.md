@@ -81,16 +81,7 @@ A tool's output should be consumable by downstream tools.
 
 **Principle**: Output is the next tool's input. Design for chaining.
 
-### 4a. Response Truncation
-
-List responses can overflow the model's context window. Every list tool should enforce a character limit and signal truncation:
-
-- Set a hard limit (e.g., 25,000 characters) on serialized response size
-- Drop items from the end until the response fits, preserving pagination metadata
-- Set a `truncated: true` flag so the agent can inform the user ("Showing first N results")
-- Include cursor/pagination info so the agent can request the next page if needed
-
-**Pattern**: Truncate at the tool layer, not the agent layer. The tool knows its data shape; the agent shouldn't have to guess what to cut.
+**Response truncation**: List responses can overflow the model's context window. Every list tool should enforce a hard character limit (e.g., 25,000 characters), drop items from the end while preserving pagination metadata, and set a `truncated: true` flag so the agent knows results were cut. Truncate at the tool layer, not the agent layer — the tool knows its data shape.
 
 ### 5. Observable Execution
 
@@ -109,7 +100,7 @@ This allows you to:
 
 ## The "Every CRUD" Philosophy
 
-Production agentic apps don't just expose a few high-level tools — they wrap *every* business operation as a tool. A financial platform with 14 transaction tools, 12 invoice tools, 13 report tools, and 12 time-tracking tools (100+ total) gives the agent comprehensive coverage of the domain.
+Production agentic apps don't just expose a few high-level tools — they wrap *every* business operation as a tool. A financial platform might have 14 transaction tools, 12 invoice tools, 13 report tools, 12 time-tracking tools, plus customer, settings, document, and search tools — easily 100+ total. This gives the agent comprehensive coverage of the domain.
 
 **Why this works**:
 - The agent becomes a universal controller, not a limited assistant
@@ -165,7 +156,8 @@ No description, no schema, no examples.
 
 ## See Also
 
-- `/references/tool-cookbook.md` — 20+ patterns for common agent tasks
-- `/references/safety.md` — Tool design for high-stakes domains (finance, healthcare)
-- `/cookbook/agent-loops.md` — How tools are orchestrated within agent loops
-- AGENTS.md specification (root) — Formal tool schema
+- `/cookbook/semantic-tool-selection` — Embedding-based filtering for large tool sets
+- `/cookbook/tool-annotations` — READ_ONLY/WRITE/DESTRUCTIVE safety annotations
+- `/cookbook/agentic-loop` — How tools are orchestrated within agent loops
+- `/tool-design/schemas` — Parameter schemas and validation patterns
+- `/tool-design/anti-patterns` — Common tool design mistakes

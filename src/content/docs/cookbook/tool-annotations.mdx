@@ -41,14 +41,14 @@ export const READ_ONLY_ANNOTATIONS = {
 export const WRITE_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
-  idempotentHint: false,
+  idempotentHint: true,
   openWorldHint: false,
 } as const;
 
 export const DESTRUCTIVE_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
-  idempotentHint: true,
+  idempotentHint: false,
   openWorldHint: false,
 } as const;
 ```
@@ -88,6 +88,8 @@ export const registerCustomerTools: RegisterTools = (server, ctx) => {
 ---
 
 ## Pattern: Tool Registry with Annotations
+
+The scope-based pattern above shows the structure. Below is the full implementation of those same tools with annotations, schemas, and handlers:
 
 ```typescript
 // mcp/tools/customers.ts
@@ -222,10 +224,12 @@ Every tool handler should be wrapped in a consistent error handler. This prevent
 
 ```typescript
 // mcp/utils.ts
-export function withErrorHandling<Args extends any[], R>(
-  handler: (...args: Args) => Promise<R>,
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+
+export function withErrorHandling<Args extends any[]>(
+  handler: (...args: Args) => Promise<CallToolResult>,
   fallbackMessage: string
-): (...args: Args) => Promise<R> {
+): (...args: Args) => Promise<CallToolResult> {
   return async (...args: Args) => {
     try {
       return await handler(...args);
@@ -236,7 +240,7 @@ export function withErrorHandling<Args extends any[], R>(
           text: error instanceof Error ? error.message : fallbackMessage,
         }],
         isError: true,
-      } as R;
+      };
     }
   };
 }
@@ -267,9 +271,11 @@ const MCP_TEXT_LIMIT = 25_000; // Characters, not tokens
 export function truncateListResponse<T>(response: PaginatedResponse<T>) {
   let text = JSON.stringify(response);
   const data = [...response.data];
+  let truncated = false;
 
   while (data.length > 1 && text.length > MCP_TEXT_LIMIT) {
     data.pop();
+    truncated = true;
     text = JSON.stringify({
       ...response,
       meta: { ...response.meta, truncated: true },
@@ -277,13 +283,17 @@ export function truncateListResponse<T>(response: PaginatedResponse<T>) {
     });
   }
 
-  return { text, structuredContent: response };
+  const result = truncated
+    ? { ...response, meta: { ...response.meta, truncated: true }, data }
+    : response;
+
+  return { text, structuredContent: result };
 }
 ```
 
-When truncated, the response includes `meta.truncated: true` — the model sees this and can tell the user "Showing first N results. Use filters or pagination for more."
+The `while` loop removes items from the end of the array until the serialized text fits within the limit (or only one item remains). When truncated, the response includes `meta.truncated: true` — the model sees this and can tell the user "Showing first N results. Use filters or pagination for more."
 
-Combine with Zod schema sanitization to strip internal fields before they reach the model:
+Combine with Zod schema sanitization to strip internal fields before they reach the model. `sanitizeArray` parses each item through a Zod schema, dropping any fields not in the schema (like `internalNotes` or `stripeCustomerId`):
 
 ```typescript
 // Strip internal fields via output schema

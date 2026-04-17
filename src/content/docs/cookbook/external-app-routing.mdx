@@ -28,7 +28,7 @@ const tools = {
   // ... 200+ more ...
 };
 
-// Cost: ~10KB of token tokens just listing tools.
+// Cost: ~10KB of tokens just listing tools.
 // Only ~5% are relevant per request.
 ```
 
@@ -244,7 +244,7 @@ that the user has connected.
 
 ## Advanced: Caching & Ranking
 
-Use tiered caching: an LRU cache for per-user tool sessions, and a short-lived cache for the external app catalog:
+Use tiered caching: an LRU cache for per-user tool availability (which apps a specific user has connected -- varies per user, evicted by least-recent-use), and a short-lived TTL cache for the external app catalog (shared metadata from the provider API -- same for all users, refreshed frequently to pick up new apps):
 
 ```typescript
 // composio/client.ts
@@ -264,7 +264,7 @@ For frequently-used actions, cache search results:
 
 ```typescript
 // mcp/tools/search-tools.ts (enhanced)
-const searchCache = new Map<string, ToolResult[]>();
+const searchCache = new Map<string, { tools: ToolResult[]; timestamp: number }>();
 
 server.registerTool("search_tools", ..., async (params) => {
   const cacheKey = `${params.query}:${ctx.userId}`;
@@ -286,7 +286,7 @@ server.registerTool("search_tools", ..., async (params) => {
 
   // Rank by frequency (user's most-used apps appear first)
   const userAppFreq = await db.getUserAppFrequency(ctx.userId);
-  const ranked = results.sort((a, b) => {
+  const ranked = [...results].sort((a, b) => {
     const aFreq = userAppFreq[a.app] || 0;
     const bFreq = userAppFreq[b.app] || 0;
     return bFreq - aFreq;

@@ -44,7 +44,7 @@ export interface NotificationContext {
   action?: string;                // Suggested action: "approve", "review", "send"
   sourcePlatform: string;         // Which platform received the notification
   sourceMessageId?: string;       // Platform message ID for threading
-  suggestedPrompts: string[];     // Follow-up suggestions shown to user
+  suggestedPrompts?: string[];    // Follow-up suggestions shown to user
 }
 
 export async function storeNotificationContext(
@@ -126,9 +126,11 @@ function formatNotificationContextForPrompt(
   context: NotificationContext | null
 ): string {
   if (!context) return "";
-  const prompts = context.suggestedPrompts.join(", ");
-  return `The user's latest notification: "${context.summary}". ` +
-    `Suggested follow-ups: ${prompts}.`;
+  let result = `The user's latest notification: "${context.summary}".`;
+  if (context.suggestedPrompts?.length) {
+    result += ` Suggested follow-ups: ${context.suggestedPrompts.join(", ")}.`;
+  }
+  return result;
 }
 ```
 
@@ -164,11 +166,13 @@ export async function notifyOrderApprovalNeeded(userId: string, orderId: string)
 
   // 1. Store context
   await storeNotificationContext(userId, {
+    eventType: "order_approval",
     type: "order",
-    entityId: orderId,
+    entityIds: [orderId],
     summary: `Order #${order.number} from ${order.customerName} needs approval`,
     timestamp: Date.now(),
     action: "approve",
+    sourcePlatform: "push",
   });
 
   // 2. Send notification
@@ -177,7 +181,7 @@ export async function notifyOrderApprovalNeeded(userId: string, orderId: string)
     body: `Order #${order.number} from ${order.customerName} awaits your approval`,
     data: {
       type: "order",
-      entityId: orderId,
+      entityIds: [orderId],
       platform: "push", // Used to route back to agent
     },
   });
@@ -188,11 +192,13 @@ export async function notifyNewInvoices(userId: string, invoiceIds: string[]) {
   const summary = invoices.map(i => `${i.customerName}: ${i.amount}`).join(", ");
 
   await storeNotificationContext(userId, {
+    eventType: "invoice_created",
     type: "invoice",
-    entityId: invoiceIds.join(","), // Multiple entities
+    entityIds: invoiceIds,
     summary: `New invoices: ${summary}`,
     timestamp: Date.now(),
     action: "send",
+    sourcePlatform: "push",
   });
 
   await sendNotification(userId, {
@@ -283,10 +289,10 @@ export async function buildSystemPromptWithNotificationContext(
 
 The user was just notified: "${notifContext.summary}"
 - Entity type: ${notifContext.type}
-- Entity ID: ${notifContext.entityId}
+- Entity IDs: ${notifContext.entityIds.join(", ")}
 - Suggested action: ${notifContext.action ?? "none"}
 
-If the user's message seems to be in response to this notification, they are referring to the above ${notifContext.type}.
+If the user's message seems to be in response to this notification, they are referring to the above ${notifContext.type}(s).
 `;
     return basePrompt + contextBlock;
   }
@@ -311,11 +317,13 @@ export async function sendWhatsAppNotification(userId: string, orderId: string) 
 
   // Store context
   await storeNotificationContext(userId, {
+    eventType: "order_approval",
     type: "order",
-    entityId: orderId,
+    entityIds: [orderId],
     summary: `Order #${order.number} from ${order.customerName} for ${order.total} needs your approval.`,
     timestamp: Date.now(),
     action: "approve",
+    sourcePlatform: "whatsapp",
   });
 
   // Send via WhatsApp
@@ -360,11 +368,13 @@ export async function sendTelegramNotification(userId: string, itemCount: number
   const items = await db.getNewItems(userId, itemCount);
 
   await storeNotificationContext(userId, {
+    eventType: "new_items",
     type: "record",
-    entityId: items.map(i => i.id).join(","),
+    entityIds: items.map(i => i.id),
     summary: `You have ${itemCount} new items to review`,
     timestamp: Date.now(),
     action: "review",
+    sourcePlatform: "telegram",
   });
 
   await telegramBot.sendMessage(userId, `
@@ -442,16 +452,22 @@ export async function cleanupOldContexts() {
 
 ```typescript
 // __tests__/notification-context.test.ts
-import { storeNotificationContext, getNotificationContext } from "@services/notification-context";
+import {
+  storeNotificationContext,
+  getNotificationContext,
+  type NotificationContext,
+} from "@services/notification-context";
 
 test("stores and retrieves notification context", async () => {
   const userId = "user-123";
-  const context = {
+  const context: NotificationContext = {
+    eventType: "order_approval",
     type: "order" as const,
-    entityId: "order-456",
+    entityIds: ["order-456"],
     summary: "Order #789 needs approval",
     timestamp: Date.now(),
     action: "approve",
+    sourcePlatform: "push",
   };
 
   await storeNotificationContext(userId, context);
@@ -478,11 +494,13 @@ test("agent uses context when replying to notification", async () => {
   const userId = "user-123";
   
   await storeNotificationContext(userId, {
+    eventType: "order_approval",
     type: "order",
-    entityId: "order-123",
+    entityIds: ["order-123"],
     summary: "Order #789 from Alice needs approval",
     timestamp: Date.now(),
     action: "approve",
+    sourcePlatform: "push",
   });
 
   const stream = await streamAssistant({
