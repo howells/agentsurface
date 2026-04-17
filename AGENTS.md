@@ -2,13 +2,13 @@
 
 ## Purpose
 
-`agent-zero` is a monorepo for auditing and improving how well a codebase works with AI agents.
+`agent-zero` is a monorepo for auditing and improving how well a codebase works with AI agents, and for scaffolding production-grade AI agent systems.
 
-The main capability in this repository is the `agentify` skill. It audits a target codebase across 11 dimensions, produces a scorecard and findings, and can execute a transformation plan through specialist sub-agents.
+The repository provides two main capabilities: `agentify` for auditing and transforming codebases for agent consumption, and `agents` for scaffolding AI agent infrastructure (agents, tools, workflows, memory, model routing).
 
 This repository also includes templates and a Next.js documentation site.
 
-## Primary Capability
+## Primary Capabilities
 
 ### `agentify`
 
@@ -26,6 +26,23 @@ Core characteristics:
 - clustered findings with concrete fixes
 - prioritized transformation planning
 - optional execution through specialist agents
+
+### `agents`
+
+Use [`./skills/agents/SKILL.md`](./skills/agents/SKILL.md) when the task is to:
+
+- scaffold a new AI agent, tool, or workflow
+- initialize Mastra agent infrastructure in a project
+- set up multi-provider model routing
+- add memory (vector search, semantic recall) to agents
+- create production-grade agent scaffolding based on proven patterns
+
+Core characteristics:
+
+- Mastra-first framework recommendation (with graceful alternatives)
+- 8 production patterns codified from deployed systems
+- project-aware scaffolding that reads existing structure
+- conversational — asks the right questions before generating code
 
 ## Specialist Agents
 
@@ -86,6 +103,7 @@ If you are an agent entering this repository cold, the usual read order is:
 ## Skills
 
 - [`agentify`](./skills/agentify/SKILL.md) - audit and transform codebases for AI agent consumption
+- [`agents`](./skills/agents/SKILL.md) - scaffold AI agent systems (agents, tools, workflows, memory, model routing)
 
 ## Cross-Runtime Compatibility
 
