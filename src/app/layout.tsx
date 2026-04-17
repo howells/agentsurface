@@ -13,7 +13,21 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <head>
+        <meta
+          name="theme-color"
+          content="#fafaf9"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#0f0f0f"
+          media="(prefers-color-scheme: dark)"
+        />
+        <link href="https://rsms.me/" rel="preconnect" />
+        <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />
+      </head>
+      <body className="flex flex-col min-h-screen">
         <RootProvider>{children}</RootProvider>
       </body>
     </html>

@@ -9,6 +9,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       nav={{
         title: "Agentify",
       }}
+      githubUrl="https://github.com/howells/agentify"
     >
       {children}
     </DocsLayout>
