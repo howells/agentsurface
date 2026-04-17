@@ -1,216 +1,166 @@
-# agentify
+# agent-zero
 
-A framework and philosophy for building production-grade agentic systems. Agentify codifies best practices from the Anthropic Claude Agent SDK, MCP 2025-11-25, and battle-tested production codebases. It's opinionated: Bun + TypeScript + Next.js + Biome, with first-class support for evaluation, retrievability, and multi-agent orchestration.
+`agent-zero` is a monorepo for auditing and improving how well software works with AI agents.
 
-## Summary
+Its main deliverable is `agentify`: a skill for scoring a codebase across 11 agent-readiness dimensions, generating findings and transformation plans, and optionally executing targeted improvements through specialist sub-agents.
 
-**agentify** is a plugin for Claude Code that helps teams:
-- **Design agent-grade tools** with clear contracts, explicit error modes, and safety constraints
-- **Evaluate agents empirically** with pass@k metrics, red-teaming, and production monitoring
-- **Build retrieval systems** that agents can trust (hybrid search, reranking, RAGAS evaluation)
-- **Orchestrate multi-agent workflows** via queues and event streams
-- **Deploy proactive agents** that monitor, batch, and notify without user input
+The repository also includes templates, command definitions, specialist agents, and a Next.js documentation site that explains the underlying patterns.
 
-**For whom**: Engineers building agentic systems in production. Not a beginner's toy; assumes familiarity with LLMs, APIs, and system design.
+## What `agentify` Does
 
-**Key offerings**:
-- 6 discipline guides (60+ pages) covering tool design, orchestration, evaluation, retrievability, proactive agents, and transferable patterns
-- 42+ templates for common agent tasks (invoice approval, transaction categorization, reconciliation, support workflows)
-- Cookbook with 10 transferable agentic patterns and real-world examples
-- House style reference based on a surveyed production codebase (Bun + Turborepo + Next.js)
-- Compatibility with AGENTS.md spec, MCP SDK, and Vercel AI SDK
+`agentify` is designed for requests such as:
 
----
+- audit this codebase for agent readiness
+- make this repo easier for AI agents to use
+- improve API, CLI, MCP, discovery, auth, testing, or retrievability surfaces
+- produce a transformation plan
+- execute the highest-impact upgrades
+
+Core outputs:
+
+- scorecard across 11 dimensions, `0-3` each, max `33`
+- clustered findings with concrete fixes
+- prioritized transformation plan
+- post-change delta scorecard
+
+The 11 dimensions are:
+
+1. API Surface
+2. CLI Design
+3. MCP Server
+4. Discovery and AEO
+5. Authentication
+6. Error Handling
+7. Tool Design
+8. Context Files
+9. Multi-Agent Support
+10. Testing
+11. Data Retrievability
+
+## Repository Contents
+
+High-signal parts of the repo:
+
+- [`skills/agentify/`](./skills/agentify/) - main skill entrypoint and scoring references
+- [`agents/`](./agents/) - specialist agent definitions used during execution
+- [`commands/`](./commands/) - slash command entrypoints such as `/agentify`
+- [`disciplines/`](./disciplines/) - longer-form guidance on agent design topics
+- [`templates/`](./templates/) - reusable templates for discovery, auth, MCP, errors, evals, and orchestration
+- [`src/app/`](./src/app/) - Next.js application for the docs site
+- [`src/content/docs/`](./src/content/docs/) - MDX documentation content served by the site
+- [`docs/`](./docs/) - working specs and internal supporting documents
 
 ## Quick Start
 
-### Installation
+Prerequisites:
 
-**Via Claude Code plugin marketplace** (recommended):
-1. Open Claude Code
-2. Settings → Plugins → Search "agentify"
-3. Install
+- Node.js 20+
+- `pnpm`
 
-**Via git**:
+Install and run the docs site:
+
 ```bash
-git clone https://github.com/anthropic-labs/agentify.git
-cd agentify && bun install
+pnpm install
+pnpm dev
 ```
 
-**Manual setup**: See `INSTALL.md` for step-by-step guidance.
+Other useful commands:
 
----
-
-## What's in This Repo
-
-| Directory | Purpose |
-|-----------|---------|
-| `/disciplines/` | 6 foundational guides: tool design, orchestration, evaluation, retrievability, proactive agents, transferable patterns |
-| `/skills/agentify/` | Plugin logic, CLI handlers, and utilities |
-| `/skills/agentify/references/` | Reference materials: tool design principles, safety, house style, observability |
-| `/templates/` | 42+ copy-paste templates for agents, tools, and workflows |
-| `/cookbook/` | Step-by-step recipes for common patterns (few-shot prompting, reflection, hierarchical decomposition, etc.) |
-| `/docs/` | Full Fumadocs site (MDX pages, searchable, auto-generated from this repo) |
-| `/packages/` | Core libraries (eval harness, tool validator, orchestration utilities) |
-
----
-
-## The 11 Dimensions of Agent Design
-
-Agentify structures agent thinking around 11 dimensions. Master these, and you can design agents for any domain:
-
-| Dimension | Description |
-|-----------|-------------|
-| **Tool Design** | Atomic, understandable, safe tools; explicit error modes and constraints |
-| **Orchestration** | Single vs. multi-agent; queues, workflows, and event streams |
-| **Evaluation** | Empirical metrics, pass@k, red-teaming, and production monitoring |
-| **Retrievability** | Hybrid search, chunking strategy, RAGAS evaluation, latency |
-| **Proactive Agents** | Event-driven scheduling, persistent state, notifications, batching |
-| **Patterns** | 10 transferable recipes (composition, reflection, decomposition, few-shot, constraints, recovery, RAG, dialogue, telemetry, confidence) |
-| **Safety & Constraints** | Guardrails, compliance, audit trails, human-in-the-loop |
-| **Observability** | Logging, tracing, metrics, dashboards |
-| **Cost Optimization** | Token budgets, caching, batch processing, model selection |
-| **Latency & Throughput** | Critical path analysis, parallelism, timeouts, degradation |
-| **User Experience** | Notifications, explanation, transparency, feedback loops |
-
----
-
-## Patterns & Cookbook
-
-The `/cookbook/` directory contains step-by-step recipes for the 10 most common agentic patterns:
-
-1. **Tool Composition**: Chain simple tools into complex workflows
-2. **Reflection & Self-Correction**: Agent reviews its own work
-3. **Hierarchical Decomposition**: Break large goals into sub-goals
-4. **Few-Shot Prompting**: Teach via examples, not descriptions
-5. **Constraint-Driven Reasoning**: Encode rules in tools, not prompts
-6. **Error Recovery Loops**: Graceful fallbacks and retries
-7. **Retrieval-Augmented Generation**: Ground reasoning in external data
-8. **Multi-Turn Dialogue**: Accumulate context across conversation turns
-9. **Agentic Loops with Telemetry**: Instrument every tool call
-10. **Staged Reasoning with Confidence**: Route decisions by confidence threshold
-
-Each recipe includes: motivation, architecture diagram, code snippets (Bun + TypeScript), eval harness, and real-world examples.
-
----
-
-## How to Use: `/agentify` Slash Command
-
-In Claude Code, invoke `/agentify` with one of these modes:
-
-### Design
+```bash
+pnpm build
+pnpm start
 ```
-/agentify design --domain "invoicing" --agents 2
-```
-Generates a multi-agent architecture for the domain, including tool specs, orchestration plan, and eval strategy.
 
-### Evaluate
-```
-/agentify evaluate --agent-file ./agents/invoice-approver.ts --eval-set ./evals/invoices.jsonl
-```
-Runs pass@k evaluation on your agent, reports metrics and failure analysis.
+Notes:
 
-### Optimize
-```
-/agentify optimize --agent-file ./agents/transaction-categorizer.ts --cost-limit 0.01
-```
-Suggests prompt rewrites, caching strategies, and model downgrades to meet cost target.
+- `postinstall` runs `fumadocs-mdx`
+- the current `package.json` does not define dedicated `test` or `lint` scripts
+- Biome configuration lives in [`biome.json`](./biome.json)
 
-### Style
-```
-/agentify style --show-config
-```
-Displays house style configuration. Run `--apply` to lint and format code per house style.
+## Using `/agentify`
 
-### Scaffold
-```
-/agentify scaffold --pattern "tool-composition" --domain "reconciliation"
-```
-Generates a starter agent with the pattern, including tests and evals.
+The command surface in this repository supports the following modes:
 
----
+- `/agentify` - full audit with scorecard and findings
+- `/agentify score` - scorecard only
+- `/agentify plan` - audit plus transformation plan
+- `/agentify transform` - audit, plan, and execution
+- `/agentify --dimension=X` - focus on a single dimension
+- `/agentify --format=json` - structured output
 
-## Project Stack
+See [`commands/agentify.md`](./commands/agentify.md) and [`skills/agentify/SKILL.md`](./skills/agentify/SKILL.md) for the operative workflow.
 
-**Runtime**: Bun 1.3+ (scripts, tests, dev server)
+## Specialist Agents
 
-**Framework**: Next.js 16 with App Router (web UI for docs site)
+`agentify` can delegate work to specialist agents in [`./agents`](./agents):
 
-**Language**: TypeScript 6.0+, strict mode
+- `context-writer`
+- `discovery-writer`
+- `error-designer`
+- `api-optimizer`
+- `cli-enhancer`
+- `auth-upgrader`
+- `mcp-builder`
+- `test-writer`
+- `retrievability-engineer`
+- `agentic-patterns-writer`
 
-**Monorepo**: Turborepo-style (apps/* for CLI/docs, packages/* for libraries)
+These agents are used to apply focused fixes after the audit identifies the highest-impact gaps.
 
-**Linter/Formatter**: Biome 2.4+ (no ESLint, no Prettier)
+## Documentation Site
 
-**Validation**: Zod 4.3+ (all APIs, tool schemas)
+The Next.js site in [`src/app`](./src/app) publishes the guidance stored in [`src/content/docs`](./src/content/docs).
 
-**LLM/AI**: Vercel AI SDK 6.0+ (model-agnostic), Anthropic SDK for native features
+Current documentation areas include:
 
-**Database**: Drizzle ORM 0.45+ (if using examples with persistence)
-
-**Observability**: OpenTelemetry GenAI semconv, Sentry (error tracking), structured logging (pino)
-
-**Testing**: Bun test + Vitest (interoperable)
-
-**Deployment**: Vercel (docs), Fly/Railway (worker agents), Cloud Run (serverless)
-
-**Docs**: Fumadocs (MDX, full-text search, dark mode)
-
----
+- API surface design
+- CLI design
+- context files
+- discovery and AEO
+- error handling
+- MCP servers
+- multi-agent patterns
+- testing
+- tool design
+- data retrievability
+- scoring and calibration
+- protocols
+- cookbook patterns
 
 ## Compatibility
 
-- **Claude Agent SDK**: ≥1.0.0
-- **Claude Code Plugin API**: Latest
-- **AGENTS.md specification**: Full compliance (see `/docs/specs/AGENTS.md`)
-- **MCP (Model Context Protocol)**: 2025-11-25 release
-- **Anthropic API**: claude-opus-4-1 and later; claude-3.5-sonnet recommended for agentic tasks
-- **OpenAI Codex / function calling**: Compatible (adapt schemas if needed)
-- **A2A (Agent-to-Agent)**: v1.0 RC compatible
-- **RFC 9457 (Problem Details for HTTP APIs)**: Error format compliant
+This repository is structured to be readable by multiple agent runtimes.
 
----
+- `AGENTS.md` provides repo-level guidance
+- `SKILL.md` provides execution instructions for `agentify`
+- Claude Code can consume the plugin and skill layout directly
+- Codex and other generic runtimes can use `AGENTS.md` plus linked skill files
 
-## Docs Site
+No standalone MCP server is bundled in this repository today. The repo mainly distributes the audit skill, related templates, and supporting documentation.
 
-Full documentation (disciplines, cookbook, templates, FAQ) is available at:
+## Current Stack
 
-```bash
-bun run dev
-# Opens http://localhost:3000
-```
+Visible in the checked-in code:
 
-Search, sidebar navigation, dark mode, and offline support included.
+- Next.js 16
+- React 19
+- TypeScript 6
+- Tailwind CSS 4
+- Fumadocs
 
----
+## Key Files
 
-## Contributing
+- [`AGENTS.md`](./AGENTS.md)
+- [`skills/agentify/SKILL.md`](./skills/agentify/SKILL.md)
+- [`commands/agentify.md`](./commands/agentify.md)
+- [`docs/arc/specs/agentify-spec.md`](./docs/arc/specs/agentify-spec.md)
+- [`INSTALL.md`](./INSTALL.md)
+- [`CHANGELOG.md`](./CHANGELOG.md)
 
-**Reporting issues**: Use GitHub issues. Include minimal reproduction and agentify version.
+## License
 
-**Adding templates**: Place new templates in `/templates/` with:
-- `agent.ts`: Annotated agent implementation
-- `tools.ts`: Tool definitions
-- `evals.jsonl`: 10+ eval cases
-- `README.md`: Purpose, usage, and customization guide
+MIT
 
-**Improving disciplines**: Edit files in `/disciplines/`. Keep summaries to 2-4 sentences, examples concise, and anti-patterns explicit.
+## Author
 
-**House style updates**: Update `/skills/agentify/references/house-style.md` based on evolving best practices.
-
----
-
-## Licence
-
-MIT. Use freely in commercial and open-source projects.
-
----
-
-## Links
-
-- [Anthropic MCP](https://modelcontextprotocol.io/)
-- [Claude Agent SDK](https://github.com/anthropic-labs/agent-sdk)
-- [AGENTS.md Specification](./AGENTS.md)
-- [A2A (Agent-to-Agent)](https://anthropic.com/docs/agents)
-- [RFC 9457 (Problem Details for HTTP APIs)](https://tools.ietf.org/html/rfc9457)
-- [Evaluating LLM-based Systems (Anthropic Blog)](https://anthropic.com)
+Daniel Howells

@@ -16,10 +16,11 @@ This installs the skill from the Claude Code plugin marketplace. The skill is th
 ### Option 2: Git Clone (Personal/Team)
 
 ```bash
-git clone https://github.com/anthropics/agent-zero ~/.claude/skills/agentify
+git clone https://github.com/anthropics/agent-zero /path/to/agent-zero
+cp -r /path/to/agent-zero/skills/agentify ~/.claude/skills/
 ```
 
-This installs to your personal skills directory. Available in all projects.
+This copies the `agentify` skill into your personal skills directory so it is available in all projects.
 
 ### Option 3: Project-Specific
 
@@ -41,7 +42,7 @@ Codex reads `AGENTS.md` at your project root. To use agentify with Codex:
 
 ### 1. Create an AGENTS.md (if you don't have one)
 
-```markdown
+~~~markdown
 # Your Project Name
 
 Describe your project here.
@@ -49,19 +50,7 @@ Describe your project here.
 ## Skills and Tools
 
 - [agentify](https://github.com/anthropics/agent-zero/blob/main/skills/agentify/SKILL.md) — Audit and transform your codebase for agent consumption
-
-## Build
-
-```bash
-pnpm install && pnpm build
-```
-
-## Test
-
-```bash
-pnpm test
-```
-```
+~~~
 
 ### 2. Point to agentify
 
@@ -105,7 +94,7 @@ For sharing via tarball or zip:
 1. **Create the package:**
    ```bash
    cd agent-zero
-   zip -r agentify-1.0.0.skill -r skills/agentify/ -x "*.git*"
+   zip -r agentify-1.0.0.skill skills/agentify/ -x "*.git*"
    ```
 
 2. **Share the .skill file** with users (e.g., via email, GitHub releases, or a package manager).
@@ -130,7 +119,7 @@ In any project, type:
 /agentify
 ```
 
-You should see the skill invoke and ask for a project path to audit.
+You should see the skill begin its audit workflow.
 
 ### For Codex
 
@@ -149,7 +138,7 @@ Codex should cite the SKILL.md content from your AGENTS.md reference.
 - Check that the skill is in the correct directory:
   - Personal: `~/.claude/skills/agentify/SKILL.md`
   - Project: `.claude/skills/agentify/SKILL.md`
-  - Plugin: `.claude-plugin/skills/agentify/SKILL.md`
+  - Marketplace installs are managed by Claude Code and may not appear as a project-local file
 
 - Restart Claude Code to reload skill directories.
 
@@ -169,4 +158,3 @@ Codex should cite the SKILL.md content from your AGENTS.md reference.
 ## Questions?
 
 See the [full agentify documentation](./skills/agentify/SKILL.md) or the project [README](https://github.com/anthropics/agent-zero).
-

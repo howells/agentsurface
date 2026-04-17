@@ -56,6 +56,8 @@ specialist-agents:
   - auth-upgrader
   - mcp-builder
   - test-writer
+  - retrievability-engineer
+  - agentic-patterns-writer
 
 # Distribution URLs (for future registry lookup)
 distribution:

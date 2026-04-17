@@ -11,7 +11,7 @@
 
 The `/agentify` skill takes any codebase and makes it maximally consumable by AI agents.
 
-Most software today is built for humans. Agents interact with it through scraping, prompt engineering, and brittle heuristics. Agentify measures how well a codebase supports agent consumption across 10 dimensions, scores each one on a 0-3 rubric, produces a detailed findings report, and can execute a transformation plan to close the gaps.
+Most software today is built for humans. Agents interact with it through scraping, prompt engineering, and brittle heuristics. Agentify measures how well a codebase supports agent consumption across 11 dimensions, scores each one on a 0-3 rubric, produces a detailed findings report, and can execute a transformation plan to close the gaps.
 
 The skill is the operational counterpart to the Agent Zero documentation site. The docs site is the textbook. The skill is the audit tool. Every finding links back to a docs page. Every transformation follows a documented pattern.
 
@@ -19,15 +19,15 @@ The skill is the operational counterpart to the Agent Zero documentation site. T
 
 1. **Measure before you fix.** The audit produces a score. The score tells you where you are. Only then do you decide what to change.
 2. **Dimension independence.** Each dimension is scored independently. A project can score 3 on API Surface and 0 on MCP Server. The skill never assumes one dimension implies another.
-3. **Incremental transformation.** You do not need to go from 0 to 30 in one pass. The transformation plan is ordered by impact-to-effort ratio. You can stop at any point and still have a better codebase.
+3. **Incremental transformation.** You do not need to go from 0 to 33 in one pass. The transformation plan is ordered by impact-to-effort ratio. You can stop at any point and still have a better codebase.
 4. **Evidence-based scoring.** Every score includes the specific files, patterns, and signals that justify it. No vibes-based assessment.
 5. **Framework agnostic.** The skill works on any codebase: Node.js, Python, Go, Rust, Ruby, Java, mixed. Dimension applicability varies, but scoring is consistent.
 
 ---
 
-## 2. The 10 Audit Dimensions
+## 2. The 11 Audit Dimensions
 
-Total score: 0-30 (each dimension scored 0-3).
+Total score: 0-33 (each dimension scored 0-3).
 
 ### Dimension 1: API Surface
 
@@ -762,7 +762,7 @@ name: agentify
 context: fork
 description: |
   Audit any codebase for AI agent consumability and transform it to be agent-first.
-  Scores 10 dimensions on a 0-3 rubric, produces a findings report, and executes
+  Scores 11 dimensions on a 0-3 rubric, produces a findings report, and executes
   a transformation plan with specialized sub-agents.
   Use when asked to "agentify this codebase", "make this agent-ready",
   "audit for agent support", "agent DX audit", or "how agent-friendly is this".

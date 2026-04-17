@@ -22,8 +22,8 @@ keywords:
   - vectors
   - rag
   - codex-compatible
-homepage: https://github.com/openai/agents.md
-repository: https://github.com/anthropics/claude-code
+homepage: https://github.com/anthropics/agent-zero
+repository: https://github.com/anthropics/agent-zero
 author: Daniel Howells
 metadata:
   agents:
@@ -35,6 +35,8 @@ metadata:
     - auth-upgrader
     - mcp-builder
     - test-writer
+    - retrievability-engineer
+    - agentic-patterns-writer
 ---
 
 # Agentify
@@ -43,18 +45,14 @@ metadata:
 
 ## Summary
 
-Agentify provides a comprehensive audit framework for assessing how well a codebase supports AI agent consumption. It evaluates 11 key dimensions from API design to data retrievability to testing, generates a scorecard rating (Human-only → Agent-first), and dispatches specialist agents to fix high-impact gaps. Use this when you need to understand agent readiness, plan modernization, or execute transformations.
+Agentify provides a comprehensive audit framework for assessing how well a codebase supports AI agent consumption. It evaluates 11 key dimensions from API design to data retrievability to testing, generates a scorecard rating, and dispatches specialist agents to fix high-impact gaps. Use this when you need to understand agent readiness, plan modernization, or execute transformations.
 
 - **11-dimension audit** with 0-3 scoring rubric per dimension
 - **Clustered findings report** organized by fix-together dependencies
 - **Transformation plan** prioritized by impact-to-effort ratio
-- **Specialist sub-agents** for targeted fixes (context, discovery, error handling, API, CLI, auth, MCP, testing)
+- **Specialist sub-agents** for targeted fixes (context, discovery, error handling, API, CLI, auth, MCP, testing, retrievability, orchestration)
 - **Delta scorecard** post-execution showing improvement across dimensions
 - **Cross-runtime compatible** — AGENTS.md + SKILL.md for Codex, Claude Code, and generic agents
-
-Audit and transform any codebase to be maximally consumable by AI agents.
-Scores across 11 dimensions (0-3 each, total 0-33), produces clustered findings,
-and optionally executes a transformation plan via specialist sub-agents.
 
 ## Compatibility
 
@@ -77,9 +75,10 @@ For Codex and non-Claude tools, reference this skill in your project's `AGENTS.m
 - Install via Claude Code: `/plugin install agentify`
 - Source: `.claude-plugin/plugin.json`
 
-**Git clone** (for personal/team use):
+**Git clone** (for personal or team use):
 ```bash
-git clone https://github.com/anthropics/agent-zero ~/.claude/skills/agentify
+git clone https://github.com/anthropics/agent-zero /path/to/agent-zero
+cp -r /path/to/agent-zero/skills/agentify ~/.claude/skills/
 ```
 
 **Project-specific** (commit to version control):
@@ -87,7 +86,7 @@ git clone https://github.com/anthropics/agent-zero ~/.claude/skills/agentify
 cp -r skills/agentify .claude/skills/
 ```
 
-See [INSTALL.md](./INSTALL.md) for detailed instructions.
+See [`../../INSTALL.md`](../../INSTALL.md) for detailed instructions.
 
 ---
 
@@ -153,6 +152,7 @@ Gather context in parallel using Glob and Grep:
    | Context Files | Always |
    | Multi-Agent | Project involves agent orchestration |
    | Testing | Always |
+   | Data Retrievability | Project exposes knowledge, documents, or searchable data |
 
 Present detected surfaces and applicable dimensions. Then proceed to Phase 1.
 
@@ -192,6 +192,13 @@ Score each applicable dimension 0-3. For each:
 The scorecard MUST be presented in EXACTLY this format.
 No variations. No prose summaries substituting for the table.
 
+Always show both:
+- a raw total: `score / max_applicable`
+- a scaled total out of `30`, used for the rating band
+
+The scaled total is:
+`round((raw_score / max_applicable) * 30)`
+
 ```
 ╔══════════════════════════════════════════════════════════════════╗
 ║                    AGENTIFY SCORECARD                          ║
@@ -209,9 +216,10 @@ No variations. No prose summaries substituting for the table.
   8. Context Files       [█░░]  1/3   Auto-generated CLAUDE.md
   9. Multi-Agent         [───]  N/A   Not an agent system
   10. Testing            [█░░]  1/3   Basic tool tests, no evals
+  11. Data Retrievability [░░░] 0/3   No semantic retrieval surface
 
 ╠══════════════════════════════════════════════════════════════════╣
-║  TOTAL: 11/27 (scaled: 12/30)                                  ║
+║  TOTAL: 11/30 (scaled: 11/30)                                  ║
 ║  RATING: Agent-tolerant                                        ║
 ║                                                                ║
 ║  ░░░░░░░░░░░░██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░     ║
@@ -234,7 +242,7 @@ Rating bands:
 | 15-22 | **Agent-ready** | Solid agent support. Few gaps remain. |
 | 23-30 | **Agent-first** | Purpose-built for agents. Best in class. |
 
-When dimensions are N/A, scale: `(score / max_applicable) * 30`.
+Always derive the rating from the scaled score, not the raw score.
 </hard_gate>
 
 If mode is `score`, STOP HERE. Present scorecard and exit.
@@ -309,8 +317,9 @@ Generate an ordered plan prioritized by impact-to-effort ratio.
 | 6 | Authentication (OAuth 2.1 M2M) | Medium | Removes blockers |
 | 7 | MCP server | Higher | Transformative |
 | 8 | Structured data (JSON-LD) | Medium | AEO |
-| 9 | Testing (eval suite) | Higher | Long-term |
-| 10 | Multi-agent patterns | Highest | Advanced |
+| 9 | Data retrievability (indexing, hybrid search) | Higher | High leverage |
+| 10 | Testing (eval suite) | Higher | Long-term |
+| 11 | Multi-agent patterns | Highest | Advanced |
 
 ### Task Format
 
@@ -347,6 +356,8 @@ Present the plan summary and ask: "Ready to execute? I'll start with [cluster na
 | `auth-upgrader` | OAuth 2.1 Client Credentials | Sonnet |
 | `mcp-builder` | MCP server creation/enhancement | Sonnet |
 | `test-writer` | Agent evaluation suite | Sonnet |
+| `retrievability-engineer` | Retrieval, indexing, and search surfaces | Sonnet |
+| `agentic-patterns-writer` | Multi-agent and orchestration patterns | Sonnet |
 
 ### Agent Dispatch
 
@@ -414,6 +425,7 @@ Load dimension-specific references ONLY when auditing that dimension:
 - `references/context-files.md`
 - `references/multi-agent.md`
 - `references/testing.md`
+- `references/data-retrievability.md`
 </required_reading>
 
 ---

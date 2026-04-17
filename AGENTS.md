@@ -1,133 +1,141 @@
 # agent-zero
 
-## Summary
+## Purpose
 
-A monorepo suite for auditing and transforming any codebase to be maximally consumable by AI agents. Core skill is `agentify`: 11-dimension scoring framework (0–33 points), produces clustered findings and transformation plans, dispatches specialist sub-agents for execution. Includes templates for AGENTS.md, CLAUDE.md, discovery files, and agent context. Cross-compatible with Claude Code, Claude Agent SDK, OpenAI Codex CLI, and generic runtimes via AGENTS.md spec and MCP standards.
+`agent-zero` is a monorepo for auditing and improving how well a codebase works with AI agents.
 
-- **agentify skill**: Audit, score, find gaps, plan, execute transformations
-- **Specialist agents**: context-writer, discovery-writer, api-optimizer, cli-enhancer, auth-upgrader, mcp-builder, test-writer
-- **11 dimensions**: API Surface, CLI, MCP, Discovery, Auth, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, Data Retrievability
-- **Output**: scorecard (JSON), findings report (clustered), transformation plan, delta scorecard post-execution
+The main capability in this repository is the `agentify` skill. It audits a target codebase across 11 dimensions, produces a scorecard and findings, and can execute a transformation plan through specialist sub-agents.
 
----
+This repository also includes supporting agents, commands, templates, and a Next.js documentation site.
 
-**A suite of agentic AI tools and frameworks for auditing, transforming, and optimizing codebases for AI agent consumption.** Includes specialist agents for discovery, API design, CLI hardening, MCP servers, authentication, error handling, and testing. Cross-compatible with Claude Code, Claude Agent SDK, OpenAI Codex CLI, and generic agent runtimes via AGENTS.md and MCP standards.
+## Primary Capability
 
-## What This Repository Contains
+### `agentify`
 
-This is a monorepo containing:
-- **Skills** (`./skills/`) — Claude Code skills for agent-driven workflows
-  - `agentify` — Core audit and transformation skill
-- **Agents** (`./agents/`) — Specialist sub-agents (context-writer, api-optimizer, mcp-builder, etc.)
-- **Commands** (`./commands/`) — Slash commands for quick invocation
-- **Disciplines** (`./disciplines/`) — Agent personas and execution contexts
-- **Templates** (`./templates/`) — AGENTS.md, CLAUDE.md, and discovery file templates
-- **Docs** (`./docs/`) — Architecture, audit reports, and reference guides
-- **Source** (`./src/`) — TypeScript utilities and helpers (Next.js documentation site)
+Use [`./skills/agentify/SKILL.md`](./skills/agentify/SKILL.md) when the task is to:
 
-## Repository Structure
+- audit agent readiness
+- score a codebase across agent-consumption dimensions
+- identify gaps in API, CLI, MCP, discovery, auth, testing, or retrievability
+- generate a transformation plan
+- execute targeted upgrades with specialist agents
 
-```
-agent-zero/
-├── AGENTS.md                    # This file: project guidance for AI agents
-├── package.json                 # Build, dev, and dependencies
-├── .claude-plugin/plugin.json   # Claude Code plugin metadata
-├── .skill.yaml                  # Skill distribution manifest
-├── INSTALL.md                   # Distribution and installation guide
-├── skills/
-│   └── agentify/
-│       ├── SKILL.md             # Main skill (entry point)
-│       ├── INSTALL.md           # Installation instructions
-│       └── references/          # Dimension-specific rubrics
-├── agents/                      # Specialist agent definitions
-├── commands/                    # Slash command definitions
-├── disciplines/                 # Agent execution personas
-├── templates/                   # Reference templates
-├── docs/                        # Audit reports and guides
-├── src/                         # Next.js site source
-└── .source/                     # Documentation generation config
-```
+Core characteristics:
 
-## Build and Development
+- 11 scored dimensions, `0-3` each, for a maximum of `33`
+- clustered findings with concrete fixes
+- prioritized transformation planning
+- optional execution through specialist agents
+- cross-runtime positioning via `AGENTS.md`, `SKILL.md`, and MCP-aligned patterns
 
-**Prerequisites:** Node.js 20+, pnpm
+## Specialist Agents
+
+When `agentify` enters execution mode, it can delegate to specialist agents in [`./agents`](./agents):
+
+- `context-writer` - context files such as `AGENTS.md`, `CLAUDE.md`, and editor rules
+- `discovery-writer` - `llms.txt`, `robots.txt`, JSON-LD, and related discovery assets
+- `error-designer` - structured error formats and recovery guidance
+- `api-optimizer` - agent-oriented API descriptions and related improvements
+- `cli-enhancer` - JSON output, exit codes, and CLI ergonomics for agents
+- `auth-upgrader` - machine-to-machine auth and token flow improvements
+- `mcp-builder` - MCP server and tool surface creation
+- `test-writer` - evaluation harnesses and test coverage for agent workflows
+- `retrievability-engineer` - retrieval and indexing improvements
+- `agentic-patterns-writer` - reusable orchestration and agent-pattern guidance
+
+## Repository Layout
+
+High-signal directories:
+
+- [`./skills/agentify`](./skills/agentify) - the main skill and scoring references
+- [`./agents`](./agents) - specialist agent definitions used during transformation
+- [`./commands`](./commands) - slash-command entrypoints such as `/agentify`
+- [`./disciplines`](./disciplines) - longer-form reference material on agent design
+- [`./templates`](./templates) - copyable templates for discovery, MCP, auth, errors, evals, and orchestration
+- [`./src/app`](./src/app) - Next.js application for the docs site
+- [`./src/content/docs`](./src/content/docs) - published documentation content in MDX
+- [`./docs`](./docs) - working docs and internal specs
+- [`./.claude-plugin/plugin.json`](./.claude-plugin/plugin.json) - Claude Code plugin metadata
+- [`./.skill.yaml`](./.skill.yaml) - skill distribution manifest
+
+## Development
+
+### Prerequisites
+
+- Node.js 20+
+- `pnpm`
+
+### Common Commands
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Start dev server (Next.js docs site)
 pnpm dev
-
-# Build static site
 pnpm build
-
-# Run in production
 pnpm start
 ```
 
-Lint and format tools are configured in `biome.json` for TypeScript/JSX.
+Notes:
 
-## Key Skills and Agents
+- `postinstall` runs `fumadocs-mdx`
+- the current `package.json` defines `dev`, `build`, and `start`
+- there is no dedicated `test` or `lint` script in `package.json` at the time of writing
+- formatting and linting configuration lives in [`./biome.json`](./biome.json)
 
-### agentify Skill
-The core audit and transformation skill. Evaluates any codebase across 11 dimensions:
-1. API Surface
-2. CLI Design
-3. MCP Server
-4. Discovery & AEO
-5. Authentication
-6. Error Handling
-7. Tool Design
-8. Context Files
-9. Multi-Agent
-10. Testing
-11. Data Retrievability
+## How To Navigate This Repo
 
-**Invocation:**
-- `/agentify` — Full audit with findings
-- `/agentify score` — Quick scorecard only
-- `/agentify plan` — Audit + transformation plan
-- `/agentify transform` — Audit + plan + execute
+If you are an agent entering this repository cold, the usual read order is:
 
-See [./skills/agentify/SKILL.md](./skills/agentify/SKILL.md) for complete documentation.
+1. Read this file for the repo overview and working constraints.
+2. Read [`./skills/agentify/SKILL.md`](./skills/agentify/SKILL.md) for the operative workflow.
+3. Read the relevant reference files under [`./skills/agentify/references`](./skills/agentify/references) for scoring details.
+4. Read [`./commands/agentify.md`](./commands/agentify.md) if you need the slash-command surface.
+5. Read the matching files in [`./agents`](./agents), [`./templates`](./templates), or [`./src/content/docs`](./src/content/docs) depending on the task.
 
-### Specialist Agents
-When executing transformations (Phase 4), agentify dispatches specialist agents:
-- `context-writer` — AGENTS.md, CLAUDE.md, .cursor/rules
-- `discovery-writer` — llms.txt, robots.txt, JSON-LD
-- `error-designer` — RFC 7807 structured errors
-- `api-optimizer` — OpenAPI descriptions
-- `cli-enhancer` — --json output, exit codes
-- `auth-upgrader` — OAuth 2.1 Client Credentials
-- `mcp-builder` — MCP server creation
-- `test-writer` — Agent evaluation suites
+## Skills Available To Agents
 
-## For Codex and Generic Agents
+- [`agentify`](./skills/agentify/SKILL.md) - audit and transform codebases for AI agent consumption
 
-This repository follows the [Linux Foundation AGENTS.md spec](https://github.com/openai/agents.md) for cross-runtime compatibility.
+## Compatibility Notes
 
-**OpenAI Codex CLI** reads this file automatically. Codex will:
-- Discover the `agentify` skill via the relative link below
-- Use the repo layout, build commands, and agent list to optimize its context
-- Apply MCP server configuration if present
+This repository is intended to be understandable by multiple agent runtimes.
 
-**Other agent runtimes** (Cursor, Devin, Jules, etc.) similarly respect the AGENTS.md convention.
+- `AGENTS.md` provides root-level project guidance
+- `SKILL.md` provides operational instructions for the `agentify` skill
+- Claude Code can consume the plugin and skill layout directly
+- Codex and other generic runtimes can follow the `AGENTS.md` entrypoint and linked skill files
 
-### Skills Available to Agents
+## MCP Status
 
-- **[agentify](./skills/agentify/SKILL.md)** — Audit and transform codebases for agent consumption (11-dimension scoring, findings, plan, execute)
+No standalone MCP server is bundled in this repository today.
 
-### MCP Servers
+`agentify` may recommend or generate MCP surfaces for other codebases, but this repo itself is primarily a skill, template, and documentation distribution repo.
 
-No MCP servers are bundled in this repo. Agentify uses Claude's native Agent tool for specialist dispatching.
+## Dependencies And Stack
 
-## Dependencies
+Current stack visible in the repository:
 
-- **Claude Code** — Required for skill execution (not required to use AGENTS.md spec)
-- **Next.js 16** — For documentation site
-- **TypeScript 6** — For development
-- **Tailwind CSS 4.2** — For styling
+- Next.js 16
+- React 19
+- TypeScript 6
+- Tailwind CSS 4
+- Fumadocs for the documentation site
+
+## Boundaries
+
+When working in this repo:
+
+- prefer updating source documentation rather than duplicating the same explanation across multiple files
+- keep repository descriptions aligned with the actual checked-in structure
+- do not claim scripts, servers, or integrations exist unless they are present in code or configuration
+- treat `AGENTS.md` as an operational document first and a marketing document second
+
+## Key References
+
+- [`./skills/agentify/SKILL.md`](./skills/agentify/SKILL.md)
+- [`./commands/agentify.md`](./commands/agentify.md)
+- [`./docs/arc/specs/agentify-spec.md`](./docs/arc/specs/agentify-spec.md)
+- [`./README.md`](./README.md)
+- [`./INSTALL.md`](./INSTALL.md)
 
 ## License
 
@@ -136,16 +144,3 @@ MIT
 ## Contact
 
 Author: Daniel Howells
-
----
-
-## For Codex-Specific Notes
-
-Codex CLI supports this repository as of April 2026:
-- Reads this AGENTS.md for project guidance
-- Respects `skills/` directory layout for Claude Code interop
-- Honors `package.json` scripts for build/test/lint
-- Can invoke the `agentify` skill via agent-to-agent delegation if Claude Code is available, or via a local MCP bridge (future feature)
-
-For Codex to use agentify, ensure `agentify` skill is installed in Claude Code first, then reference it from your project's own AGENTS.md.
-
