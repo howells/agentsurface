@@ -1,0 +1,430 @@
+---
+title: Arazzo Multi-Step Workflows
+description: Using the OpenAPI Arazzo specification to define multi-step agent workflows with explicit sequencing, control flow, and runtime expressions
+---
+
+## Summary
+
+Arazzo defines multi-step workflows as executable specifications, preventing agents from inventing their own order. A workflow document declares the sequence of operations, runtime expressions for data flow between steps, and success/failure handlers. This ensures deterministic behavior and prevents hallucinated steps or omitted operations in complex tasks like flight booking or payment processing.
+
+- Arazzo references one or many OpenAPI specs and maps them into workflows
+- Each step binds to an operationId and passes data between steps via runtime expressions
+- Control flow primitives: continue, retry, goto recovery step, end
+- Prevents agent improvisation when sequencing matters
+- Explicit parameter and input component definitions reduce hallucination
+
+Agents improvise. Without explicit workflow definitions, an agent that needs to book a flight will invent its own sequence — searching for flights, selecting one, entering passenger details, processing payment — based on what seems reasonable. It will get the order wrong, skip steps, or hallucinate operations that do not exist.
+
+Arazzo solves this by letting you define the sequence explicitly, in a machine-readable format that agent frameworks can execute directly.
+
+## What Arazzo Is
+
+Arazzo is a specification from the OpenAPI Initiative that describes multi-step API interaction sequences as executable workflows. It is a companion to OpenAPI 3.x: where OpenAPI describes individual operations, Arazzo describes how those operations compose into business workflows.
+
+A workflow definition includes:
+
+- Which OpenAPI specs it references (one or many)
+- The ordered steps in the workflow, each mapped to an `operationId`
+- Runtime expressions for passing data between steps
+- Success and failure actions (continue, retry, goto a recovery step, end)
+- Reusable parameter and input components
+
+## Core Structure
+
+An Arazzo document has three top-level fields: `arazzo`, `info`, and the core content split between `sourceDescriptions`, `workflows`, and `components`.
+
+```yaml
+arazzo: "1.0.0"
+info:
+  title: Flight Booking Workflows
+  version: "1.0.0"
+  description: Multi-step workflows for booking and managing flights
+
+sourceDescriptions:
+  - name: flights-api
+    url: https://api.example.com/openapi.yaml
+    type: openapi
+  - name: payments-api
+    url: https://payments.example.com/openapi.yaml
+    type: openapi
+
+workflows:
+  - workflowId: book-flight
+    summary: Complete flight booking from search to confirmation
+    description: >
+      Searches for available flights, selects a seat, collects passenger
+      details, processes payment, and returns a booking confirmation.
+      Use this workflow when a user wants to book a new flight end-to-end.
+    inputs:
+      type: object
+      required: [origin, destination, departure_date, passenger]
+      properties:
+        origin:
+          type: string
+          description: IATA airport code for the departure airport
+        destination:
+          type: string
+          description: IATA airport code for the destination airport
+        departure_date:
+          type: string
+          format: date
+        passenger:
+          $ref: '#/components/inputs/PassengerDetails'
+    steps:
+      - stepId: search-flights
+        operationId: $sourceDescriptions.flights-api#search_flights
+        parameters:
+          - name: origin
+            in: query
+            value: $inputs.origin
+          - name: destination
+            in: query
+            value: $inputs.destination
+          - name: date
+            in: query
+            value: $inputs.departure_date
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/flights/length > 0
+            context: $response.body
+            type: jsonpath
+        onSuccess:
+          - name: proceed-to-select
+            type: goto
+            stepId: select-flight
+        onFailure:
+          - name: no-flights-found
+            type: end
+
+      - stepId: select-flight
+        operationId: $sourceDescriptions.flights-api#hold_flight
+        requestBody:
+          contentType: application/json
+          payload:
+            flight_id: $steps.search-flights.outputs.flights[0].id
+            passenger_count: 1
+        successCriteria:
+          - condition: $statusCode == 200
+        onSuccess:
+          - name: proceed-to-payment
+            type: goto
+            stepId: process-payment
+
+      - stepId: process-payment
+        operationId: $sourceDescriptions.payments-api#charge_card
+        requestBody:
+          contentType: application/json
+          payload:
+            amount: $steps.select-flight.outputs.total_price
+            currency: $steps.select-flight.outputs.currency
+            description: "Flight booking"
+        successCriteria:
+          - condition: $statusCode == 200
+        onSuccess:
+          - name: confirm-booking
+            type: goto
+            stepId: confirm-booking
+        onFailure:
+          - name: payment-failed
+            type: goto
+            stepId: release-hold
+
+      - stepId: confirm-booking
+        operationId: $sourceDescriptions.flights-api#confirm_flight_booking
+        requestBody:
+          contentType: application/json
+          payload:
+            hold_id: $steps.select-flight.outputs.hold_id
+            payment_id: $steps.process-payment.outputs.payment_id
+            passenger: $inputs.passenger
+        successCriteria:
+          - condition: $statusCode == 201
+        onSuccess:
+          - name: booking-complete
+            type: end
+        outputs:
+          confirmation_number: $response.body#/confirmation_number
+          booking_id: $response.body#/id
+
+      - stepId: release-hold
+        operationId: $sourceDescriptions.flights-api#cancel_flight_hold
+        parameters:
+          - name: hold_id
+            in: path
+            value: $steps.select-flight.outputs.hold_id
+        onSuccess:
+          - name: payment-failed-end
+            type: end
+
+components:
+  inputs:
+    PassengerDetails:
+      type: object
+      required: [first_name, last_name, email]
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        date_of_birth:
+          type: string
+          format: date
+```
+
+## Runtime Expressions
+
+Runtime expressions are how Arazzo passes data between steps. They use a `$`-prefixed path syntax that resolves at execution time.
+
+| Expression | Resolves To |
+|------------|-------------|
+| `$inputs.field_name` | A workflow input field |
+| `$steps.stepId.outputs.field` | An output field from a named step |
+| `$steps.stepId.request.body#/path` | A field from the request body of a named step |
+| `$response.body#/json/pointer` | A JSON Pointer into the current step's response body |
+| `$response.body#/field` | Shorthand JSON Pointer for top-level response fields |
+| `$statusCode` | The HTTP status code of the current step's response |
+| `$request.header.name` | A header from the current step's request |
+| `$response.header.name` | A header from the current step's response |
+
+### Output Extraction
+
+Steps can explicitly declare their outputs to make downstream references cleaner:
+
+```yaml
+steps:
+  - stepId: create-order
+    operationId: create_order
+    requestBody:
+      contentType: application/json
+      payload:
+        product_id: $inputs.product_id
+        quantity: $inputs.quantity
+    outputs:
+      order_id: $response.body#/id
+      total: $response.body#/total_price
+      status: $response.body#/status
+```
+
+Downstream steps then reference `$steps.create-order.outputs.order_id` rather than navigating the raw response body repeatedly.
+
+## Control Flow
+
+### Success Actions
+
+After a step succeeds (status code matches `successCriteria`), you can:
+
+- `end` — terminate the workflow, returning any declared outputs
+- `goto` — jump to another step by `stepId`
+
+```yaml
+onSuccess:
+  - name: order-created
+    type: goto
+    stepId: send-confirmation-email
+  # or:
+  - name: workflow-complete
+    type: end
+```
+
+### Failure Actions
+
+After a step fails, you can:
+
+- `end` — terminate the workflow with failure
+- `goto` — jump to a recovery or cleanup step
+- `retry` — retry the current step, optionally with a delay and max attempt count
+
+```yaml
+onFailure:
+  - name: retry-on-timeout
+    type: retry
+    retryAfter: 2      # seconds
+    retryLimit: 3
+    criteria:
+      - condition: $statusCode == 503
+  - name: goto-cleanup
+    type: goto
+    stepId: rollback-transaction
+    criteria:
+      - condition: $statusCode >= 500
+  - name: fail-fast
+    type: end
+    criteria:
+      - condition: $statusCode == 403
+```
+
+### Success Criteria
+
+`successCriteria` defines what constitutes a successful step. Default is `$statusCode == 200`. You can add additional conditions:
+
+```yaml
+successCriteria:
+  - condition: $statusCode == 200
+  - condition: $response.body#/status == 'confirmed'
+  - condition: $response.body#/items/length > 0
+    context: $response.body
+    type: jsonpath
+```
+
+## Multi-Document Support
+
+Arazzo workflows can orchestrate across multiple OpenAPI specs by listing each spec in `sourceDescriptions`:
+
+```yaml
+sourceDescriptions:
+  - name: inventory-api
+    url: https://inventory.example.com/openapi.yaml
+    type: openapi
+  - name: billing-api
+    url: https://billing.example.com/openapi.yaml
+    type: openapi
+  - name: notification-api
+    url: https://notifications.example.com/openapi.yaml
+    type: openapi
+```
+
+Step `operationId` references are then prefixed with the source description name:
+
+```yaml
+steps:
+  - stepId: check-stock
+    operationId: $sourceDescriptions.inventory-api#check_inventory
+  - stepId: create-invoice
+    operationId: $sourceDescriptions.billing-api#create_invoice
+  - stepId: notify-customer
+    operationId: $sourceDescriptions.notification-api#send_email
+```
+
+This enables workflows that span service boundaries within a single definition, rather than requiring each service to implement cross-service coordination logic.
+
+## Reusable Components
+
+Repeat parameters and input schemas can be extracted into `components` for reuse across workflows:
+
+```yaml
+components:
+  parameters:
+    PaginationParameters:
+      - name: page
+        in: query
+        value: $inputs.page
+      - name: limit
+        in: query
+        value: $inputs.limit
+
+  inputs:
+    DateRangeInput:
+      type: object
+      required: [start_date, end_date]
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+```
+
+Reference them in workflows:
+
+```yaml
+steps:
+  - stepId: list-transactions
+    operationId: list_transactions
+    parameters:
+      $ref: '#/components/parameters/PaginationParameters'
+```
+
+## How Arazzo Complements MCP
+
+MCP tools expose individual operations. Arazzo describes how those operations combine into business workflows. They are complementary layers:
+
+| Layer | Tool | Scope |
+|-------|------|-------|
+| Individual operations | MCP tools | Single API call |
+| Business workflows | Arazzo | Multi-step sequences with control flow |
+| Orchestration | Agent | High-level task completion |
+
+When you generate MCP tools from an API, generate tools for both individual endpoints and Arazzo workflows. An agent exposed to a `book_flight` workflow tool can invoke the complete booking sequence as a single atomic operation, rather than being responsible for sequencing search → hold → pay → confirm itself.
+
+```json
+// MCP tool generated from an Arazzo workflow
+{
+  "name": "book_flight",
+  "description": "Books a flight end-to-end: searches availability, holds a seat, processes payment, and returns a confirmation number. Use when a user wants to complete a full flight booking. Requires origin, destination, departure date, and passenger details.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["origin", "destination", "departure_date", "passenger"],
+    "properties": {
+      "origin": { "type": "string", "description": "IATA code for departure airport" },
+      "destination": { "type": "string", "description": "IATA code for destination airport" },
+      "departure_date": { "type": "string", "format": "date" },
+      "passenger": {
+        "type": "object",
+        "required": ["first_name", "last_name", "email"],
+        "properties": {
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        }
+      }
+    }
+  }
+}
+```
+
+## The Problem Without Arazzo
+
+Without workflow definitions, agents that need to execute multi-step processes will:
+
+1. **Improvise the sequence** — agents infer order from semantics, getting it wrong when operations have non-obvious dependencies
+2. **Hallucinate intermediate steps** — if no "hold flight" operation exists in their tool set, an agent may skip it and try to go straight to payment
+3. **Fail silently at decision points** — without defined failure actions, agents have no instructions for what to do when payment fails and a hold needs to be released
+4. **Lose context across steps** — without explicit output extraction, agents may fail to thread the right IDs from step to step
+
+Arazzo makes the sequence explicit, the data dependencies traceable, and the failure paths defined.
+
+<Callout type="warn">
+Agents improvising multi-step workflows is one of the most common failure modes in production agent systems. If your API requires more than one operation to complete a user-facing action, define an Arazzo workflow for it.
+</Callout>
+
+## Practical Integration
+
+### Generate MCP Tools from Arazzo
+
+When you have an Arazzo spec alongside your OpenAPI spec, generate MCP tools from both:
+
+- **Individual operation tools** — one tool per `operationId` for fine-grained access
+- **Workflow tools** — one tool per Arazzo `workflowId` for composite operations
+
+The workflow tool's description comes from the Arazzo `workflow.description` field; write it as an agent trigger condition (see [Tool Definitions](./tool-definitions)).
+
+### Validation
+
+Validate Arazzo documents with the `@openapi-contrib/arazzo-parser` package or the Arazzo CLI before generating tools:
+
+```bash
+npx arazzo-validator validate booking-workflows.arazzo.yaml
+```
+
+### Version Alongside OpenAPI
+
+Keep your Arazzo spec in the same repository as your OpenAPI spec and version them together. When you change an `operationId` in your OpenAPI spec, update all Arazzo references to that operation at the same time.
+
+## Checklist
+
+- [ ] Each multi-step user-facing action has a corresponding Arazzo workflow
+- [ ] All `operationId` references in workflows match actual `operationId` values in the referenced OpenAPI specs
+- [ ] Every step has defined `onFailure` actions for non-200 responses
+- [ ] Runtime expression paths have been tested against actual response bodies
+- [ ] Workflow descriptions are written as agent trigger conditions
+- [ ] Composite MCP tools are generated from workflow definitions
+
+## Related Pages
+
+- [OpenAPI for Agents](./openapi-for-agents) — writing the OpenAPI spec that Arazzo workflows reference
+- [Tool Definitions](./tool-definitions) — generating MCP tools from Arazzo workflow definitions
+- [Protocols & Standards](/docs/protocols) — Arazzo in the broader protocol landscape

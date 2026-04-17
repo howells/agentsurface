@@ -1,0 +1,73 @@
+---
+title: Introduction
+description: What is Agentify and why does it exist
+---
+
+## Summary
+
+Agentify is the comprehensive reference for making any codebase, API, or CLI optimally consumable by AI agents. Provides an 11-dimension scoring framework (0–3 per dimension, max 33 points) to evaluate agent-readiness, produces clustered findings, and enables systematic modernization via specialist agents. Use this when you need to understand or improve how AI agents consume your API, CLI, or codebase.
+
+- API Surface & OpenAPI quality
+- CLI Design with JSON output
+- MCP Servers & tool definitions
+- Discovery & agent endpoints (llms.txt, AGENTS.md)
+- Authentication (OAuth 2.1, API keys)
+- Error Handling (RFC 9457)
+- Tool Design & schema quality
+- Context Files (AGENTS.md, CLAUDE.md)
+- Multi-Agent Orchestration
+- Testing & Agent Evaluation
+- Data Retrievability & RAG
+
+---
+
+Agentify is the comprehensive reference for making any codebase, API, or CLI optimally consumable by AI agents.
+
+## The Problem
+
+Traditional software is built for humans. APIs have documentation sites with marketing copy. CLIs have `--help` text designed for human readers. Error messages assume a person will read them and figure out what to do.
+
+AI agents are different. They cannot ask clarifying questions. They cannot infer context from visual cues. They cannot "just figure it out." Everything that made APIs good for developers — specificity, consistent semantics, helpful errors — matters *exponentially more* when the consumer cannot compensate for ambiguity.
+
+## The Solution
+
+Agentify provides a systematic framework for evaluating and transforming any codebase across eleven dimensions of agent-readiness:
+
+1. **API Surface** — OpenAPI specs, tool definitions, schema design
+2. **CLI Design** — Structured output, schema introspection, input hardening
+3. **MCP Servers** — Model Context Protocol server implementation
+4. **Discovery & AEO** — llms.txt, AGENTS.md, structured data, content negotiation
+5. **Authentication** — OAuth 2.1, API keys, agent identity
+6. **Error Handling** — Structured errors, recovery hints, retry guidance
+7. **Tool Design** — Naming, descriptions, schemas, idempotency, cross-framework portability
+8. **Context Files** — AGENTS.md, CLAUDE.md, cursor rules, permission boundaries
+9. **Data Retrievability** — Vector embeddings, hybrid search, reranking, knowledge graphs, agentic RAG
+10. **Multi-Agent & Orchestration** — Agent delegation, supervisor patterns, state coordination
+11. **Testing & Evaluation** — Agent evaluation, tool routing accuracy, pass@k metrics
+
+## Patterns & Cookbook
+
+Beyond the 11 dimensions, the **[Agentic Patterns Cookbook](/docs/cookbook)** distills 10 battle-tested patterns from production agentic SaaS:
+
+1. Agentic Loop as Commodity
+2. Every CRUD as Tool + Annotations
+3. Semantic Tool Selection at Scale
+4. System Prompt as Configuration
+5. Platform-Agnostic Core + Adapters
+6. Notification-to-Conversation Continuity
+7. Two-Step Confirmation for Writes
+8. MCP as External API
+9. External-App Routing via Meta-Tools
+10. Autonomous Background Agents
+
+These patterns are extracted from a real-world production application and are immediately applicable to SaaS agents, multi-platform bots, and orchestration systems.
+
+## How to Use This Reference
+
+Browse the sidebar to explore each dimension. Each section includes:
+- **Principles** — why this dimension matters for agents
+- **Patterns** — concrete implementation patterns with code examples
+- **Scoring** — how to evaluate your codebase on this dimension
+- **Checklists** — actionable items to improve agent-readiness
+
+Then explore the **[Patterns & Cookbook](/docs/cookbook)** for transferable, production-ready patterns.

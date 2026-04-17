@@ -1,0 +1,330 @@
+---
+title: Agent-to-Agent Protocol (A2A)
+description: Vendor-neutral protocol for task delegation between AI agents across organizational boundaries
+---
+
+## Summary
+
+A2A is horizontal (agent-to-agent) vs. MCP which is vertical (agent-to-tools). One agent discovers a peer's capabilities via AgentCard at `/.well-known/agent.json`, hands off a task with context, and receives results asynchronously. Works across organizational boundaries without pre-shared secrets. Spec: v1.0 RC (March 2026), governed by Linux Foundation AAIF.
+
+```
+Orchestrator        Specialist
+   (Agent A)        (Agent B)
+     ├─ GET /.well-known/agent.json
+     │  (discover capabilities)
+     ├─ POST /tasks (hand off task)
+     └─ Poll or callback for result
+```
+
+- AgentCard: client publishes identity, public JWKS, capabilities at well-known location
+- Task-based: async, long-lived, with streaming/callback progress
+- OAuth 2.1 + DPoP for authentication between agents
+- Works across org boundaries, different infrastructure
+- v1.0 RC: fully stabilized, production-ready
+
+A2A solves a different problem than MCP. Where MCP connects an agent to tools and data sources, A2A connects agents to other agents. It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back — across organizational and deployment boundaries.
+
+## Origin and Governance
+
+Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. In June 2025, governance transferred to the Linux Foundation's AI & Data Foundation (AAIF) alongside MCP, making A2A a vendor-neutral standard. The v1.0 RC (Release Candidate) specification was finalized in March 2026. Major backers include AWS, Cisco, Google, IBM, Microsoft, Salesforce, SAP, and ServiceNow.
+
+## Purpose
+
+In a multi-agent system, not every agent can or should do everything. A travel booking agent does not need to understand flight pricing algorithms — it needs to hand that task to a specialist flight agent. A customer support orchestrator should not contain HR policy logic — it should delegate HR questions to an HR specialist agent.
+
+A2A defines how that delegation works in practice:
+- How the orchestrator discovers that a specialist exists and what it handles
+- How to hand off the task with sufficient context
+- How to receive results, ask clarifying questions, and complete the workflow
+
+The key design constraint is that A2A works across organizational boundaries. The orchestrating agent and the specialist may be deployed by different organizations, with different authentication systems, running on different infrastructure.
+
+## Relationship to MCP
+
+MCP is vertical: an agent connects downward to tools and data sources.
+A2A is horizontal: an agent connects across to peer agents.
+
+```
+                    ┌─────────────────────┐
+                    │  Orchestrator Agent  │
+                    └────────┬────────────┘
+                             │
+              A2A (horizontal delegation)
+           ┌─────────────────┴──────────────────┐
+           │                                    │
+  ┌────────▼────────┐                  ┌────────▼────────┐
+  │  Flight Agent   │                  │  Hotel Agent    │
+  └────────┬────────┘                  └────────┬────────┘
+           │                                    │
+     MCP (vertical)                       MCP (vertical)
+  ┌────────▼────────┐                  ┌────────▼────────┐
+  │  Flight APIs    │                  │  Hotel APIs     │
+  │  Pricing DB     │                  │  Availability   │
+  └─────────────────┘                  └─────────────────┘
+```
+
+In most production systems, both protocols are present: agents use MCP to access their own tools and A2A to delegate tasks to peer agents.
+
+## Task Lifecycle
+
+### Discovery
+
+Before an agent can delegate a task, it must find an agent that can handle it and verify its capabilities. A2A uses AgentCard for discovery — a JSON document published at a well-known URL on the target agent's domain.
+
+The canonical location is:
+
+```
+GET /.well-known/agent.json
+```
+
+For backward compatibility, `.well-known/agent-card.json` is accepted as a fallback.
+
+A client agent fetches this document to learn:
+- What tasks the agent handles
+- What authentication it requires
+- What endpoints to call
+- What input and output formats it supports
+
+### Phase 2: Authorization
+
+Once the client has read the Agent Card and confirmed the specialist can handle the task, it establishes authorization. A2A uses standard OAuth 2.1 — the client obtains a token scoped to the specific agent, using the authorization details declared in the Agent Card.
+
+### Phase 3: Communication
+
+With a valid token, the client sends task requests to the specialist over HTTPS JSON-RPC. Responses arrive either synchronously or as Server-Sent Events for long-running tasks.
+
+## AgentCard Structure
+
+The AgentCard is the core discovery document. Every A2A-compatible agent publishes one at `/.well-known/agent.json`.
+
+```json
+{
+  "id": "agent:acme-travel/flight-specialist",
+  "name": "ACME Flight Specialist",
+  "description": "Searches, compares, and books commercial flights. Handles multi-leg itineraries, fare class selection, and seat assignments.",
+  "version": "2.3.1",
+  "url": "https://agents.acme.com/flight",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "authentication": {
+    "schemes": ["oauth2"],
+    "oauth2": {
+      "authorizationUrl": "https://auth.acme.com/oauth/authorize",
+      "tokenUrl": "https://auth.acme.com/oauth/token",
+      "scopes": {
+        "flight:search": "Search flights without booking",
+        "flight:book": "Search and book flights on behalf of users"
+      }
+    }
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "flight-search",
+      "name": "Search Flights",
+      "description": "Find available flights between two airports for given dates and passenger count. Returns ranked options with pricing.",
+      "tags": ["flights", "travel", "search"],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"],
+      "examples": [
+        "Find business class flights from JFK to LHR for 2 passengers on March 15"
+      ]
+    },
+    {
+      "id": "flight-book",
+      "name": "Book Flight",
+      "description": "Book a specific flight from search results. Requires passenger details and payment authorization.",
+      "tags": ["flights", "travel", "booking"],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ]
+}
+```
+
+### AgentCard Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Globally unique identifier for this agent |
+| `name` | Yes | Human-readable display name |
+| `description` | Yes | What tasks this agent handles — the primary discovery signal |
+| `version` | Yes | SemVer version of this agent's capabilities |
+| `url` | Yes | Base URL for the agent's JSON-RPC endpoint |
+| `capabilities` | Yes | Which A2A features this agent supports |
+| `authentication` | Yes | Auth schemes and OAuth 2.1 configuration |
+| `skills` | Yes | Array of specific tasks this agent can perform |
+| `defaultInputModes` | No | MIME types this agent accepts by default |
+| `defaultOutputModes` | No | MIME types this agent produces by default |
+
+### Capabilities Declaration
+
+```json
+{
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  }
+}
+```
+
+| Capability | Meaning |
+|---|---|
+| `streaming` | Agent supports SSE streaming for long-running tasks |
+| `pushNotifications` | Agent can send async push updates via webhook |
+| `stateTransitionHistory` | Agent records and exposes its internal state history |
+
+## Task Communication & Security
+
+A2A uses OAuth 2.1 with DPoP (Demonstration of Proof-of-Possession, RFC 9449) for client authentication. Each agent must obtain a scoped token before sending tasks. The security model ensures tokens cannot be replayed by an unauthorized client.
+
+### Sending a Task
+
+Task requests are JSON-RPC calls to the agent's endpoint:
+
+```json
+POST https://agents.acme.com/flight
+Authorization: Bearer eyJ...
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "task-8821",
+  "method": "tasks/send",
+  "params": {
+    "id": "task-8821",
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Find available business class flights from JFK to LHR on March 15, 2026 for 2 passengers."
+        }
+      ]
+    },
+    "metadata": {
+      "originAgent": "agent:acme-travel/orchestrator",
+      "correlationId": "trip-planning-session-4421"
+    }
+  }
+}
+```
+
+### Task States
+
+A task moves through a defined set of states:
+
+```
+submitted → working → (input-required →) completed
+                    ↘ failed
+                    ↘ canceled
+```
+
+| State | Meaning |
+|---|---|
+| `submitted` | Task received, queued for processing |
+| `working` | Agent is actively processing |
+| `input-required` | Agent needs additional information before continuing |
+| `completed` | Task finished successfully |
+| `failed` | Task failed with an error |
+| `canceled` | Task was canceled by the client or timed out |
+
+### Streaming Responses
+
+For long-running tasks, the agent streams updates via Server-Sent Events. Clients that include the `Accept: text/event-stream` header receive a stream:
+
+```
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+
+data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"working"},"metadata":{}}}
+
+data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"working"},"artifacts":[],"metadata":{"progress":"Searching 48 airlines..."}}}
+
+data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"completed"},"artifacts":[{"parts":[{"type":"application/json","data":{"flights":[...]}}]}]}}
+```
+
+Each event carries a partial or final result. The stream ends when the task reaches a terminal state (`completed`, `failed`, or `canceled`).
+
+### Input Required
+
+When an agent needs more information mid-task, it transitions to `input-required` state and sends a structured request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "task-8821",
+  "result": {
+    "id": "task-8821",
+    "status": {
+      "state": "input-required",
+      "message": {
+        "role": "agent",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Found 12 flights matching your criteria. Do you prefer morning departures (before noon) or afternoon departures (after noon)?"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+The orchestrator responds by sending additional input to the same task ID:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "task-8821-followup",
+  "method": "tasks/send",
+  "params": {
+    "id": "task-8821",
+    "message": {
+      "role": "user",
+      "parts": [{ "type": "text", "text": "Morning departures preferred." }]
+    }
+  }
+}
+```
+
+## When to Use A2A
+
+Use A2A when the work itself should be done by a separate agent that owns the domain knowledge and tooling:
+
+- **Cross-organizational delegation** — sending a task to an agent operated by a different organization
+- **Specialist routing** — an orchestrator directing tasks to domain-specific agents (legal, HR, finance)
+- **Parallel execution** — dispatching independent subtasks to multiple agents simultaneously and aggregating results
+- **Long-running workflows** — tasks that take minutes or hours, where the result is delivered asynchronously
+
+Do not use A2A when you just need to call a function or read data. That is what MCP tools and resources are for.
+
+```
+Orchestrator needs to:
+
+  Call an API endpoint?            → MCP tool
+  Read a file or document?         → MCP resource
+  Ask a specialist to handle it?   → A2A task delegation
+  Complete a multi-step commerce?  → ACP
+```
+
+## Skills Catalogue
+
+The `skills` array in an AgentCard describes discrete capabilities the agent exposes. Unlike MCP tools (which are atomic functions), A2A skills represent multi-step tasks that may involve reasoning, user interaction, or cross-organizational workflows. Skill definitions include examples of how to invoke them, making discovery more discoverable for orchestrators.
+
+## Spec & References
+
+- [A2A v1.0 RC Specification](https://a2a-protocol.org/latest/specification/) — official A2A specification from the Linux Foundation
+- [A2A Project Homepage](https://a2aproject.github.io/) — documentation and resources
+
+## Related Pages
+
+- [MCP Protocol](/docs/protocols/mcp) — the vertical counterpart: connecting agents to tools and data
+- [Protocol Comparison](/docs/protocols/comparison) — full landscape and decision guide

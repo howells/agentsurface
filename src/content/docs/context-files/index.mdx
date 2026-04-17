@@ -1,0 +1,130 @@
+---
+title: Context Files
+description: AGENTS.md, CLAUDE.md, and tool-specific overrides that define agent boundaries and conventions
+---
+
+## Summary
+
+Foundational onboarding for AI agents. AGENTS.md (Linux Foundation spec, read by 9+ tools) defines project overview, commands, tech stack, testing, boundaries, and gotchas. CLAUDE.md and .cursor/rules add tool-specific overrides. A well-curated AGENTS.md scales knowledge across all agents consuming it. Assess presence, curation quality (hand-curated vs. auto-generated), and adherence to standards.
+
+- **AGENTS.md**: universal baseline, read by Claude Code, Cursor, Copilot, etc.
+- **CLAUDE.md**: Claude-specific hooks only (minimal overlay)
+- **Cursor/Copilot rules**: tool-specific scoping (.cursor/rules/*.mdc, .github/copilot-instructions.md)
+- **Monorepos**: per-package AGENTS.md with root overview
+- **Drift detection**: CI checks to keep commands current
+- **Progressive disclosure**: root file tight (~150 lines), link to deeper docs
+
+Context files are the foundational onboarding layer for AI coding agents. They define what an agent can and cannot do, where to find key files and commands, and how to navigate architectural decisions. A well-curated AGENTS.md beats ten generic prompts—it scales your knowledge across all agents and tools that read it, from Claude Code to Cursor to GitHub Copilot.
+
+This dimension assesses presence and quality: Do context files exist? Are they curated or auto-generated? Do they follow standards?
+
+## Dimensions
+
+### AGENTS.md (Universal Baseline)
+
+Plain markdown governed by the Agentic AI Foundation (Linux Foundation). Read by 9+ tools: Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, JetBrains Codex, Aider, Zed, and others. Typical sections: project overview, quick-start commands, tech stack, testing expectations, permission boundaries, gotchas.
+
+See `/docs/context-files/agents-md`.
+
+### CLAUDE.md (Claude Code Override)
+
+Claude-specific hooks only. Layer on top of AGENTS.md. If Claude should use a different model, trigger specific skills, or enforce Claude-only boundaries, document here. Keep minimal.
+
+See `/docs/context-files/claude-md`.
+
+### Cursor Rules & GitHub Copilot Instructions
+
+Cursor rules (`.cursor/rules/*.mdc`), GitHub Copilot (`[.github/copilot-instructions.md]()`). Same pattern: reference AGENTS.md, add tool-only guidance. Tool-specific scoping via globs or metadata.
+
+See `/docs/context-files/cursor-and-copilot`.
+
+### Monorepos and Nested Context
+
+Monorepos (pnpm workspaces, Yarn, Lerna, Turbo) need per-package AGENTS.md files. Precedence rules: narrowest scope wins. Root AGENTS.md provides overview; per-package files provide scoped detail.
+
+See `/docs/context-files/monorepos`.
+
+### Drift Detection and CI Checks
+
+Context files go stale. Commands change, directories move, conventions evolve. Use `agentify score --dimension=context` or custom CI checks to detect drift. Automated audits ensure files stay current.
+
+See `/docs/context-files/drift-detection`.
+
+### Anti-Patterns
+
+Dumping README into AGENTS.md, marketing copy in LLM-facing files, 1500-line files that exhaust token budgets, stale commands, duplication across AGENTS.md and CLAUDE.md.
+
+See `/docs/context-files/anti-patterns`.
+
+## Scoring Rubric
+
+| Score | Criteria | Detection |
+|-------|----------|-----------|
+| 0 | No AGENTS.md, CLAUDE.md, or equivalent. | No agent context files found. |
+| 1 | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands. | AGENTS.md present but >500 lines, or contains architecture overview without commands, or clearly auto-generated. |
+| 2 | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries. Code examples. | Commands section at top with exact invocations. Permission boundaries defined (always/ask-first/never). `` `<370` `` lines. Non-obvious conventions documented with examples. |
+| 3 | Multi-tool context. AGENTS.md + CLAUDE.md + .cursor/rules. Progressive disclosure. Iteratively maintained. | Multiple context file formats. Progressive disclosure via file references. Boundaries enforced. Files evolved from friction, not auto-generated. |
+
+## Key Principles
+
+### Single Source of Truth
+
+AGENTS.md is the canonical reference. CLAUDE.md, .cursor/rules/, .github/copilot-instructions.md are overlays. They reference AGENTS.md and add tool-specific guidance only. Resist sprawl.
+
+### Progressive Disclosure
+
+Large repos need a hierarchy:
+- Root AGENTS.md = overview + commands + boundaries (tight, ~150 lines)
+- Per-package AGENTS.md = scoped detail (packages/api/AGENTS.md, etc.)
+- Link to deeper docs (/docs/ARCHITECTURE.md, /docs/CONTRIBUTING.md)
+
+Agents start with root file, drill down only if needed.
+
+### Commands First
+
+Ship actual command lines, not prose. Include timing (fast `` `<5s` ``, slow `` `>30s` ``), flags that affect agent behavior (--json, --dry-run), which commands block CI.
+
+```
+pnpm dev          # Start dev server (http://localhost:3000)
+pnpm test         # Run all tests (~8s)
+pnpm test:watch   # Watch mode (blocks on first failure)
+pnpm lint         # ESLint + Prettier check (~3s)
+pnpm build        # Production bundle (~2m)
+```
+
+### Permission Boundaries (Three-Tier)
+
+Make boundaries explicit and enforceable:
+
+```
+Always:
+  - Read files in src/, tests/, docs/
+  - Run tests: pnpm test
+  - Open PRs: gh pr create --draft
+
+Ask first:
+  - Install new dependencies (pnpm add ...)
+  - Run migrations (pnpm db:migrate)
+  - Commit directly to main (use PR instead)
+
+Never:
+  - Deploy to production
+  - Rotate API keys or secrets
+  - Delete branches or tags
+```
+
+Agents follow rules, not culture. "We try not to..." should be "Never...".
+
+## See also
+
+- `/docs/context-files/agents-md` — AGENTS.md spec and patterns
+- `/docs/context-files/claude-md` — Claude-specific overrides
+- `/docs/context-files/cursor-and-copilot` — Cursor rules and GitHub Copilot
+- `/docs/context-files/monorepos` — hierarchical context in monorepos
+- `/docs/context-files/drift-detection` — keeping files current
+- `/docs/context-files/anti-patterns` — common mistakes
+- `/templates/discovery/AGENTS.md` — starter template
+- `/templates/discovery/CLAUDE.md` — Claude override template
+- ([agents.md specification](https://agents.md))
+- ([Claude Code docs](https://code.claude.com/docs/en/claude-code))
+- ([Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai))

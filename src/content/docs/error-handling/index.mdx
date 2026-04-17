@@ -1,0 +1,29 @@
+---
+title: Error Handling
+description: Structured errors that enable agents to diagnose failures and recover autonomously
+---
+
+## Summary
+
+Agents cannot look at error screens and reason about next steps. They need the error response itself to contain structured information: whether to retry unchanged, modify and retry, use a different tool, or escalate. RFC 9457 Problem Details provides the foundation; agent extensions add retriable flags, suggestions, and trace IDs.
+
+- RFC 9457 Problem Details: type URI, title, status, detail, instance
+- Agent Extensions: is_retriable, retry_after_ms, suggestions[], errors[]
+- Idempotency-Key header for safe retries on write operations
+- Retry patterns: exponential backoff with jitter, circuit breakers, rate limits
+- Designing errors for recovery: validation context, tool order guidance, actionable prompts
+
+When an agent encounters an error, it cannot look at the screen and try something different. It needs the error response itself to contain enough structured information to decide what to do next — retry, adjust parameters, escalate, or abort.
+
+## TL;DR
+
+Use RFC 9457 Problem Details on every error response. Include `type` (stable URI), `is_retriable` (boolean), `retry_after_ms` (wait time), and `suggestions` (concrete next steps). Agents branch on `is_retriable` and `type`, not on status codes or prose. Treat error types as part of your API contract — they must remain stable across releases.
+
+## What This Section Covers
+
+- **RFC 9457 Problem Details** — the standard format for structured HTTP error responses with `type`, `title`, `status`, `detail`, and registered extension fields (obsoletes RFC 7807)
+- **Agent Extensions** — `is_retriable`, `retry_after_ms`, `doc_uri`, `trace_id`, `suggestions[]`, `errors[]` that enable autonomous recovery
+- **Idempotency** — `Idempotency-Key` header pattern and server-side deduplication for safe retries on write operations
+- **Retry Patterns** — exponential backoff with jitter, circuit breakers, rate-limit handling, and distinguishing transient from terminal failures
+- **Error for Agent Recovery** — validation context, tool-order guidance, and writing error messages as prompts
+- **CLI Errors** — exit codes, structured JSON output, and stable error codes for command-line tools

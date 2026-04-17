@@ -1,0 +1,470 @@
+---
+title: Monorepos
+description: Nested context files, precedence rules, and hierarchical AGENTS.md patterns
+---
+
+## Summary
+
+Progressive disclosure: root AGENTS.md for overview + cross-package conventions; per-package AGENTS.md for scoped detail. Precedence: narrowest scope wins (packages/api/AGENTS.md overrides root AGENTS.md for api package). Root file stays tight (~150 lines), per-package files focus on package-specific commands, testing, and boundaries. Avoid duplication: per-package files reference root, then add package-specific content. Optional: per-package CLAUDE.md for Claude-specific overrides in specific packages.
+
+```
+Root: Overview + cross-package commands (~150 lines)
+├── packages/api/AGENTS.md: API-specific (~100 lines)
+├── packages/web/AGENTS.md: Web-specific (~100 lines)
+└── Precedence: packages/*/AGENTS.md overrides root
+```
+
+---
+
+Monorepos (pnpm workspaces, Yarn workspaces, Lerna, Turbo) need per-package context files. A single root AGENTS.md is insufficient because each package has different commands, conventions, and boundaries.
+
+The pattern is progressive disclosure: root AGENTS.md provides overview and cross-package conventions; per-package AGENTS.md files provide scoped detail.
+
+## Structure
+
+```
+.
+├── AGENTS.md                      # Root: overview, cross-package commands
+├── CLAUDE.md                      # Claude-specific (applies to all packages)
+├── .cursor/rules/                 # Cursor rules (can be scoped per-package)
+└── packages/
+    ├── api/
+    │   ├── AGENTS.md              # API-specific commands, testing, boundaries
+    │   └── CLAUDE.md              # (optional) API-specific Claude hints
+    ├── web/
+    │   └── AGENTS.md              # Web-specific commands
+    ├── shared/
+    │   └── AGENTS.md              # Shared package commands
+    └── cli/
+        └── AGENTS.md              # CLI package commands
+```
+
+## Root AGENTS.md
+
+Provides overview and cross-package commands. Tight (~100–150 lines).
+
+```markdown
+# AGENTS.md
+
+Monorepo for SaaS platform: API (Fastify), Web (Next.js), Shared types, CLI.
+
+## Monorepo Layout
+
+packages/api:      Backend server (Node/Fastify)
+packages/web:      Frontend (Next.js 15)
+packages/shared:   Shared type definitions
+packages/cli:      Command-line tool
+
+## Quick Start
+
+Development:
+  pnpm dev        # Both API + Web (http://localhost:3000)
+  pnpm test       # All packages
+  pnpm lint       # Lint all
+
+Build:
+  pnpm build      # All packages in dependency order (~3m)
+
+Package-specific:
+  pnpm --filter=@app/api dev
+  pnpm --filter=@app/web dev
+  pnpm --filter=@app/shared type-check
+
+Release:
+  changeset add   # Stage version bump
+  pnpm release    # Publish all packages
+
+## Tech Stack
+
+See packages/*/AGENTS.md for package-specific tech.
+
+Shared tools: TypeScript, ESLint, Prettier, Vitest, Turbo.
+
+## Conventions
+
+Filenames: kebab-case
+Functions: camelCase
+Types: PascalCase
+API routes: /api/v1/...
+Imports: absolute paths (src/...)
+
+## Testing
+
+Unit: Vitest (pnpm test)
+Turbo parallel: pnpm test -- --parallel
+
+pnpm test must pass before merge.
+
+## Boundaries
+
+Always:
+  - Read files, run tests, lint
+  - Open draft PRs
+
+Ask first:
+  - Install dependencies
+  - Run migrations
+
+Never:
+  - Deploy to production
+  - Rotate credentials
+
+## More
+
+See packages/*/AGENTS.md for package-specific details.
+Architecture: docs/ARCHITECTURE.md
+Contributing: CONTRIBUTING.md
+```
+
+## Per-Package AGENTS.md
+
+Detailed commands, testing, and conventions specific to each package.
+
+### packages/api/AGENTS.md
+
+```markdown
+# API Server (packages/api)
+
+Backend server: HTTP API, database operations, authentication.
+Framework: Fastify + TypeScript
+Database: PostgreSQL + Prisma
+
+## Quick Start
+
+Dev:
+  pnpm --filter=@app/api dev         # http://localhost:3001
+  pnpm --filter=@app/api test
+  pnpm --filter=@app/api test:watch
+
+Build:
+  pnpm --filter=@app/api build       # Compile TS
+  pnpm --filter=@app/api start       # Run production server
+
+## Directory Map
+
+src/routes/        API route handlers (/api/v1/...)
+src/db/            Prisma schema, migrations
+src/middleware/    Authentication, logging, error handling
+src/types/         TypeScript type definitions (see ../shared/)
+test/              Integration tests (Supertest)
+
+## Testing
+
+Integration tests with real database (test container):
+  pnpm --filter=@app/api test
+
+Watch mode:
+  pnpm --filter=@app/api test:watch
+
+## Database
+
+Migrations (apply pending changes):
+  pnpm --filter=@app/api db:migrate  # Ask first
+
+Seeding (populate test data):
+  pnpm --filter=@app/api db:seed
+
+Rollback (dev only):
+  pnpm --filter=@app/api db:rollback
+
+## Conventions
+
+Routes: /api/v1/[resource]/[id]?
+Error response: { error: { code, message, details } }
+All endpoints require authentication (except /auth/*)
+
+## Boundaries
+
+Always:
+  - Read files, run tests
+  - Run db:seed
+
+Ask first:
+  - db:migrate (non-dev)
+  - External API calls
+
+Never:
+  - Production deploys
+  - Drop databases
+
+## More
+
+See ../AGENTS.md for cross-package info.
+Schema: src/db/schema.prisma
+Routes: src/routes/
+```
+
+### packages/web/AGENTS.md
+
+```markdown
+# Web (packages/web)
+
+Frontend: Next.js 15 + React 19
+Framework: Next.js App Router
+Styling: TailwindCSS + shadcn/ui
+
+## Quick Start
+
+Dev:
+  pnpm --filter=@app/web dev         # http://localhost:3000
+  pnpm --filter=@app/web test
+  pnpm --filter=@app/web test:watch
+
+Build:
+  pnpm --filter=@app/web build       # Next.js build
+  pnpm --filter=@app/web start       # Serve built app
+
+Preview:
+  pnpm --filter=@app/web build:preview  # Local build preview
+
+## Directory Map
+
+src/app/           Page routes, layouts
+src/components/    Reusable React components
+src/lib/           Utilities, helpers
+src/hooks/         Custom React hooks
+test/              Unit tests (Vitest), E2E tests (Playwright)
+
+## Testing
+
+Unit:
+  pnpm --filter=@app/web test
+
+E2E (Playwright):
+  pnpm --filter=@app/web test:e2e
+
+Watch:
+  pnpm --filter=@app/web test:watch
+
+## Conventions
+
+Components: PascalCase (src/components/Button.tsx)
+Hooks: camelCase starting with 'use' (useAuth, useRouter)
+Routes: lowercase + kebab-case (/api/users, /user/settings)
+Styling: TailwindCSS utility classes, no inline styles
+
+## Dependencies
+
+Keep light! Check bundle size before adding packages.
+
+## Boundaries
+
+Always:
+  - Read files, run tests
+  - Run build and preview
+
+Ask first:
+  - Add new dependencies
+
+Never:
+  - Deploy to production
+  - Modify next.config.js for performance (discuss first)
+
+## More
+
+See ../AGENTS.md for cross-package info.
+Components: src/components/
+```
+
+### packages/shared/AGENTS.md
+
+```markdown
+# Shared Types (packages/shared)
+
+Shared TypeScript types and Zod schemas used across API and Web.
+
+## Quick Start
+
+Type check:
+  pnpm --filter=@app/shared type-check
+
+Build:
+  pnpm --filter=@app/shared build    # Emits TS + ESM
+
+Test:
+  pnpm --filter=@app/shared test
+
+## Directory Map
+
+src/types/         TypeScript type definitions
+src/schemas/       Zod validation schemas (used by API + Web)
+src/utils/         Shared utilities (parsing, formatting)
+
+## Publishing
+
+This package is published to npm @app/shared.
+
+Releases require:
+  - changeset add (document breaking changes)
+  - pnpm release (run once all changesets merged)
+
+See ../AGENTS.md > Release for full flow.
+
+## Conventions
+
+Exports: named (export const, export type)
+No default exports (explicit is better)
+Schemas: one per file (userSchema.ts, invoiceSchema.ts)
+
+## Boundaries
+
+Always:
+  - Type changes
+  - Schema additions
+
+Ask first:
+  - Breaking changes to exported APIs
+  - New dependencies
+
+## More
+
+See ../AGENTS.md for cross-package info.
+```
+
+## Precedence Rules
+
+When searching for conventions, agents follow this order:
+
+1. **Package-level AGENTS.md** (e.g., packages/api/AGENTS.md)
+2. **Root AGENTS.md**
+3. **Root CLAUDE.md** (if present)
+4. **Root .cursor/rules/** (if present)
+
+**Example:** For API server conventions, the agent reads:
+1. packages/api/AGENTS.md (first source)
+2. If not found, fall back to AGENTS.md (root)
+3. If still unclear, check CLAUDE.md (Claude-specific hints)
+
+This hierarchical lookup keeps each file focused on its scope.
+
+## Cross-Package Tool Filters
+
+Use Turbo filters to limit tool execution to specific packages:
+
+```markdown
+## Running Tests for Specific Packages
+
+All tests:
+  pnpm test
+
+API only:
+  pnpm --filter=@app/api test
+
+Web only:
+  pnpm --filter=@app/web test
+
+Multiple packages:
+  pnpm --filter=@app/api --filter=@app/web test
+
+Depending packages (changes in shared affect web + api):
+  pnpm --filter=@app/shared... test
+```
+
+Document these in root AGENTS.md and reference in per-package files.
+
+## Monorepo Boundaries
+
+Root AGENTS.md can define boundaries that apply globally; per-package files can override for local scope.
+
+**Root AGENTS.md:**
+
+```markdown
+## Boundaries (Cross-Package)
+
+Always:
+  - Read files
+  - Run tests
+  - Open draft PRs
+
+Ask first:
+  - Install dependencies
+  - Run migrations
+  - Deploy to staging
+
+Never:
+  - Production deploys
+```
+
+**packages/api/AGENTS.md (override):**
+
+```markdown
+## Boundaries (API-Specific)
+
+(Inherit from root)
+
+Additional for this package:
+  - Ask before: External API calls to production services
+  - Never: Run db:migrate without reviewing migration script
+```
+
+## Monorepo-Specific Commands in Root
+
+Include common multi-package commands in root AGENTS.md:
+
+```markdown
+## Common Tasks
+
+Format all files:
+  pnpm lint --fix
+
+Build all packages (dependency order):
+  turbo run build
+
+Run test in all packages:
+  turbo run test -- --coverage
+
+Build only changed packages:
+  turbo run build --changed
+
+Check types all:
+  pnpm type-check
+
+Watch mode (specific package):
+  pnpm --filter=@app/web dev
+```
+
+## Tool Scoping in Cursor Rules
+
+Cursor rules can be scoped per-package:
+
+```
+.cursor/rules/
+├── global.mdc                       # All files
+├── api-routes.mdc                   # packages/api/src/routes/**
+├── web-components.mdc               # packages/web/src/components/**
+├── shared-schemas.mdc               # packages/shared/src/schemas/**
+└── tests.mdc                        # All *.test.ts files
+```
+
+Each file uses globs to target its scope:
+
+**api-routes.mdc:**
+
+```markdown
+---
+globs: "packages/api/src/routes/**/*.ts"
+---
+
+# API Route Rules
+
+Routes follow RESTful conventions: /api/v1/[resource]/[id]?
+```
+
+**web-components.mdc:**
+
+```markdown
+---
+globs: "packages/web/src/components/**/*.tsx"
+---
+
+# Web Component Rules
+
+Components are PascalCase and exported as named exports.
+```
+
+## See also
+
+- `/docs/context-files/agents-md` — AGENTS.md spec
+- `/docs/context-files/cursor-and-copilot` — scoped Cursor rules
+- `/templates/discovery/monorepo-AGENTS.md` — starter template
+- ([Turborepo docs](https://turbo.build/repo/docs))

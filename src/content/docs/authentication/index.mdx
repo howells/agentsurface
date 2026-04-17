@@ -1,0 +1,46 @@
+---
+title: Authentication
+description: Machine-to-machine and delegated authorization for agents
+---
+
+## Summary
+
+Agents cannot click "Sign in with Google" or solve CAPTCHAs — every flow requiring a browser or session state is incompatible with automation. This section covers OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, and first-class agent identity for auditability. Error handling and retry safety are threaded throughout.
+
+- OAuth 2.1 Client Credentials with token caching for M2M auth
+- Token Exchange (RFC 8693) for narrowing scope and delegation
+- DPoP (RFC 9449) for sender-constrained tokens and replay protection
+- Agent Identity: first-class principals, audit trails, and actor chains
+- Idempotency and replay protection: nonce stores and DPoP jti uniqueness
+
+Agents cannot click "Sign in with Google" or solve CAPTCHAs. Every flow requiring a browser, human interaction, or session state is incompatible with automation. Agent authentication is purely programmatic: OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, and verifiable agent identity for auditability.
+
+## Decision Tree
+
+Start here: what kind of credential do you need?
+
+- **I'm building a standalone agent service that calls APIs.** Use [OAuth 2.1 Client Credentials](/docs/authentication/oauth-for-agents). Short-lived tokens, narrow scopes, cached and refreshed proactively.
+
+- **I have a simple third-party API and don't want OAuth complexity.** Use [API Keys](/docs/authentication/api-keys), but only if the key can be scoped, rotated, and short-lived.
+
+- **An agent needs to act on behalf of a user or delegate to a sub-agent.** Use [Token Exchange](/docs/authentication/token-exchange) (RFC 8693) to narrow scope and audience.
+
+- **I need to prevent stolen tokens from being replayed.** Use [DPoP](/docs/authentication/dpop) (RFC 9449) to bind tokens to a client keypair.
+
+- **My agents need to call multiple services and I need to audit who did what.** Use [Agent Identity](/docs/authentication/agent-identity) with distinct principals per agent.
+
+- **I'm building an MCP server.** Publish [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) at `/.well-known/oauth-protected-resource` and validate inbound JWTs.
+
+- **I'm integrating with MCP's auth model.** See [MCP Authorization](/docs/authentication/mcp-auth-model) for Client ID Metadata Documents and Enterprise-Managed Authorization.
+
+## What You'll Find Here
+
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — Client Credentials grant, PKCE, token caching, JWT validation
+- [API Keys](/docs/authentication/api-keys) — when they're OK, scoping, rotation, and never-appear rules
+- [Agent Identity](/docs/authentication/agent-identity) — first-class agent principals, audit trails, `sub` + `act` claims
+- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 narrowing, delegated access, audience restriction
+- [DPoP](/docs/authentication/dpop) — RFC 9449 sender-constrained tokens, preventing replay attacks
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — RFC 9728, `.well-known/oauth-protected-resource`, client discovery
+- [MCP Authorization](/docs/authentication/mcp-auth-model) — Client ID Metadata Documents, Enterprise-Managed Authorization, MCP 2025-11-25
+- [Auth Anti-Patterns](/docs/authentication/anti-patterns) — what silently breaks agents, and the fixes
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — nonce stores, DPoP `jti` uniqueness, preventing double-submission

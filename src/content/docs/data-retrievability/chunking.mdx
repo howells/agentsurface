@@ -1,0 +1,281 @@
+---
+title: Chunking Strategies
+description: Fixed, semantic, late, contextual (Anthropic); overlap; evaluation
+---
+
+Chunking splits documents into embeddings-friendly units. Poor chunking (no context, no overlap) kills retrieval quality. Anthropic's Contextual Retrieval is the 2026 standard.
+
+## Summary
+
+**Chunking patterns:**
+- **Fixed-size:** 512–1024 tokens, 20% overlap. Baseline, predictable.
+- **Semantic:** Split on boundaries (paragraph, section). Preserves structure.
+- **Late:** Embed full doc, chunk after. Avoids boundary loss; expensive.
+- **Contextual (Anthropic):** Prepend chunk-specific summary via Claude before embedding. **49–67% failure reduction.**
+
+**2026 recommendation:** Contextual Retrieval + 20% overlap.
+
+## Fixed-size chunking
+
+```typescript
+function tokenize(text: string): string[] {
+  // Approximate: split on whitespace, estimate 1.3 tokens/word
+  return text.split(/\s+/);
+}
+
+function fixedChunk(text: string, chunkSize: number = 512, overlap: number = 0.2) {
+  const tokens = tokenize(text);
+  const overlapTokens = Math.floor(chunkSize * overlap);
+  const chunks: string[] = [];
+
+  for (let i = 0; i < tokens.length; i += chunkSize - overlapTokens) {
+    const chunk = tokens.slice(i, i + chunkSize).join(' ');
+    if (chunk.trim()) chunks.push(chunk);
+  }
+
+  return chunks;
+}
+
+const doc = 'Lorem ipsum dolor...';
+const chunks = fixedChunk(doc, 512, 0.2);
+```
+
+## Semantic chunking
+
+```typescript
+async function semanticChunk(text: string) {
+  // Split on paragraph boundaries
+  const paragraphs = text.split(/\n\n+/);
+
+  // Group paragraphs into chunks (target ~1000 tokens)
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const para of paragraphs) {
+    const combined = current + '\n\n' + para;
+    if (estimateTokens(combined) > 1000) {
+      chunks.push(current);
+      current = para;
+    } else {
+      current = combined;
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.split(/\s+/).length * 1.3);
+}
+```
+
+## Contextual Retrieval (Anthropic, 2026 STANDARD)
+
+Prepend chunk context via Claude Haiku before embedding:
+
+```typescript
+import Anthropic from '@anthropic-sdk/sdk';
+import OpenAI from 'openai';
+
+async function contextualEmbed(
+  chunk: string,
+  fullDoc: string,
+  chunkIndex: number
+) {
+  const anthropic = new Anthropic();
+
+  // Generate chunk context via Haiku (fast, cheap)
+  const contextResponse = await anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 150,
+    messages: [
+      {
+        role: 'user',
+        content: `Document (for context only):
+${fullDoc.substring(0, 2000)}
+
+Chunk #${chunkIndex}:
+${chunk}
+
+Generate a concise 1-2 sentence summary of what this chunk is about, referencing the document context (company, time period, domain, etc.).`,
+      },
+    ],
+  });
+
+  const contextText =
+    contextResponse.content[0].type === 'text' ? contextResponse.content[0].text : '';
+
+  // Prepend context to chunk
+  const contextualChunk = `${contextText}\n\n${chunk}`;
+
+  // Embed the contextual text
+  const openai = new OpenAI();
+  const embedding = await openai.embeddings.create({
+    model: 'text-embedding-3-large',
+    input: contextualChunk,
+  });
+
+  return {
+    chunkIndex,
+    originalChunk: chunk,
+    contextualChunk,
+    embedding: embedding.data[0].embedding,
+  };
+}
+```
+
+**Cost optimization with prompt caching:**
+
+```typescript
+// Cache the full document, reuse for multiple chunks
+async function contextualEmbedWithCache(chunks: string[], fullDoc: string) {
+  const results = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const cached = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 150,
+      system_prompt: [
+        {
+          type: 'text',
+          text: 'You are a document analyst.',
+        },
+        {
+          type: 'text',
+          text: `Full Document:\n${fullDoc}`, // Cached after first use
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Chunk #${i}: ${chunks[i]}\n\nSummarize this chunk's context.`,
+        },
+      ],
+    });
+
+    const contextText =
+      cached.content[0].type === 'text' ? cached.content[0].text : '';
+
+    // Embed (same process)
+    const embedding = await openai.embeddings.create({
+      model: 'text-embedding-3-large',
+      input: `${contextText}\n\n${chunks[i]}`,
+    });
+
+    results.push({ chunkIndex: i, embedding: embedding.data[0].embedding });
+  }
+
+  return results;
+}
+```
+
+**Results:** Contextual Retrieval reduces retrieval failures by 49% alone, 67% when combined with reranking.
+
+## Late chunking
+
+Embed full document first, chunk after:
+
+```typescript
+async function lateChunk(doc: string, chunkSize: number = 512) {
+  const openai = new OpenAI();
+
+  // Embed full document
+  const docEmbedding = await openai.embeddings.create({
+    model: 'text-embedding-3-large',
+    input: doc,
+  });
+
+  // Split into chunks
+  const tokens = tokenize(doc);
+  const chunks: string[] = [];
+
+  for (let i = 0; i < tokens.length; i += chunkSize) {
+    const chunk = tokens.slice(i, i + chunkSize).join(' ');
+    if (chunk.trim()) chunks.push(chunk);
+  }
+
+  // All chunks inherit document embedding (no re-embedding)
+  return chunks.map((chunk) => ({
+    chunk,
+    embedding: docEmbedding.data[0].embedding, // Reuse doc embedding
+  }));
+}
+```
+
+**Pro:** No context loss at boundaries  
+**Con:** Coarse granularity; one embedding per entire document
+
+## Chunking evaluation
+
+```typescript
+async function evaluateChunkingStrategy(
+  strategy: 'fixed' | 'semantic' | 'contextual',
+  docs: any[],
+  queries: any[]
+) {
+  let recall = 0;
+  let avgChunkCount = 0;
+
+  for (const doc of docs) {
+    let chunks: string[];
+
+    if (strategy === 'fixed') {
+      chunks = fixedChunk(doc.text, 512, 0.2);
+    } else if (strategy === 'semantic') {
+      chunks = await semanticChunk(doc.text);
+    } else {
+      chunks = await contextualChunk(doc.text);
+    }
+
+    avgChunkCount += chunks.length;
+
+    // Embed and store
+    const embeddings = await Promise.all(
+      chunks.map((chunk) =>
+        openai.embeddings.create({
+          model: 'text-embedding-3-large',
+          input: chunk,
+        })
+      )
+    );
+
+    // Test retrieval
+    for (const query of queries) {
+      const queryEmb = await openai.embeddings.create({
+        model: 'text-embedding-3-large',
+        input: query.text,
+      });
+
+      const relevant = embeddings.some((emb) =>
+        cosineSimilarity(queryEmb.data[0].embedding, emb.data[0].embedding) >
+        0.75
+      );
+
+      if (relevant) recall++;
+    }
+  }
+
+  console.log(`Strategy: ${strategy}`);
+  console.log(
+    `Recall: ${((recall / (docs.length * queries.length)) * 100).toFixed(2)}%`
+  );
+  console.log(
+    `Avg chunks per doc: ${(avgChunkCount / docs.length).toFixed(1)}`
+  );
+}
+```
+
+## Anti-patterns
+
+1. **No chunking at all.** Embedding entire documents kills granularity.
+2. **Chunks with no overlap.** Context bridges lost; retrieval fails.
+3. **Chunk size inconsistency.** Mix fixed and semantic; results degrade.
+4. **No overlap calculation.** Should be 10–30% for most domains.
+5. **Ignoring chunk metadata.** Store source, page, section; filter later.
+
+## See also
+
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
+- [LlamaIndex text splitters](https://docs.llamaindex.ai/en/stable/module_guides/loading/node_parsers/)

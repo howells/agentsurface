@@ -1,0 +1,245 @@
+---
+title: Anti-Patterns
+description: What NOT to do; common failures and pitfalls
+---
+
+## Summary
+
+Ten retrieval anti-patterns that degrade quality silently (without visible signals): dense-only retrieval (fails on keywords), no chunking strategy (poor recall), single embedding for all domains (underperforms specialized), no reranking (noisy top-k), no evaluation metrics (flying blind), stale embeddings (drift undetected), giant chunks (lose granularity), no metadata filtering (mixed contexts), skipping contextual retrieval (Anthropic pattern misses 49–67% of answers), and GraphRAG without cost constraints (6000x more expensive than LightRAG). Each anti-pattern includes specific fix.
+
+- **1. Dense-only**: Add BM25 + RRF fusion
+- **2. No chunking**: Fixed-size with 20% overlap, plus metadata
+- **3. One embedding model**: Use domain-specific or ensemble
+- **4. No reranking**: Retrieve 50, rerank to 5
+- **5. No evals**: Add RAGAS metrics in CI/CD
+- **6. Stale embeddings**: Re-embed samples monthly, track drift
+- **7. Giant chunks**: Break into `` `<500` `` tokens, add summaries
+- **8. No metadata**: Add source, date, version, namespace
+- **9. No contextual retrieval**: Prepend summaries (Anthropic pattern)
+- **10. GraphRAG without cost controls**: Use LightRAG instead
+
+---
+
+Retrieval quality fails silently. Measure obsessively and avoid these pitfalls.
+
+## Top 10 anti-patterns
+
+### 1. Dense-only retrieval
+
+**Problem:** Skip BM25; rely solely on vector embeddings. Fails on exact keywords, rare terms, proper nouns.
+
+**Fix:** Implement hybrid (BM25 + dense + RRF).
+
+### 2. "Just dump docs in Pinecone"
+
+**Problem:** No chunking strategy, no metadata, no evaluation. Guaranteed poor recall.
+
+**Fix:** Fixed-size chunks with 20% overlap; add metadata (source, date); evaluate with RAGAS.
+
+### 3. Single embedding model for all domains
+
+**Problem:** Generalist embeddings (text-embedding-3-large) underperform on specialized domains.
+
+**Fix:** Use domain-specific models (legal, medical, code). Or: specialized + generic ensemble.
+
+### 4. No reranking
+
+**Problem:** Return top-100 dense results directly. Noisy; wastes generation tokens.
+
+**Fix:** Two-stage: retrieve top-50, rerank to top-5. Cost negligible vs. generation.
+
+### 5. Contextless chunks
+
+**Problem:** Chunks isolated from document context. "Revenue grew 3%" loses company/timeframe.
+
+**Fix:** Use Anthropic Contextual Retrieval (prepend summaries via Haiku). 49–67% failure reduction.
+
+### 6. Stale embeddings
+
+**Problem:** Corpus embedded 6 months ago; model updated in meantime. Similarity drifts.
+
+**Fix:** Monitor embedding drift monthly. Re-embed if mean similarity < 0.95.
+
+### 7. Ignoring metadata filters
+
+**Problem:** Multi-tenant system returns docs from wrong tenant. Security + privacy breach.
+
+**Fix:** Mandatory metadata filters on all queries. Namespace isolation per tenant.
+
+### 8. No evaluation
+
+**Problem:** Ship retrieval system without RAGAS or recall metrics. Quality degrades invisibly.
+
+**Fix:** RAGAS + MTEB + domain-specific evals in CI/CD. Gate on recall@10 > 0.8, faithfulness > 0.85.
+
+### 9. GraphRAG for cost-sensitive workloads
+
+**Problem:** GraphRAG uses 610K+ tokens per query ($4–7 per doc). Bankrupts large-scale RAG.
+
+**Fix:** Use LightRAG (6,000x cheaper: $0.15 per doc) or vector-only.
+
+### 10. Naive pagination
+
+**Problem:** Return 1,000 results at once; agent can't reason over large sets.
+
+**Fix:** Explicit `next_cursor`, `has_more`. Return top-10 per request.
+
+## Subtle anti-patterns
+
+### 11. No overlap in chunks
+
+**Pattern to avoid:**
+
+```typescript
+// Bad: no overlap
+const chunks = [];
+for (let i = 0; i < tokens.length; i += 512) {
+  chunks.push(tokens.slice(i, i + 512).join(' '));
+}
+
+// Good: 20% overlap
+const overlapTokens = 102; // 20% of 512
+for (let i = 0; i < tokens.length; i += 512 - overlapTokens) {
+  chunks.push(tokens.slice(i, i + 512).join(' '));
+}
+```
+
+**Impact:** Context bridges lost; retrieval fails at boundaries.
+
+### 12. Opaque IDs in responses
+
+**Pattern to avoid:**
+
+```typescript
+// Bad: returns only IDs
+{ results: ['user_123', 'user_456'] }
+
+// Good: includes semantic content
+{ results: [
+  { id: 'user_123', name: 'Alice', email: 'alice@co.com' },
+  { id: 'user_456', name: 'Bob', email: 'bob@co.com' }
+] }
+```
+
+**Impact:** Agent must make follow-up calls to resolve IDs; inefficient.
+
+### 13. Embedding everything equally
+
+**Pattern to avoid:**
+
+```typescript
+// Bad: same model for all
+const embed = (text) => openai.embeddings.create({
+  model: 'text-embedding-3-large',
+  input: text
+});
+
+// Good: specialized per modality
+if (isCode(text)) return codeEmbedding(text);
+if (isLegal(text)) return legalEmbedding(text);
+return genericEmbedding(text);
+```
+
+**Impact:** 10–20% accuracy loss on domain-specific queries.
+
+### 14. No version tracking for embeddings
+
+**Problem:** Re-embed corpus with new model version (e.g., OpenAI updates 3-large). Old vectors incompatible.
+
+**Fix:** Store embedding model version + date in metadata. Version embeddings (`v1`, `v2`). Prevent mixing.
+
+### 15. Ignoring chunk metadata
+
+**Pattern to avoid:**
+
+```typescript
+// Bad: discard source
+const chunks = splitDoc(doc);
+chunks.forEach(c => db.store({ text: c }));
+
+// Good: preserve metadata
+chunks.forEach((c, i) => db.store({
+  text: c,
+  metadata: {
+    docId: doc.id,
+    docTitle: doc.title,
+    section: doc.sections[i],
+    page: doc.pageNumbers[i]
+  }
+}));
+```
+
+**Impact:** Can't filter by section or date. Lost lineage for citations.
+
+### 16. Single vector DB for all use cases
+
+**Problem:** Force Pinecone (serverless) for cost-sensitive. Or self-host pgvector for low-latency SLA.
+
+**Fix:** Match DB to workload (see vector-databases.mdx).
+
+### 17. Insufficient eval test set size
+
+**Pattern to avoid:**
+
+```typescript
+// Bad: 10 test queries
+const testSet = loadTestQueries(10);
+
+// Good: 100–1000 per domain
+const testSet = loadTestQueries(500);
+```
+
+**Impact:** Noisy metrics; false confidence in changes.
+
+### 18. No cost estimation before scaling
+
+**Problem:** 10M vectors @ $0.02/1M tokens = significant recurring cost. No budget tracking.
+
+**Fix:** Estimate costs upfront. Monitor actual spend monthly. Set alerts.
+
+```typescript
+const estimatedCost = (numDocs * avgTokensPerDoc * costPerToken).toFixed(2);
+console.log(`Monthly embedding cost: $${estimatedCost}`);
+```
+
+### 19. Skipping cold-start strategy
+
+**Problem:** Launch RAG on live data. New docs never embedded (no batch job).
+
+**Fix:** Batch embed on ingest. Or: lazy-embed on first query, cache result.
+
+### 20. No fallback for retrieval failure
+
+**Problem:** Retrieval returns empty. Agent hallucinates.
+
+**Fix:** Fallback to BM25-only, or return "Unable to retrieve relevant docs." Don't generate from nothing.
+
+```typescript
+const results = await hybridSearch(query);
+if (results.length === 0) {
+  return { error: 'No relevant documents found', suggestion: 'Try a different query' };
+}
+```
+
+## Checklist: retrieval readiness
+
+- [ ] Hybrid search (BM25 + dense + RRF)
+- [ ] Reranking (Cohere/Voyage, top-50 → top-5)
+- [ ] Chunking with 20% overlap (or Contextual Retrieval)
+- [ ] Metadata filters + multi-tenancy
+- [ ] RAGAS evaluation (faithfulness > 0.85)
+- [ ] Recall@10 > 0.80
+- [ ] Latency p95 < 500ms
+- [ ] Embedding drift detection (monthly)
+- [ ] Version tracking (embedding model, vector DB schema)
+- [ ] Cost monitoring + budget alerts
+- [ ] CI/CD eval pipeline
+- [ ] Agentic RAG (if multi-hop queries)
+- [ ] Fallback strategy (empty retrieval)
+- [ ] Error handling + recovery hints
+
+## See also
+
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
+- [RAGAS evaluation framework](https://docs.ragas.io/)
+- All other pages in Data Retrievability dimension

@@ -1,0 +1,276 @@
+---
+title: Braintrust Evals
+description: End-to-end eval platform with dataset versioning, experiment tracking, and human review
+---
+
+## Summary
+
+Managed evaluation platform designed for agent workflows. Provides dataset versioning, experiment tracking with diffs showing improvements, human review UI, and trace integration. Fastest path for TypeScript agents wanting experiment tracking with minimal setup. Core concepts: datasets (versioned test cases), scorers (grade function), evals (run agent on all test cases, aggregate scores), experiments (versioned eval runs with metadata).
+
+- **Dataset management**: Versioned collections of task + input + expected output
+- **Scorer functions**: Async grading (0-1 score or pass/fail)
+- **Eval runs**: Execute agent on all cases, score, aggregate
+- **Experiments**: Versioned runs with metadata (model, prompt, etc.)
+- **Trace integration**: Link to observability for debugging
+- **Human review**: UI for validating and correcting eval scores
+
+---
+
+Braintrust ([braintrust.dev](https://www.braintrust.dev)) is a managed evaluation platform designed for agent workflows. It provides dataset management, version control, human review, and trace integration. If you are running TypeScript agents and want experiment tracking with minimal setup, Braintrust is the fastest path.
+
+## Core concepts
+
+- **Dataset** — versioned collection of test cases (task, inputs, expected output)
+- **Scorer** — async function that grades a single execution (returns number 0-1 or pass/fail)
+- **Eval** — runs your agent on every test case in a dataset, scores each, aggregates results
+- **Experiment** — versioned eval run with metadata (model, prompt, etc.). Braintrust diffs experiments to show improvement
+
+## Basic eval
+
+```typescript
+import * as Braintrust from "braintrust";
+
+// 1. Define a dataset
+const dataset = await Braintrust.getDataset("summarize_tasks", {
+  version: "2025-04-17",
+});
+
+await dataset.insert([
+  {
+    input: { text: "The quick brown fox..." },
+    expected_output: "A story about a fox",
+  },
+  {
+    input: { text: "Climate change causes..." },
+    expected_output: "Climate impacts explained",
+  },
+]);
+
+// 2. Define a scorer
+async function scoreQuality(output: string, expected: string) {
+  // Code-based checks
+  if (output.length < 10) return 0;
+  if (output.includes("ERROR")) return 0;
+  
+  // LLM-as-judge for quality
+  const grade = await Braintrust.scoreCompletion({
+    prompt: `
+Is this summary coherent and complete?
+Summary: ${output}
+Expected tone: ${expected}
+    `,
+    model: "claude-opus-4-7",
+  });
+  
+  return grade.score;
+}
+
+// 3. Run eval
+async function runEval() {
+  const results = await Braintrust.eval({
+    projectName: "agent_summarize",
+    data: () => dataset.fetch(),
+    task: async (input) => {
+      // Call your agent
+      const agent = new YourAgent();
+      return await agent.summarize(input.text);
+    },
+    scores: {
+      quality: async (output, input, expected) => {
+        return await scoreQuality(output, expected.expected_output);
+      },
+    },
+  });
+  
+  console.log(`Eval complete. Pass rate: ${results.summary.scores.quality}`);
+  // Braintrust CLI shows link: https://www.braintrust.dev/app/...
+}
+
+await runEval();
+```
+
+## Dataset versioning
+
+Datasets in Braintrust are versioned. Update a dataset and create a new version without breaking old eval runs.
+
+```typescript
+// Create version 2025-04-18 with additional test cases
+const dataset = await Braintrust.getDataset("summarize_tasks", {
+  version: "2025-04-18",
+});
+
+// Insert adds to the dataset
+await dataset.insert([
+  { input: { text: "..." }, expected_output: "..." },
+  { input: { text: "..." }, expected_output: "..." },
+]);
+
+// Old evals on version 2025-04-17 are unaffected
+// New evals can target 2025-04-18
+```
+
+## Experiment tracking
+
+Experiments are automatically tracked in Braintrust. Compare metrics across versions:
+
+```typescript
+async function compareModels() {
+  // Baseline: Claude Haiku
+  const haikuResults = await Braintrust.eval({
+    projectName: "model_comparison",
+    metadata: {
+      model: "claude-haiku-4-5",
+      promptVersion: "v1",
+    },
+    data: () => dataset.fetch(),
+    task: async (input) => {
+      const response = await fetch("https://api.anthropic.com/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          messages: [{ role: "user", content: input.text }],
+        }),
+      });
+      return response.json().content[0].text;
+    },
+    scores: { quality: scoreQuality },
+  });
+  
+  // Variant: Claude Opus
+  const opusResults = await Braintrust.eval({
+    projectName: "model_comparison",
+    metadata: {
+      model: "claude-opus-4-7",
+      promptVersion: "v1",
+    },
+    data: () => dataset.fetch(),
+    task: async (input) => {
+      const response = await fetch("https://api.anthropic.com/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          model: "claude-opus-4-7",
+          messages: [{ role: "user", content: input.text }],
+        }),
+      });
+      return response.json().content[0].text;
+    },
+    scores: { quality: scoreQuality },
+  });
+  
+  // Braintrust web UI shows: Haiku 0.72 → Opus 0.89 (+17%)
+}
+```
+
+## Human review integration
+
+After an eval run, manually review outputs that scored below a threshold or are ambiguous:
+
+```typescript
+async function evalWithHumanReview() {
+  const results = await Braintrust.eval({
+    projectName: "summarize",
+    data: () => dataset.fetch(),
+    task: async (input) => agent.summarize(input.text),
+    scores: { quality: scoreQuality },
+  });
+  
+  // Export results for human review
+  const lowScores = results.results.filter(r => r.scores.quality < 0.5);
+  
+  await Braintrust.exportForHumanReview({
+    experimentId: results.experimentId,
+    cases: lowScores,
+  });
+  
+  // In Braintrust UI: manually update scores, add comments
+  // Re-run eval with human-corrected scores
+  const revisedResults = await Braintrust.eval({
+    projectName: "summarize",
+    data: () => dataset.fetch(),
+    task: async (input) => agent.summarize(input.text),
+    scores: {
+      quality: scoreQuality,
+      // Import human review scores
+      humanOverride: async (_, __, ___, resultId) => {
+        const humanScore = await Braintrust.getHumanScore(results.experimentId, resultId);
+        return humanScore ?? undefined;
+      },
+    },
+  });
+}
+```
+
+## Tracing and debugging
+
+Braintrust integrates with OpenTelemetry. Traces from your agent are captured and viewable in the UI:
+
+```typescript
+import { trace } from "@braintrust/browser";
+
+async function tracedTask(input) {
+  return await trace({
+    name: "summarize",
+  }, async (span) => {
+    span.setTag("model", "claude-opus-4-7");
+    span.setTag("input_length", input.text.length);
+    
+    const summary = await agent.summarize(input.text);
+    
+    span.setTag("output_length", summary.length);
+    return summary;
+  });
+}
+
+// In Braintrust UI: click eval result → inspect trace
+// See which tools were called, latency, tokens used
+```
+
+## CI integration
+
+Run evals on every PR and comment results:
+
+```typescript
+// .github/workflows/evals.yml
+name: Agent Evals
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm run evals
+        env:
+          BRAINTRUST_API_KEY: ${{ secrets.BRAINTRUST_API_KEY }}
+      - uses: actions/github-script@v6
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('eval-results.json', 'utf8'));
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Eval results: ${results.summary.scores.quality} pass rate`
+            });
+```
+
+## Links and templates
+
+- Braintrust docs: https://braintrust.dev/docs
+- TypeScript SDK: https://www.npmjs.com/package/braintrust
+- Template: `/templates/cli-and-evals/eval-braintrust.ts` — full working example
+
+## See also
+
+- `/docs/testing/evaluation-framework` — grader patterns
+- `/docs/testing/ci-integration` — running evals in GitHub Actions
+- `/docs/testing/observability` — trace-driven debugging

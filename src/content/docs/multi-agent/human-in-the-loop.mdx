@@ -1,0 +1,391 @@
+---
+title: Human-in-the-Loop
+description: Adding human approval checkpoints to agent workflows — where to interrupt, how to resume, and framework implementations across Mastra, LangGraph, and Vercel AI SDK
+---
+
+## Summary
+
+Approval gates prevent autonomous agents from sending emails, making payments, or modifying production data without human review. Place gates at irreversible actions; skip gates for reads. Implementation: suspend execution to durable state, resume with human's decision. Mastra uses suspend() and resume(); LangGraph uses checkpointers.
+
+Gates required for:
+- Sending emails, messages, or external notifications
+- Financial transactions or payment commitments
+- Creating/modifying/deleting production records
+- Publishing content publicly
+- High-cost API calls beyond threshold
+
+Skip gates for:
+- Read-only operations
+- Reversible actions with easy undo
+- User-explicitly-requested actions
+
+Fully autonomous agents are the goal for low-stakes, reversible tasks. For actions that are expensive, irreversible, or involve external systems, human oversight is not an optional feature — it is the responsible default. Human-in-the-loop (HITL) patterns provide structured interruption points where an agent pauses, presents its proposed action to a human, and resumes only with explicit approval.
+
+The implementation challenge is that "pause and wait" is architecturally difficult in systems designed for synchronous execution. Each framework has developed different primitives for this. The conceptual model is the same across all of them: execution is suspended to a durable state, and a separate resumption event carries the human's decision back into the workflow.
+
+## Where to Put Approval Points
+
+Not every action needs approval. Approval gates add latency and interrupt the user experience. The goal is to place gates precisely at decisions that justify the cost.
+
+**Approve before:**
+- Sending emails, messages, or notifications to external parties
+- Creating, modifying, or deleting records in production systems
+- Making financial transactions or commitments
+- Publishing content publicly
+- Calling external paid APIs beyond a cost threshold
+- Actions that cannot be reversed (deletions, sends, deploys)
+
+**Approve after plan generation:**
+- When an agent has decomposed a complex task into steps, show the plan before executing any step
+- When the agent is about to execute 10+ tool calls, show the tool call sequence first
+
+**Approve at cost thresholds:**
+- If accumulated token cost crosses a configured limit, pause for approval
+- If a single tool call would incur more than a configured dollar amount, pause
+
+**Do not gate:**
+- Read-only operations (no approval needed for queries)
+- Reversible writes with easy undo
+- Actions the user just explicitly requested
+
+## Mastra: Suspend and Resume in Workflows
+
+Mastra workflows support `suspend()` to pause a step and `resume()` to continue with injected data. Suspended steps persist to storage — the workflow survives process restarts between suspend and resume.
+
+### Workflow-Level Approval Step
+
+```typescript
+import { createWorkflow, createStep } from "@mastra/core/workflows"
+import { z } from "zod"
+
+const planStep = createStep({
+  id: "plan",
+  inputSchema: z.object({ goal: z.string() }),
+  outputSchema: z.object({ plan: z.array(z.string()) }),
+  execute: async ({ inputData }) => {
+    const plan = await plannerAgent.generate(inputData.goal)
+    return { plan: JSON.parse(plan.text) }
+  }
+})
+
+const approvalStep = createStep({
+  id: "await-approval",
+  inputSchema: z.object({ plan: z.array(z.string()) }),
+  outputSchema: z.object({ approved: z.boolean(), feedback: z.string().optional() }),
+  execute: async ({ inputData, suspend }) => {
+    // Suspend execution — the workflow pauses here until resumed
+    const humanDecision = await suspend({
+      message: "Review the proposed plan and approve or reject",
+      plan: inputData.plan
+    })
+    
+    // humanDecision is the payload passed to resume()
+    return {
+      approved: humanDecision.approved,
+      feedback: humanDecision.feedback
+    }
+  }
+})
+
+const executeStep = createStep({
+  id: "execute",
+  inputSchema: z.object({
+    plan: z.array(z.string()),
+    approved: z.boolean(),
+    feedback: z.string().optional()
+  }),
+  outputSchema: z.object({ result: z.string() }),
+  execute: async ({ inputData }) => {
+    if (!inputData.approved) {
+      return { result: `Execution cancelled. Feedback: ${inputData.feedback ?? "none"}` }
+    }
+    const result = await executeAgent.generate(inputData.plan.join("\n"))
+    return { result: result.text }
+  }
+})
+
+export const approvedWorkflow = createWorkflow({
+  id: "approved-execution",
+  inputSchema: z.object({ goal: z.string() }),
+  outputSchema: z.object({ result: z.string() })
+})
+  .then(planStep)
+  .then(approvalStep)
+  .then(executeStep)
+  .commit()
+```
+
+### Resuming a Suspended Workflow
+
+```typescript
+import { Mastra } from "@mastra/core"
+
+const mastra = new Mastra({
+  workflows: { approvedWorkflow }
+})
+
+// Start the workflow — it will suspend at the approval step
+const run = mastra.getWorkflow("approvedWorkflow").createRun()
+await run.start({ inputData: { goal: "Send the Q1 report to all stakeholders" } })
+
+// run.id can be stored — the workflow persists
+console.log(`Workflow ${run.id} is suspended awaiting approval`)
+
+// Later, human reviews and approves via API or UI
+// Pass the decision back to the suspended step
+await run.resume({
+  stepId: "await-approval",
+  payload: {
+    approved: true,
+    feedback: undefined
+  }
+})
+```
+
+### Tool-Level Approval with requireApproval
+
+For finer-grained control, individual tools within an agent can require approval before execution:
+
+```typescript
+import { createTool } from "@mastra/core/tools"
+import { z } from "zod"
+
+export const sendEmailTool = createTool({
+  id: "send-email",
+  description: "Sends an email to the specified recipients.",
+  inputSchema: z.object({
+    to: z.array(z.string().email()),
+    subject: z.string(),
+    body: z.string()
+  }),
+  outputSchema: z.object({ sent: z.boolean(), messageId: z.string() }),
+  // Pause execution before sending — show the draft to the user
+  requireApproval: true,
+  execute: async ({ context }) => {
+    const result = await emailClient.send(context)
+    return { sent: true, messageId: result.id }
+  }
+})
+```
+
+When `requireApproval: true` is set, the Mastra runtime suspends the agent's execution at that tool call, surfaces the tool call parameters to the human, and waits for the human to approve or reject before executing.
+
+## LangGraph: interrupt() and Command(resume=...)
+
+LangGraph's HITL uses the `interrupt()` function to pause a node and the `Command(resume=value)` primitive to inject the human's decision back into the graph.
+
+### interrupt() at a Node Boundary
+
+```python
+from langgraph.types import interrupt, Command
+from langgraph.graph import StateGraph, END
+from typing import TypedDict
+
+class WorkflowState(TypedDict):
+    goal: str
+    plan: list[str]
+    approved: bool
+    feedback: str
+    result: str
+
+def plan_node(state: WorkflowState) -> dict:
+    plan = planner_agent.invoke(state["goal"])
+    return {"plan": plan.steps}
+
+def approval_node(state: WorkflowState) -> dict:
+    # interrupt() pauses execution here and returns the value to the human
+    # The human's response becomes the return value of interrupt()
+    human_response = interrupt({
+        "question": "Review the proposed plan",
+        "plan": state["plan"],
+        "required_fields": ["approved", "feedback"]
+    })
+    
+    return {
+        "approved": human_response["approved"],
+        "feedback": human_response.get("feedback", "")
+    }
+
+def execute_node(state: WorkflowState) -> dict:
+    if not state["approved"]:
+        return {"result": f"Cancelled. Feedback: {state['feedback']}"}
+    result = execute_agent.invoke(state["plan"])
+    return {"result": result.content}
+
+builder = StateGraph(WorkflowState)
+builder.add_node("plan", plan_node)
+builder.add_node("approval", approval_node)
+builder.add_node("execute", execute_node)
+builder.add_edge("__start__", "plan")
+builder.add_edge("plan", "approval")
+builder.add_edge("approval", "execute")
+builder.add_edge("execute", END)
+
+# Checkpointer is required for interrupt/resume to work
+from langgraph.checkpoint.memory import MemorySaver
+graph = builder.compile(checkpointer=MemorySaver())
+```
+
+### Resuming with Command
+
+```python
+# Start the workflow
+config = {"configurable": {"thread_id": "workflow-run-42"}}
+
+result = graph.invoke(
+    {"goal": "Send quarterly report to all department heads"},
+    config=config
+)
+
+# result contains the interrupt value if execution paused
+if "__interrupt__" in result:
+    interrupt_data = result["__interrupt__"][0].value
+    print(f"Awaiting approval: {interrupt_data['plan']}")
+
+# Human reviews and approves
+# Resume by sending a Command back into the graph
+resumed = graph.invoke(
+    Command(resume={"approved": True, "feedback": None}),
+    config=config
+)
+
+print(f"Workflow complete: {resumed['result']}")
+```
+
+### Static Breakpoints
+
+For debugging or auditing, LangGraph supports static breakpoints that always pause at a specific node regardless of runtime conditions:
+
+```python
+# Always pause before the execute node — useful in staging environments
+graph = builder.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["execute"]   # pause before this node runs
+)
+
+# Or pause after a node to inspect its output
+graph = builder.compile(
+    checkpointer=checkpointer,
+    interrupt_after=["plan"]       # pause after plan, show output before continuing
+)
+```
+
+Static breakpoints are most useful during development to inspect state at each step. Remove them from production unless you intend for every execution to require human review at that point.
+
+## Vercel AI SDK: needsApproval on Tools
+
+The AI SDK's `needsApproval` property on tool definitions causes the SDK to pause the generation loop before executing a tool that returns true. The calling code is responsible for presenting the pending tool call to the user and invoking the continuation.
+
+```typescript
+import { generateText, tool } from "ai"
+import { openai } from "@ai-sdk/openai"
+import { z } from "zod"
+
+const sendNotificationTool = tool({
+  description: `Sends a push notification to the specified users.
+    Call when the user wants to alert team members about a significant event.`,
+  parameters: z.object({
+    recipients: z.array(z.string()).describe("User IDs to notify"),
+    message: z.string().describe("Notification text (max 200 chars)"),
+    priority: z.enum(["normal", "urgent"]).describe("Notification priority level")
+  }),
+  // Return true to require approval before execution
+  needsApproval: async ({ recipients, message, priority }) => {
+    // Require approval for urgent notifications or large recipient lists
+    return priority === "urgent" || recipients.length > 10
+  },
+  execute: async ({ recipients, message, priority }) => {
+    const results = await notificationClient.send({ recipients, message, priority })
+    return { sent: results.length, failed: recipients.length - results.length }
+  }
+})
+
+const deployTool = tool({
+  description: "Deploys the application to the specified environment.",
+  parameters: z.object({
+    environment: z.enum(["staging", "production"]),
+    version: z.string()
+  }),
+  // Always require approval for production deployments
+  needsApproval: async ({ environment }) => environment === "production",
+  execute: async ({ environment, version }) => {
+    return await deploymentService.deploy({ environment, version })
+  }
+})
+```
+
+### Approval UI Pattern
+
+When `needsApproval` returns true, the AI SDK pauses the tool loop and returns a partial result with `toolResults` containing the pending approvals. The calling code renders an approval UI and calls back to resume:
+
+```typescript
+// Server-side: stream with tool approval support
+const { textStream, toolCalls, toolResults } = await streamText({
+  model: openai("gpt-4o"),
+  tools: { sendNotification: sendNotificationTool, deploy: deployTool },
+  messages: conversationHistory,
+  experimental_toolCallStreaming: true,
+  onChunk({ chunk }) {
+    if (chunk.type === "tool-call-needs-approval") {
+      // Persist the pending tool call state for the UI
+      pendingApprovals.set(chunk.toolCallId, chunk)
+    }
+  }
+})
+
+// Client-side: render approval prompt
+function PendingApproval({ toolCallId, toolName, args, onApprove, onReject }) {
+  return (
+    <div className="approval-card">
+      <h3>Approval Required: {toolName}</h3>
+      <pre>{JSON.stringify(args, null, 2)}</pre>
+      <button onClick={() => onApprove(toolCallId)}>Approve</button>
+      <button onClick={() => onReject(toolCallId)}>Reject</button>
+    </div>
+  )
+}
+
+// Resume after approval: send the decision back to the generation loop
+// by including the tool result in the next message batch
+const approvedMessages = [
+  ...conversationHistory,
+  {
+    role: "tool",
+    content: [{ type: "tool-result", toolCallId, result: "approved" }]
+  }
+]
+```
+
+## Approval Point Reference
+
+| Trigger condition | Pattern | Framework |
+|------------------|---------|-----------|
+| Before specific tool execution | `requireApproval: true` on tool | Mastra |
+| Before specific tool execution | `needsApproval` callback | Vercel AI SDK |
+| At workflow step boundary | `suspend()` in step execute | Mastra workflows |
+| At graph node boundary | `interrupt()` in node function | LangGraph |
+| Always at a node | `interrupt_before=["node"]` | LangGraph |
+| After cost threshold | Custom check before tool call | All (custom) |
+| After plan generation | Gate between plan and execute nodes | All |
+
+<Callout type="warn">
+Approval workflows require durable state storage. If the process restarts between suspend and resume, the workflow state must survive. Use a persistent checkpointer (PostgreSQL, Redis, Upstash) rather than in-memory storage for any production HITL flow.
+</Callout>
+
+## Building a Reliable Approval Flow
+
+**1. Make the pending state visible.** When a workflow is suspended awaiting approval, persist the run ID, the approval prompt, and the proposed action to your application database. Do not rely only on the workflow engine's internal state.
+
+**2. Set approval expiry.** Approvals that wait indefinitely for a human accumulate. Set a maximum wait time; if no human approves within that window, cancel the pending action and notify the user that it expired.
+
+**3. Log all approval decisions.** Every approval and rejection should be logged with: who made the decision, when, the full proposed action, and any feedback provided. This is the audit trail.
+
+**4. Handle rejection gracefully.** An agent that receives a rejection should explain to the user what was rejected and why, then ask whether to try a different approach. Rejection is not the end of the conversation.
+
+**5. Idempotent resumption.** Ensure that calling `resume()` twice with the same payload produces the same outcome as calling it once. Approval UIs are prone to double-submission.
+
+## Related Pages
+
+- [Orchestration Patterns](./orchestration-patterns) — where HITL fits within sequential, concurrent, and dynamic patterns
+- [Supervisor Pattern](./supervisor-pattern) — adding approval gates to supervisor-worker delegations
+- [Testing & Evaluation](../testing/index) — simulating approval flows in test environments

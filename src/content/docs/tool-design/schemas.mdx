@@ -1,0 +1,345 @@
+---
+title: Schemas
+description: Typed input and output schemas with Zod and JSON Schema for agent reasoning
+---
+
+## Summary
+
+Tool schemas define input parameters and output structure, enabling agents to reason reliably over results and avoiding hallucination. Three rules: (1) Flat structure (one or two levels max; OpenAI strict mode rejects nesting), (2) Every field must have description (.describe() in Zod, description in JSON Schema), (3) Enums over free text (constrain values where server enforces them). Input examples reduce errors. Output schemas + toModelOutput reduce token cost. Avoid nullable parameters and union types (problematic for strict mode).
+
+- **Flat structures**: Max 1-2 levels deep
+- **Descriptions**: Every field documented with examples
+- **Enums**: Constrained values where possible
+- **Input examples**: On parameters to guide agent
+- **Output schema**: Declare return structure
+- **toModelOutput**: Optimize token usage in responses
+
+---
+
+Tool schemas are the contract between the agent and the server. They define what parameters the agent can pass and what the server returns. Well-designed schemas prevent hallucination, reduce token cost, and enable agents to reason reliably over results.
+
+## Input Schemas: Flat, Typed, Annotated
+
+### The Three Rules
+
+1. **Flat structure preferred.** Avoid deep nesting; one or two levels maximum. Deeply nested objects are harder for agents to reason about and rejected by OpenAI strict mode.
+2. **Every field must have a description.** Use `.describe()` in Zod or `description` in JSON Schema.
+3. **Enums over free text.** Constrain values wherever the server enforces them.
+
+### Zod Example
+
+```typescript
+import { z } from 'zod';
+
+const searchIssuesSchema = z.object({
+  query: z.string()
+    .describe('Free text search. Examples: "status:Open", "assignee:alice@company.com", "label:bug"'),
+  
+  assignee: z.string().optional()
+    .describe('Filter by assignee name or email. Omit to search all assignees.'),
+  
+  status: z.enum(['Open', 'In Progress', 'Done', 'Closed']).optional()
+    .describe('Issue workflow state. Omit to search all statuses.'),
+  
+  priority: z.enum(['low', 'medium', 'high', 'critical']).optional()
+    .describe('Severity: low=cosmetic, medium=feature, high=blocker, critical=outage'),
+  
+  limit: z.number().int().min(1).max(100).default(50)
+    .describe('Max results to return. Default 50, capped at 100 for performance.'),
+  
+  offset: z.number().int().min(0).default(0)
+    .describe('Pagination offset. Use next_offset from the previous response to fetch the next page.'),
+}).strict();  // Strict mode rejects unexpected fields
+```
+
+### JSON Schema Equivalent
+
+```json
+{
+  "type": "object",
+  "required": ["query"],
+  "additionalProperties": false,
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Free text search. Examples: \"status:Open\", \"assignee:alice@company.com\""
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Open", "In Progress", "Done", "Closed"],
+      "description": "Issue workflow state. Omit to search all statuses."
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 50,
+      "description": "Max results to return. Default 50, capped at 100."
+    }
+  }
+}
+```
+
+## Field-Level Best Practices
+
+### UUID Fields
+
+Use `.uuid()` to reject numeric IDs that look like strings:
+
+```typescript
+customer_id: z.string().uuid()
+  .describe('The UUID of the customer. Get from `billing_list_customers` or `billing_get_customer`.'),
+```
+
+### Numeric Constraints
+
+For monetary amounts and counts, use `.int()` to prevent `2.5 items`:
+
+```typescript
+amount_cents: z.number().int().positive().max(100_000_000)
+  .describe('Invoice amount in cents (100 = $1.00). Max $1,000,000.'),
+
+quantity: z.number().int().positive()
+  .describe('Number of units. Must be at least 1.'),
+```
+
+### Dates and Times
+
+Use regex constraints for format validation:
+
+```typescript
+due_date: z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format')
+  .describe('Payment due date in YYYY-MM-DD format (e.g., "2025-02-28"). Must be today or later.'),
+
+start_time: z.string()
+  .regex(/^\d{2}:\d{2}$/, 'Must be HH:MM format')
+  .describe('Start time in 24-hour HH:MM format (e.g., "09:30").'),
+```
+
+### Enums for Constrained Values
+
+Never accept free text when a fixed set is valid:
+
+```typescript
+// Bad:
+status: z.string()
+  .describe('Issue status'),
+
+// Good:
+status: z.enum(['open', 'in_progress', 'closed', 'archived'])
+  .describe('Workflow state: open=new issue, in_progress=assigned, closed=resolved, archived=historical'),
+```
+
+### Optional Fields with Clear Defaults
+
+Document what happens when optional fields are omitted:
+
+```typescript
+include_resolved: z.boolean().optional()
+  .describe('Include closed/resolved items. Defaults to false (only show open issues).'),
+
+sort_by: z.enum(['created', 'updated', 'priority']).optional()
+  .describe('Sort order. Defaults to "updated" (most recently changed first).'),
+```
+
+### Arrays and Pagination
+
+Cap arrays to prevent accidental giant payloads:
+
+```typescript
+labels: z.array(z.string()).max(10).optional()
+  .describe('Filter by labels. Max 10 labels per search.'),
+
+file_ids: z.array(z.string().uuid()).max(50).optional()
+  .describe('File IDs to include. Max 50 files.'),
+```
+
+## Output Schemas: Semantic Content
+
+Declare an `outputSchema` when the tool's result will be consumed by other tools or stored in agent state. This enables downstream agents to receive typed structured data.
+
+```typescript
+const InvoiceOutputSchema = z.object({
+  invoice_id: z.string().uuid()
+    .describe('Unique invoice identifier'),
+  
+  status: z.enum(['draft', 'open', 'paid', 'void', 'overdue'])
+    .describe('Current invoice state'),
+  
+  amount_cents: z.number().int().positive()
+    .describe('Total invoice amount in cents'),
+  
+  currency: z.enum(['usd', 'eur', 'gbp']).optional()
+    .describe('ISO 4217 currency code'),
+  
+  payment_url: z.string().url().optional()
+    .describe('Hosted payment page URL if invoice is open'),
+  
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+    .describe('Payment due date in YYYY-MM-DD format'),
+});
+
+server.tool(
+  'billing_create_invoice',
+  'Creates a new invoice and returns the invoice details...',
+  inputSchema,
+  { outputSchema: InvoiceOutputSchema },
+  async (params) => {
+    const invoice = await createInvoice(params);
+    
+    return {
+      // Required when outputSchema is declared
+      structuredContent: {
+        invoice_id: invoice.id,
+        status: invoice.status,
+        amount_cents: invoice.amountCents,
+        currency: invoice.currency,
+        payment_url: invoice.hostedUrl ?? undefined,
+        due_date: invoice.dueDate,
+      },
+      // Human-readable content for display
+      content: [{
+        type: 'text',
+        text: `Invoice ${invoice.id} created: $${(invoice.amountCents / 100).toFixed(2)} due ${invoice.dueDate}`,
+      }],
+    };
+  }
+);
+```
+
+## Strict Mode for OpenAI Compatibility
+
+OpenAI requires `strict: true` and `additionalProperties: false` at every object level. Required when targeting OpenAI Agents SDK.
+
+```typescript
+// Zod
+const schema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+}).strict();
+
+// JSON Schema
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "email"],
+  "properties": {
+    "name": { "type": "string" },
+    "email": { "type": "string", "format": "email" }
+  }
+}
+```
+
+When a nested object exists, apply `additionalProperties: false` to it as well:
+
+```typescript
+const schema = z.object({
+  customer: z.object({
+    name: z.string(),
+    email: z.string().email(),
+  }).strict(),  // Inner object must also be strict
+  items: z.array(z.object({
+    sku: z.string(),
+    quantity: z.number().int(),
+  }).strict()),  // Each array element must be strict
+}).strict();
+```
+
+## Common Anti-Patterns
+
+### Nullable Parameters
+
+```typescript
+// Bad — OpenAI requires explicit omission, not null
+assignee: z.string().nullable().optional()
+
+// Good
+assignee: z.string().optional()  // Omit entirely if not needed
+```
+
+### Nested Union Types
+
+```typescript
+// Bad — OpenAI strict mode rejects
+result: z.union([
+  z.object({ type: z.literal('success'), data: z.any() }),
+  z.object({ type: z.literal('error'), message: z.string() })
+])
+
+// Good — use flat discriminated union or separate fields
+result_type: z.enum(['success', 'error']),
+result_data: z.any().optional(),
+error_message: z.string().optional(),
+```
+
+### Free-Text Parameters That Accept Fixed Values
+
+```typescript
+// Bad
+sort_order: z.string()
+  .describe('How to sort results')  // Vague; agent will guess
+
+// Good
+sort_order: z.enum(['ascending', 'descending'])
+  .describe('ascending=A-Z/0-9, descending=Z-A/9-0')
+```
+
+### Inconsistent ID Types
+
+Use UUID everywhere or use explicit string + format constraints, never mix:
+
+```typescript
+// Bad
+user_id: z.string().uuid(),
+order_id: z.string(),  // Is this a UUID? a number?
+
+// Good — all IDs are UUIDs
+user_id: z.string().uuid(),
+order_id: z.string().uuid(),
+```
+
+## Token Efficiency
+
+Schemas are included in every tool-call request. Reduce schema size by:
+
+- Using `.describe()` with short, punchy sentences (not paragraphs)
+- Removing redundant descriptions that are obvious from the field name
+- Using MCP lazy loading to defer tool metadata until needed
+- Splitting a large tool with 30 parameters into two smaller tools
+
+```typescript
+// Bad — bloated description
+due_date: z.string()
+  .describe('The date that the customer is expected to pay the invoice. This should be set to a business day if possible, and you should avoid weekends and holidays. The format must be YYYY-MM-DD with a four-digit year, two-digit month, and two-digit day of the month.'),
+
+// Good — concise but complete
+due_date: z.string()
+  .describe('Payment due date in YYYY-MM-DD format. Avoid weekends/holidays.'),
+```
+
+## Cross-Framework Compilation
+
+Use `zod-to-json-schema` to emit OpenAI-compatible JSON Schema from Zod:
+
+```typescript
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+
+const schema = z.object({
+  query: z.string(),
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
+
+const jsonSchema = zodToJsonSchema(schema);
+console.log(JSON.stringify(jsonSchema, null, 2));
+```
+
+## See also
+
+- `/docs/tool-design/naming-and-descriptions` — descriptions as prompts
+- `/docs/tool-design/anti-patterns` — schema design mistakes
+- ([JSON Schema 2020-12](https://json-schema.org/specification.html))
+- ([OpenAI strict mode](https://platform.openai.com/docs/guides/function-calling))
+- ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))
+- `zod-to-json-schema` on npm

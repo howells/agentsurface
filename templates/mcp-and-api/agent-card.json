@@ -1,0 +1,318 @@
+{
+  "$schema": "https://a2a-protocol.org/schemas/agent-card.json",
+  "protocolVersion": "1.0.0",
+  "name": "Example Agent API",
+  "description": "A production-grade agent that manages agents and runs workflows. Demonstrates A2A v1.0 RC with OAuth 2.1, DPoP, and structured task execution.",
+  "url": "https://api.example.com",
+  "documentationUrl": "https://docs.example.com/agents",
+  "provider": {
+    "name": "Example Corp",
+    "url": "https://example.com",
+    "contactEmail": "support@example.com"
+  },
+  "capabilities": [
+    "task-execution",
+    "multi-step-workflows",
+    "progress-tracking",
+    "error-recovery",
+    "async-execution"
+  ],
+  "protocolVersions": ["1.0.0"],
+  "authentication": {
+    "type": "OAuth2.1",
+    "flowType": "ClientCredentials",
+    "authorizationEndpoint": "https://auth.example.com/oauth/authorize",
+    "tokenEndpoint": "https://auth.example.com/oauth/token",
+    "scopes": [
+      {
+        "name": "agents:read",
+        "description": "Read agent metadata and configuration"
+      },
+      {
+        "name": "agents:write",
+        "description": "Create and modify agents"
+      },
+      {
+        "name": "agents:execute",
+        "description": "Execute agents and monitor runs"
+      },
+      {
+        "name": "agents:delete",
+        "description": "Delete agents (requires confirmation)"
+      }
+    ],
+    "dpopRequired": true,
+    "dpopSigningAlgorithms": ["RS256", "ES256"]
+  },
+  "skills": [
+    {
+      "id": "create-agent",
+      "name": "Create Agent",
+      "description": "Create a new AI agent with specified configuration, model, and tools",
+      "examples": [
+        {
+          "prompt": "Create an agent named 'Support Analyzer' using Claude Opus to analyze support tickets",
+          "parameters": {
+            "name": "Support Analyzer",
+            "model": "claude-opus-4-7",
+            "description": "Analyzes support tickets for priority and sentiment"
+          }
+        },
+        {
+          "prompt": "Create a lightweight agent using Haiku for quick customer inquiries",
+          "parameters": {
+            "name": "Quick Responder",
+            "model": "claude-haiku-4-5-20251001",
+            "max_steps": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "list-agents",
+      "name": "List Agents",
+      "description": "Retrieve a paginated list of agents with filtering and sorting",
+      "examples": [
+        {
+          "prompt": "Show me all active agents"
+        },
+        {
+          "prompt": "List agents created in the last 7 days, starting with the most recent",
+          "parameters": {
+            "status": "active",
+            "created_after": "2026-04-10"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-agent",
+      "name": "Run Agent",
+      "description": "Execute an agent with input data and monitor execution progress",
+      "examples": [
+        {
+          "prompt": "Run the Support Analyzer agent on ticket SUP-12345",
+          "parameters": {
+            "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+            "input": {
+              "ticket_id": "SUP-12345"
+            },
+            "timeout_seconds": 300
+          }
+        },
+        {
+          "prompt": "Execute the Quick Responder with a customer message and wait up to 2 minutes",
+          "parameters": {
+            "input": {
+              "message": "What are your business hours?",
+              "customer_id": "CUST-789"
+            },
+            "timeout_seconds": 120
+          }
+        }
+      ]
+    },
+    {
+      "id": "monitor-execution",
+      "name": "Monitor Execution",
+      "description": "Check the status of an agent execution and retrieve results when complete",
+      "examples": [
+        {
+          "prompt": "Check the status of execution abc123"
+        },
+        {
+          "prompt": "Get the results of the last run of the Support Analyzer"
+        }
+      ]
+    },
+    {
+      "id": "update-agent",
+      "name": "Update Agent",
+      "description": "Modify an agent's configuration, name, tools, or settings",
+      "examples": [
+        {
+          "prompt": "Update the Support Analyzer agent to use Claude Sonnet instead of Opus"
+        },
+        {
+          "prompt": "Add the 'email_send' tool to the Support Analyzer and increase max_steps to 25"
+        }
+      ]
+    }
+  ],
+  "defaultInputModes": [
+    {
+      "type": "text",
+      "description": "Plain text prompts and structured JSON parameters"
+    },
+    {
+      "type": "message",
+      "description": "Multi-turn conversation with context preservation"
+    }
+  ],
+  "defaultOutputModes": [
+    {
+      "type": "text",
+      "description": "Structured JSON results with execution metadata"
+    },
+    {
+      "type": "stream",
+      "description": "Server-Sent Events (SSE) for long-running tasks"
+    }
+  ],
+  "apiSpecification": {
+    "type": "OpenAPI",
+    "url": "https://api.example.com/v1/openapi.json",
+    "version": "3.1.0"
+  },
+  "workflowSpecifications": [
+    {
+      "type": "Arazzo",
+      "url": "https://api.example.com/v1/workflows/arazzo.yaml",
+      "version": "1.0.1"
+    }
+  ],
+  "rateLimits": {
+    "createAgent": {
+      "requests": 10,
+      "period": "minute"
+    },
+    "runAgent": {
+      "requests": 50,
+      "period": "minute"
+    },
+    "listAgents": {
+      "requests": 100,
+      "period": "minute"
+    }
+  },
+  "supportedLanguages": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "zh"
+  ],
+  "securitySchemes": {
+    "OAuth2": {
+      "type": "oauth2",
+      "flows": {
+        "clientCredentials": {
+          "tokenUrl": "https://auth.example.com/oauth/token",
+          "scopes": {
+            "agents:read": "Read agent metadata",
+            "agents:write": "Create and modify agents",
+            "agents:execute": "Execute agents"
+          }
+        }
+      }
+    },
+    "DPoP": {
+      "type": "dpop",
+      "description": "Demonstrating Proof-of-Possession (RFC 9449) for token binding",
+      "signingAlgorithms": ["RS256", "ES256"],
+      "required": true
+    }
+  },
+  "modelSupport": [
+    {
+      "provider": "Anthropic",
+      "models": [
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001"
+      ]
+    },
+    {
+      "provider": "OpenAI",
+      "models": ["gpt-5.4", "gpt-5.4-mini"]
+    },
+    {
+      "provider": "Google",
+      "models": [
+        "gemini-3.1-pro",
+        "gemini-3-flash"
+      ]
+    }
+  ],
+  "taskManagement": {
+    "asyncSupported": true,
+    "progressTracking": true,
+    "cancellation": true,
+    "retryPolicy": {
+      "maxAttempts": 3,
+      "backoffMultiplier": 2,
+      "initialDelaySeconds": 1
+    }
+  },
+  "errorHandling": {
+    "format": "application/problem+json",
+    "specification": "https://www.rfc-editor.org/rfc/rfc9457.html",
+    "commonErrors": [
+      {
+        "code": "validation_failed",
+        "statusCode": 400,
+        "description": "Request validation failed"
+      },
+      {
+        "code": "unauthorized",
+        "statusCode": 401,
+        "description": "Missing or invalid authentication"
+      },
+      {
+        "code": "forbidden",
+        "statusCode": 403,
+        "description": "Insufficient permissions"
+      },
+      {
+        "code": "not_found",
+        "statusCode": 404,
+        "description": "Resource not found"
+      },
+      {
+        "code": "conflict",
+        "statusCode": 409,
+        "description": "Resource conflict (e.g., duplicate)"
+      },
+      {
+        "code": "rate_limit",
+        "statusCode": 429,
+        "description": "Rate limit exceeded"
+      },
+      {
+        "code": "internal_error",
+        "statusCode": 500,
+        "description": "Server error"
+      }
+    ]
+  },
+  "compliance": {
+    "gdpr": true,
+    "ccpa": true,
+    "hipaa": false,
+    "soc2": true
+  },
+  "observability": {
+    "traceIdHeader": "X-Trace-ID",
+    "loggingSupported": true,
+    "metricsEndpoint": "https://api.example.com/metrics",
+    "healthEndpoint": "https://api.example.com/health"
+  },
+  "changelog": "https://docs.example.com/changelog",
+  "supportUrl": "https://support.example.com",
+  "statusPageUrl": "https://status.example.com",
+  "metadata": {
+    "version": "1.0.0",
+    "releaseDate": "2026-04-17",
+    "tags": [
+      "agent-management",
+      "workflow-orchestration",
+      "ai-powered",
+      "production"
+    ],
+    "certifications": [
+      "A2A-Compliant-1.0.0",
+      "OpenAPI-3.1.0",
+      "RFC9457-ErrorHandling"
+    ]
+  }
+}

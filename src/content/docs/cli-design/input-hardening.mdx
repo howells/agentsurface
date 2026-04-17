@@ -1,0 +1,342 @@
+---
+title: Input Hardening
+description: Defending against the specific ways agents construct invalid or dangerous inputs, which differ from how humans make mistakes
+---
+
+## Summary
+
+Agents hallucinate inputs differently than humans make typos. Path traversal sequences, invalid resource IDs, and plausible-looking but structurally wrong values are common agent failures. Input hardening defends against these patterns with strict validation, actionable error messages, and boundary checks. Agents are not trusted operators — validate everything.
+
+- Reject path traversal (../) sequences in file paths and resource IDs
+- Validate resource IDs against expected format and ownership
+- Check parameter bounds and constraints strictly
+- Return structured error messages listing what was wrong
+- Include valid examples in error messages for guidance
+
+Human users make typos. They transpose characters, forget required flags, and misremember option names. Agents hallucinate. They construct plausible-looking inputs that happen to be structurally invalid, semantically wrong, or — in some cases — actively dangerous.
+
+The failure modes are different, so the defenses must be different. Standard input validation catches the human failure modes. Agent-specific input hardening catches the hallucination patterns that standard validation misses entirely.
+
+<Callout type="warn">
+The security posture for agent-facing CLIs must be: **the agent is not a trusted operator**. Even when an agent is acting on behalf of an authorized user, it can be manipulated through prompt injection (see [Safety Rails](./safety-rails)) or simply hallucinate inputs that violate intended boundaries. Validate everything.
+</Callout>
+
+## Path Traversal Attacks
+
+Agents constructing file paths or resource IDs that include user-controlled segments will sometimes hallucinate `../` sequences. These are the same path traversal patterns that appear in web security vulnerabilities — and they are dangerous for exactly the same reasons when a CLI writes output files or resolves local paths.
+
+```bash
+# An agent asked to "save the export to the reports directory" might hallucinate:
+mytool export users --output ../../etc/cron.d/mytool-export
+
+# Or in a resource ID context:
+mytool deploy artifact --path ../../../root/.ssh/authorized_keys
+```
+
+Reject any input that contains path traversal sequences before resolving it:
+
+```typescript
+import { resolve, relative } from 'path';
+
+function validateOutputPath(input: string, allowedBase: string): string {
+  const resolved = resolve(allowedBase, input);
+  const rel = relative(allowedBase, resolved);
+
+  // rel will start with '..' if the resolved path escapes the allowed base
+  if (rel.startsWith('..') || resolve(rel) === resolved) {
+    exitWithError({
+      error: 'invalid_path',
+      message: `Output path must be within ${allowedBase}`,
+      received: input,
+      code: 2,
+    });
+  }
+
+  return resolved;
+}
+
+// Sandbox all output paths to CWD by default
+const safePath = validateOutputPath(flags.output, process.cwd());
+```
+
+For resource IDs — user IDs, record IDs, slugs — that are used to construct API paths, validate that they contain no path components:
+
+```typescript
+function validateResourceId(id: string, fieldName: string): string {
+  if (id.includes('/') || id.includes('\\') || id.includes('..')) {
+    exitWithError({
+      error: 'invalid_resource_id',
+      message: `${fieldName} must not contain path separators`,
+      received: id,
+      code: 2,
+    });
+  }
+  return id;
+}
+```
+
+## Control Characters
+
+ASCII characters below `0x20` (space) have no valid place in resource identifiers, names, or most string inputs. They appear in agent outputs as hallucinated values when the model's sampling process produces tokens that include control characters, or when an agent attempts to inject terminal escape sequences.
+
+```typescript
+function rejectControlCharacters(value: string, fieldName: string): string {
+  // Check for any character below ASCII 0x20 (space), excluding common whitespace
+  // that may be valid in display names (tab, newline)
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) {
+      exitWithError({
+        error: 'invalid_input',
+        message: `${fieldName} contains control characters (ASCII < 0x20)`,
+        field: fieldName,
+        code: 2,
+      });
+    }
+  }
+  return value;
+}
+```
+
+For resource IDs specifically, be stricter — reject all non-printable characters and limit to the expected character set:
+
+```typescript
+const RESOURCE_ID_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+
+function validateResourceIdFormat(id: string, fieldName: string): string {
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    exitWithError({
+      error: 'invalid_resource_id',
+      message: `${fieldName} must contain only alphanumeric characters, underscores, and hyphens`,
+      received: id,
+      field: fieldName,
+      code: 2,
+    });
+  }
+  return id;
+}
+```
+
+## Percent-Encoded Segments
+
+Agents reading from one API response and passing values to another will sometimes receive percent-encoded values and pass them through without decoding. `%2e%2e%2f` is `../` — a path traversal that bypasses naive string-matching checks.
+
+```bash
+# These should be treated identically and both rejected:
+mytool file get ../secret.txt
+mytool file get %2e%2e%2fsecret.txt
+mytool file get %252e%252e%252fsecret.txt  # double-encoded
+```
+
+Normalize percent-encoded input before validation:
+
+```typescript
+function normalizeAndValidate(input: string, fieldName: string): string {
+  let decoded = input;
+
+  // Iteratively decode until stable (handles double/triple encoding)
+  let previous = '';
+  while (decoded !== previous) {
+    previous = decoded;
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      // Invalid percent-encoding — reject outright
+      exitWithError({
+        error: 'invalid_encoding',
+        message: `${fieldName} contains invalid percent-encoding`,
+        received: input,
+        code: 2,
+      });
+    }
+  }
+
+  // Now validate the decoded form
+  if (decoded.includes('..') || decoded.includes('/') || decoded.includes('\\')) {
+    exitWithError({
+      error: 'invalid_input',
+      message: `${fieldName} contains path traversal sequences after decoding`,
+      received: input,
+      code: 2,
+    });
+  }
+
+  return decoded;
+}
+```
+
+## Embedded Query Params and Fragment Identifiers
+
+Agents constructing URLs or resource paths sometimes include `?` and `#` characters in values that should be plain identifiers. This happens when the agent conflates a full URL with a resource ID extracted from that URL.
+
+```bash
+# Agent hallucinated a full URL where an ID was expected
+mytool user get usr_01HV?token=abcdef
+mytool user get usr_01HV#profile
+
+# Or constructed a query param injection attempt
+mytool record update rec_01 --name "value&admin=true"
+```
+
+Reject these patterns in resource IDs:
+
+```typescript
+function rejectEmbeddedURLComponents(value: string, fieldName: string): string {
+  if (value.includes('?') || value.includes('#') || value.includes('&')) {
+    exitWithError({
+      error: 'invalid_resource_id',
+      message: `${fieldName} must not contain URL components (?, #, &)`,
+      received: value,
+      field: fieldName,
+      code: 2,
+    });
+  }
+  return value;
+}
+```
+
+## HTTP-Layer Percent-Encoding
+
+When constructing API requests, the CLI must percent-encode path parameters at the HTTP layer — independently of any decoding done during input validation. This prevents double-encoding while ensuring that valid special characters in IDs (spaces, Unicode) are correctly transmitted.
+
+```typescript
+import { encodeURIComponent } from 'url';
+
+function buildAPIPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => {
+    const value = params[key];
+    if (value === undefined) {
+      throw new Error(`Missing path parameter: ${key}`);
+    }
+    // Encode for safe HTTP transmission
+    return encodeURIComponent(value);
+  });
+}
+
+// Usage
+const path = buildAPIPath('/users/{user_id}/records/{record_id}', {
+  user_id: 'usr_01HV3K8MNPQR',
+  record_id: 'rec with spaces',  // becomes 'rec%20with%20spaces' in the URL
+});
+```
+
+## Output Path Sandboxing
+
+When a CLI writes output files — exports, downloads, generated files — sandbox all output paths to the current working directory. An agent that constructs an absolute path or escapes via `../` should receive a clear error, not silent redirection of the file.
+
+```typescript
+function sandboxOutputPath(input: string): string {
+  const cwd = process.cwd();
+  const resolved = path.resolve(cwd, input);
+
+  // Verify the resolved path is within CWD
+  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+    exitWithError({
+      error: 'path_outside_sandbox',
+      message: 'Output path must be within the current working directory',
+      received: input,
+      resolved: resolved,
+      sandbox: cwd,
+      code: 2,
+    });
+  }
+
+  return resolved;
+}
+```
+
+Document this behavior in `--help --json` for any command that writes files:
+
+```json
+{
+  "command": "export users",
+  "flags": [
+    {
+      "name": "output",
+      "type": "string",
+      "description": "Output file path. Must be within the current working directory. Relative paths are resolved from CWD.",
+      "sandbox": "cwd"
+    }
+  ]
+}
+```
+
+## Comprehensive Validation Pipeline
+
+Combine these checks into a reusable validation pipeline that applies consistently across commands:
+
+```typescript
+type ValidationRule = (value: string, field: string) => string;
+
+const resourceIdRules: ValidationRule[] = [
+  (v, f) => normalizeAndValidate(v, f),       // decode and check traversals
+  (v, f) => rejectControlCharacters(v, f),     // no ASCII < 0x20
+  (v, f) => rejectEmbeddedURLComponents(v, f), // no ?, #, &
+  (v, f) => validateResourceIdFormat(v, f),    // alphanumeric/dash/underscore only
+];
+
+const outputPathRules: ValidationRule[] = [
+  (v, f) => normalizeAndValidate(v, f),        // decode percent-encoding
+  (v, f) => rejectControlCharacters(v, f),     // no control characters
+  (v, f) => sandboxOutputPath(v),              // must stay within CWD
+];
+
+function validate(value: string, field: string, rules: ValidationRule[]): string {
+  return rules.reduce((v, rule) => rule(v, field), value);
+}
+
+// Usage in command handler
+const userId = validate(flags.userId, 'user_id', resourceIdRules);
+const outputFile = validate(flags.output, 'output', outputPathRules);
+```
+
+## Structured Validation Errors
+
+All validation failures must return structured errors (not prose) so agents can self-correct. Include the field name, the issue, the received value, and — where possible — what was expected:
+
+```json
+{
+  "error": "validation_failed",
+  "message": "Input validation failed",
+  "violations": [
+    {
+      "field": "user_id",
+      "issue": "contains_path_traversal",
+      "description": "user_id must not contain path separators or traversal sequences",
+      "received": "../admin",
+      "code": 2
+    }
+  ]
+}
+```
+
+This gives the agent enough information to identify which field was wrong, what the issue was, and what value it passed — without requiring it to parse error prose.
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | No input validation beyond basic type checks. |
+| 1 | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding). |
+| 2 | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs. |
+| 3 | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
+
+## Checklist
+
+- [ ] Path traversal sequences (`../`, `..\`) rejected in resource IDs and file paths
+- [ ] Control characters (ASCII < 0x20) rejected in all string inputs
+- [ ] Percent-encoded inputs are decoded iteratively before validation
+- [ ] Double-encoded sequences (`%252e`) are detected and rejected
+- [ ] Embedded URL components (`?`, `#`, `&`) rejected in resource IDs
+- [ ] Output file paths sandboxed to CWD; absolute paths outside CWD rejected
+- [ ] HTTP path parameters are percent-encoded at the request layer independently
+- [ ] All validation failures return structured JSON with field-level detail
+- [ ] Security posture is documented: "The agent is not a trusted operator"
+
+## Related Pages
+
+- [Safety Rails](./safety-rails) — dry-run, confirmations, and prompt injection defense
+- [Raw Payload Input](./raw-payload-input) — validating payload content, not just flags
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

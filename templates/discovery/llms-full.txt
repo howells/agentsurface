@@ -1,0 +1,591 @@
+<!--
+llms-full.txt — Full documentation concatenation for token-constrained agents or offline crawling.
+
+This is an auto-generated file. Regenerate periodically by running:
+  node scripts/generate-llms-full.js > public/llms-full.txt
+
+See llms-full-generator.ts (bottom of this file) for the script.
+-->
+
+# Acme Agent Tools — Full Documentation
+
+<!--- llms-full.txt auto-generated 2026-04-17 from 18 pages, ~52k tokens --->
+
+---
+
+## Table of contents
+
+1. Getting started
+2. SDK reference
+3. MCP server
+4. API reference
+5. Discovery
+6. Advanced topics
+
+---
+
+## 1. Getting started
+
+### Installation
+
+Acme Agent Tools runs on Node 20+ and pnpm.
+
+```sh
+pnpm add @acme/sdk
+```
+
+For a monorepo:
+
+```sh
+# Clone the repo
+git clone https://github.com/acme/agent-tools.git
+cd agent-tools
+
+# Install dependencies
+pnpm install
+
+# Start development servers
+pnpm dev
+```
+
+Runs at:
+- SDK playground: http://localhost:5173
+- API server: http://localhost:3001
+- Dashboard: http://localhost:3000
+
+### Quick start: build your first agent
+
+```typescript
+import { Agent, Tool } from '@acme/sdk';
+
+// 1. Define a tool
+const getTodaysTasks = Tool.define({
+  name: 'get_tasks',
+  description: 'Retrieve tasks for the current day',
+  parameters: {
+    filter: { type: 'string', enum: ['all', 'urgent'] },
+  },
+  handler: async ({ filter }) => {
+    return [
+      { id: 1, title: 'Review PR', priority: 'high' },
+      { id: 2, title: 'Write docs', priority: 'normal' },
+    ].filter(t => filter === 'all' || t.priority === 'high');
+  },
+});
+
+// 2. Create an agent
+const agent = new Agent({
+  name: 'TaskMaster',
+  description: 'Helps you manage your daily tasks',
+  tools: [getTodaysTasks],
+});
+
+// 3. Query the agent
+const result = await agent.query({
+  prompt: 'What are my urgent tasks?',
+});
+
+console.log(result);
+// Output: { success: true, data: [...] }
+```
+
+---
+
+## 2. SDK reference
+
+### Agent class
+
+```typescript
+import { Agent, Tool } from '@acme/sdk';
+
+const agent = new Agent({
+  name: string;                    // Identifier (lowercase, hyphenated)
+  description: string;             // One-liner for agent introspection
+  tools: Tool[];                   // Array of Tool definitions
+  model?: 'opus-4-7' | 'sonnet-4-6';  // Default: opus-4-7
+  systemPrompt?: string;           // Optional system instructions
+  mcpServers?: MCPServerConfig[];  // Remote MCP servers
+});
+
+// Query the agent
+await agent.query({
+  prompt: string;              // User message
+  messages?: Message[];        // Conversation history (optional)
+  maxTurns?: number;           // Max tool-call iterations (default: 10)
+  thinking?: boolean;          // Enable extended thinking (Opus only)
+  thinkingBudget?: number;     // Token budget for reasoning
+}): Promise<AgentResult>
+```
+
+### Tool definition
+
+Tools are the interface between agents and services. Define with Zod schemas:
+
+```typescript
+import { Tool } from '@acme/sdk';
+import { z } from 'zod';
+
+const searchUsers = Tool.define({
+  name: 'search_users',
+  description: 'Find users by email or name. Use when agent needs to identify or lookup a specific user.',
+  parameters: z.object({
+    query: z.string().describe('Search term (email or full name)'),
+    limit: z.number().int().positive().default(10).describe('Max results to return'),
+    include_archived: z.boolean().default(false).describe('Include archived users?'),
+  }),
+  handler: async ({ query, limit, include_archived }) => {
+    // Your implementation
+    return users;
+  },
+});
+```
+
+**Tool naming:** Namespace with service name. `search_users`, `create_invoice`, not `search` or `create`.
+
+**Parameters:** All fields explicit; no implicit context. Provide examples in descriptions.
+
+**Handler:** Async function; return semantic data, not opaque IDs. Errors should be data in result, not thrown.
+
+### Tool result shape
+
+```typescript
+type ToolResult =
+  | { success: true; data: unknown; tokens?: number }
+  | {
+      success: false;
+      error: {
+        type: string;           // RFC 9457: 'validation_error', 'not_found', 'auth_required'
+        status: number;         // HTTP status code
+        detail: string;         // Human-readable error
+        instance?: string;      // URI identifying the specific occurrence
+      };
+    };
+```
+
+Example error response:
+
+```typescript
+{
+  success: false,
+  error: {
+    type: 'validation_error',
+    status: 400,
+    detail: 'Email is required and must be valid format.',
+    instance: '/api/users/create#email',
+  }
+}
+```
+
+---
+
+## 3. MCP server
+
+### Server setup
+
+MCP (Model Context Protocol) 2025-11-25 servers expose tools, resources, and prompts to agents.
+
+```typescript
+// server.ts
+import { MCPServer } from '@acme/sdk/mcp';
+import { createToolHandlers } from './tools';
+
+const server = new MCPServer({
+  name: 'my-service',
+  version: '1.0.0',
+  capabilities: ['tools', 'resources'],
+});
+
+// Register tools
+const tools = createToolHandlers();
+server.tools.register(tools);
+
+// Start server (stdio transport)
+server.start();
+```
+
+### Tool registration
+
+```typescript
+server.tools.register({
+  name: 'user_search',
+  description: 'Search users by email or name',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search term' },
+      limit: { type: 'integer', default: 10 },
+    },
+    required: ['query'],
+    additionalProperties: false,  // Required for OpenAI strict: true
+  },
+  handler: async (input) => {
+    // Validate input
+    const { query, limit } = input;
+
+    // Execute
+    const results = await db.users.search(query, limit);
+
+    // Return RFC 9457 shape
+    return {
+      success: true,
+      data: results,
+    };
+  },
+});
+```
+
+### Resource endpoints (MCP 2025-11-25)
+
+Resources expose static or dynamic data that agents can read:
+
+```typescript
+server.resources.register({
+  uri: 'memory://task-backlog',
+  name: 'Task backlog',
+  description: 'All pending tasks',
+  mimeType: 'application/json',
+  handler: async () => ({
+    tasks: await db.tasks.list({ status: 'pending' }),
+  }),
+});
+```
+
+### OAuth 2.0 (M2M client credentials)
+
+For remote agents to call your MCP server securely:
+
+```typescript
+// server.ts
+server.auth.oauth2({
+  tokenEndpoint: 'https://example.com/oauth/token',
+  requiredScopes: ['agent:execute', 'agent:read'],
+  validateToken: async (token) => {
+    // Verify JWT: iss, aud, exp
+    const claims = jwt.verify(token, PUBLIC_KEY);
+    return claims.aud === 'agents' && claims.exp > Date.now();
+  },
+});
+
+// Agent side (SDK)
+const agent = new Agent({
+  mcpServers: [{
+    name: 'my-service',
+    url: 'https://example.com/mcp',
+    auth: {
+      type: 'oauth2',
+      clientId: 'my-agent',
+      clientSecret: process.env.MCP_CLIENT_SECRET,
+      grantType: 'client_credentials',
+    },
+  }],
+});
+```
+
+---
+
+## 4. API reference
+
+### REST endpoints
+
+All responses follow RFC 9457 `Problem+JSON` for errors.
+
+#### POST /agents/:agentId/query
+
+Query an agent with a prompt.
+
+```
+POST /agents/my-agent/query
+Content-Type: application/json
+
+{
+  "prompt": "What are my tasks?",
+  "maxTurns": 5
+}
+
+200 OK:
+{
+  "success": true,
+  "data": {...},
+  "tokensUsed": 1234
+}
+
+400 Bad Request:
+{
+  "type": "https://example.com/errors/validation",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "Prompt is required and must be non-empty.",
+  "instance": "/agents/my-agent/query"
+}
+```
+
+#### GET /tools
+
+List all available tools.
+
+```
+GET /tools
+
+200 OK:
+{
+  "tools": [
+    {
+      "name": "user_search",
+      "description": "...",
+      "parameters": {...}
+    },
+    ...
+  ]
+}
+```
+
+#### POST /tools/:toolName/call
+
+Directly invoke a tool (for debugging).
+
+```
+POST /tools/user_search/call
+Content-Type: application/json
+
+{
+  "query": "alice@example.com",
+  "limit": 5
+}
+
+200 OK:
+{
+  "success": true,
+  "data": {...}
+}
+```
+
+### Content negotiation
+
+API supports markdown responses for agents with limited context:
+
+```
+GET /api/docs/getting-started
+Accept: text/markdown
+
+200 OK
+Content-Type: text/markdown; charset=utf-8
+Vary: Accept
+x-markdown-tokens: 2500
+
+# Getting Started
+
+[Full markdown content...]
+```
+
+---
+
+## 5. Discovery
+
+### AGENTS.md
+
+Standard agent context file. Read by Claude Code, Cursor, Copilot, and others.
+
+```
+https://example.com/AGENTS.md
+https://github.com/acme/agent-tools/blob/main/AGENTS.md
+```
+
+See canonical spec: https://agents.md
+
+### Agent card (A2A v1.0 RC)
+
+If you run an MCP server or agent interface, advertise yourself at `/.well-known/agent.json`:
+
+```json
+GET /.well-known/agent.json
+
+{
+  "name": "Acme Agent Tools",
+  "description": "API for agent-consumable services",
+  "homepage": "https://example.com",
+  "rpc_endpoint": {
+    "url": "https://example.com/rpc",
+    "protocol": "json-rpc-2.0"
+  },
+  "auth": {
+    "type": "oauth2",
+    "grant_type": "client_credentials",
+    "token_endpoint": "https://example.com/oauth/token"
+  },
+  "capabilities": ["task_execution", "message_routing"],
+  "version": "1.0.0"
+}
+```
+
+Spec: https://a2a-protocol.org/latest/specification/
+
+### robots.txt (AI crawlers)
+
+Allow AI training and search bots; block admin paths:
+
+```
+# Allow AI training bots
+User-agent: GPTBot
+Disallow: /admin
+Disallow: /private
+
+User-agent: ClaudeBot
+Disallow: /admin
+Disallow: /private
+
+User-agent: PerplexityBot
+Disallow: /admin
+
+# Block all other bots
+User-agent: *
+Disallow: /admin
+Allow: /llms.txt
+```
+
+Spec: https://agents.md (Robots.txt section)
+
+---
+
+## 6. Advanced topics
+
+### JSON-LD structured data
+
+Embed machine-readable metadata in HTML for agent discovery:
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Acme Agent Tools",
+  "description": "SDK and servers for agent integration",
+  "url": "https://example.com",
+  "codeRepository": "https://github.com/acme/agent-tools",
+  "downloadUrl": "https://www.npmjs.com/package/@acme/sdk",
+  "applicationCategory": "DeveloperApplication"
+}
+</script>
+```
+
+Types: `SoftwareApplication`, `WebAPI`, `APIReference`, `FAQPage`, `HowTo`.
+
+### NLWeb integration
+
+Expose a `/ask` endpoint for natural language queries:
+
+```typescript
+// app/api/ask/route.ts (Next.js)
+export async function POST(req: Request) {
+  const { query, max_sources } = await req.json();
+
+  // Search docs, find relevant pages
+  const results = await searchDocs(query);
+
+  // Use LLM to generate answer
+  const answer = await generateAnswer(query, results);
+
+  return Response.json({
+    answer: answer,
+    sources: results.map(r => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.snippet,
+    })),
+  });
+}
+```
+
+Spec: https://github.com/microsoft/NLWeb
+
+### Error handling (RFC 9457)
+
+All errors follow `Problem+JSON` format:
+
+```typescript
+// Validation error
+{
+  "type": "https://example.com/errors/validation",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "Email must be valid format.",
+  "instance": "/api/users/create#email",
+  "errors": [
+    { "field": "email", "message": "Invalid format" }
+  ]
+}
+
+// Not found
+{
+  "type": "https://example.com/errors/not-found",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "User with id=123 does not exist.",
+  "instance": "/api/users/123"
+}
+
+// Rate limit
+{
+  "type": "https://example.com/errors/rate-limit",
+  "title": "Too Many Requests",
+  "status": 429,
+  "detail": "Rate limit exceeded. Retry after 60 seconds.",
+  "retry_after": 60
+}
+```
+
+Spec: https://www.rfc-editor.org/rfc/rfc9457.html
+
+---
+
+## Links
+
+- [Repository](https://github.com/acme/agent-tools)
+- [AGENTS.md](https://example.com/AGENTS.md)
+- [MCP 2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25)
+- [A2A v1.0 RC spec](https://a2a-protocol.org/latest/specification/)
+- [RFC 9457 (Problem+JSON)](https://www.rfc-editor.org/rfc/rfc9457.html)
+- [schema.org types](https://schema.org)
+
+---
+
+## Generate script
+
+```typescript
+// scripts/generate-llms-full.ts — Run via: npx ts-node scripts/generate-llms-full.ts
+
+import fs from 'fs';
+import path from 'path';
+import glob from 'glob';
+
+const docsDir = path.join(process.cwd(), 'docs');
+const files = glob.sync('**/*.md', { cwd: docsDir }).sort();
+
+let content = `# Acme Agent Tools — Full Documentation\n\n`;
+content += `<!--- llms-full.txt auto-generated ${new Date().toISOString().split('T')[0]} from ${files.length} pages --->\n\n`;
+
+for (const file of files) {
+  const filePath = path.join(docsDir, file);
+  const markdown = fs.readFileSync(filePath, 'utf-8');
+
+  // Extract heading (H1 or H2)
+  const heading = markdown.match(/^#{1,2}\s+(.+)/m)?.[1] || path.basename(file);
+  content += `\n\n## ${heading}\n\n`;
+  content += markdown.replace(/^# /, '### ');  // Shift headings down
+}
+
+process.stdout.write(content);
+```
+
+To auto-generate:
+```sh
+npx ts-node scripts/generate-llms-full.ts > public/llms-full.txt
+```
+
+Or add as npm script:
+```json
+{
+  "scripts": {
+    "docs:llms-full": "ts-node scripts/generate-llms-full.ts > public/llms-full.txt"
+  }
+}
+```

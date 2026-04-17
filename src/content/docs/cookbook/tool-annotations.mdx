@@ -1,0 +1,443 @@
+---
+title: Tool Annotations (READ_ONLY/WRITE/DESTRUCTIVE)
+description: Declare tool intent once. Drive system prompts, safety rules, and client UI automatically.
+---
+
+## Summary
+
+Every MCP tool declares intent via annotations: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. Annotations are declarative metadata — not behaviors, not constraints. Use them in three places: system prompt (to inject safety rules), client UI (to show confirmations), and tool-selection logic (to filter dangerous tools in certain contexts).
+
+- **READ_ONLY**: Safe to call repeatedly; no state change. Example: `customers_list`, `bank_accounts_balances`.
+- **WRITE**: Idempotent state change; can be safely retried. Example: `invoice_create_draft`, `category_update`.
+- **DESTRUCTIVE**: Irreversible; requires confirmation before the model accesses it. Example: `invoice_delete`, `team_member_remove`.
+- **Annotations as metadata**: Frameworks read them; you don't enforce them in tool logic.
+
+---
+
+## MCP Annotation Spec
+
+Each tool in MCP 0.6+ accepts an `annotations` object:
+
+```typescript
+interface ToolAnnotations {
+  readOnlyHint?: boolean;        // True: no state change
+  destructiveHint?: boolean;     // True: irreversible
+  idempotentHint?: boolean;      // True: safe to retry
+  openWorldHint?: boolean;       // True: external data (web search, APIs)
+}
+```
+
+The production app uses three presets:
+
+```typescript
+// mcp/types.ts
+export const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+
+export const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
+
+export const DESTRUCTIVE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+```
+
+---
+
+## Pattern: Tool Registry with Annotations
+
+```typescript
+// mcp/tools/customers.ts
+import { READ_ONLY_ANNOTATIONS, WRITE_ANNOTATIONS, DESTRUCTIVE_ANNOTATIONS } from "../types";
+import { z } from "zod";
+
+export function registerCustomerTools(server: McpServer, ctx: McpContext) {
+  const db = ctx.db;
+
+  // READ_ONLY: Safe to call anytime
+  server.registerTool(
+    "customers_list",
+    {
+      title: "List Customers",
+      description: "Get all customers for the team. Filter by name or status.",
+      inputSchema: z.object({
+        status: z.enum(["active", "inactive", "archived"]).optional(),
+      }).strict(),
+      outputSchema: z.object({
+        data: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          status: z.string(),
+        })),
+      }),
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    async (params) => {
+      const customers = await db.getCustomers(ctx.teamId, params.status);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(customers),
+        }],
+        structuredContent: { data: customers },
+      };
+    }
+  );
+
+  // WRITE: State change, but idempotent (retryable)
+  server.registerTool(
+    "customer_create",
+    {
+      title: "Create Customer",
+      description: "Create a new customer. Idempotent by name (will not create duplicate).",
+      inputSchema: z.object({
+        name: z.string().min(1),
+        email: z.string().email().optional(),
+        taxId: z.string().optional(),
+      }).strict(),
+      outputSchema: z.object({
+        customerId: z.string(),
+        name: z.string(),
+        created: z.boolean(), // true if newly created, false if already existed
+      }),
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (params) => {
+      const existing = await db.getCustomerByName(ctx.teamId, params.name);
+      if (existing) {
+        return {
+          content: [{
+            type: "text",
+            text: `Customer ${params.name} already exists (ID: ${existing.id})`,
+          }],
+          structuredContent: { customerId: existing.id, name: existing.name, created: false },
+        };
+      }
+
+      const customer = await db.createCustomer(ctx.teamId, {
+        name: params.name,
+        email: params.email,
+        taxId: params.taxId,
+      });
+
+      return {
+        content: [{
+          type: "text",
+          text: `Created customer ${customer.name} (ID: ${customer.id})`,
+        }],
+        structuredContent: { customerId: customer.id, name: customer.name, created: true },
+      };
+    }
+  );
+
+  // DESTRUCTIVE: Irreversible; should require model-side confirmation
+  server.registerTool(
+    "customer_delete",
+    {
+      title: "Delete Customer",
+      description: "Permanently delete a customer and all associated records. Cannot be undone.",
+      inputSchema: z.object({
+        customerId: z.string(),
+      }).strict(),
+      outputSchema: z.object({
+        success: z.boolean(),
+        message: z.string(),
+      }),
+      annotations: DESTRUCTIVE_ANNOTATIONS,
+    },
+    async (params) => {
+      const customer = await db.getCustomer(ctx.teamId, params.customerId);
+      if (!customer) {
+        return {
+          content: [{
+            type: "text",
+            text: "Customer not found",
+          }],
+          structuredContent: { success: false, message: "Customer not found" },
+        };
+      }
+
+      await db.deleteCustomer(ctx.teamId, params.customerId);
+
+      return {
+        content: [{
+          type: "text",
+          text: `Deleted customer ${customer.name}`,
+        }],
+        structuredContent: { success: true, message: `Deleted customer ${customer.name}` },
+      };
+    }
+  );
+}
+```
+
+---
+
+## Using Annotations in System Prompt
+
+The system prompt reads annotations and generates safety rules dynamically:
+
+```typescript
+// chat/prompt.ts
+export function buildSystemPrompt(ctx: UserContext, tools: ToolDefinition[]): string {
+  // Separate tools by annotation
+  const readOnlyTools = tools.filter(t => t.annotations?.readOnlyHint);
+  const writeTools = tools.filter(t => !t.annotations?.readOnlyHint && !t.annotations?.destructiveHint);
+  const destructiveTools = tools.filter(t => t.annotations?.destructiveHint);
+
+  const destructiveList = destructiveTools.map(t => `- ${t.name}: ${t.description}`).join("\n");
+
+  return `
+You are an AI assistant for a SaaS application.
+
+## Available Tools
+
+You have ${tools.length} tools organized by safety level:
+
+### Read-only (safe to call anytime)
+${readOnlyTools.map(t => `- ${t.name}: ${t.description}`).join("\n")}
+
+### Write (state-changing, but idempotent)
+${writeTools.map(t => `- ${t.name}: ${t.description}`).join("\n")}
+
+### Destructive (irreversible; requires explicit user confirmation)
+${destructiveList}
+
+## Safety Rules
+
+1. **Read-only tools**: Call freely. Safe to retry.
+2. **Write tools**: Safe to call, but explain what will happen first.
+3. **Destructive tools**: NEVER call without explicit user confirmation. Always state what will be deleted/changed and ask "Confirm?" before proceeding.
+4. Before calling ANY tool that changes state (write or destructive), always:
+   - State the intended action in plain language
+   - If destructive, ask for explicit confirmation (the user must say "yes" or "confirm")
+   - Only call the tool after the user has confirmed
+5. If the user says "no" or expresses doubt, do not call the tool.
+
+## Examples
+
+**User**: "Delete all inactive customers from 2020"
+**You**: "This will permanently delete X customers from 2020. They cannot be recovered. Confirm?" (wait for user response)
+
+**User**: "Create an order for Alice"
+**You**: (Call create_order immediately; explain what was created afterward)
+
+**User**: "What customers do we have?"
+**You**: (Call customers_list immediately; no confirmation needed)
+`;
+}
+```
+
+---
+
+## Using Annotations in Client UI
+
+The client reads annotations to show confirmation dialogs:
+
+```typescript
+// frontend/components/agent-response.tsx
+import { ToolDefinition } from "@ai-sdk/mcp";
+
+type ToolAnnotation = ToolDefinition["annotations"];
+
+function shouldShowConfirmation(tool: ToolDefinition): boolean {
+  return tool.annotations?.destructiveHint === true;
+}
+
+function getConfirmationMessage(tool: ToolDefinition): string {
+  if (tool.annotations?.destructiveHint) {
+    return `This action is irreversible. ${tool.description}. Proceed?`;
+  }
+  if (tool.annotations?.destructiveHint === false && !tool.annotations?.readOnlyHint) {
+    return `About to ${tool.description}. OK?`;
+  }
+  return "";
+}
+
+function ToolCallUI({ toolCall, toolDef }: Props) {
+  const [confirmed, setConfirmed] = useState(false);
+
+  if (shouldShowConfirmation(toolDef) && !confirmed) {
+    return (
+      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+        <p className="text-sm font-medium text-yellow-900">
+          {getConfirmationMessage(toolDef)}
+        </p>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => setConfirmed(true)}
+            className="px-3 py-1 bg-yellow-600 text-white rounded text-sm"
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => cancelToolCall(toolCall.id)}
+            className="px-3 py-1 bg-gray-300 text-gray-800 rounded text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+      <p className="text-sm font-medium">{toolDef.title}</p>
+      <p className="text-xs text-gray-600 mt-1">{JSON.stringify(toolCall.arguments)}</p>
+    </div>
+  );
+}
+```
+
+---
+
+## Using Annotations for Tool Selection
+
+At scale (>20 tools), filter tools by annotation before semantic selection:
+
+```typescript
+// chat/tools.ts
+export function buildPrepareStep(options: {
+  maxTools: number;
+  alwaysActive?: string[];
+  excludeDestructive?: boolean; // Prevent destructive tools unless explicitly selected
+}): PrepareStepFunction {
+  const toolIndex = ...; // embeddings-based tool index
+
+  return async (stepOptions: any) => {
+    let candidates = await toolIndex.select(stepOptions.userMessage, {
+      maxTools: options.maxTools,
+    });
+
+    // Filter: exclude destructive tools unless context explicitly allows them
+    if (options.excludeDestructive) {
+      candidates = candidates.filter(t => !t.annotations?.destructiveHint);
+    }
+
+    // Always include safety-critical tools
+    if (options.alwaysActive) {
+      for (const name of options.alwaysActive) {
+        if (!candidates.some(c => c.name === name)) {
+          candidates.push(toolIndex.getToolByName(name));
+        }
+      }
+    }
+
+    return {
+      activeTools: candidates.map(c => c.name),
+    };
+  };
+}
+```
+
+---
+
+## Annotation Guidelines
+
+### When to Use READ_ONLY
+- List/search/fetch operations: `customers_list`, `transactions_search`, `orders_get`.
+- Computation with no side effects: `calculate_tax`, `forecast_spending`.
+- Safe to call multiple times in a row without concern.
+
+### When to Use WRITE
+- Create/update operations that don't destroy data: `customer_create`, `order_update_status`, `invoice_update_draft`.
+- Should be **idempotent** — calling twice with the same params should produce the same result (no duplicate creates).
+- OK for model to call with minimal explicit confirmation; can explain afterward.
+
+### When to Use DESTRUCTIVE
+- Deletes: `customer_delete`, `order_cancel`.
+- Bulk mutations: `bulk_archive_old_records`.
+- Irreversible state changes: `finalize_invoice` (can't be undone), `close_account`.
+- **Never call without explicit user confirmation in the prompt.**
+
+### Special Cases
+
+**openWorldHint**: Set to `true` for tools that reach external data (web search, third-party APIs). Helps the model understand that results may be dynamic or unverified.
+
+```typescript
+server.registerTool(
+  "web_search",
+  {
+    title: "Web Search",
+    description: "Search the internet for current information.",
+    inputSchema: z.object({ query: z.string() }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false, // Results may vary over time
+      openWorldHint: true,   // External data source
+    },
+  },
+  // ...
+);
+```
+
+---
+
+## Testing Annotations
+
+Verify annotations are declared and used consistently:
+
+```typescript
+// __tests__/annotations.test.ts
+import { registerCustomerTools } from "../tools/customers";
+import { READ_ONLY_ANNOTATIONS, DESTRUCTIVE_ANNOTATIONS } from "../types";
+
+test("all read-only tools have correct annotations", () => {
+  const tools = getRegisteredTools();
+  const readOnlyTools = ["customers_list", "customers_get", "transactions_list"];
+
+  readOnlyTools.forEach(name => {
+    const tool = tools[name];
+    expect(tool.annotations).toEqual(READ_ONLY_ANNOTATIONS);
+  });
+});
+
+test("destructive tools are marked as destructive", () => {
+  const tools = getRegisteredTools();
+  const destructiveTools = ["customer_delete", "order_cancel"];
+
+  destructiveTools.forEach(name => {
+    const tool = tools[name];
+    expect(tool.annotations?.destructiveHint).toBe(true);
+  });
+});
+
+test("system prompt includes safety rules for destructive tools", () => {
+  const prompt = buildSystemPrompt({}, getRegisteredTools());
+  expect(prompt).toContain("NEVER call without explicit user confirmation");
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Define three annotation presets: READ_ONLY, WRITE, DESTRUCTIVE.
+- [ ] Tag every tool at registration time with appropriate annotations.
+- [ ] Generate system prompt dynamically from annotations; include safety rules.
+- [ ] Client UI reads annotations to show confirmations for DESTRUCTIVE tools.
+- [ ] Semantic tool selection filters out DESTRUCTIVE tools in certain contexts.
+- [ ] Test that annotations match tool behavior (read-only tools don't mutate).
+- [ ] Document annotation semantics for tool authors.
+
+---
+
+## See Also
+
+- [Tool Design](/docs/tool-design) — MCP tool schema and transport.
+- [Agentic Loop](/docs/cookbook/agentic-loop) — how frameworks consume annotations.
+- [Two-Step Confirmation](/docs/cookbook/two-step-confirmation) — enforcing confirmation workflows.
+

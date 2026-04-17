@@ -1,0 +1,214 @@
+---
+title: Evaluation Frameworks
+description: RAGAS, MTEB, recall@k, nDCG, MRR; CI/CD eval loops
+---
+
+Measure retrieval quality obsessively. Without metrics, quality degrades invisibly.
+
+## Summary
+
+**RAGAS** (Retrieval-Augmented Generation Assessment): Faithfulness, answer relevancy, context precision, context recall.  
+**MTEB**: 56+ tasks; text-only; leaderboard updated monthly.  
+**Custom metrics**: Recall@k, nDCG, MRR, domain-specific.
+
+## RAGAS metrics (TypeScript)
+
+```typescript
+import { evaluate } from '@ragas/sdk';
+
+const testDataset = [
+  {
+    question: 'Which vendors supply Acme?',
+    groundTruthAnswer: 'TechStart Inc and WidgetCorp',
+    retrievedContext: 'Acme sources from TechStart Inc (electronics) and WidgetCorp (hardware).',
+  },
+];
+
+async function evaluateRAGS() {
+  const results = await evaluate({
+    dataset: testDataset,
+    metrics: ['faithfulness', 'answerRelevancy', 'contextPrecision', 'contextRecall'],
+  });
+
+  console.log('Faithfulness:', results.faithfulness.mean); // 0–1
+  console.log('Answer Relevancy:', results.answerRelevancy.mean); // 0–1
+  console.log('Context Precision:', results.contextPrecision.mean); // 0–1
+  console.log('Context Recall:', results.contextRecall.mean); // 0–1
+}
+```
+
+**Metrics:**
+- **Faithfulness:** Retrieved context supports generated answer (0–1)
+- **Answer Relevancy:** Answer addresses query (0–1)
+- **Context Precision:** Relevant docs ranked first (0–1)
+- **Context Recall:** All relevant docs retrieved (0–1)
+
+Target: All metrics > 0.8 in production.
+
+## MTEB evaluation
+
+```typescript
+async function evaluateMTEB() {
+  // Use MTEB library
+  const results = await mteb.evaluate({
+    model: 'text-embedding-3-large',
+    tasks: ['retrieval', 'classification', 'semantic-similarity'],
+  });
+
+  console.log('MTEB Score:', results.average); // 0–100
+}
+```
+
+**Caveats:**
+- Text-only (no images, video)
+- No cross-lingual retrieval
+- Limited long-document coverage (`<10K` tokens)
+- No Matryoshka truncation tests
+
+## Custom metrics: recall, nDCG, MRR
+
+```typescript
+function recall(retrieved: Set<string>, relevant: Set<string>): number {
+  const matches = [...retrieved].filter(id => relevant.has(id)).length;
+  return matches / relevant.size;
+}
+
+function nDCG(relevances: number[], k: number = 10): number {
+  const dcg = relevances
+    .slice(0, k)
+    .reduce((sum, rel, i) => sum + rel / Math.log2(i + 2), 0);
+
+  const idcg = [...relevances].sort((a, b) => b - a).slice(0, k)
+    .reduce((sum, rel, i) => sum + rel / Math.log2(i + 2), 0);
+
+  return dcg / (idcg || 1);
+}
+
+function mrr(relevantIndex: number): number {
+  return relevantIndex >= 0 ? 1 / (relevantIndex + 1) : 0;
+}
+
+// Usage
+const retrieved = new Set(['doc1', 'doc2', 'doc3']);
+const relevant = new Set(['doc1', 'doc4', 'doc5']);
+console.log('Recall@3:', recall(retrieved, relevant)); // 0.33
+console.log('nDCG@10:', nDCG([1, 0, 1, 0, 1], 10)); // ~0.63
+console.log('MRR (relevant at index 0):', mrr(0)); // 1.0
+```
+
+## Domain-specific evaluation
+
+```typescript
+async function evaluateCustom(queries: any[]) {
+  let correctCount = 0;
+  let totalLatency = 0;
+
+  for (const { query, expectedAnswer } of queries) {
+    const start = Date.now();
+    const result = await retrieve(query);
+    totalLatency += Date.now() - start;
+
+    // Custom: does result contain expected answer?
+    if (result.some(r => r.text.includes(expectedAnswer))) {
+      correctCount++;
+    }
+  }
+
+  console.log(`Custom Accuracy: ${((correctCount / queries.length) * 100).toFixed(2)}%`);
+  console.log(`Avg Latency: ${(totalLatency / queries.length).toFixed(0)}ms`);
+}
+```
+
+## CI/CD evaluation pipeline
+
+```typescript
+// jest.test.ts
+describe('Retrieval Quality', () => {
+  test('maintains recall@10 > 0.80', async () => {
+    const testSet = loadTestDataset();
+    const results = await evaluateRetrieval(testSet);
+
+    expect(results.recall_at_10).toBeGreaterThan(0.80);
+  });
+
+  test('faithfulness > 0.85', async () => {
+    const ragas = await evaluateRAGS();
+    expect(ragas.faithfulness).toBeGreaterThan(0.85);
+  });
+
+  test('latency p95 < 500ms', async () => {
+    const latencies = await benchmarkLatency(1000);
+    const p95 = percentile(latencies, 95);
+    expect(p95).toBeLessThan(500);
+  });
+});
+```
+
+Run in GitHub Actions / CI:
+
+```yaml
+name: Retrieval Quality Gates
+
+on: [push]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm test -- --testNamePattern="Retrieval Quality"
+```
+
+## Embedding drift detection
+
+```typescript
+async function detectEmbeddingDrift() {
+  const sample = await db.getSample(1000);
+  const oldEmbeddings = sample.map(s => s.embedding);
+
+  // Re-embed with current model
+  const newEmbeddings = await Promise.all(
+    sample.map(s => openai.embeddings.create({
+      model: 'text-embedding-3-large',
+      input: s.text,
+    }))
+  );
+
+  // Compute similarity
+  const similarities = oldEmbeddings.map((old, i) =>
+    cosineSimilarity(old, newEmbeddings[i].data[0].embedding)
+  );
+
+  const meanSim = similarities.reduce((a, b) => a + b) / similarities.length;
+
+  if (meanSim < 0.95) {
+    console.warn(`Embedding drift detected (mean similarity: ${meanSim.toFixed(3)})`);
+    console.warn('Consider re-embedding corpus');
+  }
+
+  return meanSim;
+}
+
+// Run monthly
+schedule.scheduleJob('0 0 1 * *', detectEmbeddingDrift);
+```
+
+## Comparison: metrics and targets
+
+| Metric | Computation | Target | What it measures |
+|--------|-------------|--------|------------------|
+| **Recall@k** | (relevant docs in top-k) / total relevant | > 0.8 | Coverage |
+| **nDCG@k** | Normalized discounted gain | > 0.8 | Ranking quality |
+| **MRR** | 1 / rank of first relevant | > 0.7 | First-result quality |
+| **Faithfulness** | Answer supported by context | > 0.85 | Hallucination prevention |
+| **Answer Relevancy** | Answer addresses query | > 0.85 | Utility |
+| **Context Precision** | Relevant docs ranked first | > 0.8 | Noise reduction |
+| **Context Recall** | All relevant docs retrieved | > 0.8 | Completeness |
+| **Latency (p95)** | 95th percentile response time | < 500ms | User experience |
+| **Cost per query** | Tokens consumed | < $0.05 | Economics |
+
+## See also
+
+- [RAGAS docs](https://docs.ragas.io/)
+- [MTEB leaderboard](https://huggingface.co/mteb)
+- [TruLens docs](https://www.trulens.org/)

@@ -1,0 +1,338 @@
+---
+title: Clustering Findings
+description: Organizing findings into actionable work clusters
+---
+
+## Summary
+
+Organize findings by user-visible problem solved ("what you'd fix together"), not by category or dimension. Cluster name answers: "What would I fix together, and why?" Each cluster includes rationale, 1-2 sentence description of approach, table of findings (severity, file, issue, dimension), and dependencies on other clusters. Critical insight: category-based grouping (API findings, MCP findings) hides dependencies; action-based clustering (Agent tool discoverability: weak API + no MCP + no llms.txt) reveals work relationships and priorities.
+
+```
+Bad: "API findings" (3), "MCP findings" (2)
+Good: "Agent tool discoverability" (3 findings across
+      API Surface + Discovery + Tool Design)
+```
+
+---
+
+A scorecard can contain dozens of findings across multiple dimensions. Raw findings are scattered and hard to prioritize. Clustering groups findings by the user-visible problem they solve, not the category they fall under.
+
+## Principle
+
+**Group by action, not by category.**
+
+Bad clustering:
+```
+"API findings" (3 findings)
+"MCP findings" (2 findings)
+"Discovery findings" (1 finding)
+```
+
+Good clustering:
+```
+"Agent tool discoverability" (3 findings: weak API descriptions + no MCP + missing llms.txt)
+```
+
+The cluster name answers: "What would I fix together, and why?"
+
+## Structure
+
+Each cluster contains:
+
+| Field | Purpose |
+|-------|---------|
+| **Name** | Short, action-oriented title |
+| **Rationale** | 1 sentence: why these findings belong together |
+| **Findings** | Table: severity, dimension, issue, fix impact |
+| **Suggested approach** | 1–2 sentences on how to tackle the cluster |
+| **Dependencies** | Other clusters that must complete first |
+
+## Worked Example: 3 Findings → 1 Cluster
+
+### Raw Findings (From Scorecard)
+
+```
+Finding 1: Tool Design
+  Issue: tools/search-users.ts — description is "Search users" (3 words)
+  Why: Agents use descriptions as prompts. Short descriptions lead to wrong tool selection.
+  Fix: Expand to "Search for users by email, phone, or username. Use when you need to find a specific user. Do not use for admin operations."
+  Impact: Tool Design 1/3 → 2/3
+
+Finding 2: MCP Server
+  Issue: .mcp.json — no MCP server. 0 files matching **/.mcp.json.
+  Why: Agents consume MCP to discover tools. Without MCP, agents must use CLI or API docs (harder).
+  Fix: Create MCP server with 6 existing tools. Use InMemoryTransport for testing.
+  Impact: MCP Server 0/3 → 2/3
+
+Finding 3: Discovery & AEO
+  Issue: llms.txt — missing from web root
+  Why: Agent crawlers use llms.txt to discover project scope. Without it, agents struggle to find what's available.
+  Fix: Create llms.txt at root with sections: API, CLI, Tools. Link to AGENTS.md and API docs.
+  Impact: Discovery 1/3 → 2/3
+```
+
+### Clustered
+
+```
+CLUSTER: Agent Tool Discoverability
+
+Rationale:
+Agents can't reliably find and understand your tools because descriptions are terse,
+no MCP server exists, and discovery files are minimal. Fixing all three enables agents
+to discover and correctly invoke your tools.
+
+Findings:
+
+| Severity | Dimension    | Issue                          | Fix                                       | Impact     |
+|----------|--------------|--------------------------------|-------------------------------------------|------------|
+| High     | Tool Design  | Descriptions `` `<10` `` words         | Expand with context & examples            | 1/3 → 2/3  |
+| Critical | MCP Server   | No MCP server exists           | Create .mcp.json + MCP impl               | 0/3 → 2/3  |
+| Medium   | Discovery    | No llms.txt at root            | Create llms.txt with categorized links    | 1/3 → 2/3  |
+
+Suggested Approach:
+Start with tool descriptions (1 hour). Add MCP server (4 hours). Create llms.txt
+(30 min). This cluster improves discoverability across three dimensions.
+
+Dependencies:
+None. This cluster can be tackled independently.
+```
+
+## Clustering Algorithm
+
+When organizing findings into clusters:
+
+1. **Identify the user-facing outcome** each group of findings enables.
+   - Example: "Agents can authenticate without human interaction"
+   - Example: "Agents can recover from rate limits"
+
+2. **List all findings that contribute to that outcome.**
+   - Example: Authentication cluster: API keys + OAuth + scoped tokens + JWT validation
+
+3. **Name the cluster after the outcome, not the findings.**
+   - Bad: "Authentication findings"
+   - Good: "Machine-readable authentication"
+
+4. **Check for dependencies.**
+   - Does this cluster depend on another? (e.g., "Create API spec" must come before "Optimize OpenAPI descriptions")
+
+5. **Estimate effort and impact.**
+   - Sort by impact-to-effort ratio: highest value first
+
+## Common Cluster Patterns
+
+### Pattern 1: Discoverability
+
+**Cluster name:** Agent discovery and context
+
+**Findings:** Weak API descriptions + no MCP + missing llms.txt + no AGENTS.md + no JSON-LD
+
+**Outcome:** Agents can find and understand your project
+
+**Effort:** Low to Medium (2–6 hours)
+
+**Impact:** +3 to +4 on dimensions (API Surface, MCP, Discovery, Context Files)
+
+### Pattern 2: Error Resilience
+
+**Cluster name:** Error recovery for agents
+
+**Findings:** No RFC 7807 + missing is_retriable + no suggestions array + no error tests
+
+**Outcome:** Agents can recover from transient failures
+
+**Effort:** Medium (3–5 hours)
+
+**Impact:** +2 to +3 on Error Handling and Testing
+
+### Pattern 3: Machine Auth
+
+**Cluster name:** Machine-readable authentication
+
+**Findings:** No OAuth 2.1 + API keys are long-lived + no scoped tokens + no JWT validation
+
+**Outcome:** Agents authenticate without human intervention
+
+**Effort:** Medium to High (3–6 hours)
+
+**Impact:** +2 on Authentication (0/3 → 2/3)
+
+### Pattern 4: Tool Design
+
+**Cluster name:** Tool quality and consistency
+
+**Findings:** Weak tool descriptions + no schemas + no toModelOutput + inconsistent naming
+
+**Outcome:** Agents select and invoke tools correctly
+
+**Effort:** Medium (2–4 hours)
+
+**Impact:** +2 on Tool Design, +1 on Testing (new tool tests)
+
+### Pattern 5: Context & Documentation
+
+**Cluster name:** Agent-oriented context and docs
+
+**Findings:** No AGENTS.md + no CLAUDE.md + missing context boundaries + no llms.txt
+
+**Outcome:** AI assistants (Claude, Cursor, GitHub Copilot) can work on the project
+
+**Effort:** Low (2–3 hours)
+
+**Impact:** +1 to +2 on Context Files and Discovery
+
+## Clustering Worked Example: From Audit to Plan
+
+### Raw Scorecard: acme-api
+
+```
+API Surface:         1/3 (OpenAPI exists, descriptions weak)
+CLI Design:          N/A
+MCP Server:          0/3 (no MCP)
+Discovery & AEO:     1/3 (AGENTS.md only)
+Authentication:      1/3 (API keys only)
+Error Handling:      0/3 (no structured errors)
+Tool Design:         1/3 (basic schemas, terse descriptions)
+Context Files:       1/3 (auto-generated AGENTS.md)
+Multi-Agent:         N/A
+Testing:             0/3 (no agent tests)
+```
+
+### Raw Findings (Unordered)
+
+- API descriptions lack "use when" context
+- No MCP server
+- No llms.txt
+- AGENTS.md is auto-generated
+- API keys with no scope limits
+- No OAuth 2.1
+- Error responses are plain HTTP status
+- Tool descriptions are `<10` words
+- No tool naming convention (verb_noun)
+- No RFC 7807 Problem Details
+- No is_retriable on errors
+- No agent-specific tests
+- No error recovery tests
+
+### Clustered (Prioritized by Impact-to-Effort)
+
+**Cluster 1: Agent tool discoverability**
+- Tool descriptions (↑Tool Design 1→2)
+- API descriptions (↑API Surface 1→2)
+- MCP server (↑MCP Server 0→2)
+- llms.txt (↑Discovery 1→2)
+- Effort: 6 hours | Impact: +4 dimensions | Ratio: Excellent
+
+**Cluster 2: Machine-readable auth**
+- OAuth 2.1 Client Credentials (↑Authentication 1→3)
+- Scoped tokens (↑Authentication 1→3)
+- JWT validation (↑Authentication 1→3)
+- Effort: 4 hours | Impact: +1 dimension (fully) | Ratio: Good
+
+**Cluster 3: Error recovery**
+- RFC 7807 Problem Details (↑Error Handling 0→2)
+- is_retriable field (↑Error Handling 0→2)
+- Error recovery tests (↑Testing 0→1)
+- Effort: 3 hours | Impact: +2 dimensions | Ratio: Excellent
+
+**Cluster 4: Context & conventions**
+- Curate AGENTS.md (↑Context Files 1→2)
+- Add permission boundaries (↑Context Files 1→2)
+- Document commands (↑Context Files 1→2)
+- Effort: 2 hours | Impact: +1 dimension | Ratio: Good
+
+### Transformation Plan (By Cluster)
+
+```
+PHASE 1: Agent tool discoverability (Week 1, 6 hours)
+├─ Task 1.1: Expand tool descriptions with context [1h]
+├─ Task 1.2: Enhance API descriptions in OpenAPI [2h]
+├─ Task 1.3: Create MCP server [3h]
+└─ Task 1.4: Write llms.txt [0.5h]
+
+PHASE 2: Machine-readable auth (Week 1, 4 hours)
+├─ Task 2.1: Implement OAuth 2.1 Client Credentials [2h]
+├─ Task 2.2: Add token scoping and JWT validation [2h]
+
+PHASE 3: Error recovery (Week 2, 3 hours)
+├─ Task 3.1: Refactor to RFC 7807 format [1.5h]
+├─ Task 3.2: Write error recovery tests [1.5h]
+
+PHASE 4: Context & conventions (Week 2, 2 hours)
+└─ Task 4.1: Curate AGENTS.md [2h]
+
+Total effort: 15 hours
+Expected improvement: 4/30 → 18/30 (Agent-tolerant → Agent-ready)
+```
+
+## Tips for Effective Clustering
+
+**1. Make clusters user-visible problems, not technical categories.**
+
+Bad: "API findings" (technical category)
+Good: "API-first agent discovery" (user problem: agents can find your API)
+
+**2. Keep clusters focused (3–5 findings per cluster).**
+
+If a cluster has >7 findings, split it into two.
+
+**3. Document dependencies explicitly.**
+
+Example:
+```
+Cluster: CLI enhancements
+Depends on: None (independent)
+
+Cluster: CLI integration with OpenAPI
+Depends on: "CLI enhancements" (need --json output first)
+```
+
+**4. Use effort/impact ratio to prioritize.**
+
+```
+Impact (score delta):   +4  +3  +2  +1
+Effort (hours):          6   4   3   2
+
+Ratio (impact/effort):  0.7 0.75 0.67 0.5
+                        ↑ Highest priority
+```
+
+**5. Show which agent specializes in each cluster.**
+
+Example:
+```
+Cluster: Agent tool discoverability
+Agent assigned: api-optimizer (API descriptions) + mcp-builder (MCP) + discovery-writer (llms.txt)
+Effort estimate: 6 hours
+```
+
+## Anti-Patterns
+
+**Anti-pattern 1: Dimension-based clustering**
+
+Bad:
+```
+"API Surface cluster" (all API Surface findings)
+"MCP Server cluster" (all MCP findings)
+```
+
+This leads to working on things that don't create user value.
+
+**Anti-pattern 2: Mixing effort levels**
+
+Bad:
+```
+Cluster: Error resilience
+├─ Add RFC 7807 (1 hour) ✓ Easy
+├─ Implement custom error codes (4 hours) ✗ Hard
+├─ Multi-vendor error handling (8 hours) ✗ Very hard
+```
+
+These should be separate clusters so you can tackle the easy win first.
+
+**Anti-pattern 3: Ignoring dependencies**
+
+Bad: Start with "Advanced multi-agent patterns" before "Basic tool descriptions"
+
+This creates frustration. Dependencies prevent parallel work and waste effort.
+
+Good: Start with low-effort/high-impact clusters first, then build on them.

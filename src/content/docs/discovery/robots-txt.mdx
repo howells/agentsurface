@@ -1,0 +1,173 @@
+---
+title: robots.txt for AI Agents
+description: Configuring robots.txt to control training crawler access while keeping retrieval bots enabled
+---
+
+## Summary
+
+robots.txt now controls two distinct bot types: training crawlers (index for model training) and retrieval bots (fetch during inference). Blocking GPTBot does not prevent ChatGPT-User from reading your docs. This two-decision model lets you appear in AI answers while opting out of training data. Recommended: block training crawlers, allow retrieval bots.
+
+```
+Training Crawlers       Retrieval Bots
+─────────────────       ──────────────
+GPTBot (OpenAI)         ChatGPT-User (OpenAI)
+ClaudeBot (Anthropic)   Claude-SearchBot (Anthropic)
+Google-Extended         Googlebot
+Applebot-Extended       Applebot, Spotlight, Siri
+cohere-ai               (various)
+```
+
+`robots.txt` has a new dimension in the AI era: the distinction between bots that train models and bots that retrieve content at inference time. Blocking a training crawler prevents your content from influencing model weights. Blocking a retrieval crawler prevents agents from finding your content when answering questions. These are different decisions with different business implications.
+
+## The Training vs Retrieval Split
+
+Most AI companies run at least two bot types: a training crawler that indexes content for future model training, and a retrieval bot that fetches content in real time during inference.
+
+| Bot Name | Operator | Type | Default Stance |
+|----------|----------|------|---------------|
+| `GPTBot` | OpenAI | Training | Block to exclude from training data |
+| `ChatGPT-User` | OpenAI | Retrieval | Allow to appear in ChatGPT browsing |
+| `ClaudeBot` | Anthropic | Training | Block to exclude from training data |
+| `Claude-SearchBot` | Anthropic | Retrieval | Allow to appear in Claude answers |
+| `Google-Extended` | Google | Training | Block to exclude from Gemini training |
+| `Googlebot` | Google | Search + retrieval | Allow for search ranking and AI Overviews |
+| `PerplexityBot` | Perplexity | Retrieval | Allow to appear in Perplexity answers |
+| `Applebot-Extended` | Apple | Training | Block to exclude from Apple AI training |
+| `Applebot` | Apple | Search + retrieval | Allow for Spotlight and Siri |
+| `cohere-ai` | Cohere | Training | Block to exclude from Cohere training |
+| `YouBot` | You.com | Retrieval | Allow to appear in You.com answers |
+| `Diffbot` | Diffbot | Retrieval/structured | Case by case |
+
+The key insight: blocking `GPTBot` does not prevent your content from appearing in ChatGPT answers — that is `ChatGPT-User`. Blocking `ClaudeBot` does not prevent Claude from reading your docs — that is `Claude-SearchBot`. These are separate decisions that require separate entries.
+
+## Recommended Configuration for SaaS Pursuing AEO
+
+A SaaS product pursuing AEO wants to appear in AI-generated answers but does not want content used to train competitors' models or general-purpose LLMs. The recommended configuration:
+
+```
+User-agent: *
+Allow: /
+
+# Block training crawlers
+# These crawlers index content for model training, not retrieval
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+# Allow retrieval bots
+# These bots fetch content during AI inference — blocking them
+# means your content won't appear in AI-generated answers.
+# They are allowed by the wildcard rule above, but listed
+# explicitly for clarity and auditability.
+
+# User-agent: ChatGPT-User
+# Allow: /
+
+# User-agent: Claude-SearchBot
+# Allow: /
+
+# User-agent: PerplexityBot
+# Allow: /
+
+# User-agent: Googlebot
+# Allow: /
+
+# Reference LLM index
+Sitemap: https://example.com/sitemap.xml
+```
+
+The explicit `Allow` entries for retrieval bots are commented out because they are already covered by `User-agent: * Allow: /`. They are included as documentation of intent — future engineers can see the decision was deliberate.
+
+## Selective Content Blocking
+
+Some content warrants training exclusion even if your default is to allow training crawlers:
+
+```
+# Allow training crawlers generally
+User-agent: GPTBot
+Allow: /docs
+Allow: /blog
+Disallow: /customers    # Customer case studies — contractually restricted
+Disallow: /pricing      # Pricing changes frequently, stale training data is harmful
+Disallow: /private      # Internal content
+
+User-agent: ClaudeBot
+Allow: /docs
+Allow: /blog
+Disallow: /customers
+Disallow: /pricing
+Disallow: /private
+```
+
+## Cloudflare Content Signals Policy
+
+Cloudflare introduced Content Signals, a structured way to declare AI usage permissions that sits alongside `robots.txt`. It is configured at the Cloudflare dashboard level and injects a policy header into responses:
+
+```
+Content-Signals-Policy: search=yes, ai-input=yes, ai-train=no
+```
+
+The three signal types:
+
+**`search`** — Whether search engines may index this content. `search=yes` is equivalent to allowing `Googlebot`.
+
+**`ai-input`** — Whether AI systems may use this content as retrieval context at inference time. `ai-input=yes` allows retrieval bots to include this page in their responses.
+
+**`ai-train`** — Whether AI systems may use this content to train or fine-tune models. `ai-train=no` is the typical setting for commercial content you want to protect.
+
+This header approach has an advantage over `robots.txt`: it applies per-response rather than per-path, which means you can vary the policy based on the request (authenticated users versus public content, for example).
+
+Content Signals does not replace `robots.txt`. Well-behaved crawlers respect both, with `robots.txt` as the baseline and Content Signals as an override or supplement. Bots that do not support Content Signals still see `robots.txt`.
+
+## Referencing llms.txt from robots.txt
+
+There is no official standard for linking `llms.txt` from `robots.txt`, but the informal convention is a comment line:
+
+```
+# AI agent index
+# llms-txt: https://example.com/llms.txt
+# llms-full: https://example.com/llms-full.txt
+```
+
+Some crawlers parse these comment conventions. It is low cost to include them.
+
+## The Enforcement Gap
+
+`robots.txt` is unenforceable. It is a convention, not a technical control. Any crawler can ignore it, and many commercial scrapers do. A `Disallow` directive in `robots.txt` is a statement of preference, not a barrier.
+
+For content you genuinely need to protect from AI training or unauthorized use:
+
+- **Authentication gates** — content behind login walls is not indexable by crawlers without credentials
+- **Legal agreements** — Terms of Service that explicitly prohibit scraping create legal liability for violators
+- **`noindex` meta tags** — `<meta name="robots" content="noindex">` instructs search engines not to index a page; some AI crawlers respect this
+- **Rate limiting** — throttling requests from known bot user-agents limits scraping throughput
+
+For most documentation and public content, `robots.txt` is the appropriate tool. It works for well-behaved crawlers — which includes all the major AI companies — and documents your policy for any future disputes.
+
+## Monitoring Bot Traffic
+
+Understanding which AI bots are actually crawling your site helps you verify `robots.txt` is being respected and identify undeclared crawlers:
+
+- Filter your access logs for known bot user-agent strings
+- Watch for high-volume requests from cloud provider IP ranges with no matching user-agent
+- Use Cloudflare's Bot Management dashboard if your site is on Cloudflare
+- Check the `Referer` header on server-side rendered pages — retrieval bots often include a `Referer` pointing to the AI product that triggered the fetch
+
+If you see traffic from a bot not covered by your `robots.txt`, look up the bot's documentation to identify its user-agent string and add an appropriate directive.

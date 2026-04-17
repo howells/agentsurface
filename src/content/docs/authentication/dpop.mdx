@@ -1,0 +1,260 @@
+---
+title: "DPoP: Demonstrating Proof-of-Possession"
+description: "RFC 9449 sender-constrained tokens, preventing token replay attacks"
+---
+
+## Summary
+
+DPoP binds an access token to a client's public key. On every request, the client signs a proof JWT with the request method, URI, and a unique jti (nonce). If the token is stolen without the private key, an attacker cannot create a valid proof, making the token useless.
+
+```
+Client: (with private key)        Server: (verifies)
+  Generate keypair               Extract public key from DPoP
+  Sign DPoP proof                Verify signature
+  Send token + DPoP              Check htm, htu, jti
+```
+
+- Each request includes a DPoP proof: unique jti, htm (method), htu (URI), iat (timestamp)
+- Server validates signature, claim values, and jti uniqueness (prevents replay)
+- Token includes `dpop_jkt`: thumbprint of the DPoP proof's JWK
+- Required for financial operations, user data access, administrative actions
+- Use standard exponential backoff with jitter (ES256 or Ed25519)
+
+When an access token is stolen — via a log, a memory dump, a man-in-the-middle attack — the attacker can replay it against the resource server until it expires. Demonstrating Proof-of-Possession (DPoP, RFC 9449) solves this by binding the token to the client's public key. If the token is stolen, it cannot be replayed because the attacker lacks the private key.
+
+DPoP is critical for high-value operations and agent-to-agent communication where token compromise is a real risk.
+
+## How DPoP Works
+
+The client generates an Ed25519 or ES256 keypair. On every request, the client creates a `DPoP` proof JWT that includes:
+
+- `htm` (HTTP Method): the request method (GET, POST, etc.)
+- `htu` (HTTP URI): the request URI
+- `iat` (Issued At): Unix timestamp
+- `jti` (JWT ID): unique nonce, prevents replay of the same proof
+
+The client sends both the `Authorization` (Bearer token) and `DPoP` headers. The server validates:
+
+1. The DPoP proof is a valid JWT signed by a key the client registered
+2. The `htm` and `htu` match the current request
+3. The `jti` has never been seen before (prevents reuse)
+4. The `iat` is recent (prevents old proofs from being replayed)
+
+If the token is stolen without the private key, an attacker cannot create a valid DPoP proof for a different URI, so the stolen token is useless.
+
+## Client-Side: Generating DPoP Proofs
+
+```typescript
+import { SignJWT, generateKeyPair } from 'jose';
+import { randomUUID } from 'crypto';
+
+// Generate keypair once and store securely
+const { publicKey, privateKey } = await generateKeyPair('ES256');
+
+async function generateDPopProof(method: string, uri: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+
+  const proof = await new SignJWT({
+    jti: randomUUID(),           // Unique per request
+    htm: method,                 // GET, POST, etc.
+    htu: uri,                    // Full request URI
+    iat: now,
+    exp: now + 120,              // 2 minutes validity
+  })
+    .setProtectedHeader({
+      alg: 'ES256',
+      typ: 'dpop+jwt',
+      jwk: {
+        // Public key in JWK format (without private component)
+        kty: 'EC',
+        crv: 'P-256',
+        x: publicKey.x,
+        y: publicKey.y,
+      },
+    })
+    .sign(privateKey);
+
+  return proof;
+}
+
+// On every request
+const method = 'GET';
+const uri = 'https://api.example.com/invoices';
+const dpopProof = await generateDPopProof(method, uri);
+
+const res = await fetch(uri, {
+  method,
+  headers: {
+    'Authorization': `DPoP ${accessToken}`,
+    'DPoP': dpopProof,
+  },
+});
+```
+
+The `jti` must be globally unique per request to prevent replay. Use a UUID or a counter.
+
+## Server-Side: Validating DPoP Proofs
+
+```typescript
+import { jwtVerify } from 'jose';
+
+// Store of seen JTIs to prevent replay
+const seenJtis = new Set<string>();
+const JTI_MAX_AGE = 2 * 60; // 2 minutes
+
+async function validateDPopProof(
+  dpopHeader: string,
+  method: string,
+  uri: string
+): Promise<{ thumbprint: string; sub: string }> {
+  const { payload, protectedHeader } = await jwtVerify(dpopHeader, null, {
+    algorithms: ['ES256', 'RS256'],
+    // Do NOT verify signature yet; extract the public key from the header
+  });
+
+  // Extract the public key from the JWT header
+  if (!protectedHeader.jwk) {
+    throw new Error('DPoP JWT missing public key in header');
+  }
+
+  const publicKey = await importJWK(protectedHeader.jwk);
+
+  // Now verify the signature
+  await jwtVerify(dpopHeader, publicKey, {
+    algorithms: ['ES256', 'RS256'],
+  });
+
+  // Verify claims
+  const now = Math.floor(Date.now() / 1000);
+  if ((payload.iat as number) > now + 60) {
+    throw new Error('DPoP proof issued in the future');
+  }
+  if ((payload.iat as number) < now - 300) {
+    throw new Error('DPoP proof is stale');
+  }
+
+  if (payload.htm !== method) {
+    throw new Error(`DPoP htm does not match request method: ${payload.htm} vs ${method}`);
+  }
+
+  if (payload.htu !== uri) {
+    throw new Error(`DPoP htu does not match request URI: ${payload.htu} vs ${uri}`);
+  }
+
+  // Check JTI for replay
+  const jti = payload.jti as string;
+  if (seenJtis.has(jti)) {
+    throw new Error('DPoP JTI has been replayed');
+  }
+  seenJtis.add(jti);
+
+  // Clean up old JTIs (optional, in production use Redis or similar)
+  // ...
+
+  // Return the thumbprint for binding to access token
+  const thumbprint = await calculateJwkThumbprint(protectedHeader.jwk);
+  return { thumbprint, sub: payload.sub as string };
+}
+```
+
+## Binding DPoP to Access Tokens
+
+When issuing an access token, the authorization server includes the DPoP proof's JWK thumbprint in a `dpop_jkt` claim:
+
+```json
+{
+  "sub": "client_01HV3K8MNP",
+  "aud": "https://api.example.com/",
+  "scope": "invoices:read",
+  "dpop_jkt": "fUHyO2r...rg",
+  "iat": 1700000000,
+  "exp": 1700003600
+}
+```
+
+On every request, the server verifies:
+
+1. The DPoP proof is valid (signature, `htm`, `htu`, `jti`)
+2. The DPoP proof's JWK thumbprint matches the token's `dpop_jkt` claim
+
+If an attacker steals the token but not the private key, they cannot create a valid DPoP proof with the matching thumbprint.
+
+```typescript
+import { calculateJwkThumbprint, importJWK } from 'jose';
+
+async function validateTokenAndDPoP(token: string, dpopHeader: string, method: string, uri: string) {
+  // Validate the JWT token
+  const { payload: tokenPayload } = await jwtVerify(token, jwks);
+
+  // Validate the DPoP proof
+  const { payload: dpopPayload, protectedHeader } = await jwtVerify(dpopHeader, null);
+
+  // Compare thumbprints
+  const dpopThumbprint = await calculateJwkThumbprint(protectedHeader.jwk!);
+  if (dpopThumbprint !== tokenPayload.dpop_jkt) {
+    throw new Error('DPoP thumbprint does not match token');
+  }
+
+  // Verify htm and htu match
+  if (dpopPayload.htm !== method || dpopPayload.htu !== uri) {
+    throw new Error('DPoP proof does not match request');
+  }
+
+  return tokenPayload;
+}
+```
+
+## When to Require DPoP
+
+DPoP has overhead: every request requires generating and validating a proof. Use it when token compromise is a serious risk:
+
+- **Agent-to-agent communication** where tokens flow through multiple systems
+- **Financial operations** (payments, refunds, transfers)
+- **User data access** (PII, medical records)
+- **Administrative operations** (user creation, permission changes)
+
+For read-only operations on public data, the overhead may not be justified.
+
+## MCP and DPoP
+
+MCP 2025-11-25 encourages DPoP for remote servers that expose sensitive operations. An MCP server can require DPoP proofs on every resource access:
+
+```typescript
+// MCP server validating DPoP
+server.setRequestHandler(
+  {
+    schema: jsonrpc.JsonRpcRequestSchema,
+  },
+  async (request) => {
+    const dpopHeader = request.headers?.['DPoP'] as string;
+    const authHeader = request.headers?.['Authorization'] as string;
+
+    if (!dpopHeader) {
+      throw new Error('DPoP proof required');
+    }
+
+    await validateDPopProof(dpopHeader, request.method, request.uri);
+    // ... proceed with request
+  }
+);
+```
+
+See [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) for advertising DPoP requirements.
+
+## Checklist
+
+- [ ] Clients generate Ed25519 or ES256 keypairs at startup
+- [ ] Every request includes a unique `DPoP` proof with `jti`, `htm`, `htu`, `iat`
+- [ ] Server validates DPoP signature, claims, and JTI uniqueness
+- [ ] Access tokens include `dpop_jkt` claim with the proof's JWK thumbprint
+- [ ] Server validates that DPoP thumbprint matches token claim
+- [ ] JTI store prevents reuse (Redis or equivalent for distributed systems)
+- [ ] DPoP is required for sensitive operations (financial, user data, admin)
+
+## See Also
+
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — advertising DPoP requirements
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — nonce stores and DPoP `jti`
+- ([RFC 9449: Demonstrating Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — full specification
+- ([jose on npm](https://www.npmjs.com/package/jose)) — JWT signing and validation

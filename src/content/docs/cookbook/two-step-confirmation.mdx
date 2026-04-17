@@ -1,0 +1,414 @@
+---
+title: Two-Step Confirmation for Writes
+description: Create-as-draft → user confirms → send/commit. Eliminates accidental sends and unintended bulk operations.
+---
+
+## Summary
+
+Never expose direct-send or direct-delete tools to the model unprompted. Every destructive or costly action follows: `prepare_draft` → show user what will happen → `confirm_draft` → execute. This pattern prevents accidental invoice sends, unintended bulk deletes, and expensive external API calls without explicit user review.
+
+- **Prepare step**: Model calls `prepare_draft` tool; creates draft, returns preview.
+- **User review**: Agent shows draft to user; user sees exactly what will happen.
+- **Confirm step**: User says "yes" or "send"; model calls `confirm_draft` tool.
+- **Execute**: `confirm_draft` tool runs the actual, irreversible operation.
+- **No direct tools**: Tools like `invoice_send` or `record_delete` should not exist; only draft variants.
+
+---
+
+## Anti-Pattern: Direct-Send Tools
+
+```typescript
+// ❌ DON'T: Direct-send tool
+server.registerTool(
+  "invoice_send",
+  {
+    description: "Send an invoice to a customer",
+    inputSchema: z.object({ invoiceId: z.string() }),
+    annotations: DESTRUCTIVE_ANNOTATIONS,
+  },
+  async (params) => {
+    await sendInvoiceEmail(params.invoiceId);
+    return { success: true };
+  }
+);
+```
+
+**Problem**: Model can call `invoice_send` at any time. Even with safety rules, models hallucinate. One wrong hallucination = invoice sent accidentally.
+
+---
+
+## Pattern: Draft-First, Confirm-Second
+
+```typescript
+// ✅ DO: Separate draft and confirm tools
+
+// Step 1: Create draft (or fetch existing draft)
+server.registerTool(
+  "invoice_create_draft",
+  {
+    title: "Create Invoice Draft",
+    description: "Create a draft invoice. Does not send. Returns a preview URL.",
+    inputSchema: z.object({
+      customerId: z.string(),
+      items: z.array(z.object({
+        description: z.string(),
+        amount: z.number(),
+        quantity: z.number().default(1),
+      })),
+      dueDate: z.string().describe("ISO 8601 date (YYYY-MM-DD)"),
+    }),
+    outputSchema: z.object({
+      invoiceId: z.string(),
+      previewUrl: z.string(),
+      total: z.number(),
+    }),
+    annotations: WRITE_ANNOTATIONS, // Safe; idempotent
+  },
+  async (params) => {
+    const invoice = await db.createInvoiceDraft(ctx.teamId, {
+      customerId: params.customerId,
+      items: params.items,
+      dueDate: params.dueDate,
+      deliveryType: "draft", // Never "create_and_send"
+    });
+
+    const previewUrl = `${baseUrl}/invoices/${invoice.id}/preview`;
+
+    return {
+      content: [{
+        type: "text",
+        text: `Draft invoice created. Total: ${invoice.total}. Preview: ${previewUrl}`,
+      }],
+      structuredContent: {
+        invoiceId: invoice.id,
+        previewUrl,
+        total: invoice.total,
+      },
+    };
+  }
+);
+
+// Step 2: Confirm and send (only after explicit user approval)
+server.registerTool(
+  "invoice_confirm_and_send",
+  {
+    title: "Confirm and Send Invoice",
+    description: "Send a draft invoice to the customer. This is irreversible.",
+    inputSchema: z.object({
+      invoiceId: z.string(),
+      confirmationToken: z.string().describe("Token from the user's confirmation"),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      sentAt: z.string(),
+    }),
+    annotations: DESTRUCTIVE_ANNOTATIONS, // Irreversible
+  },
+  async (params) => {
+    // Verify confirmation token (user explicitly approved)
+    const confirmed = await db.verifyConfirmationToken(params.confirmationToken);
+    if (!confirmed) {
+      return {
+        content: [{
+          type: "text",
+          text: "Confirmation failed. Please ask the user to confirm again.",
+        }],
+        structuredContent: { success: false },
+      };
+    }
+
+    const invoice = await db.getInvoice(ctx.teamId, params.invoiceId);
+    if (invoice.status !== "draft") {
+      return {
+        content: [{
+          type: "text",
+          text: `Invoice is already ${invoice.status}, not a draft.`,
+        }],
+        structuredContent: { success: false },
+      };
+    }
+
+    await sendInvoiceEmail(ctx.teamId, params.invoiceId);
+    await db.updateInvoice(ctx.teamId, params.invoiceId, {
+      status: "sent",
+      sentAt: new Date(),
+    });
+
+    return {
+      content: [{
+        type: "text",
+        text: `Invoice sent to ${invoice.customerEmail}`,
+      }],
+      structuredContent: {
+        success: true,
+        sentAt: new Date().toISOString(),
+      },
+    };
+  }
+);
+```
+
+---
+
+## Agent Workflow
+
+```typescript
+// System prompt guidance
+const systemPrompt = `
+## Invoice Workflow
+
+1. **Create draft**: Call \`invoice_create_draft\` with customer, items, due date.
+   The tool returns a preview URL. Do NOT send automatically.
+   
+2. **Show user**: Display the draft details and ask: "Ready to send this invoice?"
+   
+3. **Wait for confirmation**: The user must explicitly say "yes", "send it", or "confirm".
+   
+4. **Send**: Only AFTER the user confirms, call \`invoice_confirm_and_send\` with the invoice ID.
+   
+**Critical**: NEVER send an invoice without explicit user confirmation. If the user says
+"create and send", create the draft first, show it, THEN ask again before sending.
+`;
+```
+
+**Agent execution flow**:
+
+1. User: "Create an invoice for Alice for $500"
+2. Agent calls `invoice_create_draft` with Alice's ID, amount, date.
+3. Tool returns draft with preview URL and total.
+4. Agent shows user: "I created a draft invoice for Alice for $500. Preview: [URL]. Ready to send?"
+5. User: "Yes, send it"
+6. Agent calls `invoice_confirm_and_send` with the invoice ID.
+7. Tool sends the email; returns confirmation.
+
+---
+
+## Confirmation Token Pattern (Optional)
+
+For extra safety, require a confirmation token generated client-side:
+
+```typescript
+// frontend/invoice-draft.tsx
+import { generateConfirmationToken } from "@lib/security";
+
+export function InvoiceDraftPreview({ invoice }: Props) {
+  const [token, setToken] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    // Generate a time-limited token (valid for 5 min)
+    const newToken = generateConfirmationToken(invoice.id, 5 * 60 * 1000);
+    await db.storeConfirmationToken(invoice.id, newToken);
+    setToken(newToken);
+
+    // User can now paste this token into chat, or let it autofill
+  };
+
+  return (
+    <div>
+      <h2>Invoice Preview</h2>
+      <InvoiceTable invoice={invoice} />
+      <button onClick={handleConfirm}>
+        {token ? "Copy Confirmation Token" : "Confirm & Send"}
+      </button>
+      {token && <code>{token}</code>}
+    </div>
+  );
+}
+```
+
+Agent then calls:
+```typescript
+await agent.call("invoice_confirm_and_send", {
+  invoiceId: "inv-123",
+  confirmationToken: token, // User provided
+});
+```
+
+---
+
+## Multi-Step Example: Bulk Operations
+
+For bulk operations (delete 10 records, update all items), use the same pattern:
+
+```typescript
+server.registerTool(
+  "record_bulk_update_prepare",
+  {
+    title: "Preview Bulk Update",
+    description: "Show which records will be updated. Does not apply changes.",
+    inputSchema: z.object({
+      query: z.string().describe("Filter: 'category=expenses AND amount>1000'"),
+      updateFields: z.record(z.string(), z.any()),
+    }),
+    outputSchema: z.object({
+      matchCount: z.number(),
+      preview: z.array(z.object({
+        id: z.string(),
+        before: z.object({ ... }),
+        after: z.object({ ... }),
+      })),
+    }),
+  },
+  async (params) => {
+    const matching = await db.records.find(params.query);
+    const preview = matching.slice(0, 5).map(r => ({
+      id: r.id,
+      before: r,
+      after: { ...r, ...params.updateFields },
+    }));
+
+    return {
+      content: [{
+        type: "text",
+        text: `Will update ${matching.length} records. First 5: ${JSON.stringify(preview)}`,
+      }],
+      structuredContent: {
+        matchCount: matching.length,
+        preview,
+      },
+    };
+  }
+);
+
+server.registerTool(
+  "record_bulk_update_execute",
+  {
+    title: "Execute Bulk Update",
+    description: "Apply the bulk update. Irreversible.",
+    inputSchema: z.object({
+      query: z.string(),
+      updateFields: z.record(z.string(), z.any()),
+    }),
+    outputSchema: z.object({
+      updatedCount: z.number(),
+    }),
+    annotations: DESTRUCTIVE_ANNOTATIONS,
+  },
+  async (params) => {
+    const result = await db.records.updateMany(params.query, params.updateFields);
+
+    return {
+      content: [{
+        type: "text",
+        text: `Updated ${result.updatedCount} records`,
+      }],
+      structuredContent: { updatedCount: result.updatedCount },
+    };
+  }
+);
+```
+
+**System prompt**:
+```
+## Bulk Operations
+
+1. Call \`record_bulk_update_prepare\` with the filter and desired changes.
+2. Show the user which records will be affected and how they'll change.
+3. Ask: "Proceed with ${matchCount} updates?"
+4. Only after user says yes, call \`record_bulk_update_execute\`.
+```
+
+---
+
+## Client-Side Confirmation
+
+The client (web UI, chat interface) can also enforce confirmation:
+
+```typescript
+// frontend/chat-interface.tsx
+function ChatResponse({ toolCall }: Props) {
+  const isDestructive = toolCall.tool.annotations?.destructiveHint;
+
+  if (isDestructive && !toolCall.confirmed) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-300 rounded">
+        <p className="text-sm font-bold text-red-900">
+          This action is irreversible.
+        </p>
+        <p className="text-sm text-red-800 mt-1">{toolCall.tool.description}</p>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => approveToolCall(toolCall.id)}
+            className="px-3 py-1 bg-red-600 text-white rounded"
+          >
+            Confirm & Execute
+          </button>
+          <button
+            onClick={() => rejectToolCall(toolCall.id)}
+            className="px-3 py-1 bg-gray-400 rounded"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <div>... tool call result ...</div>;
+}
+```
+
+---
+
+## Testing
+
+```typescript
+// __tests__/confirmation-flow.test.ts
+test("invoice draft + confirm flow", async () => {
+  const stream = await runAgent({
+    messages: [
+      { role: "user", content: "Create an invoice for Alice for $500 due 2024-05-31" },
+    ],
+  });
+
+  let response = await stream.nextMessage();
+
+  // Agent should create draft, not send directly
+  expect(response).toContain("invoice_create_draft");
+  expect(response).not.toContain("invoice_send");
+
+  // Simulate user confirmation
+  stream.send({ role: "user", content: "Send it" });
+  response = await stream.nextMessage();
+
+  // Agent should call confirm tool
+  expect(response).toContain("invoice_confirm_and_send");
+});
+
+test("bulk update shows preview before execution", async () => {
+  const stream = await runAgent({
+    messages: [
+      { role: "user", content: "Delete all transactions from 2020" },
+    ],
+  });
+
+  let response = await stream.nextMessage();
+
+  // Agent should call prepare, not execute
+  expect(response).toContain("transaction_bulk_delete_prepare");
+  expect(response).not.toContain("transaction_bulk_delete_execute");
+  expect(response).toContain("records"); // Preview results
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Replace all direct-send/direct-delete tools with draft variants.
+- [ ] Create prepare tool: returns preview, does not mutate state.
+- [ ] Create confirm tool: requires user token or explicit approval, then executes.
+- [ ] Update system prompt: document prepare-confirm workflow.
+- [ ] Test agent: verify it doesn't call confirm before showing preview.
+- [ ] Client-side: block destructive tool calls until user confirms.
+- [ ] Optional: use confirmation tokens for extra safety.
+- [ ] Monitor: log all destructive tool calls; alert on unexpected confirmations.
+
+---
+
+## See Also
+
+- [Tool Annotations](/docs/cookbook/tool-annotations) — marking tools as DESTRUCTIVE.
+- [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — prompt guidance on workflows.
+- [Agentic Loop](/docs/cookbook/agentic-loop) — tool execution in the loop.
+

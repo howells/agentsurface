@@ -1,0 +1,368 @@
+---
+title: Agent Knowledge Packaging
+description: Shipping CLI documentation in formats agents consume at conversation start — CONTEXT.md, AGENTS.md, and structured SKILL.md files
+---
+
+## Summary
+
+Agents starting fresh will hallucinate without guidance. Agent knowledge packaging bundles CLI documentation in formats agents load automatically at conversation start: CONTEXT.md (general orientation), AGENTS.md (Linux Foundation standard for repo context), and SKILL.md (structured tool definitions). This eliminates discovery cost and prevents common failure modes.
+
+- CONTEXT.md: high-level orientation, credentials, invariants
+- AGENTS.md: commands, build/test steps, boundaries, exclusions
+- SKILL.md: structured tool definitions with JSON Schema
+- Most agent frameworks auto-load these files from project root
+- Lead with commands in AGENTS.md — this is the most valuable content
+
+An agent that has never used your CLI before will try to discover how it works through schema introspection, trial and error, and hallucination. A CLI that ships explicit, structured knowledge for agents to load at conversation start eliminates most of that discovery cost and prevents the most common failure modes before they occur.
+
+Agent knowledge packaging is the practice of bundling the right information in the right format so agents start every session already knowing how to use your CLI correctly.
+
+## The Three File Formats
+
+### CONTEXT.md
+
+A general-purpose context file that most agent frameworks will load automatically when it appears in the project root or the directory from which the CLI is run. It provides high-level orientation: what the tool does, what credentials are needed, and the most important invariants.
+
+```markdown
+# mytool Context
+
+mytool is the CLI for the Example Platform API. It manages users, DNS records,
+billing, and deployments.
+
+## Authentication
+
+Set MYTOOL_API_KEY to your API key:
+export MYTOOL_API_KEY=your_key_here
+
+Obtain an API key at: https://app.example.com/settings/api-keys
+
+## Important Invariants
+
+- Always pass --dry-run before any delete or archive operation
+- Always pass --json or rely on auto-detection when piping output
+- Always pass --fields to limit response size (e.g., --fields id,name,status)
+- The --yes flag is required for destructive operations in non-interactive contexts
+
+## Getting the Schema
+
+Run `mytool describe --json` to get the full command schema for any command group.
+```
+
+CONTEXT.md is intentionally lightweight. It orients the agent without overwhelming it. Deep workflow guidance goes in SKILL.md.
+
+### AGENTS.md
+
+AGENTS.md follows a convention popularized by several agent frameworks (including the Claude Code convention of loading `CLAUDE.md`). It is the primary context file agents look for in a repository.
+
+Structure AGENTS.md around three concerns:
+
+1. **Setup** — what environment variables and authentication the agent needs
+2. **Capabilities** — what the CLI can do, organized by domain
+3. **Guardrails** — what the agent must never do without specific safety steps
+
+```markdown
+# mytool Agent Guide
+
+## Setup
+
+Required environment variables:
+- `MYTOOL_API_KEY` — API key for authentication
+- `MYTOOL_BASE_URL` — Override the API base URL (optional, default: https://api.example.com)
+
+Run `mytool auth status --json` to verify authentication before starting work.
+
+## Capabilities
+
+### User Management
+- Create, update, suspend, and delete users
+- Assign roles: admin, member, viewer
+- Bulk operations with --status filter
+
+### DNS Records
+- Create A, AAAA, CNAME, MX, TXT records
+- Supports raw JSON payloads for full RFC 1035 compliance
+- Propagation takes 0–60 seconds
+
+### Deployments
+- Trigger deployments, roll back to previous versions
+- Monitor deployment status with --watch
+
+## Guardrails
+
+### Before any DELETE operation
+1. Run with --dry-run first
+2. Inspect the `would_affect` count and `preview` array
+3. Check the `warnings` array for side effects
+4. Only then run without --dry-run
+
+### Before bulk operations
+1. Always use --fields to limit response size
+2. Always use --all with --json for streaming output
+3. Verify the count with a dry-run or list operation first
+
+### Never
+- Do not pass absolute paths to --output
+- Do not pass --yes without a preceding --dry-run
+- Do not retry on 422 (validation failure) — fix the input instead
+
+## Schema Discovery
+
+```bash
+# Full CLI schema
+mytool describe --json
+
+# Schema for a specific command
+mytool user create --help --json
+```
+```
+
+### SKILL.md
+
+SKILL.md is a structured capability declaration with machine-readable YAML frontmatter and human-readable Markdown guidance. It is designed to be loaded by agent frameworks that support typed skill files — allowing the agent framework to index capabilities, check version compatibility, and route tasks to the right skill.
+
+```markdown
+---
+name: mytool
+version: 2.4.1
+description: CLI for the Example Platform — users, DNS, billing, deployments
+schema_command: mytool describe --json
+auth:
+  type: api_key
+  env: MYTOOL_API_KEY
+  status_command: mytool auth status --json
+capabilities:
+  - id: user_management
+    description: Create, update, suspend, delete users and manage roles
+    commands: [user create, user update, user delete, user role assign]
+  - id: dns_management
+    description: Manage DNS records across zones
+    commands: [dns record create, dns record update, dns record delete]
+  - id: deployments
+    description: Trigger and monitor deployments, manage rollbacks
+    commands: [deploy trigger, deploy rollback, deploy status]
+invariants:
+  - always_dry_run_before_delete: true
+  - always_use_fields: true
+  - confirmation_flag: --yes
+compatibility:
+  min_version: 2.0.0
+  breaking_changes:
+    - version: 2.0.0
+      change: "user create --email is now required (was optional)"
+---
+
+# mytool Skill
+
+## Authentication
+
+```bash
+export MYTOOL_API_KEY=your_key_here
+mytool auth status --json  # verify before starting
+```
+
+## Common Workflows
+
+### Create a user
+
+```bash
+# Dry run first
+mytool user create \
+  --name "Alice Chen" \
+  --email alice@example.com \
+  --role admin \
+  --dry-run --json
+
+# Execute after reviewing dry-run output
+mytool user create \
+  --name "Alice Chen" \
+  --email alice@example.com \
+  --role admin \
+  --json
+```
+
+### Delete suspended users (safe pattern)
+
+```bash
+# Step 1: preview
+mytool users delete --status suspended --dry-run --json
+
+# Step 2: confirm the would_affect count, read warnings
+# Step 3: execute only if preview is acceptable
+mytool users delete --status suspended --yes --json
+```
+
+### Bulk-export users with minimal context usage
+
+```bash
+# Stream all active users, only id and email
+mytool users list \
+  --status active \
+  --all \
+  --fields id,email \
+  --json
+```
+
+### Create a DNS record using raw payload
+
+```bash
+# Pass the API payload directly — no flag translation needed
+mytool dns record create --zone-id zone_01HV <<'EOF'
+{
+  "type": "MX",
+  "name": "@",
+  "content": "mail.example.com",
+  "priority": 10,
+  "ttl": 3600
+}
+EOF
+```
+
+## Field Mask Reference
+
+Use `--fields` to limit response size. Common useful field sets:
+
+| Task | Recommended --fields value |
+|------|---------------------------|
+| Count or existence check | `id` |
+| Display a list | `id,name,status` |
+| Find by email | `id,name,email,status` |
+| Role assignment | `id,name,role` |
+| Billing check | `id,name,billing.plan,billing.status` |
+
+Avoid fetching `notification_preferences`, `feature_flags`, or `audit_log` unless specifically needed.
+```
+
+## Per-Command Skill Files
+
+For complex CLIs, supplement the top-level SKILL.md with per-command skill files. These live alongside the CLI's documentation or in a `skills/` directory:
+
+```
+mytool/
+  SKILL.md             # top-level capability declaration
+  AGENTS.md            # agent guardrails and setup
+  skills/
+    user-management.md # detailed user command workflows
+    dns-records.md     # DNS-specific invariants and examples
+    deployments.md     # deployment safety patterns
+```
+
+Per-command files can go deeper without bloating the top-level skill:
+
+```markdown
+---
+skill: mytool/dns-records
+version: 2.4.1
+parent: mytool
+---
+
+# DNS Records
+
+## Record Types
+
+Supported: A, AAAA, CNAME, MX, TXT, SRV, CAA, NS
+
+## Propagation Timing
+
+DNS changes propagate within 0–60 seconds. Do not assume a record is live
+immediately after creation. Use `` `mytool dns record get <id> --fields id,name,status` ``
+to check propagation status.
+
+## Invariants
+
+- Always verify a record exists before attempting to update it
+- MX records require `priority` — there is no default
+- CNAME records cannot coexist with other record types at the same name
+- Do not delete a record if you are unsure which service depends on it
+
+## Proxied vs Unproxied
+
+The `proxied` field routes traffic through the CDN. When true:
+- The record's actual IP is hidden
+- HTTP/HTTPS traffic is accelerated and protected
+- Non-HTTP protocols (e.g., mail, SIP) must use proxied: false
+
+## Raw Payload Example
+
+```json
+{
+  "type": "A",
+  "name": "api",
+  "content": "203.0.113.10",
+  "ttl": 300,
+  "proxied": false,
+  "comment": "Production API server"
+}
+```
+```
+
+## Versioning and Discoverability
+
+Skill files should be versioned and referenced from the CLI's machine-readable schema:
+
+```json
+{
+  "name": "mytool",
+  "version": "2.4.1",
+  "skill_files": [
+    {
+      "path": "SKILL.md",
+      "version": "2.4.1",
+      "url": "https://raw.githubusercontent.com/example/mytool/v2.4.1/SKILL.md"
+    },
+    {
+      "path": "skills/user-management.md",
+      "version": "2.4.1",
+      "url": "https://raw.githubusercontent.com/example/mytool/v2.4.1/skills/user-management.md"
+    }
+  ]
+}
+```
+
+An agent can discover skill file URLs from the schema, fetch only the skills relevant to its current task, and load them into context selectively.
+
+## The "Always Use" Pattern
+
+The most impactful invariants are those that prevent common, recoverable mistakes. Encode these as explicit rules in every skill file:
+
+```markdown
+## Invariants (Always Follow)
+
+- **Always `--dry-run` before delete**: `` `mytool <resource> delete ... --dry-run --json` ``
+- **Always `--fields` on list commands**: Minimum `--fields id,name,status`
+- **Always check `warnings` in dry-run output** before executing
+- **Always `--json`** in non-interactive scripts (or rely on TTY auto-detection)
+- **Never `--yes` without a preceding `--dry-run`** for bulk operations
+- **Never absolute paths** for `--output` — use relative paths only
+```
+
+These invariants reduce the need for the agent to reason about safety on every call. The knowledge is pre-packaged.
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only `--help` and a docs site. No agent-specific context files. |
+| 1 | A `CONTEXT.md` or `AGENTS.md` with basic usage guidance. |
+| 2 | Structured skill files (YAML frontmatter + Markdown) covering per-command or per-API-surface workflows and invariants. |
+| 3 | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow a standard like OpenClaw. |
+
+## Checklist
+
+- [ ] `AGENTS.md` in the repository root with setup instructions, capabilities, and guardrails
+- [ ] `CONTEXT.md` in the repository root for agent frameworks that load it automatically
+- [ ] `SKILL.md` with YAML frontmatter including `name`, `version`, `schema_command`, `auth`, `capabilities`, and `invariants`
+- [ ] `schema_command` in SKILL.md frontmatter points to the live introspection command
+- [ ] Per-command or per-domain skill files in a `skills/` directory for complex CLIs
+- [ ] Skill files include versioning and are referenced from the CLI's schema output
+- [ ] "Always use" invariants are encoded explicitly — `--dry-run`, `--fields`, `--json`
+- [ ] Field mask reference table documents recommended `--fields` values per task type
+- [ ] Skill files are updated as part of the release pipeline, not manually
+
+## Related Pages
+
+- [Schema Introspection](./schema-introspection) — SKILL.md format and the `schema_command` field
+- [Context Window Discipline](./context-window-discipline) — why `--fields` invariants matter
+- [Safety Rails](./safety-rails) — dry-run and confirmation patterns to encode as invariants
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

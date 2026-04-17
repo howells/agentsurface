@@ -1,0 +1,227 @@
+---
+title: Raw Payload Input
+description: Accepting structured JSON input so agents can pass API payloads directly without lossy flag translation
+---
+
+## Summary
+
+API-wrapping CLIs typically force agents to translate rich JSON payloads into bespoke flags, which is lossy and error-prone. Raw payload input lets agents pass JSON directly that maps to the underlying API schema, using the API documentation as the CLI documentation. This eliminates translation overhead and prevents information loss from flag constraints.
+
+- Accept --json or stdin input that maps directly to API schema
+- Allow agents to use API schema as CLI documentation without translation
+- Combine raw payload support with convenience flags for human users
+- Support both approaches: --json for agents, flags for humans
+- Validate raw payloads with same rigor as flag-based input
+
+Every CLI that wraps an API faces the translation problem: the underlying API accepts a rich JSON payload, but the CLI exposes it through bespoke flags that map — imperfectly — to that payload. For human users, this is a convenience. For agents, it is a liability.
+
+## The Translation Problem
+
+Consider an API that creates a DNS record:
+
+```json
+POST /zones/{zone_id}/dns_records
+{
+  "type": "MX",
+  "name": "@",
+  "content": "mail.example.com",
+  "priority": 10,
+  "ttl": 3600,
+  "proxied": false,
+  "comment": "Primary MX record",
+  "tags": ["mail", "primary"]
+}
+```
+
+A typical CLI wraps this as:
+
+```bash
+mytool dns create \
+  --type MX \
+  --name @ \
+  --content mail.example.com \
+  --priority 10 \
+  --ttl 3600 \
+  --no-proxied \
+  --comment "Primary MX record" \
+  --tag mail \
+  --tag primary
+```
+
+This translation introduces several failure modes for agents:
+
+- **Flag naming diverges from the API.** The agent read the API docs or a previous response and knows the field is `proxied`. The flag is `--no-proxied`. The agent either guesses wrong or falls back to the API directly.
+- **Arrays require repeated flags.** `--tag mail --tag primary` is a CLI convention, not visible from the API schema. The agent may try `--tags mail,primary` or `--tags '["mail","primary"]'` and get an error.
+- **Boolean flags lose their shape.** `--no-proxied` is a common CLI convention that the agent has no guarantee of. Some CLIs use `--proxied=false`, others `--no-proxied`, others `--proxied false`.
+- **New API fields require CLI updates.** When the API adds a field, the CLI must add a corresponding flag before agents can use it. Zero-day feature access is impossible.
+
+## Raw Payload as First-Class Input
+
+The fix is to accept the raw API payload directly, alongside the convenience flags:
+
+```bash
+# Convenience flags (still valid, still useful)
+mytool dns create --type MX --name @ --content mail.example.com --priority 10
+
+# Raw payload via flag
+mytool dns create --payload '{"type":"MX","name":"@","content":"mail.example.com","priority":10,"ttl":3600}'
+
+# Raw payload via stdin
+echo '{"type":"MX","name":"@","content":"mail.example.com","priority":10}' | mytool dns create
+
+# Raw payload from file
+mytool dns create < record.json
+```
+
+All three forms pass the JSON body directly to the underlying API call with no field translation. The agent can use the API schema — which it likely already has from the OpenAPI spec or a previous schema introspection — as its documentation.
+
+## Zero Translation Loss
+
+The goal is for the agent to be able to read the API reference and use the CLI without needing to learn a separate flag vocabulary. This means:
+
+1. **Field names in the payload match field names in the API schema exactly.** No renaming, no aliasing.
+2. **The entire API schema is accepted.** Including fields that have no corresponding convenience flag.
+3. **Payload input bypasses flag validation.** If the API accepts it, the CLI forwards it. Validation happens at the API layer, and errors are returned in structured form.
+
+```typescript
+async function createDNSRecord(flags: Flags, stdin: Readable) {
+  let payload: Record<string, unknown>;
+
+  if (flags.payload) {
+    // Parse inline JSON payload
+    try {
+      payload = JSON.parse(flags.payload);
+    } catch {
+      exitWithError({
+        error: 'invalid_json',
+        message: 'Value passed to --payload is not valid JSON',
+        code: 2,
+      });
+    }
+  } else if (!isTTY() || flags.stdin) {
+    // Read JSON from stdin
+    const raw = await readStdin();
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      exitWithError({
+        error: 'invalid_json',
+        message: 'Stdin input is not valid JSON',
+        code: 2,
+      });
+    }
+  } else {
+    // Build payload from convenience flags
+    payload = buildPayloadFromFlags(flags);
+  }
+
+  const result = await api.createDNSRecord(zoneId, payload);
+  output(result, flags);
+}
+```
+
+## Merging Flags and Payload
+
+When both convenience flags and a payload are provided, define a clear precedence rule and document it. The most useful pattern is: **flags override payload fields**. This allows an agent to use a base payload file and override specific fields for a particular run.
+
+```bash
+# Create a record based on a template, but override the name
+mytool dns create \
+  --payload "$(cat mx-template.json)" \
+  --name subdomain
+```
+
+```typescript
+function mergeInput(flags: Flags, payload: Record<string, unknown>) {
+  // Start with the raw payload, then apply any explicit flags on top
+  const flagFields = buildPayloadFromFlags(flags);
+  return { ...payload, ...flagFields };
+}
+```
+
+Document this precedence explicitly in `--help --json` output (see [Schema Introspection](./schema-introspection)):
+
+```json
+{
+  "command": "dns create",
+  "flags": [
+    {
+      "name": "payload",
+      "type": "string",
+      "description": "Raw JSON payload passed directly to the API. Explicit flags take precedence over payload fields when both are provided."
+    }
+  ]
+}
+```
+
+## Stdin Conventions
+
+Accepting JSON from stdin is essential for composability in agent pipelines. Follow these conventions:
+
+- **Check for piped stdin automatically.** Do not require `--stdin` — detect `!isatty(0)` and read stdin as the payload.
+- **Require explicit opt-in when both piped stdin and flags are present.** This prevents silent errors where an agent accidentally pipes unrelated output.
+- **Support `-` as an explicit stdin marker.** `mytool dns create -` reads from stdin explicitly, even in a TTY.
+
+```bash
+# Pipeline composition: output of one command feeds the next
+mytool dns template MX --domain example.com | mytool dns create
+
+# Explicit stdin marker
+mytool dns create - < record.json
+
+# Here-document
+mytool dns create <<'EOF'
+{"type": "A", "name": "api", "content": "203.0.113.10", "ttl": 300}
+EOF
+```
+
+## Payload Validation Feedback
+
+When an agent submits a malformed payload, return a structured error with enough detail for self-correction:
+
+```json
+// Input: {"type": "MX", "name": "@", "priority": "high"}
+// Error: priority must be an integer
+{
+  "error": "validation_failed",
+  "message": "Payload validation failed",
+  "fields": [
+    {
+      "field": "priority",
+      "issue": "Expected integer, got string",
+      "received": "high",
+      "expected": "integer between 0 and 65535"
+    }
+  ]
+}
+```
+
+Do not silently coerce types. If the agent passed `"priority": "10"` as a string instead of an integer, reject it and explain the expected type. Coercion hides the mismatch and the agent never learns the correct format.
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only bespoke flags. No way to pass structured input. |
+| 1 | Accepts `--json` or stdin JSON for some commands, but most require flags. |
+| 2 | All mutating commands accept a raw JSON payload that maps directly to the underlying API schema. |
+| 3 | Raw payload is first-class alongside convenience flags. The agent can use the API schema as documentation with zero translation loss. |
+
+## Checklist
+
+- [ ] Every mutating command accepts `` `--payload <json>` `` or equivalent
+- [ ] Every mutating command accepts JSON from stdin when stdout is not a TTY
+- [ ] `-` is accepted as an explicit stdin marker
+- [ ] Payload field names match the underlying API schema exactly, with no renaming
+- [ ] All API fields are accepted in the payload, including those without convenience flag equivalents
+- [ ] Flag precedence over payload is documented and consistent across commands
+- [ ] Invalid JSON in `--payload` or stdin returns a structured error with code 2 (usage error)
+- [ ] Type mismatches in payload fields return per-field structured errors, not silent coercion
+
+## Related Pages
+
+- [Schema Introspection](./schema-introspection) — letting agents discover the payload schema at runtime
+- [Input Hardening](./input-hardening) — validating payload content against agent-specific failure patterns
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

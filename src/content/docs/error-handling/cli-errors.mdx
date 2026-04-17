@@ -1,0 +1,292 @@
+---
+title: CLI Error Design
+description: Exit codes, structured error output, and stable error codes for CLIs consumed by agents
+---
+
+## Summary
+
+CLI errors must be machine-readable. Use exit codes (0 success, 1 general, 2 usage, 3 not found, 4 auth, 5 conflict) to categorize failures. In non-TTY mode, emit structured JSON on stderr with stable snake_case error codes, suggestions, and failing_input. Never emit stack traces.
+
+```
+$ mytool invoice send inv_01HV3K8MNP (exit 5)
+{"error": "invoice_not_finalized", "message": "...", 
+ "suggestions": ["Run: mytool invoice finalize ..."], 
+ "failing_input": {...}}
+```
+
+- Exit codes: 0 (success), 1 (general), 2 (usage), 3 (not found), 4 (auth), 5 (conflict)
+- Structured JSON errors in non-TTY mode with stable `error` codes
+- `suggestions`: concrete, runnable commands
+- `failing_input`: the values that caused failure
+- Validation errors include per-argument details
+- Unhandled exceptions: generic error with trace ID, log details internally
+
+A CLI error that prints to stderr and exits with code 1 communicates exactly one bit of information: something failed. An agent driving that CLI cannot tell whether it should retry, adjust its inputs, try a different command, or escalate to a human. Designing CLI errors for agent consumption means providing the same structured recovery information as an HTTP API — through exit codes, structured JSON output, and stable error identifiers.
+
+## Exit Code Semantics
+
+Exit code 0 means success. Exit codes 1–127 have no inherent meaning beyond "failure" by convention, but agents benefit from a consistent vocabulary across commands.
+
+A five-level scale provides enough resolution for agents to categorize failures without requiring them to parse error messages:
+
+| Code | Category | Description |
+|---|---|---|
+| 0 | Success | The command completed successfully |
+| 1 | General error | An unexpected error — safe to retry with exponential backoff |
+| 2 | Usage error | The command was called incorrectly — wrong flags, missing arguments |
+| 3 | Not found | The specified resource does not exist |
+| 4 | Auth error | Authentication or authorization failed — do not retry until credentials are refreshed |
+| 5 | Conflict | The operation conflicts with current state — precondition not met |
+
+Agents can branch on exit codes without parsing any output:
+
+```bash
+mytool invoice send inv_01HV3K8MNP
+EXIT=$?
+
+case $EXIT in
+  0) echo "Sent successfully" ;;
+  1) echo "Unexpected error — retry with backoff" ;;
+  2) echo "Usage error — check argument format" ;;
+  3) echo "Invoice not found — verify the ID" ;;
+  4) echo "Auth failed — refresh credentials" ;;
+  5) echo "Conflict — check invoice status before retrying" ;;
+  *) echo "Unknown exit code: $EXIT" ;;
+esac
+```
+
+The exit code is machine-readable. It should never be omitted or always set to 1 regardless of failure type.
+
+## JSON Error Output
+
+When the CLI is running in non-TTY mode (piped or scripted), error output must be structured JSON on stderr. The shape should be consistent across all commands in the tool.
+
+```json
+{
+  "error": "invoice_not_finalized",
+  "message": "Invoice inv_01HV3K8MNP is in 'draft' status. Only finalized invoices can be sent.",
+  "suggestions": [
+    "Run: mytool invoice finalize inv_01HV3K8MNP",
+    "Then retry: mytool invoice send inv_01HV3K8MNP"
+  ],
+  "failing_input": {
+    "invoice_id": "inv_01HV3K8MNP",
+    "current_status": "draft",
+    "required_status": "finalized"
+  }
+}
+```
+
+The fields:
+
+- `error` — A stable snake\_case error code that agents can branch on. Never a human-readable message.
+- `message` — A human-readable explanation of this specific occurrence. Can change between releases.
+- `suggestions` — Ordered list of concrete next steps. The first suggestion is the most likely fix.
+- `failing_input` — The input values that caused the failure, to help the agent reason about corrections.
+
+The agent uses `error` for branching and `suggestions` for constructing the corrective command:
+
+```typescript
+const result = await runCommand("mytool", ["invoice", "send", invoiceId]);
+
+if (result.exitCode !== 0) {
+  const error = JSON.parse(result.stderr);
+
+  if (error.error === "invoice_not_finalized") {
+    // Execute the first suggestion — finalize first, then retry
+    await runCommand("mytool", ["invoice", "finalize", invoiceId]);
+    await runCommand("mytool", ["invoice", "send", invoiceId]);
+  }
+}
+```
+
+```python
+import subprocess
+import json
+
+result = subprocess.run(
+    ["mytool", "invoice", "send", invoice_id],
+    capture_output=True,
+    text=True
+)
+
+if result.returncode != 0:
+    error = json.loads(result.stderr)
+
+    if error["error"] == "invoice_not_finalized":
+        subprocess.run(["mytool", "invoice", "finalize", invoice_id], check=True)
+        subprocess.run(["mytool", "invoice", "send", invoice_id], check=True)
+```
+
+## Detecting Non-TTY Mode
+
+Structured JSON error output should activate automatically when the CLI is not connected to a terminal — the same TTY detection used for success output:
+
+```typescript
+import { isatty } from "tty";
+
+function emitError(code: string, message: string, details: Record<string, unknown>): never {
+  const isTTY = isatty(process.stderr.fd);
+
+  if (isTTY) {
+    // Human-readable error for terminal
+    process.stderr.write(`\x1b[31mError:\x1b[0m ${message}\n`);
+    if (details.suggestions) {
+      for (const suggestion of details.suggestions as string[]) {
+        process.stderr.write(`  → ${suggestion}\n`);
+      }
+    }
+  } else {
+    // Structured JSON for agent consumption
+    process.stderr.write(JSON.stringify({
+      error: code,
+      message,
+      ...details,
+    }) + "\n");
+  }
+
+  process.exit(exitCodeForError(code));
+}
+```
+
+An explicit `--json` flag should also force structured error output:
+
+```bash
+# Agent always gets structured errors in JSON mode
+mytool --json invoice send inv_01HV3K8MNP 2>error.json
+```
+
+## Stable Error Codes
+
+The `error` field is the stable contract for agents. It must not change between releases. Treat it like an API field — if the semantics change, introduce a new code rather than reusing the old one.
+
+Use snake\_case, domain-prefixed codes:
+
+```
+invoice_not_found
+invoice_not_finalized
+invoice_already_sent
+payment_card_declined
+payment_insufficient_funds
+auth_token_expired
+auth_insufficient_scope
+rate_limit_exceeded
+service_unavailable
+```
+
+Never use human-readable phrases as error codes:
+
+```
+// Wrong — will drift as copy changes
+"error": "The invoice could not be found"
+"error": "Invoice is not in finalized state"
+
+// Right — stable machine-readable codes
+"error": "invoice_not_found"
+"error": "invoice_not_finalized"
+```
+
+## Never Stack Traces in User-Facing Output
+
+A stack trace on stderr is not a structured error. It is a debug artifact that discloses internal implementation details and is unusable by agents.
+
+```bash
+# Wrong — stack trace on stderr
+$ mytool invoice send inv_01HV3K8MNP
+TypeError: Cannot read properties of undefined (reading 'status')
+    at InvoiceCommand.send (src/commands/invoice.ts:142:23)
+    at async runCommand (src/cli.ts:67:5)
+```
+
+Catch all unhandled exceptions in the CLI entry point and convert them to structured errors:
+
+```typescript
+async function main() {
+  try {
+    await run(process.argv.slice(2));
+  } catch (err) {
+    if (err instanceof CliError) {
+      emitError(err.code, err.message, err.details);
+    } else {
+      // Unknown error — emit a generic structured error, log details internally
+      const traceId = generateTraceId();
+      logger.error("Unhandled CLI error", { err, trace_id: traceId });
+
+      emitError("internal_error", "An unexpected error occurred.", {
+        trace_id: traceId,
+        suggestions: ["Check the command syntax and try again", `Contact support with trace ID: ${traceId}`],
+      });
+    }
+  }
+}
+```
+
+The trace ID gives a human support path without exposing internals.
+
+## Validation Error Format
+
+When the agent provides invalid arguments, report per-argument failures in the same structured shape used for HTTP validation errors:
+
+```json
+{
+  "error": "validation_error",
+  "message": "The command arguments failed validation.",
+  "invalid_args": [
+    {
+      "arg": "--amount",
+      "reason": "Must be a positive integer",
+      "received": "-100",
+      "expected": "A positive integer representing the amount in cents (e.g., 5000 for $50.00)"
+    },
+    {
+      "arg": "--due-date",
+      "reason": "Must be a future date in YYYY-MM-DD format",
+      "received": "2024-01-01",
+      "expected": "A date after 2025-04-17"
+    }
+  ],
+  "suggestions": [
+    "Change --amount to a positive integer (e.g., --amount 5000)",
+    "Change --due-date to a future date (e.g., --due-date 2025-05-01)"
+  ]
+}
+```
+
+This format mirrors the HTTP validation error structure, which allows the same agent error-handling logic to operate on both CLI and HTTP errors.
+
+## Full Example: Invoice CLI
+
+```bash
+# Success — JSON output on stdout, exit 0
+$ mytool --json invoice send inv_01HV3K8MNP
+{"id": "inv_01HV3K8MNP", "status": "sent", "sent_at": "2025-04-17T10:22:01Z"}
+# exit: 0
+
+# Draft invoice — structured error on stderr, exit 5
+$ mytool --json invoice send inv_01HV3K8MNP 2>&1
+{"error": "invoice_not_finalized", "message": "Invoice inv_01HV3K8MNP is in 'draft' status.", "suggestions": ["Run: mytool invoice finalize inv_01HV3K8MNP", "Then retry: mytool invoice send inv_01HV3K8MNP"], "failing_input": {"invoice_id": "inv_01HV3K8MNP", "current_status": "draft", "required_status": "finalized"}}
+# exit: 5
+
+# Not found — structured error on stderr, exit 3
+$ mytool --json invoice send inv_NOTREAL 2>&1
+{"error": "invoice_not_found", "message": "Invoice inv_NOTREAL does not exist.", "suggestions": ["Verify the invoice ID", "Use: mytool invoice list to see available invoices"], "failing_input": {"invoice_id": "inv_NOTREAL"}}
+# exit: 3
+```
+
+## Checklist
+
+- [ ] Exit codes follow the five-level scale (0 success, 1 general, 2 usage, 3 not found, 4 auth, 5 conflict)
+- [ ] Errors are structured JSON on stderr in non-TTY and `--json` mode
+- [ ] The `error` field is a stable snake\_case code — not a human-readable message
+- [ ] `suggestions` are concrete, runnable commands, not general advice
+- [ ] `failing_input` includes the values that caused the failure
+- [ ] Stack traces never appear in user-facing output
+- [ ] Unhandled exceptions produce a generic structured error with a trace ID
+- [ ] Validation errors include per-argument details
+
+## Related Pages
+
+- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) — the standard error format (applies to CLIs too)
+- [Agent Extensions](/docs/error-handling/agent-extensions) — `is_retriable` and structured fields
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — the same principles for HTTP APIs
+- [Retry and Recovery Patterns](/docs/error-handling/retry-patterns) — what agents should do with these errors

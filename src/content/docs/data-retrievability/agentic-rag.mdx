@@ -1,0 +1,296 @@
+---
+title: Agentic RAG
+description: Query planning, reflection, dynamic tool selection; LangGraph, LlamaIndex
+---
+
+Agentic RAG adds reasoning to retrieval: agents decompose queries, iterate, reflect, and refine results. Pattern: **Query → Plan → Tool Use → Reflect → Answer**.
+
+## Summary
+
+Single-stage RAG (embed query, retrieve, generate) is outdated. Agentic RAG handles complex queries requiring multi-hop reasoning, schema-driven queries (SQL + vectors), and output validation. 2026 frameworks: LangGraph (LangChain), LlamaIndex agentic, Mastra (TypeScript-native).
+
+## Query planning agent
+
+```typescript
+import Anthropic from '@anthropic-sdk/sdk';
+
+const client = new Anthropic();
+
+async function planQuery(userQuery: string) {
+  const response = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 1000,
+    messages: [
+      {
+        role: 'user',
+        content: `User query: "${userQuery}"
+
+Classify this query and generate a retrieval plan:
+1. Query type (simple lookup, multi-hop, schema-driven, analytical)
+2. Retrieval strategy (vector-only, hybrid, graph, SQL, multi-source)
+3. Sub-queries if needed
+
+Output JSON with keys: type, strategy, subQueries.`,
+      },
+    ],
+  });
+
+  return JSON.parse(
+    response.content[0].type === 'text' ? response.content[0].text : '{}'
+  );
+}
+
+// Example:
+const plan = await planQuery(
+  'Which vendors supply my manufacturer, and who are their competitors?'
+);
+// { type: "multi-hop", strategy: "graph+vector", subQueries: [...] }
+```
+
+## Multi-hop retrieval with reflection
+
+```typescript
+async function multiHopRetrieval(query: string) {
+  const plan = await planQuery(query);
+  let context = '';
+
+  // Execute sub-queries iteratively
+  for (const subQuery of plan.subQueries) {
+    const results = await hybridSearch(subQuery);
+    context += `\n${subQuery}:\n${results.map((r) => r.text).join('\n')}`;
+  }
+
+  // Reflect: does context sufficiently answer original query?
+  const reflection = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 500,
+    messages: [
+      {
+        role: 'user',
+        content: `Original query: "${query}"
+
+Retrieved context:
+${context}
+
+Is this context sufficient to answer the query? 
+If not, suggest additional retrieval steps.`,
+      },
+    ],
+  });
+
+  const reflectionText =
+    reflection.content[0].type === 'text' ? reflection.content[0].text : '';
+
+  // If insufficient, refine and retry
+  if (reflectionText.includes('insufficient')) {
+    const refinedResults = await hybridSearch(
+      `${query} expand scope`,
+      { limit: 20 }
+    );
+    context += `\n[Expanded retrieval]:\n${refinedResults.map((r) => r.text).join('\n')}`;
+  }
+
+  return context;
+}
+```
+
+## LangGraph agentic RAG
+
+```typescript
+import { StateGraph, MessagesState } from '@langchain/langgraph';
+import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { Anthropic } from '@langchain/anthropic';
+
+const model = new Anthropic({ modelName: 'claude-3-5-sonnet-20241022' });
+
+// Define tools: vector search, graph query, SQL
+const tools = [
+  {
+    name: 'vector_search',
+    description: 'Search documents by semantic similarity',
+    invoke: async (query: string) => hybridSearch(query),
+  },
+  {
+    name: 'graph_query',
+    description: 'Query relationships in knowledge graph',
+    invoke: async (cypher: string) => neo4j.run(cypher),
+  },
+  {
+    name: 'sql_query',
+    description: 'Query structured data',
+    invoke: async (sql: string) => db.query(sql),
+  },
+];
+
+const toolNode = new ToolNode(tools);
+const modelWithTools = model.bindTools(tools);
+
+async function shouldContinue(state: MessagesState) {
+  const messages = state.messages;
+  const lastMessage = messages[messages.length - 1];
+
+  // If tool calls present, continue; else end
+  return lastMessage.additional_kwargs?.tool_use ? 'tools' : 'end';
+}
+
+// Build graph
+const workflow = new StateGraph(MessagesState)
+  .addNode('agent', async (state) => {
+    const response = await modelWithTools.invoke(state.messages);
+    return { messages: [...state.messages, response] };
+  })
+  .addNode('tools', toolNode)
+  .addEdge('__start__', 'agent')
+  .addConditionalEdges('agent', shouldContinue, { tools: 'tools', end: '__end__' })
+  .addEdge('tools', 'agent');
+
+const app = workflow.compile();
+
+// Run agent
+const result = await app.invoke({
+  messages: [
+    { role: 'user', content: 'Find vendors for my manufacturer' },
+  ],
+});
+```
+
+## Self-RAG (self-reflection)
+
+Agent evaluates retrieved docs and generated response:
+
+```typescript
+async function selfRAG(query: string) {
+  // Retrieve
+  const retrieved = await hybridSearch(query, 10);
+
+  // Evaluate retrieval relevance
+  const relevanceCheck = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 100,
+    messages: [
+      {
+        role: 'user',
+        content: `Query: "${query}"
+Retrieved: ${retrieved.map((r) => r.text).join(' ')}
+Are these documents relevant? Yes/No`,
+      },
+    ],
+  });
+
+  if (
+    relevanceCheck.content[0].type === 'text' &&
+    relevanceCheck.content[0].text.includes('No')
+  ) {
+    // Re-retrieve with refined query
+    const refined = await hybridSearch(`${query} in detail`, 15);
+    retrieved.push(...refined);
+  }
+
+  // Generate answer
+  const answer = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 1000,
+    messages: [
+      {
+        role: 'user',
+        content: `Query: "${query}"
+Context: ${retrieved.map((r) => r.text).join('\n')}
+Provide a comprehensive answer.`,
+      },
+    ],
+  });
+
+  // Evaluate answer faithfulness
+  const faithfulness = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 100,
+    messages: [
+      {
+        role: 'user',
+        content: `Context: ${retrieved.map((r) => r.text).join(' ')}
+Generated answer: ${answer.content[0].type === 'text' ? answer.content[0].text : ''}
+Is the answer fully supported by context? Yes/No`,
+      },
+    ],
+  });
+
+  return {
+    answer: answer.content[0].type === 'text' ? answer.content[0].text : '',
+    retrievalRelevant: relevanceCheck.content[0].type === 'text' ? 
+      relevanceCheck.content[0].text.includes('Yes') : false,
+    answerFaithful: faithfulness.content[0].type === 'text' ?
+      faithfulness.content[0].text.includes('Yes') : false,
+  };
+}
+```
+
+## Dynamic tool selection
+
+```typescript
+async function selectTool(query: string): Promise<'vector' | 'graph' | 'sql'> {
+  const response = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 50,
+    messages: [
+      {
+        role: 'user',
+        content: `Query: "${query}"
+Which tool to use: 'vector' (semantic), 'graph' (relationships), or 'sql' (structured)?`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  if (text.includes('graph')) return 'graph';
+  if (text.includes('sql')) return 'sql';
+  return 'vector';
+}
+
+async function intelligentRetrieval(query: string) {
+  const tool = await selectTool(query);
+
+  if (tool === 'vector') {
+    return await hybridSearch(query);
+  } else if (tool === 'graph') {
+    return await neo4j.run(`MATCH (n:Entity) WHERE n.name CONTAINS $q RETURN n`, {
+      q: query,
+    });
+  } else {
+    return await db.query(`SELECT * FROM documents WHERE text ILIKE $1`, [
+      query,
+    ]);
+  }
+}
+```
+
+## LlamaIndex agentic retrieval
+
+```typescript
+import { Agent, VectorStoreIndex } from 'llamaindex';
+
+const index = new VectorStoreIndex(...); // From documents
+const agent = new Agent(index, {
+  agentType: 'ReActAgent', // Reasoning + acting
+  verbose: true,
+});
+
+// Agent automatically decomposes query, retrieves, reflects
+const response = await agent.query('Find vendors and their competitors');
+```
+
+## When to use agentic RAG
+
+| Scenario | Use agentic? |
+|----------|-------------|
+| Simple keyword search | No |
+| Multi-hop relationships | **Yes** |
+| Requires SQL + vectors | **Yes** |
+| Document Q&A (single retrieval) | No |
+| Complex business logic | **Yes** |
+| Output validation needed | **Yes** |
+| Cost-sensitive | No (uses more tokens) |
+
+## See also
+
+- [LangGraph docs](https://python.langchain.com/docs/langgraph/)
+- [LlamaIndex agentic](https://docs.llamaindex.ai/en/stable/module_guides/agents/)

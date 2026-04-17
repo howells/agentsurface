@@ -1,0 +1,440 @@
+---
+title: Notification-to-Conversation Continuity
+description: Persist lastNotificationContext per user. Inject when they reply so the agent knows what they're responding to.
+---
+
+## Summary
+
+When a user replies to a push notification (e.g., "Order #123 needs approval"), the agent needs context to understand what "it" refers to. Store the notification content (lastNotificationContext) per user; when they reply, inject it into the next prompt so the agent can reference it. Without this, the agent treats the reply as disconnected from the notification.
+
+- **Notification fires**: "You have 3 new orders" → stored in Redis as `lastNotificationContext:{userId}`.
+- **User replies**: "Approve the first one" → agent reads context from Redis, knows you're talking about orders.
+- **Storage**: Redis (fast, real-time), or database (durable across server restarts).
+- **Injection point**: System prompt or message history.
+
+---
+
+## Problem
+
+```typescript
+// ❌ Without context injection
+Notification: "Order #123 from Alice needs approval"
+(User reads notification on mobile, taps reply)
+User: "Approve it"
+
+Agent: "Approve what? I don't have context. Please clarify which order."
+```
+
+---
+
+## Solution: Context Store
+
+```typescript
+// services/notification-context.ts
+import Redis from "redis";
+
+const redis = Redis.createClient();
+
+export interface NotificationContext {
+  type: "order" | "invoice" | "customer" | "record"; // Entity type
+  entityId: string;
+  summary: string; // Short summary of what the notification was about
+  timestamp: number; // When the notification was sent
+  action?: string; // Suggested action: "approve", "review", "send"
+}
+
+export async function storeNotificationContext(
+  userId: string,
+  context: NotificationContext
+): Promise<void> {
+  const key = `lastNotificationContext:${userId}`;
+  await redis.setEx(
+    key,
+    24 * 60 * 60, // 24 hours TTL
+    JSON.stringify(context)
+  );
+}
+
+export async function getNotificationContext(userId: string): Promise<NotificationContext | null> {
+  const key = `lastNotificationContext:${userId}`;
+  const data = await redis.get(key);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function clearNotificationContext(userId: string): Promise<void> {
+  const key = `lastNotificationContext:${userId}`;
+  await redis.del(key);
+}
+```
+
+---
+
+## Pattern: Dispatch Notification + Store Context
+
+```typescript
+// services/notification-dispatcher.ts
+import { storeNotificationContext } from "./notification-context";
+import { sendNotification } from "@platform/notifications";
+
+export async function notifyOrderApprovalNeeded(userId: string, orderId: string) {
+  const order = await db.getOrder(orderId);
+
+  // 1. Store context
+  await storeNotificationContext(userId, {
+    type: "order",
+    entityId: orderId,
+    summary: `Order #${order.number} from ${order.customerName} needs approval`,
+    timestamp: Date.now(),
+    action: "approve",
+  });
+
+  // 2. Send notification
+  await sendNotification(userId, {
+    title: "Order Approval Needed",
+    body: `Order #${order.number} from ${order.customerName} awaits your approval`,
+    data: {
+      type: "order",
+      entityId: orderId,
+      platform: "push", // Used to route back to agent
+    },
+  });
+}
+
+export async function notifyNewInvoices(userId: string, invoiceIds: string[]) {
+  const invoices = await db.getInvoices(invoiceIds);
+  const summary = invoices.map(i => `${i.customerName}: ${i.amount}`).join(", ");
+
+  await storeNotificationContext(userId, {
+    type: "invoice",
+    entityId: invoiceIds.join(","), // Multiple entities
+    summary: `New invoices: ${summary}`,
+    timestamp: Date.now(),
+    action: "send",
+  });
+
+  await sendNotification(userId, {
+    title: "New Invoices",
+    body: `You have ${invoices.length} new invoices to review`,
+  });
+}
+```
+
+---
+
+## Pattern: Inject Context into Chat
+
+When the user replies to a notification, retrieve and inject context:
+
+```typescript
+// chat/assistant-runtime.ts
+import { ToolLoopAgent } from "ai";
+import { getNotificationContext, clearNotificationContext } from "@services/notification-context";
+
+export async function streamAssistant(params: {
+  userId: string;
+  systemPrompt: string;
+  messages: ModelMessage[];
+  tools: Record<string, Tool>;
+  fromNotification?: boolean; // User replied to a notification
+}) {
+  let { messages } = params;
+
+  // If reply-to-notification, inject context
+  if (params.fromNotification) {
+    const context = await getNotificationContext(params.userId);
+    
+    if (context) {
+      // Prepend a system note to the conversation
+      const contextMessage: ModelMessage = {
+        role: "user",
+        content: `(Context: You previously sent a notification about "${context.summary}". The user is replying to that notification. Their message below is in response to: ${context.summary})`,
+      };
+      
+      messages = [
+        ...messages.slice(0, -1), // All messages except the latest
+        contextMessage,
+        messages[messages.length - 1], // The user's reply
+      ];
+    }
+  }
+
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: params.systemPrompt,
+    tools: params.tools,
+    stopWhen: stepCountIs(10),
+  });
+
+  const stream = await agent.stream({
+    messages,
+    experimental_transform: smoothStream(),
+  });
+
+  // After successful completion, clear the context (so next reply doesn't re-use old context)
+  await stream.finalMessage();
+  await clearNotificationContext(params.userId);
+
+  return stream;
+}
+```
+
+---
+
+## Alternate: Inject into System Prompt
+
+Instead of adding a message, inject into the system prompt:
+
+```typescript
+// chat/prompt.ts
+export async function buildSystemPromptWithNotificationContext(
+  userCtx: UserContext,
+  userId: string
+): Promise<string> {
+  const basePrompt = buildSystemPrompt(userCtx);
+
+  const notifContext = await getNotificationContext(userId);
+
+  if (notifContext) {
+    const contextBlock = `
+## Recent Notification Context
+
+The user was just notified: "${notifContext.summary}"
+- Entity type: ${notifContext.type}
+- Entity ID: ${notifContext.entityId}
+- Suggested action: ${notifContext.action ?? "none"}
+
+If the user's message seems to be in response to this notification, they are referring to the above ${notifContext.type}.
+`;
+    return basePrompt + contextBlock;
+  }
+
+  return basePrompt;
+}
+```
+
+---
+
+## Platform-Specific Examples
+
+### WhatsApp Notification + Reply
+
+```typescript
+// platforms/whatsapp/notification.ts
+import { twilioClient } from "@platform/whatsapp/client";
+import { storeNotificationContext } from "@services/notification-context";
+
+export async function sendWhatsAppNotification(userId: string, orderId: string) {
+  const order = await db.getOrder(orderId);
+
+  // Store context
+  await storeNotificationContext(userId, {
+    type: "order",
+    entityId: orderId,
+    summary: `Order #${order.number} from ${order.customerName} for ${order.total} needs your approval.`,
+    timestamp: Date.now(),
+    action: "approve",
+  });
+
+  // Send via WhatsApp
+  await twilioClient.messages.create({
+    from: `whatsapp:+1234567890`,
+    to: `whatsapp:${userId}`,
+    body: `Order Approval Needed:\n\nOrder #${order.number} from ${order.customerName}\nAmount: ${order.total}\n\nReply with "Approve" or "Reject"`,
+  });
+}
+
+// platforms/whatsapp/handler.ts — when user replies
+export async function handleWhatsAppReply(message: WhatsAppMessage) {
+  const normalized = normalizeWhatsAppMessage(message);
+  const userCtx = await db.getUserContext(normalized.userId, normalized.teamId);
+
+  // Build prompt WITH notification context
+  const systemPrompt = await buildSystemPromptWithNotificationContext(
+    userCtx,
+    normalized.userId
+  );
+
+  // Run agent
+  const stream = await runCoreAgent({
+    userContext: userCtx,
+    platform: "whatsapp",
+    messages: [{ role: "user", content: normalized.text }],
+    tools: await getTools(normalized.teamId),
+  });
+
+  // ... send response ...
+}
+```
+
+### Telegram Notification + Reply
+
+```typescript
+// platforms/telegram/notification.ts
+import { telegramBot } from "@platform/telegram/client";
+import { storeNotificationContext } from "@services/notification-context";
+
+export async function sendTelegramNotification(userId: string, itemCount: number) {
+  const items = await db.getNewItems(userId, itemCount);
+
+  await storeNotificationContext(userId, {
+    type: "record",
+    entityId: items.map(i => i.id).join(","),
+    summary: `You have ${itemCount} new items to review`,
+    timestamp: Date.now(),
+    action: "review",
+  });
+
+  await telegramBot.sendMessage(userId, `
+New items: ${itemCount}
+
+${items.map(i => `• ${i.title} (${i.date})`).join("\n")}
+
+Reply to manage them.
+`);
+}
+```
+
+---
+
+## Database Fallback (for Server Restarts)
+
+For durability across server restarts, use the database instead of (or in addition to) Redis:
+
+```typescript
+// db/notification-context.ts
+export async function storeNotificationContextInDb(
+  userId: string,
+  context: NotificationContext
+): Promise<void> {
+  await db.notificationContexts.upsert({
+    userId,
+    context: JSON.stringify(context),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+  });
+}
+
+export async function getNotificationContextFromDb(userId: string): Promise<NotificationContext | null> {
+  const row = await db.notificationContexts.findUnique({ where: { userId } });
+  if (!row || row.expiresAt < new Date()) return null;
+  return JSON.parse(row.context);
+}
+
+// Wrapper: try Redis first, fallback to DB
+export async function getNotificationContext(userId: string): Promise<NotificationContext | null> {
+  // Try Redis (fast)
+  const cached = await redis.get(`lastNotificationContext:${userId}`);
+  if (cached) return JSON.parse(cached);
+
+  // Fall back to DB
+  return getNotificationContextFromDb(userId);
+}
+```
+
+---
+
+## TTL and Cleanup
+
+Notification context should expire after a period (usually 24 hours) to avoid stale references:
+
+```typescript
+// Automatic cleanup via TTL
+// Redis: setEx(..., 24 * 60 * 60, ...) handles it
+// Database: periodic cron job
+
+// scheduled-tasks/cleanup-old-notification-contexts.ts
+export async function cleanupOldContexts() {
+  const count = await db.notificationContexts.deleteMany({
+    where: { expiresAt: { lt: new Date() } },
+  });
+  logger.info(`Cleaned up ${count} expired notification contexts`);
+}
+
+// Schedule via cron (e.g., hourly)
+// 0 * * * * → run at top of every hour
+```
+
+---
+
+## Testing
+
+```typescript
+// __tests__/notification-context.test.ts
+import { storeNotificationContext, getNotificationContext } from "@services/notification-context";
+
+test("stores and retrieves notification context", async () => {
+  const userId = "user-123";
+  const context = {
+    type: "order" as const,
+    entityId: "order-456",
+    summary: "Order #789 needs approval",
+    timestamp: Date.now(),
+    action: "approve",
+  };
+
+  await storeNotificationContext(userId, context);
+  const retrieved = await getNotificationContext(userId);
+
+  expect(retrieved).toEqual(context);
+});
+
+test("context expires after TTL", async () => {
+  const userId = "user-123";
+  const context = { ... };
+  
+  await storeNotificationContext(userId, context);
+  
+  // Simulate TTL expiry
+  jest.useFakeTimers();
+  jest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+  
+  const retrieved = await getNotificationContext(userId);
+  expect(retrieved).toBeNull();
+});
+
+test("agent uses context when replying to notification", async () => {
+  const userId = "user-123";
+  
+  await storeNotificationContext(userId, {
+    type: "order",
+    entityId: "order-123",
+    summary: "Order #789 from Alice needs approval",
+    timestamp: Date.now(),
+    action: "approve",
+  });
+
+  const stream = await streamAssistant({
+    userId,
+    systemPrompt: "...",
+    messages: [{ role: "user", content: "Approve it" }],
+    tools: {},
+    fromNotification: true,
+  });
+
+  const response = await stream.finalMessage();
+  
+  // Agent should reference the order, not ask "what should I approve?"
+  expect(response.content[0].text).toContain("order");
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Create `NotificationContext` interface.
+- [ ] Store context in Redis (or DB) with 24h TTL.
+- [ ] On notification dispatch, call `storeNotificationContext`.
+- [ ] When user replies, retrieve context and inject into agent.
+- [ ] Test that agent references notification context.
+- [ ] Clear context after agent processes the reply.
+- [ ] Add periodic cleanup for expired contexts.
+- [ ] Monitor context hit rate (how often user replies to notifications).
+
+---
+
+## See Also
+
+- [Platform-Agnostic Core](/docs/cookbook/platform-agnostic-core) — handling replies across platforms.
+- [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — injecting context into prompts.
+- [Agentic Loop](/docs/cookbook/agentic-loop) — where the agent runs.
+

@@ -1,0 +1,26 @@
+---
+title: API Surface
+description: Designing APIs that AI agents can discover, understand, and call reliably
+---
+
+## Summary
+
+This section covers the foundational design patterns for APIs that agents can operate reliably. It addresses OpenAPI specifications as executable contracts, tool definition best practices, idempotency, pagination, versioning strategies, and webhook design. These practices prevent silent failures and ensure agents understand API semantics without guessing.
+
+- Complete, accurate OpenAPI specs as single source of truth
+- Clear tool definitions with descriptions that serve as prompts
+- Idempotency and safety markers for retry-safe operations
+- Consistent pagination, filtering, and error structures
+- Versioning strategies that protect against breaking changes
+
+Your API surface is the primary interface agents use to interact with your system. An agent-ready API goes beyond "has documentation" — it must be fully machine-negotiable, self-describing, and unambiguous at every level.
+
+## What This Section Covers
+
+- **OpenAPI 3.1 specifications** — complete, accurate specs that serve as the single source of truth for agent tool generation
+- **Schema design** — using JSON Schema effectively so agents understand input constraints, output shapes, and edge cases without guessing
+- **Tool definitions** — structuring your API operations as discrete tools with clear names, descriptions, and parameter semantics
+- **Idempotency and safety** — marking operations correctly so agents know which calls are safe to retry
+- **Pagination and filtering** — cursor-based pagination and consistent query patterns that agents can navigate programmatically
+- **Content negotiation** — supporting `application/json` responses by default with structured error bodies
+- **Versioning** — strategies that let agents pin to stable contracts without silent breaking changes

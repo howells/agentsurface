@@ -1,0 +1,460 @@
+---
+title: Webhooks and Events for Agents
+description: Designing webhook schemas and event payloads that agents can route, deduplicate, and act on reliably
+---
+
+## Summary
+
+Webhooks push state changes to agents, but poorly designed events cause duplicate processing and unroutable payloads. Well-designed events are self-describing, idempotent, and verifiable. OpenAPI 3.1's webhooks field lets you document incoming payloads in the same spec as your API. Each event needs a unique event_id and idempotency_key for deduplication, explicit event_type for routing, and a timestamp for ordering.
+
+- Event payloads are self-describing with event_type and event_id
+- Include idempotency_key to prevent duplicate processing
+- Timestamp every event for reliable ordering and replay
+- Document all webhook types in OpenAPI webhooks field, not separately
+- Provide schema for every event payload
+
+Agents are not always the initiating party. Many workflows begin when something happens: an order ships, a payment succeeds, a user completes onboarding. Webhooks and event streams are the mechanism for pushing these state changes to agents. Poorly designed events produce unroutable payloads, duplicate processing, and security vulnerabilities. Well-designed events are self-describing, idempotent, and verifiable.
+
+## OpenAPI 3.1 Webhooks Field
+
+OpenAPI 3.1 introduced a top-level `webhooks` field that lets you document incoming webhook payloads in the same spec as your outbound API. This is the correct place to document webhooks — not in a separate `callbacks` object under a subscription endpoint, and not in a separate documentation site.
+
+```yaml
+openapi: "3.1.0"
+info:
+  title: Orders API
+  version: "1.0.0"
+
+paths:
+  # ... your regular API endpoints
+
+webhooks:
+  order.created:
+    post:
+      operationId: webhook_order_created
+      summary: An order has been created
+      description: >
+        Sent immediately when a new order is submitted. The order will be in
+        "pending" status. Listen for order.status_changed to track subsequent
+        status transitions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreatedEvent'
+            example:
+              event_type: "order.created"
+              event_id: "evt_01HV3K8MNPQR"
+              created_at: "2024-03-15T14:22:00Z"
+              idempotency_key: "ord_01HV3K8M-created-1710511320"
+              data:
+                id: "ord_01HV3K8M"
+                status: "pending"
+                customer_id: "cust_xyz"
+                total: 149.99
+      responses:
+        '200':
+          description: Event acknowledged
+        '202':
+          description: Event accepted for async processing
+
+  order.status_changed:
+    post:
+      operationId: webhook_order_status_changed
+      summary: An order's status has changed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusChangedEvent'
+
+  payment.succeeded:
+    post:
+      operationId: webhook_payment_succeeded
+      summary: A payment was processed successfully
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentSucceededEvent'
+
+  payment.failed:
+    post:
+      operationId: webhook_payment_failed
+      summary: A payment attempt failed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentFailedEvent'
+```
+
+## Webhooks vs Callbacks
+
+OpenAPI 3.x supports both `webhooks` and `callbacks`. They serve different purposes:
+
+**`webhooks`** — events that your server sends to a registered URL, initiated by server-side state changes. The consumer registers a URL in advance; the server calls it whenever the event occurs.
+
+**`callbacks`** — responses to long-running or asynchronous operations. Defined under a specific path operation; the server calls the consumer's URL when a previously initiated operation completes.
+
+```yaml
+paths:
+  /exports:
+    post:
+      operationId: create_export
+      summary: Start an async data export
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format:
+                  type: string
+                  enum: [csv, json, parquet]
+                callback_url:
+                  type: string
+                  format: uri
+                  description: URL to receive the export.completed event
+      callbacks:
+        exportCompleted:
+          '{$requestBody#/callback_url}':
+            post:
+              summary: Export completed notification
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/ExportCompletedEvent'
+```
+
+Use `webhooks` for system-wide events (order created, payment succeeded). Use `callbacks` for operation-specific async completion events.
+
+## Agent-Friendly Webhook Design
+
+### Discriminator Fields
+
+Every event payload must include a field that unambiguously identifies the event type. Agents route events by this field — without it, the agent must infer event type from payload shape, which is unreliable.
+
+```yaml
+components:
+  schemas:
+    BaseEvent:
+      type: object
+      required: [event_type, event_id, created_at]
+      properties:
+        event_type:
+          type: string
+          description: Identifies the event type; used to route to the correct handler
+        event_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this event instance
+        created_at:
+          type: string
+          format: date-time
+          description: When the event was generated (not when it was delivered)
+
+    OrderCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required: [data]
+          properties:
+            event_type:
+              type: string
+              const: "order.created"
+            data:
+              $ref: '#/components/schemas/Order'
+
+    PaymentSucceededEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          required: [data]
+          properties:
+            event_type:
+              type: string
+              const: "payment.succeeded"
+            data:
+              $ref: '#/components/schemas/Payment'
+```
+
+### OpenAPI Discriminator for Polymorphic Event Handling
+
+When multiple event types share a base schema, use the OpenAPI `discriminator` field to map `event_type` values to their corresponding schemas:
+
+```yaml
+components:
+  schemas:
+    AnyEvent:
+      discriminator:
+        propertyName: event_type
+        mapping:
+          "order.created": '#/components/schemas/OrderCreatedEvent'
+          "order.status_changed": '#/components/schemas/OrderStatusChangedEvent'
+          "order.cancelled": '#/components/schemas/OrderCancelledEvent'
+          "payment.succeeded": '#/components/schemas/PaymentSucceededEvent'
+          "payment.failed": '#/components/schemas/PaymentFailedEvent'
+          "user.created": '#/components/schemas/UserCreatedEvent'
+          "user.deleted": '#/components/schemas/UserDeletedEvent'
+      oneOf:
+        - $ref: '#/components/schemas/OrderCreatedEvent'
+        - $ref: '#/components/schemas/OrderStatusChangedEvent'
+        - $ref: '#/components/schemas/OrderCancelledEvent'
+        - $ref: '#/components/schemas/PaymentSucceededEvent'
+        - $ref: '#/components/schemas/PaymentFailedEvent'
+        - $ref: '#/components/schemas/UserCreatedEvent'
+        - $ref: '#/components/schemas/UserDeletedEvent'
+```
+
+This allows an agent framework that receives any event payload to look up the correct schema by the `event_type` discriminator value, rather than trying to pattern-match the payload shape.
+
+### Idempotency Keys
+
+Webhook delivery systems guarantee at-least-once delivery. Agents must handle duplicate events without creating duplicate side effects. Include an `idempotency_key` in every event payload:
+
+```yaml
+components:
+  schemas:
+    BaseEvent:
+      type: object
+      required: [event_type, event_id, created_at, idempotency_key]
+      properties:
+        event_type:
+          type: string
+        event_id:
+          type: string
+          format: uuid
+          description: Unique ID for this event instance; same value on redeliveries
+        idempotency_key:
+          type: string
+          description: >
+            Stable key for deduplication. Agents should track processed
+            idempotency_keys to avoid reprocessing delivered events.
+            Format: {resource_id}-{event_type}-{unix_timestamp}
+        created_at:
+          type: string
+          format: date-time
+```
+
+Document the deduplication expectation explicitly in your webhook documentation:
+
+```yaml
+webhooks:
+  payment.succeeded:
+    post:
+      operationId: webhook_payment_succeeded
+      description: >
+        Sent when a payment is successfully processed. This event may be
+        delivered more than once due to network retries. Use the
+        idempotency_key field to detect and ignore duplicate deliveries.
+        A payment is guaranteed to appear at most once per idempotency_key.
+```
+
+### Signature Verification
+
+Agents receiving webhooks must verify the payload signature to prevent spoofed events. Document the verification mechanism in your spec:
+
+```yaml
+webhooks:
+  order.created:
+    post:
+      operationId: webhook_order_created
+      description: >
+        Verify the X-Signature-256 header before processing. The value is
+        HMAC-SHA256 of the raw request body using your webhook secret as the key,
+        encoded as hex. Reject requests where the signature does not match.
+      parameters:
+        - name: X-Signature-256
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^sha256=[0-9a-f]{64}$'
+          description: >
+            HMAC-SHA256 signature of the request body. Format: sha256={hex_digest}.
+            Compute: HMAC-SHA256(body_bytes, webhook_secret).
+        - name: X-Delivery-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique ID for this delivery attempt; use for support requests
+        - name: X-Timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+          description: >
+            Unix timestamp when the delivery was initiated. Reject requests
+            where abs(now - X-Timestamp) > 300 seconds to prevent replay attacks.
+```
+
+## Schema Design Patterns
+
+### Exhaustive Event Type Listing
+
+List every event type your system emits. Agents building event-driven workflows need to know the full event catalog to design their listening logic.
+
+```yaml
+webhooks:
+  # Order lifecycle
+  order.created:
+    post: { ... }
+  order.status_changed:
+    post: { ... }
+  order.shipped:
+    post: { ... }
+  order.delivered:
+    post: { ... }
+  order.cancelled:
+    post: { ... }
+  order.refunded:
+    post: { ... }
+
+  # Payment lifecycle
+  payment.initiated:
+    post: { ... }
+  payment.succeeded:
+    post: { ... }
+  payment.failed:
+    post: { ... }
+  payment.refunded:
+    post: { ... }
+
+  # User lifecycle
+  user.created:
+    post: { ... }
+  user.email_verified:
+    post: { ... }
+  user.subscription_changed:
+    post: { ... }
+  user.deleted:
+    post: { ... }
+```
+
+### Including State Snapshots
+
+Include the full resource state at the time of the event, not just the changed fields. Agents should not need to make a follow-up API call to get the current state after receiving an event.
+
+```yaml
+components:
+  schemas:
+    OrderStatusChangedEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseEvent'
+        - type: object
+          properties:
+            event_type:
+              type: string
+              const: "order.status_changed"
+            data:
+              type: object
+              required: [order, previous_status, new_status]
+              properties:
+                # Full state snapshot — agent does not need to call get_order
+                order:
+                  $ref: '#/components/schemas/Order'
+                previous_status:
+                  type: string
+                  enum: [pending, processing, shipped, delivered, cancelled]
+                  description: Status before this transition
+                new_status:
+                  type: string
+                  enum: [pending, processing, shipped, delivered, cancelled]
+                  description: Status after this transition
+                changed_at:
+                  type: string
+                  format: date-time
+                  description: When the status transition occurred
+```
+
+### Versioned Event Schemas
+
+As your event schemas evolve, version them to prevent breaking changes:
+
+```yaml
+components:
+  schemas:
+    BaseEvent:
+      type: object
+      required: [event_type, event_id, schema_version, created_at]
+      properties:
+        schema_version:
+          type: string
+          enum: ["1.0", "1.1", "2.0"]
+          description: >
+            Version of the event schema. Consumers should check this field
+            before processing. Breaking schema changes increment the major version.
+            Additive changes increment the minor version.
+```
+
+## Webhook Registration Endpoint
+
+Document the webhook subscription endpoint alongside the webhook definitions:
+
+```yaml
+paths:
+  /webhooks:
+    post:
+      operationId: create_webhook
+      summary: Register a webhook endpoint
+      description: >
+        Registers a URL to receive webhook events. The endpoint must accept
+        POST requests and return 200 within 10 seconds. Use the event_types
+        array to filter which events are delivered to this endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, event_types]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: HTTPS URL to receive webhook deliveries
+                event_types:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - "order.created"
+                      - "order.status_changed"
+                      - "order.shipped"
+                      - "order.delivered"
+                      - "order.cancelled"
+                      - "payment.succeeded"
+                      - "payment.failed"
+                  description: Events to deliver to this endpoint
+                secret:
+                  type: string
+                  description: >
+                    Optional secret for signature verification. If provided,
+                    all deliveries will include an X-Signature-256 header.
+```
+
+## Checklist
+
+- [ ] All webhooks are documented in the OpenAPI `webhooks` field (not in a separate file)
+- [ ] Every event payload includes `event_type`, `event_id`, and `created_at`
+- [ ] Every event payload includes an `idempotency_key`
+- [ ] A `discriminator` is configured on the union event schema
+- [ ] Signature verification headers are documented with the algorithm and format
+- [ ] State snapshots are included in event payloads (agents should not need follow-up calls)
+- [ ] Every emitted event type is listed in the spec
+- [ ] Event schemas are versioned with a `schema_version` field
+- [ ] Webhook registration endpoint is documented in `paths`
+
+## Related Pages
+
+- [OpenAPI for Agents](./openapi-for-agents) — spec structure that webhooks sit alongside
+- [Error Handling](/docs/error-handling) — how to return errors from webhook receivers
+- [Arazzo Workflows](./arazzo-workflows) — multi-step workflows triggered by webhook events

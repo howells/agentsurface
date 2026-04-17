@@ -1,0 +1,32 @@
+---
+title: Multi-Agent Patterns
+description: Designing systems where multiple AI agents collaborate, delegate, and coordinate
+---
+
+## Summary
+
+As systems grow complex, single agents give way to multi-agent patterns where specialists collaborate. Five primary patterns exist: sequential (pipeline), concurrent (fan-out), handoff (routing), group chat (collaborative refinement), and dynamic orchestration (emergent planning). Most production systems combine patterns with a deterministic backbone and AI at decision points.
+
+- Sequential pipeline: output of one agent is input to the next
+- Concurrent fan-out: same input to multiple agents, aggregate results
+- Handoff routing: one agent routes to exactly one specialist
+- Group chat: multiple agents share a thread, manager controls order
+- Dynamic orchestration: manager decomposes goal, assigns tasks, revises plan
+- 2026 consensus: deterministic routing + AI at judgment points
+
+As AI systems grow more capable, single-agent architectures give way to multi-agent patterns where specialized agents collaborate on complex tasks. Your system needs to support this by enabling clean delegation, shared context, and coordination.
+
+## What This Section Covers
+
+- **Orchestrator-worker patterns** — a central agent that decomposes tasks and delegates to specialized sub-agents
+- **Agent-to-agent delegation** — how one agent hands off work to another with context, constraints, and expected outcomes
+- **Shared context management** — passing conversation history, tool results, and accumulated state between agents without losing information
+- **Fan-out and aggregation** — dispatching parallel work to multiple agents and combining their results coherently
+- **Capability advertising** — how agents describe what they can do so orchestrators can route tasks to the right specialist
+- **Conflict resolution** — handling disagreements between agents, competing writes, and inconsistent state
+- **Observability** — tracing multi-agent interactions, measuring latency across agent hops, and debugging coordination failures
+
+## See also
+
+- **[Cookbook: Agentic Loop as Commodity](/docs/cookbook/agentic-loop)** — building individual agents with ToolLoopAgent
+- **[Cookbook: Autonomous Background Agents](/docs/cookbook/autonomous-background-agents)** — agents for proactive tasks, batching, and scheduling

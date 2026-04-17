@@ -1,0 +1,396 @@
+---
+title: Cross-Framework Portability
+description: Defining tools once and exporting adapters for MCP, Claude Agent SDK, and OpenAI
+---
+
+## Summary
+
+Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK, LangChain). Keeps logic centralized, ensures consistency across platforms, reduces duplication. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Tool constructor, OpenAI FunctionDeclaration). Single source of truth for tool behavior means updates flow everywhere.
+
+- **Shared registry**: Tool metadata, handler, schema (Zod)
+- **MCP adapter**: server.tool() registration
+- **Claude Agent SDK adapter**: Tool() constructor
+- **OpenAI adapter**: FunctionDeclaration with handler wrapper
+- **Vercel AI SDK adapter**: tools object
+- **Benefits**: Single source of truth, reduced duplication, consistent behavior
+
+---
+
+Tool definitions are business logic. Frameworks are deployment targets. Define your tool once in a framework-neutral module; emit adapters for each framework (MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK). This keeps logic centralized and ensures consistency across platforms.
+
+## The Pattern
+
+### Step 1: Shared Registry
+
+Define tool metadata and handler once:
+
+```typescript
+// tools/registry.ts — shared across all frameworks
+import { z } from 'zod';
+
+const searchDocsSchema = z.object({
+  query: z.string()
+    .describe('Free text search query. Examples: "authentication", "API rate limits"'),
+  limit: z.number().int().min(1).max(100).default(10)
+    .describe('Max results to return (default 10, max 100)'),
+  offset: z.number().int().min(0).default(0)
+    .describe('Pagination offset for large result sets'),
+  format: z.enum(['concise', 'detailed']).default('concise')
+    .describe('concise: title + URL only. detailed: full snippet (slower, more tokens)'),
+}).strict();
+
+type SearchDocsInput = z.infer<typeof searchDocsSchema>;
+
+export async function searchDocsHandler(input: SearchDocsInput) {
+  const results = await internal.search(input.query, { 
+    limit: input.limit, 
+    offset: input.offset,
+  });
+  
+  return {
+    results: results.map(doc => ({
+      id: doc.id,
+      title: doc.title,
+      url: doc.url,
+      ...(input.format === 'detailed' && { snippet: doc.snippet }),
+    })),
+    has_more: results.length === input.limit,
+    next_offset: input.offset + input.limit,
+  };
+}
+
+export const searchDocsTool = {
+  name: 'search_docs',
+  description: `Search internal documentation by keyword. Use this to find setup guides, API references, and troubleshooting steps. 
+Do not use this for general knowledge (use web search instead) or to create new docs (use create_doc). Returns snippets ranked by relevance.`,
+  schema: searchDocsSchema,
+  handler: searchDocsHandler,
+};
+
+// Other tools exported same way
+export const createDocTool = { /* ... */ };
+export const updateDocTool = { /* ... */ };
+
+export const allTools = [
+  searchDocsTool,
+  createDocTool,
+  updateDocTool,
+];
+```
+
+### Step 2: MCP Adapter
+
+```typescript
+// tools/mcp.ts
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { allTools, searchDocsTool, createDocTool, updateDocTool } from './registry';
+
+const server = new Server({
+  name: 'docs-mcp',
+  version: '1.0.0',
+});
+
+// Register all tools with MCP-specific annotations
+server.tool(
+  searchDocsTool.name,
+  searchDocsTool.description,
+  searchDocsTool.schema,
+  searchDocsTool.handler,
+  {
+    readOnlyHint: true,
+    idempotentHint: true,
+  }
+);
+
+server.tool(
+  createDocTool.name,
+  createDocTool.description,
+  createDocTool.schema,
+  createDocTool.handler,
+  {
+    destructiveHint: false,
+    idempotentHint: true,  // Supports idempotency_key parameter
+  }
+);
+
+// ... register remaining tools
+
+export default server;
+```
+
+### Step 3: Claude Agent SDK Adapter
+
+```typescript
+// tools/claude-agent-sdk.ts
+import { tool } from '@anthropic-ai/claude-agent-sdk';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { allTools } from './registry';
+
+// Export each tool for use in Claude Agent SDK
+export const claudeTools = allTools.map(t => 
+  tool({
+    name: t.name,
+    description: t.description,
+    inputSchema: zodToJsonSchema(t.schema),
+    execute: async (params: any) => {
+      const result = await t.handler(params);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result),
+        }],
+      };
+    },
+  })
+);
+
+// Or destructure for use in agent:
+export const searchDocsTool = claudeTools.find(t => t.name === 'search_docs');
+export const createDocTool = claudeTools.find(t => t.name === 'create_doc');
+```
+
+In an agent:
+
+```typescript
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import { searchDocsTool, createDocTool } from './tools/claude-agent-sdk';
+
+async function main() {
+  const response = await query({
+    prompt: 'Find the authentication guide',
+    tools: [searchDocsTool, createDocTool],
+  });
+  
+  console.log(response);
+}
+```
+
+### Step 4: OpenAI Agents SDK Adapter
+
+```typescript
+// tools/openai-agents.ts
+import { Tool } from '@openai/agents';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { allTools } from './registry';
+
+export const openaiTools = allTools.map(t => 
+  new Tool({
+    name: t.name,
+    description: t.description,
+    parameters: zodToJsonSchema(t.schema),
+    execute: t.handler,
+  })
+);
+
+export const searchDocsTool = openaiTools.find(t => t.name === 'search_docs');
+export const createDocTool = openaiTools.find(t => t.name === 'create_doc');
+```
+
+In an OpenAI agent:
+
+```typescript
+import { Agent } from '@openai/agents';
+import { searchDocsTool, createDocTool } from './tools/openai-agents';
+
+const agent = new Agent({
+  tools: [searchDocsTool, createDocTool],
+});
+
+const result = await agent.run('Find the authentication guide');
+```
+
+### Step 5: Vercel AI SDK Adapter
+
+```typescript
+// tools/vercel-ai.ts
+import { tool } from 'ai';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { allTools } from './registry';
+
+export const vercelTools = allTools.map(t => 
+  tool({
+    description: t.description,
+    parameters: zodToJsonSchema(t.schema),
+    execute: t.handler,
+  })
+);
+
+export const searchDocsTool = vercelTools.find(t => t.name === 'search_docs');
+```
+
+## Handling Framework-Specific Features
+
+### Annotations (MCP Only)
+
+MCP supports behavioral hints that other frameworks don't. Add them at the adapter layer:
+
+```typescript
+// tools/mcp.ts
+const toolAnnotations = {
+  search_docs: { readOnlyHint: true, idempotentHint: true },
+  create_doc: { destructiveHint: false, idempotentHint: true },
+  delete_doc: { destructiveHint: true, idempotentHint: false },
+};
+
+for (const toolDef of allTools) {
+  server.tool(
+    toolDef.name,
+    toolDef.description,
+    toolDef.schema,
+    toolDef.handler,
+    toolAnnotations[toolDef.name] || {}
+  );
+}
+```
+
+### Output Schemas
+
+MCP supports `outputSchema` for type-safe responses. Add at the adapter layer:
+
+```typescript
+// tools/mcp.ts
+import { z } from 'zod';
+
+const SearchDocsOutputSchema = z.object({
+  results: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    url: z.string(),
+    snippet: z.string().optional(),
+  })),
+  has_more: z.boolean(),
+  next_offset: z.number().int(),
+});
+
+server.tool(
+  'search_docs',
+  searchDocsTool.description,
+  searchDocsTool.schema,
+  searchDocsTool.handler,
+  { outputSchema: SearchDocsOutputSchema }
+);
+```
+
+### Dynamic Tool Selection (Anthropic/OpenAI)
+
+For agents with >20 tools, use framework-specific dynamic loading:
+
+**Anthropic BM25 search:**
+
+```typescript
+import { bm25Search } from '@anthropic-ai/sdk/utils';
+
+async function selectTools(query: string, allTools: Tool[]) {
+  return bm25Search(query, allTools, { topK: 5 });
+}
+
+async function main() {
+  const selected = await selectTools(userQuery, claudeTools);
+  
+  const response = await query({
+    prompt: userQuery,
+    tools: selected,  // Only active tools
+  });
+}
+```
+
+**OpenAI defer_loading:**
+
+```typescript
+const agent = new Agent({
+  tools: allTools.map(t => ({
+    ...t,
+    defer_loading: true,  // Load on demand
+  })),
+});
+```
+
+## Testing Strategy
+
+Test the shared handler independently of frameworks:
+
+```typescript
+// test/registry.test.ts
+import { searchDocsHandler, searchDocsSchema } from '../tools/registry';
+
+describe('searchDocsHandler', () => {
+  it('returns paginated results', async () => {
+    const result = await searchDocsHandler({
+      query: 'authentication',
+      limit: 10,
+      offset: 0,
+      format: 'concise',
+    });
+    
+    expect(result.results).toHaveLength(10);
+    expect(result).toHaveProperty('has_more');
+    expect(result).toHaveProperty('next_offset');
+  });
+  
+  it('validates input schema', () => {
+    const badInput = { query: 'test', limit: 1000 };  // limit > 100
+    expect(() => searchDocsSchema.parse(badInput)).toThrow();
+  });
+});
+```
+
+Then test each adapter separately:
+
+```typescript
+// test/mcp.test.ts
+import server from '../tools/mcp';
+
+describe('MCP adapter', () => {
+  it('exposes search_docs tool with annotations', async () => {
+    const tools = await server.listTools({});
+    const searchDocs = tools.find(t => t.name === 'search_docs');
+    expect(searchDocs).toBeDefined();
+  });
+});
+
+// test/claude-agent-sdk.test.ts
+import { searchDocsTool } from '../tools/claude-agent-sdk';
+
+describe('Claude Agent SDK adapter', () => {
+  it('tool has correct shape', () => {
+    expect(searchDocsTool).toHaveProperty('name', 'search_docs');
+    expect(searchDocsTool).toHaveProperty('description');
+    expect(searchDocsTool).toHaveProperty('inputSchema');
+    expect(searchDocsTool).toHaveProperty('execute');
+  });
+});
+```
+
+## Project Layout
+
+```
+src/
+├── tools/
+│   ├── registry.ts           # Shared handlers + metadata
+│   ├── mcp.ts                # MCP Server adapter
+│   ├── claude-agent-sdk.ts   # Claude Agent SDK adapter
+│   ├── openai-agents.ts      # OpenAI Agents SDK adapter
+│   └── vercel-ai.ts          # Vercel AI SDK adapter
+├── test/
+│   ├── registry.test.ts      # Handler tests
+│   ├── mcp.test.ts           # MCP adapter tests
+│   └── ...
+└── index.ts                  # Export all adapters
+```
+
+## Benefits
+
+- **Single source of truth** — Tool logic defined once, tested once, deployed many ways
+- **Consistency** — Same behavior across all frameworks; no drift
+- **Maintainability** — Update description, schema, or handler in one place
+- **Testing** — Unit tests on shared handlers apply to all adapters
+- **Flexibility** — Add a new framework by writing a new adapter without touching core logic
+
+## See also
+
+- `/templates/tools-and-orchestration/tool-definition.ts` — starter template
+- `/templates/tools-and-orchestration/tool-registry.ts` — registry pattern for >10 tools
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+- ([Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/typescript))
+- ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
+- ([Vercel AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/))

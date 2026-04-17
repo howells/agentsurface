@@ -1,0 +1,303 @@
+---
+title: Machine-Readable Output
+description: Structuring CLI output so agents can parse it without heuristics, regex, or guesswork
+---
+
+## Summary
+
+Agents cannot parse color codes, spinner characters, or variable-width tables. Machine-readable output requires a clear separation: stdout carries data as deterministic JSON, stderr carries everything else (spinners, progress, warnings). This dual-stream approach is non-optional for agent-readable CLIs and prevents regex brittleness that breaks on the next release.
+
+- Separate data (stdout) from noise (stderr, progress, spinners)
+- Return consistent, typed JSON for every command
+- Use --json or --output json flags for structured output
+- Never interleave progress indicators with data streams
+- Ensure error responses also return structured JSON
+
+When a human reads CLI output, they tolerate a lot — color codes, spinner characters, progress bars embedded in the data stream, tables with variable column widths. They scan visually and extract what they need. An agent has none of that tolerance. It reads stdout as a byte stream and must parse it programmatically. If the output format is not deterministic and structured, the agent resorts to regex, which breaks on the next release.
+
+Machine-readable output is not an afterthought flag. It is a parallel output path that runs alongside the human-readable path and returns stable, typed JSON for every command.
+
+## The Two-Stream Rule
+
+Every CLI should treat stdout and stderr as semantically distinct channels:
+
+- **Stdout** carries data — the structured result of the command
+- **Stderr** carries everything else — spinners, progress indicators, warnings, informational messages, debug output
+
+This is not optional when agents are consumers. An agent reading stdout to parse a created resource ID will break if a progress spinner is interleaved with the JSON. Stderr is invisible to a piped consumer unless explicitly redirected.
+
+```bash
+# Wrong — spinner and JSON on the same stream
+$ mytool user create --name Alice
+⠋ Creating user...
+{"id": "usr_01HV", "name": "Alice", "email": null}
+
+# Right — spinner on stderr, JSON on stdout
+$ mytool user create --name Alice
+{"id": "usr_01HV", "name": "Alice", "email": null}
+# (the spinner ran on stderr and is invisible to the pipe)
+```
+
+In code, this means every interactive UI element must write to stderr:
+
+```typescript
+// Node.js example
+process.stderr.write('\r⠋ Creating user...');
+
+// After operation completes, the result goes to stdout
+process.stdout.write(JSON.stringify(result) + '\n');
+```
+
+## TTY Detection
+
+The output mode should adapt automatically based on whether stdout is a terminal. When an agent pipes the CLI's output to another process, it expects clean structured data. When a human runs the command interactively, they expect the rich human-readable output.
+
+Use `isatty(1)` (or the equivalent in your language) to detect this:
+
+```typescript
+import { isatty } from 'tty';
+
+const isTTY = isatty(process.stdout.fd);
+
+if (isTTY) {
+  // Human-readable: tables, colors, spinners on stderr
+  printTable(results);
+} else {
+  // Machine-readable: plain JSON to stdout
+  process.stdout.write(JSON.stringify(results) + '\n');
+}
+```
+
+```python
+import sys
+import json
+
+if sys.stdout.isatty():
+    print_table(results)
+else:
+    print(json.dumps(results))
+```
+
+```go
+import (
+    "encoding/json"
+    "os"
+)
+
+func outputResult(result interface{}) {
+    fi, _ := os.Stdout.Stat()
+    isTTY := (fi.Mode() & os.ModeCharDevice) != 0
+
+    if isTTY {
+        printTable(result)
+    } else {
+        enc := json.NewEncoder(os.Stdout)
+        enc.Encode(result)
+    }
+}
+```
+
+TTY detection means agents get structured output by default without needing to pass any flags. Piping `mytool users list | jq '.[].id'` just works.
+
+## The `--json` Flag
+
+Even with TTY detection, provide an explicit `--json` flag. This allows human users to request structured output when running interactively and makes the intent explicit in scripts.
+
+```bash
+# Human running interactively, wants JSON for a script
+mytool users list --json | jq '.[].email'
+
+# Non-TTY context (piped): JSON is automatic
+mytool users list | jq '.[].email'
+```
+
+The `--json` flag overrides TTY detection and always outputs structured JSON regardless of context.
+
+## JSON as a Parallel Code Path
+
+The common mistake is bolting JSON output onto an existing human-readable implementation:
+
+```typescript
+// Wrong — serializing the display object, not the data object
+function listUsers(flags) {
+  const users = await api.getUsers();
+  const table = buildTable(users);  // formats for display
+
+  if (flags.json) {
+    // Serializing a display-oriented structure, not a data structure
+    console.log(JSON.stringify(table.rows));
+  } else {
+    console.log(table.render());
+  }
+}
+```
+
+The JSON path should serialize the raw data object — the same one you would return from an API endpoint — not a derivative of the display-formatted version:
+
+```typescript
+// Right — JSON serializes the data, display formats the data
+function listUsers(flags) {
+  const users = await api.getUsers();
+
+  if (flags.json || !isTTY()) {
+    // Serialize the data directly
+    output(JSON.stringify(users));
+  } else {
+    // Format the same data for display
+    printTable(users, ['id', 'name', 'email', 'created_at']);
+  }
+}
+```
+
+## Deterministic Output Shape
+
+An agent that parses your CLI output once and codifies that structure into its skill file needs confidence that the shape will not change between invocations. Deterministic output means:
+
+- Same command with same inputs always produces the same JSON structure
+- Optional fields are always present in the response, set to `null` rather than omitted
+- Array responses are always arrays, never `null` when empty
+- Field names are stable across CLI versions (treat them like API fields — breaking changes need a major version bump)
+
+```json
+// Wrong — inconsistent optional field presence
+// Run 1: user with no phone
+{"id": "usr_01", "name": "Alice"}
+
+// Run 2: user with phone
+{"id": "usr_02", "name": "Bob", "phone": "+1-555-0100"}
+
+// Right — null for absent fields, consistent shape
+{"id": "usr_01", "name": "Alice", "phone": null}
+{"id": "usr_02", "name": "Bob", "phone": "+1-555-0100"}
+```
+
+```json
+// Wrong — null instead of empty array
+{"users": null}
+
+// Right — empty array
+{"users": []}
+```
+
+## NO_COLOR Environment Variable
+
+Respect the `NO_COLOR` convention (https://no-color.org). When `NO_COLOR` is set to any non-empty value, suppress all ANSI color codes. This complements TTY detection — some environments pipe output but still have a TTY attached (e.g., CI systems), and `NO_COLOR` gives operators explicit control.
+
+```typescript
+const useColor = process.stdout.hasColors() && !process.env.NO_COLOR;
+
+function print(text: string, color?: string) {
+  if (useColor && color) {
+    process.stdout.write(`\x1b[${color}m${text}\x1b[0m\n`);
+  } else {
+    process.stdout.write(text + '\n');
+  }
+}
+```
+
+Also suppress color when stderr is not a TTY — agents reading stderr for error messages should not receive ANSI escape sequences embedded in error text.
+
+## NDJSON Streaming for Paginated Results
+
+For commands that return large or paginated result sets, use Newline-Delimited JSON (NDJSON). NDJSON emits one JSON object per line, allowing consumers to process results incrementally without waiting for the full response.
+
+```bash
+# Single-page response: one JSON array
+$ mytool users list --json
+[{"id": "usr_01", "name": "Alice"}, {"id": "usr_02", "name": "Bob"}]
+
+# Paginated streaming response: one object per line (NDJSON)
+$ mytool users list --all --json
+{"id": "usr_01", "name": "Alice"}
+{"id": "usr_02", "name": "Bob"}
+{"id": "usr_03", "name": "Carol"}
+...
+```
+
+NDJSON is processable with standard tools:
+
+```bash
+# Count results without loading everything into memory
+mytool users list --all --json | wc -l
+
+# Filter with jq streaming parser
+mytool users list --all --json | jq -c 'select(.status == "active")'
+
+# Process per-record in a shell pipeline
+mytool users list --all --json | while IFS= read -r line; do
+  echo "$line" | jq -r '.email'
+done
+```
+
+Implement NDJSON by flushing each record immediately rather than accumulating:
+
+```typescript
+async function* streamUsers(api: API): AsyncGenerator<User> {
+  let cursor: string | null = null;
+  do {
+    const page = await api.listUsers({ cursor, limit: 100 });
+    for (const user of page.items) {
+      yield user;
+    }
+    cursor = page.next_cursor;
+  } while (cursor);
+}
+
+async function listUsersCommand(flags: Flags) {
+  if (flags.all && (flags.json || !isTTY())) {
+    for await (const user of streamUsers(api)) {
+      process.stdout.write(JSON.stringify(user) + '\n');
+    }
+  } else {
+    // ... paginated human-readable output
+  }
+}
+```
+
+## Structured Error Output
+
+Errors must also be structured when output is in JSON mode. A human-readable error printed to stderr in a non-TTY context leaves an agent with no way to programmatically determine what went wrong.
+
+```bash
+# Wrong — unstructured error text
+$ mytool user get usr_999 --json
+Error: user not found
+
+# Right — structured error on stderr, non-zero exit code
+$ mytool user get usr_999 --json
+# stderr:
+{"error": "not_found", "message": "User usr_999 does not exist", "code": 404}
+# exit code: 3
+```
+
+Always exit with a non-zero code when outputting a structured error. The exit code and the structured error body are complementary signals — do not rely on just one.
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Human-only output (tables, color codes, prose). No structured format available. |
+| 1 | `--output json` or equivalent exists but is incomplete or inconsistent across commands. |
+| 2 | Consistent JSON output across all commands. Errors also return structured JSON. |
+| 3 | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
+
+## Checklist
+
+- [ ] Stdout carries only data; all UI elements (spinners, progress, warnings) write to stderr
+- [ ] TTY detection activates structured output automatically when piped
+- [ ] `--json` flag available on every command as an explicit override
+- [ ] JSON output path serializes raw data objects, not display-formatted derivatives
+- [ ] All fields present in every response; optional fields are `null`, not omitted
+- [ ] Empty collections return `[]`, not `null`
+- [ ] `NO_COLOR` environment variable is respected
+- [ ] Paginated list commands support NDJSON streaming with `--all` or equivalent
+- [ ] Errors return structured JSON with a consistent shape
+- [ ] Non-zero exit codes accompany all error responses
+
+## Related Pages
+
+- [Context Window Discipline](./context-window-discipline) — controlling response size to protect agent context
+- [Command Structure](./command-structure) — exit codes and non-interactive defaults
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

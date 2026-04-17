@@ -1,0 +1,240 @@
+---
+title: Agent-Specific RFC 9457 Extensions
+description: Structured error fields that enable agents to diagnose and recover from failures autonomously
+---
+
+## Summary
+
+Beyond RFC 9457's core five fields, agents need is_retriable, retry_after_ms, doc_uri, trace_id, suggestions, and errors. These extensions enable autonomous recovery: agents check is_retriable to decide whether to retry, read suggestions for correction steps, and use trace_id to investigate with support.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| is_retriable | boolean | Retry same request unchanged? |
+| retry_after_ms | number | Milliseconds to wait before retry |
+| doc_uri | URL | Link to detailed error documentation |
+| trace_id | string | Correlation ID for internal lookup |
+| suggestions | string[] | Ordered recovery steps (first is most likely fix) |
+| errors | Problem[] | Nested errors for batch operations |
+
+RFC 9457 Problem Details provides a foundation. Agents need additional fields to decide whether to retry unchanged, modify and retry, or escalate. These extensions are not part of the RFC but follow its registry pattern for vendor-specific error metadata.
+
+## Core Agent Extensions
+
+### `is_retriable` (boolean)
+
+True if retrying the same request unchanged might succeed. False for terminal errors where the request itself is wrong.
+
+```json
+{
+  "type": "https://example.com/errors/rate-limit-exceeded",
+  "status": 429,
+  "is_retriable": true,
+  "retry_after_seconds": 60
+}
+```
+
+### `retry_after_ms` (number)
+
+Milliseconds to wait before retry. Preferred over `Retry-After` header for parsing consistency. Agents can sleep synchronously:
+
+```typescript
+if (error.is_retriable && error.retry_after_ms) {
+  await sleep(error.retry_after_ms);
+  return retry();
+}
+```
+
+### `doc_uri` (string, URL)
+
+Link to detailed error documentation, troubleshooting, and examples. Helps humans understand what went wrong:
+
+```json
+{
+  "type": "https://example.com/errors/auth-expired",
+  "doc_uri": "https://docs.example.com/auth/token-refresh"
+}
+```
+
+### `trace_id` (string)
+
+Correlation ID matching server logs and OpenTelemetry spans. Enables support teams to investigate failures without the agent having to reproduce the issue:
+
+```json
+{
+  "type": "https://example.com/errors/internal-error",
+  "status": 500,
+  "trace_id": "01HV3K8MNP2QRS3TUVWX",
+  "is_retriable": true,
+  "retry_after_ms": 5000
+}
+```
+
+### `suggestions` (array of strings)
+
+Ordered list of concrete recovery steps. The first suggestion is the most likely fix:
+
+```json
+{
+  "type": "https://example.com/errors/validation-error",
+  "suggestions": [
+    "Provide a value for the required 'amount' field",
+    "The 'currency' field must be a 3-letter ISO 4217 code (e.g., 'USD')"
+  ]
+}
+```
+
+### `errors` (array of Problem Details)
+
+RFC 9457 supports aggregating multiple errors. Useful for batch operations or multi-field validation. Each element follows the same Problem Details schema:
+
+```json
+{
+  "type": "https://example.com/errors/batch-failure",
+  "status": 422,
+  "detail": "3 of 5 items failed validation",
+  "errors": [
+    {
+      "type": "https://example.com/errors/validation-error",
+      "detail": "Item 0: 'amount' is required",
+      "is_retriable": true
+    },
+    {
+      "type": "https://example.com/errors/validation-error",
+      "detail": "Item 2: 'currency' is invalid",
+      "is_retriable": true
+    }
+  ]
+}
+```
+
+## TypeScript Schema
+
+```typescript
+import { z } from 'zod';
+
+const ProblemDetails = z.object({
+  type: z.string().url().optional().default('about:blank'),
+  title: z.string(),
+  status: z.number().int().min(400).max(599),
+  detail: z.string(),
+  instance: z.string().optional(),
+  is_retriable: z.boolean().optional(),
+  retry_after_ms: z.number().int().optional(),
+  doc_uri: z.string().url().optional(),
+  trace_id: z.string().optional(),
+  suggestions: z.array(z.string()).optional(),
+  errors: z.array(z.lazy(() => ProblemDetails)).optional(),
+});
+
+type ErrorResponse = z.infer<typeof ProblemDetails>;
+```
+
+Use this schema in API responses and CLI error output for consistency. See `/templates/errors-and-auth/problem-details.ts` for a production-ready implementation.
+
+## Agent-Side Error Handling
+
+When an agent encounters a Problem Details response, it branches on `is_retriable`:
+
+```typescript
+async function callTool(
+  tool: string,
+  params: Record<string, unknown>
+): Promise<unknown> {
+  const response = await fetch(`/api/tools/${tool}`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+
+    if (error.is_retriable === false) {
+      // Terminal error — escalate or fail the task
+      throw new Error(
+        `${error.title}: ${error.detail}. See ${error.doc_uri}`
+      );
+    }
+
+    if (error.is_retriable && error.retry_after_ms) {
+      // Transient error with explicit wait time
+      await sleep(error.retry_after_ms);
+      return callTool(tool, params); // Retry unchanged
+    }
+
+    if (error.suggestions && error.suggestions.length > 0) {
+      // Recoverable with modification — agent rewrites params
+      // (implementation depends on agent framework)
+    }
+  }
+
+  return response.json();
+}
+```
+
+## Batch Error Aggregation
+
+When processing multiple items, return partial success with detailed per-item errors:
+
+```typescript
+async function batchCreateInvoices(invoices: InvoiceData[]): Promise<Response> {
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < invoices.length; i++) {
+    try {
+      results.push(await createInvoice(invoices[i]));
+    } catch (err) {
+      errors.push({
+        type: 'https://example.com/errors/validation-error',
+        title: 'Validation failed',
+        status: 422,
+        detail: `Item ${i}: ${err.message}`,
+        instance: `batch-item-${i}`,
+        is_retriable: true,
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    return Response.json(
+      {
+        type: 'https://example.com/errors/batch-failure',
+        title: 'Batch operation partially failed',
+        status: 207, // Multi-status
+        detail: `${results.length} succeeded, ${errors.length} failed`,
+        errors,
+      },
+      { status: 207 }
+    );
+  }
+
+  return Response.json(results);
+}
+```
+
+## Intent Tracing on Cancellation
+
+When an agent cancels a request in-flight, include context so it can reason about cleanup:
+
+```json
+{
+  "type": "https://example.com/errors/operation-cancelled",
+  "title": "Operation Cancelled",
+  "status": 408,
+  "detail": "Request aborted by client after 5000ms",
+  "trace_id": "span-xyz789",
+  "is_retriable": true,
+  "intent": {
+    "operation": "create_invoice",
+    "resource_id": "inv-pending-123",
+    "state_before_cancel": "payment_processing",
+    "recovery": "Operation may be in progress server-side. Poll GET /invoices/inv-pending-123 to check status."
+  }
+}
+```
+
+## Related Pages
+
+- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) — the standard
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — how to structure recovery information
+- [Templates: Problem Details Schema](/templates/errors-and-auth/problem-details.ts) — Zod implementation

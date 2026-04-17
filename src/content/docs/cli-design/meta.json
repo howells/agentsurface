@@ -1,0 +1,15 @@
+{
+  "title": "CLI Design",
+  "pages": [
+    "index",
+    "command-structure",
+    "machine-readable-output",
+    "raw-payload-input",
+    "schema-introspection",
+    "context-window-discipline",
+    "input-hardening",
+    "safety-rails",
+    "agent-knowledge-packaging",
+    "cli-scale"
+  ]
+}

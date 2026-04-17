@@ -1,0 +1,302 @@
+---
+title: Hybrid Search
+description: BM25 + dense + RRF fusion; why hybrid beats dense-only
+---
+
+Hybrid search combines sparse (keyword) and dense (semantic) retrieval via fusion algorithms. It is the 2026 production standard; dense-only is considered naive.
+
+## Summary
+
+**Consensus:** Hybrid retrieval beats dense-only by 20–40% on MTEB benchmarks. **Three-stage pipeline:** (1) sparse BM25 (top-100), (2) dense vectors (top-100), (3) rerank to top-5. Reciprocal Rank Fusion (RRF) is the default fusion algorithm.
+
+**Why hybrid works:**
+- Dense excels at semantics: synonyms, paraphrasing, context
+- Sparse (BM25) excels at exact keywords, rare terms, proper nouns
+- Combined signal covers both types; no single approach is universal
+
+## Three-stage retrieval pipeline
+
+```typescript
+import { Typesense } from 'typesense';
+import { QdrantClient } from '@qdrant/js-client-rest';
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+const typesense = new Typesense.Client({
+  nodes: [{ host: 'localhost', port: 8108, protocol: 'http' }],
+});
+const qdrant = new QdrantClient({ url: 'http://localhost:6333' });
+
+async function hybridSearch(query: string, limit: number = 5) {
+  // Stage 1: Sparse BM25 retrieval
+  const sparseResults = await typesense
+    .collections('docs')
+    .documents()
+    .search({
+      q: query,
+      query_by: 'text',
+      limit_hits: 100,
+    });
+
+  // Stage 2: Dense vector retrieval
+  const embedding = await openai.embeddings.create({
+    model: 'text-embedding-3-large',
+    input: query,
+  });
+
+  const denseResults = await qdrant.search('docs_collection', {
+    vector: embedding.data[0].embedding,
+    limit: 100,
+  });
+
+  // Stage 3: Reciprocal Rank Fusion (RRF)
+  const sparseRanks = new Map(
+    sparseResults.results.map((r: any, i: number) => [r.document.id, i])
+  );
+
+  const denseRanks = new Map(
+    denseResults.map((r: any, i: number) => [r.payload.id, i])
+  );
+
+  // RRF formula: 1/(k + rank), typically k=60
+  const fusedScores = new Map<string, number>();
+  const allIds = new Set([...sparseRanks.keys(), ...denseRanks.keys()]);
+
+  for (const id of allIds) {
+    const sparseRank = sparseRanks.get(id) ?? 1000;
+    const denseRank = denseRanks.get(id) ?? 1000;
+
+    const rrf = 1 / (60 + sparseRank) + 1 / (60 + denseRank);
+    fusedScores.set(id, rrf);
+  }
+
+  // Sort by fused score
+  const topIds = [...fusedScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
+
+  // Fetch full documents
+  const docs = await Promise.all(
+    topIds.map((id) => qdrant.retrieve('docs_collection', { ids: [id] }))
+  );
+
+  return docs.flat();
+}
+
+// Usage
+const results = await hybridSearch('python error handling', 10);
+console.log(results);
+```
+
+## Weaviate native hybrid (simpler)
+
+Weaviate has hybrid search built-in; no manual fusion needed:
+
+```typescript
+import weaviate from 'weaviate-ts-client';
+
+const client = weaviate.client({
+  scheme: 'http',
+  host: 'localhost:8080',
+});
+
+async function weaviateHybridSearch(query: string, embedding: number[]) {
+  const result = await client.graphql
+    .get()
+    .withClassName('Document')
+    .withHybrid({
+      query: query,
+      vector: embedding,
+      alpha: 0.5, // 50/50 BM25 + dense (default)
+      fusionType: 'rankedFusion', // Or 'relativeScoreFusion'
+    })
+    .withFields(['text', '_additional {score}'])
+    .withLimit(10)
+    .do();
+
+  return result.data.Get.Document;
+}
+```
+
+**`alpha` parameter:**
+- `alpha: 0` = BM25 only
+- `alpha: 0.5` = 50/50 (default)
+- `alpha: 1` = dense only
+
+Tune `alpha` based on your query patterns (code queries → higher alpha; FAQ queries → lower alpha).
+
+## Qdrant sparse-dense hybrid
+
+Qdrant supports sparse vectors (SPLADE) + dense in a single query:
+
+```typescript
+import { QdrantClient } from '@qdrant/js-client-rest';
+
+const client = new QdrantClient({ url: 'http://localhost:6333' });
+
+async function qdrantHybrid(denseVector: number[], sparseVector: any) {
+  // Create collection with both vector types
+  await client.createCollection('hybrid_docs', {
+    vectors: {
+      size: 1536,
+      distance: 'Cosine',
+    },
+    sparse_vectors: {
+      text_sparse: {},
+    },
+  });
+
+  // Upsert with both vector types
+  await client.upsert('hybrid_docs', {
+    points: [
+      {
+        id: 1,
+        vector: denseVector,
+        sparse_vectors: {
+          text_sparse: sparseVector, // SPLADE output
+        },
+        payload: { text: '...' },
+      },
+    ],
+  });
+
+  // Search: combine both
+  const results = await client.search('hybrid_docs', {
+    vector: denseVector,
+    sparse_vector_name: 'text_sparse',
+    limit: 10,
+  });
+
+  return results;
+}
+```
+
+## Fusion algorithms
+
+### Reciprocal Rank Fusion (RRF)
+
+Combines ranks from multiple retrievers:
+
+```typescript
+function rrf(rank1: number, rank2: number, k: number = 60): number {
+  return 1 / (k + rank1) + 1 / (k + rank2);
+}
+
+// Typical results:
+// Rank (1,1): 1/61 + 1/61 = 0.0328 ← highest
+// Rank (5,5): 1/65 + 1/65 = 0.0308
+// Rank (100, 1): 1/160 + 1/61 = 0.0230
+```
+
+**Advantages:** Rank-neutral, no score normalization, simple  
+**Disadvantages:** Ignores actual similarity scores
+
+### Relative Score Fusion
+
+Normalizes scores (0–1), weighted sum:
+
+```typescript
+function relativeScoreFusion(
+  score1: number,
+  score2: number,
+  allScores1: number[],
+  allScores2: number[],
+  weight1: number = 0.5,
+  weight2: number = 0.5
+) {
+  const min1 = Math.min(...allScores1);
+  const max1 = Math.max(...allScores1);
+  const norm1 = (score1 - min1) / (max1 - min1 || 1);
+
+  const min2 = Math.min(...allScores2);
+  const max2 = Math.max(...allScores2);
+  const norm2 = (score2 - min2) / (max2 - min2 || 1);
+
+  return weight1 * norm1 + weight2 * norm2;
+}
+```
+
+**Advantages:** Uses actual scores, customizable weights  
+**Disadvantages:** Requires score normalization, more complex
+
+## Hybrid search + reranking (full pipeline)
+
+```typescript
+import { Cohere } from 'cohere-ai';
+
+const cohere = new Cohere({ token: process.env.COHERE_API_KEY });
+
+async function fullHybridPipeline(query: string, embedding: number[]) {
+  // Stage 1 + 2: Hybrid retrieval (BM25 + dense with RRF)
+  const fusedResults = await hybridSearch(query, 50); // Get top-50
+
+  // Stage 3: Reranking (Cohere)
+  const reranked = await cohere.rerank({
+    model: 'rerank-3.5',
+    query,
+    documents: fusedResults.map((r) => ({ text: r.text })),
+    top_n: 5, // Keep top-5
+  });
+
+  // Return final ranked results
+  return reranked.results.map((r) => ({
+    doc: fusedResults[r.index],
+    relevanceScore: r.relevance_score,
+  }));
+}
+```
+
+## Tuning hybrid search
+
+| Factor | Recommendation | Impact |
+|--------|---------------|--------|
+| **Sparse retriever** | BM25 with field weighting (title > body) | 5–10% improvement |
+| **Dense model** | Matryoshka embeddings (truncate to 512 dims) | 30–50% latency reduction |
+| **Fusion algorithm** | RRF default; try relative-score if using learned ranking | `<5%` variance |
+| **Alpha** | Start 0.5; tune based on query type (code→0.7, FAQ→0.3) | 10–20% improvement |
+| **Rerank model** | Cohere rerank-3.5 or Voyage rerank-2.5 | 15–30% improvement |
+| **Rerank top-k** | Retrieve 50, rerank to 5–10 | Trade: cost vs. quality |
+
+## Monitoring and evaluation
+
+```typescript
+async function evaluateHybridSearch(testQueries: any[]) {
+  let recall5 = 0;
+  let recall10 = 0;
+  let ndcg = 0;
+
+  for (const { query, embedding, relevantDocs } of testQueries) {
+    const results = await fullHybridPipeline(query, embedding);
+
+    // Recall@k
+    const topK = new Set(results.slice(0, 5).map((r) => r.doc.id));
+    if (relevantDocs.some((d) => topK.has(d.id))) recall5++;
+
+    const topK10 = new Set(results.slice(0, 10).map((r) => r.doc.id));
+    if (relevantDocs.some((d) => topK10.has(d.id))) recall10++;
+
+    // nDCG
+    const dcg = results.reduce((sum, r, i) => {
+      const isRelevant = relevantDocs.some((d) => d.id === r.doc.id) ? 1 : 0;
+      return sum + (isRelevant / Math.log2(i + 2));
+    }, 0);
+    ndcg += dcg;
+  }
+
+  console.log(
+    `Recall@5: ${((recall5 / testQueries.length) * 100).toFixed(2)}%`
+  );
+  console.log(
+    `Recall@10: ${((recall10 / testQueries.length) * 100).toFixed(2)}%`
+  );
+  console.log(`nDCG: ${(ndcg / testQueries.length).toFixed(3)}`);
+}
+```
+
+## See also
+
+- [Weaviate Hybrid Search docs](https://docs.weaviate.io/weaviate/search/hybrid)
+- [Qdrant Sparse Vectors](https://qdrant.tech/articles/sparse-vectors/)
+- [SPLADE GitHub](https://github.com/naver/splade)
+- [Cohere Rerank docs](https://docs.cohere.com/docs/rerank)

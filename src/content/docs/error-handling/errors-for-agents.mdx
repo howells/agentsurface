@@ -1,0 +1,349 @@
+---
+title: Designing Errors for Agent Recovery
+description: Structuring error responses so agents can diagnose failures and recover without human intervention
+---
+
+## Summary
+
+Error messages are prompts. A precise error with concrete suggestions is a good prompt; a vague error is a bad one. Three recovery patterns: retry unchanged (transient), modify and retry (validation), use different tool (precondition). Validation errors include per-field details with JSON Pointers and expected values. Never return stack traces.
+
+- Retry unchanged: transient failures (503, 429, lock contention)
+- Modify and retry: validation failures with suggestions for corrections
+- Use different tool: preconditions not met, next_operation hints
+- Validation context: field paths, reasons, expected values, examples
+- Tool order guidance: next_operation and next_operation_args
+- Never: stack traces, internal exception details, sanitize before response
+
+The fundamental problem with errors in agentic systems is not that agents encounter them — it is that agents silently abandon tasks when they do. A human encountering a vague "something went wrong" error will read it, shrug, and try something different. An agent encountering the same message has no information to act on, and its most common response is to quietly give up.
+
+Agent-recoverable errors are designed differently. They contain the structured information the agent needs to decide: should I retry this request unchanged? Should I modify the request and try again? Should I stop and escalate? The goal is to make as many failures recoverable as possible — not because agents are infallible, but because a precise error message is equivalent to a prompt that tells the agent exactly what to do.
+
+## The Three Recovery Patterns
+
+Most recoverable errors fall into one of three patterns:
+
+**1. Retry unchanged** — The error is transient and the same request will succeed later. Rate limits, temporary unavailability, and lock contention all fall here.
+
+**2. Modify and retry** — The request was structurally valid but had incorrect or missing parameters. The error body tells the agent which fields to fix and how.
+
+**3. Use a different tool** — The agent called the wrong operation for its intent, or a precondition was not met. The error body tells the agent what to call instead.
+
+Your error responses should make clear which pattern applies:
+
+```json
+// Pattern 1: Retry unchanged — transient failure
+{
+  "type": "https://api.example.com/errors/service-unavailable",
+  "status": 503,
+  "is_retriable": true,
+  "retry_after_seconds": 15,
+  "suggestions": ["Retry the same request after the retry_after_seconds delay"]
+}
+
+// Pattern 2: Modify and retry — validation failure
+{
+  "type": "https://api.example.com/errors/validation-error",
+  "status": 422,
+  "is_retriable": true,
+  "suggestions": [
+    "The 'due_date' field must be a future date",
+    "Change 'due_date' to a date after today"
+  ],
+  "invalid_fields": [
+    { "field": "/due_date", "reason": "Must be a future date", "received": "2024-01-01" }
+  ]
+}
+
+// Pattern 3: Use a different tool — precondition failed
+{
+  "type": "https://api.example.com/errors/invoice/not-finalized",
+  "status": 422,
+  "is_retriable": false,
+  "suggestions": [
+    "Call finalize_invoice before calling send_invoice",
+    "The invoice must be in 'finalized' status to be sent"
+  ],
+  "required_status": "finalized",
+  "current_status": "draft"
+}
+```
+
+## Tool Order Guidance
+
+When an operation has preconditions — states that must be true before the operation can succeed — encode those preconditions explicitly in the error response when they are not met.
+
+An agent calling `send_invoice` on a draft invoice should not receive a generic 422. It should receive an error that names the required precondition and the tool that satisfies it:
+
+```json
+{
+  "type": "https://api.example.com/errors/invoice/not-finalized",
+  "title": "Invoice is not finalized",
+  "status": 422,
+  "detail": "Invoice inv_01HV3K8MNP is in 'draft' status. Only finalized invoices can be sent.",
+  "is_retriable": true,
+  "current_status": "draft",
+  "required_status": "finalized",
+  "suggestions": [
+    "Call finalize_invoice with invoice_id='inv_01HV3K8MNP' first",
+    "Then retry send_invoice"
+  ],
+  "next_operation": "finalize_invoice",
+  "next_operation_args": {
+    "invoice_id": "inv_01HV3K8MNP"
+  }
+}
+```
+
+The `next_operation` and `next_operation_args` fields go further — they give the agent enough information to construct the corrective tool call without reasoning about the API surface.
+
+```typescript
+// Agent-side handling
+if (error.type === "https://api.example.com/errors/invoice/not-finalized") {
+  if (error.next_operation && error.next_operation_args) {
+    // Execute the suggested corrective action
+    await tools[error.next_operation](error.next_operation_args);
+    // Retry the original operation
+    await sendInvoice({ invoice_id: invoiceId });
+  }
+}
+```
+
+## Validation Context
+
+Validation errors are the most common class of recoverable error. An agent that sends a malformed request needs to know exactly which field failed, why it failed, and what a correct value looks like.
+
+Per-field errors use JSON Pointer paths to identify the failing field within the request body:
+
+```json
+{
+  "type": "https://api.example.com/errors/validation-error",
+  "title": "Validation failed",
+  "status": 422,
+  "detail": "The request body contains 3 validation errors.",
+  "is_retriable": true,
+  "invalid_fields": [
+    {
+      "field": "/amount",
+      "reason": "Required field is missing",
+      "expected": "A positive integer representing the amount in cents"
+    },
+    {
+      "field": "/currency",
+      "reason": "Invalid value 'dollars'",
+      "expected": "A 3-letter ISO 4217 currency code",
+      "valid_values": ["USD", "EUR", "GBP", "JPY"]
+    },
+    {
+      "field": "/due_date",
+      "reason": "Must be a future date",
+      "received": "2024-01-01",
+      "expected": "ISO 8601 date string for a date after today (2025-04-17)"
+    }
+  ],
+  "suggestions": [
+    "Add an 'amount' field with a positive integer (e.g., 5000 for $50.00)",
+    "Change 'currency' from 'dollars' to 'USD'",
+    "Change 'due_date' to a date after 2025-04-17"
+  ]
+}
+```
+
+The agent now has everything needed to construct a corrected request without calling another tool or asking a human.
+
+```typescript
+// Build corrected request using validation error details
+function correctRequest(
+  original: Record<string, unknown>,
+  errors: ValidationError[]
+): Record<string, unknown> {
+  const corrected = { ...original };
+
+  for (const error of errors) {
+    const field = error.field.replace(/^\//, "");
+    if (error.valid_values?.length === 1) {
+      corrected[field] = error.valid_values[0];
+    }
+    // Other corrections depend on agent reasoning
+  }
+
+  return corrected;
+}
+```
+
+## The Try-Rewrite-Retry Loop
+
+The general pattern for agent error recovery is a bounded loop: attempt the operation, inspect the error, rewrite the failing part of the request, and retry — up to a configured limit.
+
+```typescript
+async function tryWithRewrite<T>(
+  operation: () => Promise<T>,
+  rewrite: (error: ProblemDetails) => Promise<(() => Promise<T>) | null>,
+  maxAttempts = 3
+): Promise<T> {
+  let attempt = 0;
+
+  while (attempt < maxAttempts) {
+    attempt++;
+
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isProblemDetails(error) || !error.is_retriable) {
+        throw error; // Non-retriable — stop immediately
+      }
+
+      if (attempt >= maxAttempts) {
+        throw error; // Exhausted attempts — escalate
+      }
+
+      // Ask the rewrite function if it can construct a corrected operation
+      const corrected = await rewrite(error);
+      if (!corrected) {
+        throw error; // Cannot rewrite — escalate
+      }
+
+      operation = corrected;
+
+      // Respect retry delay if specified
+      if (error.retry_after_seconds) {
+        await sleep(error.retry_after_seconds * 1000);
+      }
+    }
+  }
+
+  throw new Error("Exhausted retry attempts");
+}
+```
+
+The loop terminates on three conditions: success, a non-retriable error, or exhaustion of the attempt limit. This prevents infinite loops while allowing structured recovery.
+
+## Actionable Error Messages as Prompt Engineering
+
+Error messages are, functionally, prompts. An LLM-based agent reads the error message as part of its context window and uses it to decide what to do next. A vague error message is a bad prompt. A precise error message with concrete suggestions is a good one.
+
+Compare:
+
+```json
+// Vague — unhelpful prompt for an agent
+{
+  "error": "Invalid request",
+  "message": "The request could not be processed."
+}
+
+// Precise — effective prompt for an agent
+{
+  "type": "https://api.example.com/errors/validation-error",
+  "detail": "The 'amount' field must be a positive integer representing cents. To charge $42.00, set amount to 4200.",
+  "suggestions": [
+    "Change 'amount' from 0 to a positive integer greater than 0",
+    "To charge $42.00, set amount to 4200"
+  ]
+}
+```
+
+Write `detail` and `suggestions` as if you are writing prompt instructions for an LLM. Be specific. Use the exact field names from the schema. Provide an example value when the correct format might not be obvious.
+
+## Stable, Parseable Error Codes
+
+Agents branch on error types. A type that changes between releases breaks agent logic that was working yesterday. Treat error type URIs as part of your public API contract — they follow the same versioning rules as your endpoints.
+
+```
+// Stable: the path structure is consistent and version-safe
+https://api.example.com/errors/invoice/not-finalized
+https://api.example.com/errors/invoice/already-sent
+https://api.example.com/errors/payment/card-declined
+
+// Unstable: prose in the type URI will drift
+https://api.example.com/errors/invoice-is-not-in-finalized-state
+https://api.example.com/errors/the-invoice-has-already-been-sent
+```
+
+When an error type needs to change, create a new type URI and return both the old and new URIs in the response during a deprecation window:
+
+```json
+{
+  "type": "https://api.example.com/errors/invoice/not-finalized",
+  "deprecated_type": "https://api.example.com/errors/invoice-not-finalized",
+  "status": 422
+}
+```
+
+## Never Return Stack Traces
+
+A stack trace in a user-facing error response is a security vulnerability. It discloses internal structure, dependency versions, and code paths. It is also useless to agents — they cannot parse or act on a Java stack trace or a Python traceback.
+
+```json
+// Wrong — stack trace in response
+{
+  "error": "NullPointerException",
+  "message": "Cannot read property 'amount' of undefined",
+  "stack": "at InvoiceService.finalize (invoice-service.js:142:23)\n  at async handler (routes/invoices.ts:67:5)..."
+}
+
+// Right — stable error type with a trace ID for internal lookup
+{
+  "type": "https://api.example.com/errors/internal-error",
+  "title": "Internal server error",
+  "status": 500,
+  "detail": "An unexpected error occurred processing this request.",
+  "trace_id": "01HV3K8MNP2QRS3TUVWX",
+  "is_retriable": true,
+  "retry_after_seconds": 5
+}
+```
+
+Map all internal exceptions to stable, sanitized error types before they reach the response layer:
+
+```typescript
+function toApiError(err: unknown): ProblemDetails {
+  if (err instanceof ValidationError) {
+    return {
+      type: "https://api.example.com/errors/validation-error",
+      title: "Validation failed",
+      status: 422,
+      is_retriable: true,
+      invalid_fields: err.fields,
+    };
+  }
+
+  if (err instanceof NotFoundError) {
+    return {
+      type: `https://api.example.com/errors/${err.resource}/not-found`,
+      title: `${err.resource} not found`,
+      status: 404,
+      is_retriable: false,
+    };
+  }
+
+  // All unhandled errors become a generic 500 with a trace ID
+  const traceId = generateTraceId();
+  logger.error("Unhandled error", { err, trace_id: traceId });
+
+  return {
+    type: "https://api.example.com/errors/internal-error",
+    title: "Internal server error",
+    status: 500,
+    is_retriable: true,
+    retry_after_seconds: 5,
+    trace_id: traceId,
+  };
+}
+```
+
+## Checklist
+
+- [ ] Every error body includes `is_retriable` — agents should never have to guess
+- [ ] Validation errors include per-field details with JSON Pointer paths and correction guidance
+- [ ] Tool order errors include the name and arguments of the prerequisite operation
+- [ ] Error type URIs are stable and versioned like API endpoints
+- [ ] `suggestions` field is written as actionable, specific instructions
+- [ ] Stack traces and internal exception details never appear in responses
+- [ ] All internal errors are mapped to stable types before reaching the response layer
+- [ ] `trace_id` is included on all 5xx errors
+
+## Related Pages
+
+- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) — the standard error format
+- [Agent Extensions](/docs/error-handling/agent-extensions) — agent-specific fields for autonomous recovery
+- [Retry and Recovery Patterns](/docs/error-handling/retry-patterns) — exponential backoff, circuit breakers, idempotency
+- [CLI Error Design](/docs/error-handling/cli-errors) — applying these principles to command-line tools

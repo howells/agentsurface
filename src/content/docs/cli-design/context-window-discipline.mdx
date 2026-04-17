@@ -1,0 +1,263 @@
+---
+title: Context Window Discipline
+description: Controlling response size so CLI output does not bloat agent context windows
+---
+
+## Summary
+
+Agents have finite context budgets. CLI commands that return full API responses with 30+ fields per record burn context budget on unused data. Context window discipline means building tools to control response size — --fields flags, pagination limits, summary modes — and protecting agents with defaults when they forget to ask. This prevents agents from truncating responses or exceeding limits.
+
+- Provide --fields flag to select which fields are returned
+- Default to summary views with essential fields only
+- Implement --limit and cursor-based pagination
+- Use --summary mode for overview queries
+- Return total counts separately from paginated results
+
+An agent's context window is a finite, shared resource. Every byte of CLI output that flows into the context competes with the task description, previous tool calls, conversation history, and reasoning steps. A CLI that returns full API responses with dozens of fields for every command will burn through context budget on fields the agent will never read.
+
+Context window discipline is the practice of giving agents tools to control what comes back — and building defaults that protect them when they forget to ask.
+
+## The Problem: Full Responses by Default
+
+Most CLI tools return whatever the API returns. For a `users list` command, that might mean 100 records, each with 30+ fields. An agent asking "how many active users are there?" does not need each user's full profile, their billing history, their most recent login timestamp, and their notification preferences. But without a mechanism to ask for less, it gets all of it.
+
+```bash
+# Returns 100 users × 30 fields = ~50KB of JSON per page
+$ mytool users list --json
+[
+  {
+    "id": "usr_01HV3K8MNPQR",
+    "name": "Alice Chen",
+    "email": "alice@example.com",
+    "role": "admin",
+    "status": "active",
+    "created_at": "2024-01-15T09:00:00Z",
+    "updated_at": "2024-03-20T14:32:11Z",
+    "last_login_at": "2024-03-20T14:32:11Z",
+    "login_count": 847,
+    "mfa_enabled": true,
+    "avatar_url": "https://cdn.example.com/avatars/usr_01HV3K8MNPQR.png",
+    "timezone": "America/Los_Angeles",
+    "locale": "en-US",
+    "notification_preferences": { ... },
+    "billing": { ... },
+    "feature_flags": { ... }
+  },
+  ...
+]
+```
+
+Across a multi-step agent workflow with several list operations, this accumulates quickly. An agent that burns 80% of its context window on fields it does not need will either truncate responses or exceed limits entirely.
+
+## Field Masks with `--fields`
+
+The `--fields` flag accepts a comma-separated list of field names to include in the response. Everything else is omitted.
+
+```bash
+# Only return id, name, and status for each user
+$ mytool users list --fields id,name,status --json
+[
+  {"id": "usr_01HV3K8MNPQR", "name": "Alice Chen", "status": "active"},
+  {"id": "usr_02XY9Z1ABCDE", "name": "Bob Rivera", "status": "suspended"}
+]
+```
+
+Field masks should work on every read command — not just list operations. Getting a single resource should also support `--fields`:
+
+```bash
+$ mytool user get usr_01HV3K8MNPQR --fields id,email,role --json
+{"id": "usr_01HV3K8MNPQR", "email": "alice@example.com", "role": "admin"}
+```
+
+For nested fields, use dot notation:
+
+```bash
+$ mytool user get usr_01HV3K8MNPQR --fields id,name,billing.plan --json
+{
+  "id": "usr_01HV3K8MNPQR",
+  "name": "Alice Chen",
+  "billing": {"plan": "pro"}
+}
+```
+
+Implement field masks at the CLI layer if the underlying API does not support them, by projecting the response after it is received:
+
+```typescript
+function applyFieldMask<T extends Record<string, unknown>>(
+  record: T,
+  fields: string[]
+): Partial<T> {
+  return fields.reduce((acc, field) => {
+    const parts = field.split('.');
+    if (parts.length === 1) {
+      if (field in record) {
+        acc[field as keyof T] = record[field as keyof T];
+      }
+    } else {
+      // Nested field
+      const [head, ...tail] = parts;
+      const nested = record[head as keyof T];
+      if (nested && typeof nested === 'object') {
+        const projected = applyFieldMask(
+          nested as Record<string, unknown>,
+          [tail.join('.')]
+        );
+        (acc as Record<string, unknown>)[head] = projected;
+      }
+    }
+    return acc;
+  }, {} as Partial<T>);
+}
+
+function applyFieldMaskToList<T extends Record<string, unknown>>(
+  records: T[],
+  fields: string[] | null
+): T[] | Partial<T>[] {
+  if (!fields || fields.length === 0) {
+    return records;
+  }
+  return records.map((record) => applyFieldMask(record, fields));
+}
+```
+
+## Pagination with `--page-all`
+
+List commands that are paginated by default should offer `--page-all` (or `--all`) to fetch all pages automatically. Without this, an agent must manually iterate pages by tracking cursors — which requires extra tool calls and more complex prompting.
+
+```bash
+# Default: first page only (20 results), includes pagination metadata
+$ mytool users list --json
+{
+  "items": [...],
+  "pagination": {
+    "total": 1543,
+    "per_page": 20,
+    "cursor": "eyJpZCI6InVzcl8wMlhZOVoiP...",
+    "has_more": true
+  }
+}
+
+# All pages, automatically fetched and concatenated
+$ mytool users list --all --json
+[...all 1543 users...]
+```
+
+The pagination metadata in the default response is a useful signal for agents — they can see whether to fetch more and at what cost.
+
+## Streaming Pagination with NDJSON
+
+`--page-all` concatenates everything before outputting, which means the agent waits for the full dataset before it can process any records. For large datasets, this is slow and still consumes peak memory.
+
+Streaming pagination emits each record as it is fetched, one JSON object per line. The agent can begin processing immediately and — if it has enough information before reaching the end — stop consuming early.
+
+```bash
+# Stream all users as NDJSON, page by page
+$ mytool users list --all --json
+{"id": "usr_01HV3K8MNPQR", "name": "Alice Chen", "status": "active"}
+{"id": "usr_02XY9Z1ABCDE", "name": "Bob Rivera", "status": "suspended"}
+{"id": "usr_03PQRS456789", "name": "Carol Obi", "status": "active"}
+...
+```
+
+Combine streaming with field masks for maximum efficiency:
+
+```bash
+$ mytool users list --all --fields id,status --json
+{"id": "usr_01HV3K8MNPQR", "status": "active"}
+{"id": "usr_02XY9Z1ABCDE", "status": "suspended"}
+{"id": "usr_03PQRS456789", "status": "active"}
+```
+
+This combination — streaming + field masks — is the minimal payload an agent needs to answer "count active users by status" without loading any full user objects into context.
+
+## Guidance in Context and Skill Files
+
+The most durable context window protection is not a flag — it is documentation that teaches agents to use the flags correctly before they need to.
+
+Your SKILL.md (see [Schema Introspection](./schema-introspection)) and AGENTS.md files should explicitly instruct agents on field mask usage:
+
+```markdown
+---
+name: mytool
+version: 2.4.1
+---
+
+## Context Window Invariants
+
+- **Always use `--fields`** for list commands unless the full record is required.
+  Minimum useful fields: `id,name,status`
+- **Always use `--all` with `--fields`** for bulk operations to avoid paginating manually.
+- For counting or aggregation, `--fields id` is sufficient.
+- Avoid fetching `notification_preferences`, `billing`, or `feature_flags` unless
+  the task specifically requires them — these are the largest fields and rarely needed.
+
+## Example: Count active users
+
+```bash
+mytool users list --status active --all --fields id --json | wc -l
+```
+
+## Example: Find a user by email
+
+```bash
+mytool users list --email alice@example.com --fields id,name,email,status --json
+```
+```
+
+These instructions prime the agent with the right patterns at the start of every session, before it has made any tool calls.
+
+## Default Field Sets
+
+Consider defining sensible default field sets for each command that are smaller than the full response. The full response remains available with `--fields *` or `--full`, but the default saves tokens for the common case.
+
+```bash
+# Default: returns id, name, email, status, created_at (5 fields)
+$ mytool users list --json
+
+# Explicit full response
+$ mytool users list --full --json
+
+# Custom field set
+$ mytool users list --fields id,name,billing.plan --json
+```
+
+Document the default field set in the schema introspection output:
+
+```json
+{
+  "command": "users list",
+  "default_fields": ["id", "name", "email", "status", "created_at"],
+  "all_fields": ["id", "name", "email", "role", "status", "created_at", "updated_at", "last_login_at", "login_count", "mfa_enabled", "avatar_url", "timezone", "locale", "notification_preferences", "billing", "feature_flags"]
+}
+```
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Returns full API responses with no way to limit fields or paginate. |
+| 1 | Supports `--fields` or field masks on some commands. |
+| 2 | Field masks on all read commands. Pagination with `--page-all` or equivalent. |
+| 3 | Streaming pagination (NDJSON per page). Explicit guidance in context/skill files on field mask usage. The CLI actively protects the agent from token waste. |
+
+## Checklist
+
+- [ ] `--fields` flag supported on every read command (list, get, search)
+- [ ] Dot notation supported for nested field selection
+- [ ] `--all` or `--page-all` flag fetches all pages automatically
+- [ ] Streaming pagination emits NDJSON per record when `--all` is combined with `--json`
+- [ ] Pagination metadata included in default paginated responses (total, cursor, has_more)
+- [ ] SKILL.md includes explicit guidance on which fields to request for common tasks
+- [ ] AGENTS.md includes the "always use --fields" invariant
+- [ ] Default field set for each command is smaller than the full response
+- [ ] `--full` or `--fields *` available to opt into the full response explicitly
+- [ ] Schema introspection output documents default and available field sets per command
+
+## Related Pages
+
+- [Machine-Readable Output](./machine-readable-output) — NDJSON streaming format
+- [Schema Introspection](./schema-introspection) — SKILL.md and context file structure
+- [Agent Knowledge Packaging](./agent-knowledge-packaging) — encoding invariants in skill files
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

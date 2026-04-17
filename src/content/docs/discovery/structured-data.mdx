@@ -1,0 +1,306 @@
+---
+title: Structured Data for Agents
+description: JSON-LD schema markup that improves AI Overview inclusion and agent comprehension of your content
+---
+
+## Summary
+
+JSON-LD markup embeds structured data so AI systems can extract facts without natural language inference. Pages with FAQPage schema are 3.2x more likely in AI Overviews. Independent testing shows GPT-4 accuracy improves from 16% to 54% with JSON-LD. The fundamental rule: schema must exactly match visible page content, not supplement it.
+
+- JSON-LD is the preferred format for AI systems (no HTML parsing required)
+- FAQPage schema for FAQ sections, definitions, troubleshooting guides
+- BreadcrumbList schema for navigation and hierarchy
+- LocalBusiness, Product, and NewsArticle schemas for specific content types
+- Schema must match visible content exactly; penalized if mismatch occurs
+
+Search-augmented AI systems — Google AI Overviews, Perplexity, ChatGPT's web browsing — retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Pages with relevant structured data are measurably more likely to appear in AI-generated answers.
+
+## Why JSON-LD
+
+JSON-LD embeds structured data in a separate `` `<script>` `` block rather than wrapping HTML elements in microdata attributes. For AI agents, this is the preferable format:
+
+- No HTML parsing required — the agent reads the JSON directly
+- The data model is explicit and fully typed
+- Google's documentation confirms JSON-LD is the recommended format for AI Overviews
+- Multiple schemas can coexist in the same page without interference
+
+The performance numbers are significant: pages with `FAQPage` schema are 3.2 times more likely to appear in AI Overviews. Independent testing shows GPT-4 answer accuracy on structured content improves from 16% to 54% when JSON-LD is present. These are not marginal gains.
+
+## The Fundamental Rule
+
+JSON-LD must exactly match the visible content on the page. If your FAQ schema contains a question-and-answer pair that does not appear in the page body, search engines will penalize the page and agents may distrust all structured data from your domain. The schema is a machine-readable version of the page — not a supplement to it.
+
+## FAQPage
+
+Use `FAQPage` for any content structured as questions and answers: FAQ sections, definition pages, policy explanations, troubleshooting guides.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the rate limit for the API?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The API is rate limited to 1,000 requests per minute per API key. If you exceed this limit, the API returns HTTP 429 with a Retry-After header specifying how many seconds to wait before retrying."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I authenticate API requests?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Include your API key in the Authorization header as a Bearer token: Authorization: Bearer YOUR_API_KEY. API keys are scoped to specific permissions and can be rotated without downtime."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What formats does the API return?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The API returns JSON by default. Set the Accept header to text/markdown to receive Markdown-formatted responses, or application/xml for XML."
+      }
+    }
+  ]
+}
+</script>
+```
+
+The `name` field should be the exact heading text of the question as it appears on the page. The `text` field in `acceptedAnswer` should be the full answer, including any code snippets or specific values that agents might extract.
+
+## HowTo
+
+Use `HowTo` for procedural content: setup guides, integration walkthroughs, step-by-step tutorials.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "Connect to the API using OAuth 2.0",
+  "description": "Authenticate your application with the API using the OAuth 2.0 Client Credentials flow.",
+  "totalTime": "PT15M",
+  "tool": [
+    {
+      "@type": "HowToTool",
+      "name": "API client (curl, Postman, or your HTTP library)"
+    },
+    {
+      "@type": "HowToTool",
+      "name": "Client ID and Client Secret from the developer dashboard"
+    }
+  ],
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "name": "Obtain credentials",
+      "text": "Log in to the developer dashboard at dashboard.example.com. Navigate to API Keys and create a new OAuth application. Copy the Client ID and Client Secret.",
+      "url": "https://docs.example.com/oauth#obtain-credentials"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "name": "Request an access token",
+      "text": "POST to https://auth.example.com/oauth/token with grant_type=client_credentials, client_id, and client_secret in the request body. The response includes an access_token and expires_in value.",
+      "url": "https://docs.example.com/oauth#request-token"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "name": "Use the access token",
+      "text": "Include the access token in the Authorization header of API requests: Authorization: Bearer {access_token}. Tokens expire after the number of seconds indicated by expires_in. Request a new token before expiry.",
+      "url": "https://docs.example.com/oauth#use-token"
+    }
+  ]
+}
+</script>
+```
+
+`totalTime` uses ISO 8601 duration format: `PT15M` is 15 minutes, `PT1H30M` is 90 minutes. The `url` in each step should anchor to the specific step heading on the page.
+
+## TechArticle
+
+Use `TechArticle` for technical documentation pages: API reference pages, concept explanations, architecture documentation.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Webhook Event Reference",
+  "description": "Complete reference for all webhook events emitted by the API, including payload schemas and example payloads.",
+  "datePublished": "2024-09-01T00:00:00Z",
+  "dateModified": "2025-03-15T00:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Acme Inc",
+    "url": "https://example.com"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Acme Inc",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://example.com/logo.png"
+    }
+  },
+  "proficiencyLevel": "Expert",
+  "dependencies": "API version 2.0 or later",
+  "articleSection": "Reference",
+  "keywords": ["webhooks", "events", "API", "payload", "HMAC"],
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://docs.example.com/webhooks/events"
+  }
+}
+</script>
+```
+
+`proficiencyLevel` accepts: `Beginner`, `Expert`. `dateModified` is more important than `datePublished` for agent trust — agents use modification date to assess whether documentation is current.
+
+## SoftwareApplication
+
+Use `SoftwareApplication` for tool and product pages, CLI documentation, and SDK landing pages.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Acme CLI",
+  "description": "Command-line interface for managing Acme resources, running jobs, and inspecting logs.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Linux, Windows",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "downloadUrl": "https://example.com/cli/install",
+  "softwareVersion": "2.4.1",
+  "releaseNotes": "https://github.com/acme/cli/releases/tag/v2.4.1",
+  "programmingLanguage": "Go",
+  "codeRepository": "https://github.com/acme/cli",
+  "license": "https://opensource.org/licenses/MIT"
+}
+</script>
+```
+
+## WebAPI
+
+Use `WebAPI` specifically for API reference and documentation pages. This schema type signals to agents that the page describes a callable interface.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebAPI",
+  "name": "Acme REST API",
+  "description": "REST API for programmatic access to all Acme platform features. Supports JSON and Markdown response formats.",
+  "documentation": "https://docs.example.com/api",
+  "termsOfService": "https://example.com/terms",
+  "version": "2024-11-01",
+  "provider": {
+    "@type": "Organization",
+    "name": "Acme Inc",
+    "url": "https://example.com"
+  },
+  "license": "https://example.com/api/license",
+  "endpointUrl": "https://api.example.com/v2",
+  "potentialAction": {
+    "@type": "ConsumeAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://api.example.com/v2/{path}",
+      "httpMethod": "GET",
+      "encodingType": "application/json"
+    }
+  }
+}
+</script>
+```
+
+## Multiple Schemas on One Page
+
+A single page can carry multiple schema types. A page that is both an API overview (`WebAPI`) and contains setup steps (`HowTo`) should include both:
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebAPI",
+      "name": "Acme REST API",
+      ...
+    },
+    {
+      "@type": "HowTo",
+      "name": "Make your first API call",
+      ...
+    }
+  ]
+}
+</script>
+```
+
+Use `@graph` when combining schemas. Do not use multiple `` `<script>` `` tags with competing `@context` declarations — this is valid JSON-LD but some parsers mishandle it.
+
+## Implementing in Next.js
+
+```typescript
+// app/docs/[slug]/page.tsx
+import type { WithContext, FAQPage, TechArticle } from 'schema-dts'
+
+export default function DocPage({ page }) {
+  const faqSchema: WithContext<FAQPage> = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: page.faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer,
+      },
+    })),
+  }
+
+  const articleSchema: WithContext<TechArticle> = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: page.title,
+    description: page.description,
+    dateModified: page.lastModified,
+    author: { '@type': 'Organization', name: 'Acme Inc' },
+  }
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
+      {/* page content */}
+    </>
+  )
+}
+```
+
+The `schema-dts` package provides TypeScript types for all Schema.org types, catching type errors at build time rather than at validation.
+
+## Validation
+
+Test structured data before deploying:
+
+- **Google Rich Results Test** — `search.google.com/test/rich-results` — validates whether Google can process your schema and whether it qualifies for rich results
+- **Schema.org Validator** — `validator.schema.org` — validates against the full Schema.org specification, not just Google's subset
+- **JSON-LD Playground** — `json-ld.org/playground` — useful for debugging `@context` and `@graph` issues

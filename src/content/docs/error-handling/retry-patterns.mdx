@@ -1,0 +1,374 @@
+---
+title: Retry and Recovery Patterns
+description: Exponential backoff, circuit breakers, and idempotency for resilient agent-driven workflows
+---
+
+## Summary
+
+Agents must retry safely: exponential backoff with jitter spreads retries over time instead of hammering a degraded service. Circuit breakers stop retrying after N failures. Idempotency keys prevent double-submission on retries. Distinguish retriable (429, 5xx) from non-retriable errors (4xx validation) and trust is_retriable from the problem body.
+
+```
+delay = base * 2^attempt + random(0, base)  (capped at 60s)
+```
+
+- Exponential backoff: 1s, 2s, 4s, 8s, 16s (with jitter and 60s cap)
+- Full jitter: random(0, base * 2^attempt) for large populations
+- Circuit breaker: stop after N consecutive failures, cool down, probe
+- Rate limit handling: use Retry-After header and X-RateLimit-Remaining
+- Idempotency-Key required for write operations
+- is_retriable from problem body overrides status code heuristics
+
+Agents retry. Unlike humans, who might manually retry a failed request once or twice, an agent following a retry loop will retry at whatever cadence its logic allows — which, without constraints, can become a thundering herd that makes an already-degraded service worse. Retry patterns for agent systems are not just about eventual success; they are about failing safely without amplifying failures.
+
+## Exponential Backoff with Jitter
+
+The baseline retry algorithm for transient failures is exponential backoff: each attempt waits longer than the previous one, so a sustained failure results in increasingly infrequent retries rather than a constant bombardment.
+
+The formula:
+
+```
+delay = base * 2^attempt + random(0, base)
+```
+
+The `random(0, base)` term is jitter — a random offset added to prevent synchronized retries when multiple agents encounter the same error at the same time.
+
+```typescript
+function backoffDelay(attempt: number, base = 1000): number {
+  const exponential = base * Math.pow(2, attempt);
+  const jitter = Math.random() * base;
+  const delay = exponential + jitter;
+  const maxDelay = 60 * 1000; // Cap at 60 seconds
+  return Math.min(delay, maxDelay);
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxAttempts?: number; base?: number } = {}
+): Promise<T> {
+  const { maxAttempts = 4, base = 1000 } = options;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isLast = attempt === maxAttempts - 1;
+      const retriable = isRetriable(err);
+
+      if (isLast || !retriable) throw err;
+
+      const delay = backoffDelay(attempt, base);
+      await sleep(delay);
+    }
+  }
+
+  throw new Error("Unreachable");
+}
+```
+
+```python
+import asyncio
+import random
+from typing import TypeVar, Callable, Awaitable
+
+T = TypeVar("T")
+
+def backoff_delay(attempt: int, base: float = 1.0, max_delay: float = 60.0) -> float:
+    exponential = base * (2 ** attempt)
+    jitter = random.uniform(0, base)
+    return min(exponential + jitter, max_delay)
+
+async def with_retry(
+    fn: Callable[[], Awaitable[T]],
+    max_attempts: int = 4,
+    base: float = 1.0,
+) -> T:
+    for attempt in range(max_attempts):
+        try:
+            return await fn()
+        except Exception as err:
+            is_last = attempt == max_attempts - 1
+            if is_last or not is_retriable(err):
+                raise
+
+            delay = backoff_delay(attempt, base)
+            await asyncio.sleep(delay)
+
+    raise RuntimeError("Unreachable")
+```
+
+The delay sequence for a 1-second base:
+
+| Attempt | Exponential | Jitter (max) | Total (max) |
+|---|---|---|---|
+| 0 | 1s | 1s | 2s |
+| 1 | 2s | 1s | 3s |
+| 2 | 4s | 1s | 5s |
+| 3 | 8s | 1s | 9s |
+| 4 | 16s | 1s | 17s |
+
+With a 60-second cap, delays plateau rather than growing indefinitely.
+
+## Thundering Herd Prevention
+
+When a service goes down and comes back up, every agent that accumulated retries during the outage fires simultaneously. The recovered service receives a traffic spike larger than the one that caused the outage.
+
+Jitter alone is not sufficient when the population of retrying agents is large. Full jitter — using a random value across the entire backoff range rather than adding jitter to an exponential value — spreads retries more evenly:
+
+```typescript
+// Exponential backoff with jitter: base * 2^n + random(0, base)
+// Good for small retry populations
+
+// Full jitter: random(0, base * 2^n)
+// Better for large retry populations — fully randomizes within the window
+
+function fullJitterDelay(attempt: number, base = 1000): number {
+  const cap = base * Math.pow(2, attempt);
+  return Math.random() * Math.min(cap, 60 * 1000);
+}
+```
+
+Full jitter is appropriate when many independent agents might be retrying the same endpoint concurrently. For a single agent retrying its own request, standard exponential backoff with jitter is sufficient.
+
+## Circuit Breakers
+
+A circuit breaker stops retrying entirely after a configured number of consecutive failures. Rather than continuing to send requests to a service that has failed N times in a row, the circuit "opens" and all further calls fail immediately for a cooldown period. After the cooldown, a single probe request tests whether the service has recovered.
+
+```typescript
+type CircuitState = "closed" | "open" | "half-open";
+
+class CircuitBreaker {
+  private state: CircuitState = "closed";
+  private failureCount = 0;
+  private lastFailureTime: number | null = null;
+
+  constructor(
+    private readonly failureThreshold: number = 5,
+    private readonly cooldownMs: number = 30 * 1000
+  ) {}
+
+  async call<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === "open") {
+      const elapsed = Date.now() - (this.lastFailureTime ?? 0);
+      if (elapsed < this.cooldownMs) {
+        throw new CircuitOpenError(
+          `Circuit open. Retry after ${Math.ceil((this.cooldownMs - elapsed) / 1000)}s`
+        );
+      }
+      // Cooldown elapsed — allow one probe request
+      this.state = "half-open";
+    }
+
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (err) {
+      this.onFailure();
+      throw err;
+    }
+  }
+
+  private onSuccess() {
+    this.failureCount = 0;
+    this.state = "closed";
+  }
+
+  private onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = "open";
+    }
+  }
+}
+
+// Usage
+const invoiceServiceBreaker = new CircuitBreaker(5, 30_000);
+
+async function getInvoice(id: string) {
+  return invoiceServiceBreaker.call(() =>
+    fetch(`https://invoices.example.com/invoices/${id}`)
+  );
+}
+```
+
+When the circuit is open, `CircuitOpenError` carries the remaining cooldown time. Agents should treat an open circuit as a non-retriable error — they should escalate or return a partial result rather than sitting in a wait loop.
+
+## Rate Limit Handling
+
+Rate limits are a specific class of retriable error with explicit timing information. The `Retry-After` header on a 429 response specifies exactly how long to wait.
+
+```typescript
+async function withRateLimitHandling(
+  fn: () => Promise<Response>
+): Promise<Response> {
+  const response = await fn();
+
+  if (response.status === 429) {
+    const retryAfter = response.headers.get("Retry-After");
+
+    if (retryAfter) {
+      const waitSeconds = parseInt(retryAfter, 10);
+      if (!isNaN(waitSeconds)) {
+        await sleep(waitSeconds * 1000);
+        return fn(); // Single retry after the specified wait
+      }
+    }
+
+    // No Retry-After — fall back to exponential backoff
+    await sleep(backoffDelay(0));
+    return fn();
+  }
+
+  return response;
+}
+```
+
+Read `X-RateLimit-Remaining` on every successful response to detect approaching limits before hitting them:
+
+```typescript
+class RateLimitAwareClient {
+  private remaining = Infinity;
+  private resetAt: Date | null = null;
+
+  async request(url: string, options?: RequestInit): Promise<Response> {
+    // If near limit, wait proactively
+    if (this.remaining < 5 && this.resetAt) {
+      const waitMs = this.resetAt.getTime() - Date.now();
+      if (waitMs > 0) await sleep(waitMs);
+    }
+
+    const response = await fetch(url, options);
+
+    // Update remaining quota from headers
+    const remaining = response.headers.get("X-RateLimit-Remaining");
+    const reset = response.headers.get("X-RateLimit-Reset");
+
+    if (remaining !== null) this.remaining = parseInt(remaining, 10);
+    if (reset !== null) this.resetAt = new Date(parseInt(reset, 10) * 1000);
+
+    return response;
+  }
+}
+```
+
+## Idempotency Keys
+
+An agent retrying a write operation without idempotency guarantees risks creating duplicate resources. An invoice creation that is retried after a network timeout might create two invoices if the first request actually succeeded before the connection dropped.
+
+Idempotency keys prevent this. The client generates a unique key per logical operation and includes it in every retry. The server deduplicates — if a request with a given key has already been processed, it returns the original response without executing the operation again.
+
+```typescript
+import { randomUUID } from "crypto";
+
+// Generate key once per logical operation, not per attempt
+const idempotencyKey = randomUUID();
+
+async function createInvoiceIdempotent(
+  data: InvoiceData,
+  key: string = randomUUID()
+): Promise<Invoice> {
+  return withRetry(async () => {
+    const response = await fetch("https://api.example.com/invoices", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,  // Same key on every retry
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new ApiError(error);
+    }
+
+    return response.json();
+  });
+}
+```
+
+The server's idempotency implementation stores the response keyed by the idempotency key with a TTL (typically 24 hours):
+
+```typescript
+async function handleCreateInvoice(req: Request, res: Response) {
+  const idempotencyKey = req.headers["idempotency-key"];
+
+  if (idempotencyKey) {
+    const cached = await idempotencyStore.get(idempotencyKey);
+    if (cached) {
+      // Return the original response — do not execute again
+      return res.status(cached.status).json(cached.body);
+    }
+  }
+
+  const invoice = await createInvoice(req.body);
+
+  if (idempotencyKey) {
+    await idempotencyStore.set(idempotencyKey, {
+      status: 201,
+      body: invoice,
+      ttl: 24 * 60 * 60, // 24 hours
+    });
+  }
+
+  res.status(201).json(invoice);
+}
+```
+
+Idempotency keys are most critical for payment operations, invoice creation, and any operation that consumes a limited resource or triggers an external side effect (email, SMS, webhook).
+
+## Distinguishing Retriable from Non-Retriable Errors
+
+Not all errors should be retried. Retrying a 400 Validation Error or a 403 Forbidden will never succeed — the request itself is wrong, not the timing.
+
+```typescript
+function isRetriable(err: unknown): boolean {
+  if (err instanceof ApiError) {
+    // These are never retriable
+    if ([400, 401, 403, 404, 410, 422].includes(err.status)) {
+      return false;
+    }
+
+    // Check the problem body's explicit flag
+    if (err.problem?.is_retriable === false) {
+      return false;
+    }
+
+    // 429 and 5xx are retriable
+    if (err.status === 429 || err.status >= 500) {
+      return true;
+    }
+  }
+
+  // Network errors (ECONNRESET, ETIMEDOUT) are retriable
+  if (err instanceof TypeError && err.message.includes("fetch")) {
+    return true;
+  }
+
+  return false;
+}
+```
+
+The `is_retriable` field in the RFC 9457 Problem Details body takes precedence over the status code heuristic. A 422 with `is_retriable: true` indicates the server believes the request could succeed after modification. A 503 with `is_retriable: false` means the service is permanently unavailable (decommissioned, not transient).
+
+## Checklist
+
+- [ ] Retry logic uses exponential backoff: `base * 2^attempt + random(0, base)`
+- [ ] Jitter is applied on every retry — not just the first
+- [ ] Maximum delay is capped (60 seconds recommended)
+- [ ] Circuit breakers stop retrying after N consecutive failures
+- [ ] 429 responses use the `Retry-After` header value as the wait time
+- [ ] `X-RateLimit-Remaining` is tracked to throttle proactively before hitting limits
+- [ ] All write operations that may be retried use idempotency keys
+- [ ] Idempotency key is generated once per logical operation — not per attempt
+- [ ] Non-retriable errors (4xx validation, auth failures) are not retried
+- [ ] `is_retriable` from the problem body overrides status code heuristics
+
+## Related Pages
+
+- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) — the standard error format
+- [Agent Extensions](/docs/error-handling/agent-extensions) — `is_retriable` and `retry_after_ms` fields
+- [Idempotency](/docs/error-handling/idempotency) — safe retries for write operations
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — structuring errors to enable this logic
+- [CLI Error Design](/docs/error-handling/cli-errors) — applying these patterns to command-line tools

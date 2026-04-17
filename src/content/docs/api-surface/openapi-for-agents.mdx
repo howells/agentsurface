@@ -1,0 +1,509 @@
+---
+title: OpenAPI for Agents
+description: Writing OpenAPI specifications that AI agents can use as executable contracts, not just documentation
+---
+
+## Summary
+
+OpenAPI specs are executable contracts when agents consume them. This document explains how spec semantics — operationId, descriptions, schema constraints — directly shape agent behavior at runtime. Vague descriptions become routing failures. Missing operationId values break tool generation. Schema constraints are enforced, not suggested.
+
+- operationId must be globally unique and verb_noun format
+- Descriptions are prompts, not documentation — be precise and specific
+- Schema constraints are enforced strictly by agents
+- Ambiguous descriptions lead to silent failures and misrouting
+- Token-heavy prose degrades LLM routing accuracy
+
+OpenAPI is no longer just documentation. When an agent framework ingests your spec to generate tool definitions, every field becomes executable instructions. A vague description is a bug. A missing `operationId` is a build failure. This page covers what makes an OpenAPI spec agent-ready.
+
+## The Conceptual Shift: Specs as Agent Contracts
+
+An OpenAPI spec written for human developers communicates intent through prose. A developer reads the description, infers the behavior, and writes code. That pipeline breaks entirely when an agent is the consumer.
+
+Agents do not infer. They pattern-match. Every decision an agent makes about when to call an operation, what parameters to pass, and how to interpret the response is based on the literal text you wrote. This means your spec is not documentation — it is a contract that the agent executes verbatim.
+
+The practical consequences:
+
+- **Ambiguity compounds.** If a description could be interpreted two ways, the agent will pick one, and you will not know which until a user reports a bug.
+- **Descriptions are prompts.** The LLM generating tool calls reads your `description` as part of its context window. Token-heavy, prose-heavy descriptions degrade routing accuracy.
+- **Schema constraints are enforced, not suggested.** Unlike a human who reads "string, max 100 chars" and uses judgment, an agent runtime validates strictly and rejects calls that violate the schema.
+
+## Critical Fields
+
+### `operationId`
+
+`operationId` is the function name in every generated client, SDK, and tool definition. It must be:
+
+- **Globally unique** across your entire spec
+- **Verb-noun format** that unambiguously describes the action and resource
+- **Snake\_case or camelCase** — pick one and be consistent
+
+```yaml
+# Bad — no operationId, frameworks generate names from path + method
+paths:
+  /users/{id}:
+    get:
+      summary: Get user
+
+# Bad — noun only, ambiguous between list and get
+paths:
+  /users/{id}:
+    get:
+      operationId: user
+
+# Good — verb_noun, unambiguous
+paths:
+  /users/{id}:
+    get:
+      operationId: get_user
+  /users:
+    get:
+      operationId: list_users
+    post:
+      operationId: create_user
+  /users/{id}/activate:
+    post:
+      operationId: activate_user
+```
+
+Common verb prefixes: `get_`, `list_`, `create_`, `update_`, `delete_`, `search_`, `send_`, `trigger_`, `validate_`, `generate_`.
+
+### `description`
+
+The `description` field on an operation is the primary signal an agent uses to decide whether to call it. It answers three questions:
+
+1. **When should I call this?** (trigger conditions)
+2. **When should I use something else?** (negative conditions and disambiguation)
+3. **What do I get back?** (return value summary)
+
+```yaml
+# Bad — describes the endpoint, not the agent's decision
+description: Returns a user object from the database by user ID.
+
+# Bad — just the summary repeated
+description: Get user by ID.
+
+# Good — answers when/why/what, includes disambiguation
+description: >
+  Retrieves a single user's full profile including account settings,
+  subscription tier, and usage statistics. Use this when you have a
+  specific user ID and need complete profile data. For listing multiple
+  users or searching by email or name, use list_users instead. Returns
+  404 if the user does not exist or has been deleted.
+```
+
+### `summary`
+
+`summary` is a single-line label shown in tool pickers and sidebars. It should be a complete human-readable sentence under 100 characters. Do not repeat the `operationId`.
+
+```yaml
+# Bad — repeats the operationId
+summary: get_user
+
+# Bad — too long
+summary: Retrieves a user object from the database given a valid user identifier
+
+# Good
+summary: Get a user's full profile by ID
+```
+
+## The "When / Why / How" Description Pattern
+
+Structure operation descriptions around three phases:
+
+**When:** What triggers this call? What context requires this operation?
+**Why (vs alternatives):** When should the agent prefer this over similar operations?
+**How:** Prerequisites, parameter notes, return summary, errors.
+
+```yaml
+paths:
+  /documents/{id}/publish:
+    post:
+      operationId: publish_document
+      summary: Publish a document to make it publicly visible
+      description: >
+        Publishes a draft document, making it visible to all users with
+        read access to the containing workspace. Call this after the user
+        confirms they want to make a document public, or when an automated
+        workflow reaches the publication step.
+
+        Use update_document instead if the document content still needs
+        changes. Use schedule_document_publish if publication should happen
+        at a future time. Publishing is irreversible through this endpoint —
+        to unpublish, call archive_document.
+
+        Requires the document to be in "draft" or "review" status.
+        Returns the updated document with status "published" and a
+        public_url field. Returns 409 if the document is already published
+        or archived.
+```
+
+## Parameter Design
+
+### Count and Depth
+
+Fewer parameters make tool selection more accurate. Operations with more than 10 parameters suffer from agent confusion about which parameters are required, which interact, and what the defaults mean.
+
+- **Ideal:** fewer than 4 parameters
+- **Acceptable:** 4–10 parameters
+- **Problematic:** more than 10 parameters
+
+When an operation genuinely requires many inputs, group related parameters into a request body object rather than passing them as individual query parameters.
+
+### Flat over Nested
+
+Agents handle flat parameter lists more reliably than deeply nested objects. Nesting creates ambiguity about which level holds which constraint.
+
+```yaml
+# Bad — nested, agent must navigate structure
+requestBody:
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          user:
+            type: object
+            properties:
+              profile:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  email:
+                    type: string
+
+# Better — flat structure with clear field names
+requestBody:
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [name, email]
+        properties:
+          name:
+            type: string
+            description: Full display name of the user
+          email:
+            type: string
+            format: email
+            description: Primary email address used for login and notifications
+```
+
+### Format Keywords
+
+Use `format` to constrain string inputs. This allows validators to enforce constraints and gives agents semantic information without requiring description prose.
+
+```yaml
+properties:
+  user_id:
+    type: string
+    format: uuid
+    description: Unique identifier for the user
+  created_after:
+    type: string
+    format: date-time
+    description: ISO 8601 datetime; return only records created after this time
+  report_type:
+    type: string
+    enum: [summary, detailed, raw]
+    description: >
+      Output verbosity. Use "summary" for dashboard display, "detailed"
+      for export workflows, "raw" for data pipeline ingestion.
+```
+
+### Exhaustive Enums
+
+List every valid value in the `enum` array. Do not use open-ended strings when a fixed set of values is accepted. Each enum value should have a corresponding description in the parent field's `description`, especially when the semantic difference between values is not obvious from the name alone.
+
+```yaml
+properties:
+  status:
+    type: string
+    enum: [pending, active, suspended, cancelled, deleted]
+    description: >
+      Account status filter. "pending" = awaiting email verification.
+      "active" = fully operational. "suspended" = temporarily disabled
+      by admin. "cancelled" = user-initiated cancellation, data retained.
+      "deleted" = scheduled for permanent deletion within 30 days.
+```
+
+## Response Schema Design
+
+### Essential Fields Only
+
+Include only fields agents need to make decisions or pass to subsequent operations. Avoid exposing large internal objects with dozens of fields — most will never be read and inflate token usage.
+
+```yaml
+# Bad — exposes every database column
+responses:
+  '200':
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/UserFull'  # 40+ fields
+
+# Good — returns the fields agents actually use
+responses:
+  '200':
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [id, email, status, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            status:
+              type: string
+              enum: [active, suspended, deleted]
+            display_name:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+```
+
+### Concrete Examples
+
+Examples are part of the contract. Include them at the operation level so agents see a real response shape, not just an abstract schema.
+
+```yaml
+responses:
+  '200':
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/User'
+        example:
+          id: "usr_01HV3K8MNPQR2STUVW"
+          email: "alice@example.com"
+          status: "active"
+          display_name: "Alice Chen"
+          created_at: "2024-03-15T09:23:11Z"
+```
+
+### Error Documentation
+
+Document every error response your operation can return. An undocumented 422 is an unrecoverable failure for an agent that has no idea what it did wrong.
+
+```yaml
+responses:
+  '200':
+    description: User found and returned
+  '400':
+    description: Invalid user_id format (must be UUID)
+  '404':
+    description: User not found or has been permanently deleted
+  '429':
+    description: Rate limit exceeded; retry after the Retry-After header value
+  '500':
+    description: Internal server error; safe to retry with exponential backoff
+```
+
+## Explicit Disambiguation
+
+When your API has operations with similar names or overlapping functionality, add explicit comparison language to descriptions. This prevents agents from calling the wrong operation.
+
+```yaml
+paths:
+  /users:
+    get:
+      operationId: list_users
+      description: >
+        Returns a paginated list of users matching optional filters.
+        Use this to find users by email, name, or status. For retrieving
+        a single user when you already have the ID, use get_user instead —
+        it is faster and returns more complete profile data.
+
+  /users/{id}:
+    get:
+      operationId: get_user
+      description: >
+        Returns the complete profile for a single user by ID. Use this
+        when you have a specific user ID. For searching or listing multiple
+        users, use list_users instead.
+
+  /users/search:
+    get:
+      operationId: search_users
+      description: >
+        Full-text search across user names, emails, and profile fields.
+        Use this for fuzzy or partial matching. For exact-match filtering
+        by status or role, use list_users with query parameters — it is
+        more efficient. For retrieving a known user ID, use get_user.
+```
+
+## Token Efficiency
+
+Every description field becomes part of the context window when an agent is choosing which tool to call. Excessive description length degrades accuracy.
+
+| Description length | Effect |
+|--------------------|--------|
+| ~200 tokens (~150 words) | Acceptable — full context fits in tool selection window |
+| ~500 tokens | Marginal — monitor routing accuracy |
+| ~2000 tokens | Problematic — crowds out other tools, degrades selection |
+
+Write descriptions that are precise, not exhaustive. If you find yourself writing paragraphs of edge cases, that is a signal the operation should be split into more focused operations.
+
+<Callout type="warn">
+Long descriptions hurt agent performance more than they help. A 2000-token description does not make an agent smarter about when to use a tool — it makes every other tool harder to select. Target under 150 words per operation description.
+</Callout>
+
+## OpenAPI 3.1 Features That Matter
+
+OpenAPI 3.1 aligns with JSON Schema 2020-12, which unlocks several patterns important for agent-ready specs.
+
+### Type Arrays
+
+Allow a field to hold multiple types without a discriminator:
+
+```yaml
+properties:
+  value:
+    type: [string, "null"]
+    description: The field value, or null if not yet set
+```
+
+### `$ref` with Sibling Keywords
+
+In 3.1, `$ref` can appear alongside other keywords (not just as a standalone reference):
+
+```yaml
+properties:
+  user:
+    $ref: '#/components/schemas/User'
+    description: The owning user; see get_user for full field details
+```
+
+### Webhooks Field
+
+Document incoming webhooks in the same spec as your outbound API:
+
+```yaml
+webhooks:
+  order.completed:
+    post:
+      operationId: webhook_order_completed
+      description: >
+        Sent when an order transitions to "completed" status.
+        Payload includes the full order object with final totals.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCompletedEvent'
+```
+
+## OpenAPI 3.2 Features
+
+OpenAPI 3.2 (in development as of 2025) introduces two features with direct agent relevance.
+
+### Streaming Media Types
+
+Native support for streaming response bodies, replacing custom content-type conventions:
+
+```yaml
+responses:
+  '200':
+    content:
+      application/jsonl:
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/StreamChunk'
+```
+
+### `$self` for Multi-Document Specs
+
+`$self` allows a spec to reference its own root document by identity, enabling cleaner multi-document compositions without fragile relative path references. This matters for large APIs split across multiple spec files that get merged for agent consumption.
+
+## Full Well-Formed Operation Example
+
+```yaml
+paths:
+  /invoices/{invoice_id}/send:
+    post:
+      operationId: send_invoice
+      summary: Send an invoice to the customer by email
+      description: >
+        Sends a finalized invoice to the customer's email address on file.
+        Call this after the invoice has been approved and is in "finalized"
+        status. For draft invoices, call finalize_invoice first.
+
+        Use resend_invoice if the customer reports not receiving the original.
+        Use void_invoice to cancel a sent invoice.
+
+        Returns the updated invoice with sent_at timestamp and delivery
+        status. Returns 409 if the invoice is already sent or voided.
+        Returns 422 if the customer has no email address on record.
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the invoice to send
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 500
+                  description: >
+                    Optional personal message to include in the email body.
+                    Leave empty to use the default template text.
+                cc:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  maxItems: 5
+                  description: Additional email addresses to CC on the invoice email
+      responses:
+        '200':
+          description: Invoice sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+              example:
+                id: "inv_01HV3K8MNPQR"
+                status: "sent"
+                sent_at: "2024-03-15T14:22:00Z"
+                customer_email: "billing@acme.com"
+        '404':
+          description: Invoice not found
+        '409':
+          description: Invoice is already sent or has been voided
+        '422':
+          description: Customer account has no email address on record
+```
+
+## Checklist
+
+Before treating a spec as agent-ready:
+
+- [ ] Every operation has a unique `operationId` in verb\_noun format
+- [ ] Every operation description answers when to call it and when not to
+- [ ] Similar operations explicitly disambiguate from each other
+- [ ] All enum values are listed with semantic descriptions
+- [ ] No operation has more than 10 parameters
+- [ ] All error responses are documented with status codes
+- [ ] Descriptions are under 150 words per operation
+- [ ] Response schemas include a concrete `example`
+- [ ] `format` keywords are used on string fields wherever applicable
+
+## Related Pages
+
+- [Tool Definitions](./tool-definitions) — how these OpenAPI operations become agent tool definitions
+- [Arazzo Workflows](./arazzo-workflows) — composing operations into multi-step workflows
+- [OpenAPI Extensions](./openapi-extensions) — semantic extensions for agent behavior hints

@@ -1,0 +1,573 @@
+---
+title: Model Context Protocol (MCP)
+description: The dominant standard for connecting AI agents to external tools, data sources, and services
+---
+
+## Summary
+
+MCP defines how agents discover and use tools, read resources, invoke prompts, and run long-lived async tasks over a stateful connection. It is the baseline protocol: every major AI lab supports it as of 2025. Current spec: 2025-11-25. Transport options: stdio (local), Streamable HTTP (remote). Authentication: OAuth 2.1 + optional DPoP.
+
+```
+Agent → connects via stdlib/HTTP → MCP Server
+  ├─ discovers tools
+  ├─ reads resources (documents, data)
+  ├─ invokes prompts (structured workflows)
+  └─ runs async tasks (polling or callback)
+```
+
+- Four primitives: tools (model-controlled), resources (agent-read), prompts (structured workflows), tasks (async, long-lived)
+- Stateful JSON-RPC over stdio or HTTP
+- Authorization via OAuth 2.1 Client Credentials or MCP 2025-11-25 CIMD
+- Server advertises capabilities; agent selects which to use
+- MCP registry: 10,000+ public servers, 97M+ SDK downloads/month
+
+MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and execute long-running async tasks — all over a single stateful connection. As of 2025, it is the de-facto standard across every major AI lab and the protocol you should implement first.
+
+## Origin and Governance
+
+Anthropic published the initial MCP specification in November 2024. In December 2025, Anthropic donated the specification to the Linux Foundation's AI & Data Foundation (AAIF), making it a vendor-neutral open standard governed by a technical steering committee with representation from across the industry.
+
+All major AI labs have adopted MCP as of mid-2025: OpenAI, Google DeepMind, Microsoft, AWS, and Anthropic all ship MCP support in their agent runtimes. The ecosystem around it reflects this adoption: the MCP SDK packages exceed 97 million monthly downloads, and the public MCP server registry lists over 10,000 servers.
+
+The current specification version is [`2025-11-25`](https://spec.modelcontextprotocol.io/specification/2025-11-25/). This page covers that version.
+
+## Four Primitives
+
+MCP exposes four core capability types. Each primitive has a different controller — the entity that decides when and how it is used.
+
+### Tools (Model-Controlled)
+
+Tools are functions the model calls autonomously to take action or retrieve information. The model receives a list of available tools, selects which to call based on its reasoning, provides arguments, and receives the result.
+
+```json
+{
+  "type": "tool",
+  "name": "billing_create_invoice",
+  "description": "Creates a new invoice for a customer. Call this when the user wants to bill a customer for services. Requires a valid customer_id — use billing_list_customers first if you only have a name.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["customer_id", "amount_cents", "currency"],
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UUID of the customer to invoice"
+      },
+      "amount_cents": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Invoice amount in cents"
+      },
+      "currency": {
+        "type": "string",
+        "enum": ["usd", "eur", "gbp"],
+        "description": "ISO 4217 currency code"
+      },
+      "due_date": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "description": "Due date in YYYY-MM-DD format"
+      }
+    }
+  }
+}
+```
+
+The `description` field is the primary routing signal. It should answer: when to call this tool, when not to, what it returns, and what preconditions are required. See [Server Architecture](../mcp-servers/architecture) for patterns on writing effective tool descriptions.
+
+### Resources (Application-Controlled)
+
+Resources expose data that the application makes available for an agent to read. Unlike tools, resources are not called autonomously — the application controls which resources are exposed and when. Resources are identified by URI and can represent files, database records, API responses, or any other data source.
+
+```json
+{
+  "uri": "file:///workspace/reports/q4-2025.pdf",
+  "name": "Q4 2025 Financial Report",
+  "description": "Quarterly financial report including revenue, expenses, and projections",
+  "mimeType": "application/pdf"
+}
+```
+
+Resource URIs follow standard URI syntax. Custom URI schemes are common for application-specific resources:
+
+```json
+{
+  "uri": "billing://customers/cus_01HV3K8MNP/invoices",
+  "name": "Alice Chen — Invoice History",
+  "mimeType": "application/json"
+}
+```
+
+Servers that implement resource subscriptions notify clients when resource content changes. Declare this capability at server construction time (see [Capability Declaration](#capability-declaration)).
+
+### Prompts (User-Controlled)
+
+Prompts are reusable message templates that users select to start or guide interactions. They are pre-defined conversation starters or structured workflows, chosen by the user rather than the model.
+
+```json
+{
+  "name": "billing_monthly_review",
+  "description": "Start a guided review of this month's billing activity",
+  "arguments": [
+    {
+      "name": "month",
+      "description": "Month to review in YYYY-MM format",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "description": "Filter to a specific currency (optional)",
+      "required": false
+    }
+  ]
+}
+```
+
+### Tasks (Async Execution)
+
+Tasks allow long-running, asynchronous operations with explicit state management and progress notifications. New in `2025-11-25`, tasks progress through a state machine: `working → input_required → completed` (or `failed`, `cancelled`). The server initiates callbacks or poll patterns for result delivery.
+
+```json
+{
+  "name": "billing_generate_report",
+  "description": "Generate a comprehensive billing report. Returns a task_id for async polling.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "month": { "type": "string", "description": "YYYY-MM format" },
+      "format": { "enum": ["csv", "json", "pdf"] }
+    }
+  }
+}
+```
+
+Use tasks when an operation cannot complete in a single RPC roundtrip — report generation, data exports, compliance audits, or any work taking >5 seconds. Clients can poll the task state or register webhooks for push notifications.
+
+## Wire Format
+
+MCP uses JSON-RPC 2.0 as its message format. Every interaction is a request/response pair or a notification, encoded as JSON.
+
+### Initialization Handshake
+
+When a client connects, it sends an `initialize` request to negotiate protocol version and exchange capability declarations:
+
+```json
+// Client → Server
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-11-25",
+    "capabilities": {
+      "roots": { "listChanged": true },
+      "sampling": {}
+    },
+    "clientInfo": {
+      "name": "claude-desktop",
+      "version": "1.4.0"
+    }
+  }
+}
+
+// Server → Client
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2025-11-25",
+    "capabilities": {
+      "tools": {},
+      "resources": { "subscribe": true, "listChanged": true },
+      "prompts": {},
+      "logging": {}
+    },
+    "serverInfo": {
+      "name": "billing-mcp",
+      "version": "2.1.0"
+    }
+  }
+}
+```
+
+The server must respond with the same `protocolVersion` or a lower supported version. If the versions are incompatible, the client disconnects.
+
+### Tool Call
+
+```json
+// Client → Server: tool call request
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "method": "tools/call",
+  "params": {
+    "name": "billing_create_invoice",
+    "arguments": {
+      "customer_id": "cus_01HV3K8MNPQR",
+      "amount_cents": 149900,
+      "currency": "usd",
+      "due_date": "2025-02-15"
+    }
+  }
+}
+
+// Server → Client: tool result
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Invoice inv_01HV3K8STUVW created for $1,499.00 USD, due 2025-02-15."
+      }
+    ],
+    "isError": false
+  }
+}
+```
+
+For error conditions, set `isError: true` and include a recovery-oriented message in `content`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Customer cus_01HV3K8MNPQR not found. Use billing_list_customers to find valid customer IDs."
+      }
+    ],
+    "isError": true
+  }
+}
+```
+
+<Callout type="warn">
+Do not return JSON-RPC error objects for business logic failures. Use `isError: true` in the result instead. JSON-RPC errors (`error` instead of `result`) should only be used for protocol-level failures like malformed requests or unknown methods.
+</Callout>
+
+### Resource Read
+
+```json
+// Client → Server
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "resources/read",
+  "params": {
+    "uri": "billing://customers/cus_01HV3K8MNP/invoices"
+  }
+}
+
+// Server → Client
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "contents": [
+      {
+        "uri": "billing://customers/cus_01HV3K8MNP/invoices",
+        "mimeType": "application/json",
+        "text": "[{\"id\":\"inv_01HV\",\"status\":\"paid\",\"amount_cents\":149900}]"
+      }
+    ]
+  }
+}
+```
+
+## Tool Annotations
+
+The `2025-11-25` specification adds an `annotations` field to tool definitions. Annotations communicate behavioral characteristics to clients without embedding them in the description text.
+
+```json
+{
+  "name": "billing_void_invoice",
+  "description": "Voids an invoice, marking it as cancelled. This action cannot be undone.",
+  "inputSchema": { ... },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false
+  }
+}
+```
+
+| Annotation | Type | Meaning |
+|---|---|---|
+| `readOnlyHint` | boolean | Tool does not modify any state (safe to call freely) |
+| `destructiveHint` | boolean | Tool may delete or irreversibly modify data |
+| `idempotentHint` | boolean | Calling with the same arguments multiple times has the same effect as calling once |
+| `openWorldHint` | boolean | Tool interacts with external systems outside the MCP server's control |
+
+Annotations are hints, not enforcement. Clients may use them to require user confirmation before destructive calls or to allow unrestricted use of read-only tools.
+
+## New in 2025-11-25
+
+The November 2025 revision introduces four significant features:
+
+**Tasks & Async Primitives** — Long-running operations with poll + push notification support for background jobs.
+
+**Client ID Metadata Documents (CIMD)** — Servers declare which client integrations (Claude Desktop, ChatGPT, Gemini) are supported and version requirements for compatibility checking.
+
+**Enterprise-Managed Authorization (EMA)** — Identity providers can centrally manage MCP client credentials, useful for multi-tenant and compliance-heavy deployments.
+
+**URL Mode Elicitation** — Clients can provide missing arguments as URL query parameters for browser-based workflow support, expanding MCP beyond JSON-RPC.
+
+Additionally, the spec formalizes an Extensions Framework via SEPs (Server Enhancement Proposals) for vendor extensions without breaking compatibility.
+
+## Advanced Capabilities
+
+### Sampling
+
+Sampling allows an MCP server to request that the client (the AI model) generate a completion. This inverts the normal flow and enables servers to use the model's reasoning as part of their own logic.
+
+```json
+// Server → Client: sampling request
+{
+  "jsonrpc": "2.0",
+  "id": 99,
+  "method": "sampling/createMessage",
+  "params": {
+    "messages": [
+      {
+        "role": "user",
+        "content": {
+          "type": "text",
+          "text": "Classify this invoice description as 'consulting', 'software', or 'hardware': Web development services for March 2025"
+        }
+      }
+    ],
+    "maxTokens": 10,
+    "modelPreferences": {
+      "costPriority": 0.8
+    }
+  }
+}
+```
+
+Sampling requires the client to declare the `sampling` capability during initialization. Not all clients support it.
+
+### Roots
+
+Roots tell the server which filesystem or resource locations the client has authorized it to access. A client running in a workspace might declare its project directory as a root:
+
+```json
+{
+  "roots": [
+    {
+      "uri": "file:///Users/alice/projects/billing-app",
+      "name": "Billing App Source"
+    }
+  ]
+}
+```
+
+Servers that respect roots will not access paths outside the declared roots, providing a scope boundary for filesystem operations.
+
+### Elicitation
+
+Elicitation allows a server to request additional information from the user during a tool execution — mid-call user input rather than pre-declared parameters. A server handling a file operation might elicit confirmation before overwriting an existing file.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "elicitation/create",
+  "params": {
+    "message": "File report-2025.pdf already exists. Overwrite it?",
+    "requestedSchema": {
+      "type": "object",
+      "properties": {
+        "overwrite": {
+          "type": "boolean",
+          "description": "Confirm overwrite"
+        }
+      },
+      "required": ["overwrite"]
+    }
+  }
+}
+```
+
+### Progress Notifications
+
+For long-running tool operations, servers send progress notifications to keep clients informed without blocking on the final result:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "notifications/progress",
+  "params": {
+    "progressToken": "export-job-7821",
+    "progress": 45,
+    "total": 100,
+    "message": "Processing invoice 2,247 of 5,000..."
+  }
+}
+```
+
+The client includes a `_meta.progressToken` in the original tool call request to opt into progress notifications for that call.
+
+### Pagination
+
+List operations (`tools/list`, `resources/list`, `prompts/list`) support cursor-based pagination for servers with large numbers of items:
+
+```json
+// Client request with cursor
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "resources/list",
+  "params": {
+    "cursor": "eyJwYWdlIjozfQ=="
+  }
+}
+
+// Server response with next cursor
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "resources": [ ... ],
+    "nextCursor": "eyJwYWdlIjo0fQ=="
+  }
+}
+```
+
+Omit `nextCursor` from the response to indicate the final page. Clients must not assume a specific page size.
+
+## Transport
+
+### stdio (Local Processes)
+
+The stdio transport runs the MCP server as a subprocess. The client writes JSON-RPC messages to the process's stdin and reads responses from stdout. stderr is reserved for diagnostic logs.
+
+This is the appropriate transport for:
+- Desktop applications launching local tools
+- Development tooling and IDE integrations
+- Tools that require filesystem access on the user's machine
+
+```json
+// claude_desktop_config.json
+{
+  "mcpServers": {
+    "billing": {
+      "command": "npx",
+      "args": ["-y", "billing-mcp@latest"],
+      "env": {
+        "STRIPE_API_KEY": "sk_live_..."
+      }
+    }
+  }
+}
+```
+
+The process is isolated at the OS level. Each MCP client instance gets its own subprocess. This provides natural process isolation — a crash in one MCP server does not affect others.
+
+### Streamable HTTP (Remote Services)
+
+The Streamable HTTP transport is the preferred non-stdio transport for MCP servers. It runs the server as an HTTP endpoint where clients send JSON-RPC messages as POST requests. Responses can be:
+- A single JSON response for request/response operations
+- A Server-Sent Events stream for operations that produce multiple messages (progress notifications, streaming tool results, task polling)
+
+```
+POST /mcp HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer eyJ...
+MCP-Protocol-Version: 2025-11-25
+
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}
+```
+
+Streamable HTTP replaced the earlier `http+sse` transport. The legacy SSE transport remains supported via fallback for backward compatibility with older clients, but should not be used in new implementations. Streamable HTTP scales horizontally since each request is stateless.
+
+## Security
+
+### OAuth 2.1 for HTTP Transport
+
+OAuth 2.1 is mandatory for MCP servers deployed over HTTP. The spec does not permit unauthenticated HTTP MCP servers in production. The authorization flow uses standard OAuth 2.1 with PKCE:
+
+```
+1. Client discovers authorization server via MCP server metadata
+2. Client initiates OAuth 2.1 authorization code flow with PKCE
+3. User grants consent
+4. Client exchanges code for access token
+5. Client includes Bearer token in all MCP HTTP requests
+```
+
+The MCP server exposes its authorization server metadata at:
+
+```
+GET /.well-known/oauth-authorization-server
+```
+
+Tokens must be validated on every request — not cached across sessions. Validate the audience (`aud`) claim to ensure tokens issued for other services are rejected.
+
+### Process Isolation for stdio
+
+Each MCP server launched via stdio runs as its own OS process. This provides:
+- Memory isolation between MCP servers
+- Separate environment variable namespaces
+- OS-level resource limits per server
+- Clean failure containment — a crashing server does not cascade
+
+Do not share credentials between MCP servers. Each server should have its own scoped credentials with the minimum permissions required for its domain.
+
+### Defense in Depth
+
+```
+┌─────────────────────────────────────┐
+│  Network Layer                      │
+│  TLS, rate limiting, IP allowlists  │
+├─────────────────────────────────────┤
+│  Authentication Layer               │
+│  Bearer token / OAuth 2.1 with PKCE │
+├─────────────────────────────────────┤
+│  Authorization Layer                │
+│  Scope validation per tool,         │
+│  resource-level access control      │
+├─────────────────────────────────────┤
+│  Input Validation Layer             │
+│  JSON Schema on every tool call,    │
+│  reject unknown fields              │
+├─────────────────────────────────────┤
+│  Business Logic Layer               │
+│  Domain invariants, idempotency,    │
+│  per-customer rate limits           │
+└─────────────────────────────────────┘
+```
+
+Each layer fails closed. A request that cannot be authenticated is rejected, not downgraded to reduced permissions.
+
+## Capability Declaration
+
+Declare capabilities at server construction time. Only declare what you actually implement — undeclared capabilities are simply absent from the server's offerings, which is always preferable to declaring a capability and failing to implement its handler.
+
+```json
+{
+  "capabilities": {
+    "tools": {},
+    "resources": {
+      "subscribe": true,
+      "listChanged": true
+    },
+    "prompts": {},
+    "logging": {}
+  }
+}
+```
+
+Declaring `resources.subscribe: true` without implementing `resources/subscribe` will produce protocol errors that are difficult to trace back to the missing handler.
+
+## Spec & References
+
+- [MCP Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/) — canonical spec with all wire format details
+- [modelcontextprotocol.io](https://modelcontextprotocol.io) — official docs and server registry
+
+## Related Pages
+
+- [A2A Protocol](/docs/protocols/a2a) — agent-to-agent delegation, the horizontal complement to MCP
+- [Protocol Comparison](/docs/protocols/comparison) — when to use MCP vs A2A vs ACP

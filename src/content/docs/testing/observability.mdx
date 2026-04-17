@@ -1,0 +1,360 @@
+---
+title: Observability and Instrumentation
+description: OpenTelemetry GenAI semantic conventions, trace export, Langfuse, Phoenix
+---
+
+## Summary
+
+The ability to inspect agent execution: which tools called, in order, with what arguments, and what they returned. Traces are source of truth for debugging. OpenTelemetry GenAI semantic conventions standardize instrumentation across providers (Anthropic, OpenAI, Google). Key spans: LLM completion (model, tokens, input/output messages), tool calls (tool name, input, output, duration), errors (type, message, stack). Export to Langfuse, Arize Phoenix, Datadog, or Grafana Cloud for visualization and alerting.
+
+```
+Root span: llm.completion
+├── Tool call: tool.call
+│   ├── tool.result
+│   └── duration, status
+├── Tool call: tool.call
+└── LLM result: tokens, latency
+```
+
+---
+
+Agent observability is the ability to inspect what happened: which tools were called, in what order, with what arguments, and what did they return? Traces are the source of truth for debugging. Use OpenTelemetry GenAI semantic conventions to standardize instrumentation across providers.
+
+## OpenTelemetry GenAI semantic conventions
+
+The spec (https://opentelemetry.io/docs/specs/semconv/gen-ai/) defines standard attributes for LLM and agent spans.
+
+### Root span: LLM completion
+
+```typescript
+import { context, trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("agent");
+
+async function runAgent(prompt: string) {
+  const span = tracer.startSpan("llm.completion", {
+    attributes: {
+      "gen_ai.provider.name": "anthropic",
+      "gen_ai.request.model": "claude-opus-4-7",
+      "gen_ai.input.messages": JSON.stringify([
+        { role: "user", content: prompt }
+      ]),
+      "gen_ai.usage.input_tokens": 150,
+      "gen_ai.usage.output_tokens": 300,
+      "gen_ai.system_instructions": "hash_of_system_prompt",
+    },
+  });
+  
+  try {
+    const response = await callClaude({
+      model: "claude-opus-4-7",
+      messages: [{ role: "user", content: prompt }],
+    });
+    
+    span.setAttributes({
+      "gen_ai.output.messages": JSON.stringify([
+        { role: "assistant", content: response }
+      ]),
+    });
+    
+    return response;
+  } finally {
+    span.end();
+  }
+}
+```
+
+### Tool call span: nested under LLM
+
+```typescript
+async function runAgentWithTools(prompt: string) {
+  const span = tracer.startSpan("agent.run", {
+    attributes: {
+      "gen_ai.provider.name": "anthropic",
+      "gen_ai.request.model": "claude-opus-4-7",
+    },
+  });
+  
+  try {
+    const response = await callClaude({ messages: [...] });
+    
+    // Tool call spans as children
+    for (const toolCall of response.tool_calls) {
+      const toolSpan = tracer.startSpan(`tool.${toolCall.name}`, {
+        parent: span,
+        attributes: {
+          "tool.name": toolCall.name,
+          "tool.arguments": JSON.stringify(toolCall.arguments),
+          "tool.input_tokens": estimateTokens(toolCall.arguments),
+        },
+      });
+      
+      try {
+        const result = await executeTool(toolCall);
+        toolSpan.setAttributes({
+          "tool.output": JSON.stringify(result),
+          "tool.output_tokens": estimateTokens(result),
+        });
+      } finally {
+        toolSpan.end();
+      }
+    }
+    
+    return response;
+  } finally {
+    span.end();
+  }
+}
+```
+
+### Full attribute list
+
+**Core attributes** (on every LLM span):
+- `gen_ai.provider.name` — "anthropic", "openai", "google"
+- `gen_ai.request.model` — e.g., "claude-opus-4-7"
+- `gen_ai.input.messages` — JSON array of messages (or hash if large)
+- `gen_ai.output.messages` — model's response
+- `gen_ai.usage.input_tokens` — prompt tokens
+- `gen_ai.usage.output_tokens` — completion tokens
+- `gen_ai.system_instructions` — hash or summary (never the actual prompt if it contains secrets)
+
+**Optional attributes**:
+- `gen_ai.temperature` — sampling temperature
+- `gen_ai.max_tokens` — max completion length
+- `gen_ai.data_source.id` — if RAG is used, corpus ID
+- `error.type` — if the call failed
+
+**Tool span attributes**:
+- `tool.name` — name of the tool being called
+- `tool.arguments` — serialized arguments
+- `tool.input_tokens` — estimated tokens in call
+- `tool.output` — result from tool execution
+- `tool.output_tokens` — estimated tokens in result
+
+## Instrumentation libraries
+
+### Traceloop SDK
+
+Auto-instruments Claude, OpenAI, Gemini SDK calls:
+
+```typescript
+import * as traceloop from "@traceloop/sdk";
+
+traceloop.initialize({
+  appName: "my-agent",
+  apiKey: process.env.TRACELOOP_API_KEY,
+  exporter: "otlp", // Or "json" for local files
+});
+
+// Automatic instrumentation for Claude SDK
+const client = new Anthropic();
+const response = await client.messages.create({
+  model: "claude-opus-4-7",
+  messages: [{ role: "user", content: "Hello" }],
+});
+// Traceloop automatically sends a span with gen_ai attributes
+```
+
+### OpenLLMetry
+
+Python-first auto-instrumentation:
+
+```bash
+pip install opentelemetry-instrumentation-openai
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+OpenAIInstrumentor().instrument()
+```
+
+For TypeScript, use Traceloop or manual instrumentation.
+
+### Manual instrumentation
+
+For full control, use `@opentelemetry/api`:
+
+```typescript
+import { context, trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("agent");
+
+async function evaluateAgent(task: string) {
+  const span = tracer.startSpan("agent.evaluation", {
+    attributes: {
+      "task.id": task,
+      "task.difficulty": "medium",
+    },
+  });
+  
+  try {
+    const agent = new MyAgent();
+    const result = await agent.run(task);
+    
+    span.setAttributes({
+      "task.completed": result.success,
+      "task.steps": result.steps.length,
+      "task.tokens_used": result.tokensUsed,
+    });
+    
+    return result;
+  } finally {
+    span.end();
+  }
+}
+```
+
+## Exporting traces
+
+Traces must be exported to a backend for storage and querying. Use OTLP (OpenTelemetry Protocol):
+
+```typescript
+import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+
+const exporter = new OTLPTraceExporter({
+  url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318",
+  // Common endpoints:
+  // http://localhost:4318 — local Docker
+  // https://api.langfuse.com/api/v1 — Langfuse Cloud
+  // https://api.arize.com — Arize Phoenix
+});
+
+const provider = new BasicTracerProvider();
+provider.addSpanProcessor(new BatchSpanProcessor(exporter));
+trace.setGlobalTracerProvider(provider);
+```
+
+## Backends
+
+### Langfuse
+
+Managed SaaS backend with trace UI, eval API, cost tracking.
+
+```typescript
+// Initialize with Langfuse exporter
+const exporter = new OTLPTraceExporter({
+  url: "https://api.langfuse.com/api/v1",
+  headers: {
+    Authorization: `Bearer ${process.env.LANGFUSE_API_KEY}`,
+  },
+});
+
+// Traces appear in Langfuse dashboard at https://cloud.langfuse.com
+```
+
+Langfuse docs: https://langfuse.com/
+
+### Arize Phoenix
+
+Open-source, self-hostable OTEL backend. Deploy locally or on cloud.
+
+```bash
+# Run locally
+docker run -p 6006:6006 arizephoenix/phoenix:latest
+
+# Or cloud: https://app.phoenix.arize.com
+```
+
+```typescript
+const exporter = new OTLPTraceExporter({
+  url: "http://localhost:4318", // Local Docker
+});
+```
+
+Phoenix docs: https://arize.com/phoenix
+
+### Braintrust
+
+Braintrust integrates OTEL tracing with its eval platform. Traces from your agent evals are automatically captured.
+
+```typescript
+import * as Braintrust from "braintrust";
+
+await Braintrust.eval({
+  projectName: "my-agent",
+  data: () => dataset.fetch(),
+  task: async (input) => {
+    // Agent runs here
+    // Braintrust captures traces automatically
+    return await agent.run(input);
+  },
+  scores: { quality: scoreQuality },
+});
+
+// View traces in Braintrust UI alongside eval results
+```
+
+## Querying traces for debugging
+
+Once traces are in a backend, query them by attributes:
+
+```typescript
+// Pseudocode for Langfuse query
+const traces = await langfuse.traces.list({
+  filter: {
+    "attributes.gen_ai.provider.name": "anthropic",
+    "attributes.gen_ai.usage.input_tokens": { gte: 1000 },
+  },
+});
+
+// Find all tool calls to delete_user
+const deleteSpans = traces.flatMap(t => 
+  t.spans.filter(s => s.attributes["tool.name"] === "delete_user")
+);
+
+console.log(`Found ${deleteSpans.length} delete_user calls in past 24h`);
+```
+
+## Sampling for cost control
+
+At scale, sampling traces reduces storage and export costs. Sample based on attributes:
+
+```typescript
+import { ParentBasedSampler, TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+
+// Sample 100% of errors, 10% of success
+const sampler = new ParentBasedSampler({
+  root: new TraceIdRatioBasedSampler(0.1), // 10% sampling by default
+});
+
+const provider = new BasicTracerProvider({ sampler });
+
+// Or: sample based on attributes
+const span = tracer.startSpan("llm.completion");
+if (span.recordingEvents()) { // Only record if sampled
+  span.setAttributes({ /* ... */ });
+}
+```
+
+## Relationship to eval metrics
+
+Traces provide raw data; metrics summarize traces.
+
+- **Trace** — Full execution: agent called search_docs, got 5 results, called read_file on 2 of them, summarized output. (Detailed, expensive to store)
+- **Metric** — pass@1=1, tool_f1=0.95, latency_p99=2.3s. (Summarized, cheap to store)
+
+For production monitoring, store metrics. For debugging, query traces. Use `gen_ai` attributes in traces to join with eval metrics:
+
+```
+SELECT count(*) FROM traces WHERE
+  attributes."gen_ai.provider.name" == "anthropic" AND
+  attributes."gen_ai.usage.output_tokens" > 5000
+GROUP BY attributes."gen_ai.request.model"
+```
+
+## Template
+
+Instrumentation template: `/templates/cli-and-evals/otel-genai-instrument.ts` — bootstrap code for Traceloop, manual instrumentation, and OTLP export.
+
+## References
+
+- OpenTelemetry GenAI spec: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+- Langfuse: https://langfuse.com/
+- Arize Phoenix: https://arize.com/phoenix
+- Traceloop: https://www.traceloop.com/
+- OTLP exporter: https://opentelemetry.io/docs/specs/otlp/
+
+## See also
+
+- `/docs/testing/metrics` — computing pass@k from traces
+- `/docs/testing/red-teaming` — detecting attacks in trace logs
+- `/docs/testing/ci-integration` — monitoring evals in CI

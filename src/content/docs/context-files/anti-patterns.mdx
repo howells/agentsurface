@@ -1,0 +1,350 @@
+---
+title: Anti-Patterns
+description: Common mistakes in context file design and how to fix them
+---
+
+## Summary
+
+Seven anti-patterns that cause context file failure: (1) Dumping README (marketing prose doesn't help agents), (2) Marketing copy in LLM-facing files (token waste, no actionable content), (3) One 1500-line file (exhausts token budgets, impossible to maintain), (4) Stale commands (git history shows no recent edits), (5) Duplication across AGENTS.md and CLAUDE.md (update one not the other), (6) No permission boundaries (vague "try not to..."), (7) Generic template language ("This project uses..."). Each includes specific fixes.
+
+- **1. Dumping README**: Commands and boundaries only, link to docs for overview
+- **2. Marketing copy**: Remove "comprehensive platform for...", keep "What it does"
+- **3. One 1500-line file**: Split into root + per-package files (root ~150 lines)
+- **4. Stale commands**: Run in CI, check git log for recent edits
+- **5. Duplication**: CLAUDE.md references AGENTS.md, adds Claude-only content
+- **6. Vague boundaries**: "Always X", "Ask first Y", "Never Z" (not "try not to")
+- **7. Generic templates**: Remove boilerplate, keep specifics to this repo
+
+---
+
+Well-designed context files are invisible—agents read them and work correctly. Poorly-designed files cause confusion, outdated guidance, and wasted agent effort. This page catalogs seven patterns that reliably cause failure.
+
+## 1. Dumping README into AGENTS.md
+
+**Mistake:**
+
+```markdown
+# AGENTS.md
+
+## Project Overview
+
+This is a comprehensive SaaS platform for analytics and business intelligence.
+It provides real-time dashboards, data ingestion pipelines, and user management.
+The architecture uses microservices with message queues and distributed caching.
+We support multiple data sources including Segment, Google Analytics, and custom APIs...
+
+(Two pages of marketing copy and architecture overview)
+```
+
+AGENTS.md is not documentation. It is instructions for agents. Marketing prose does not help agents run commands or understand boundaries.
+
+**Fix:**
+
+```markdown
+# AGENTS.md
+
+SaaS analytics platform: API (Fastify), Web (Next.js), data pipelines.
+
+See docs/ARCHITECTURE.md for full architecture overview.
+
+## Quick Start
+
+...commands...
+
+## Boundaries
+
+...permissions...
+```
+
+Reference deeper docs instead of inlining. Keep AGENTS.md command-focused.
+
+---
+
+## 2. Marketing Copy in LLM-Facing Files
+
+**Mistake:**
+
+```markdown
+# CLAUDE.md
+
+Harness the power of Claude's advanced capabilities to unlock the potential
+of your codebase. With extended thinking and memory, Claude can solve your
+most complex problems...
+```
+
+Agents do not care about marketing. This wastes tokens and confuses intent.
+
+**Fix:**
+
+```markdown
+# CLAUDE.md
+
+See AGENTS.md for core conventions.
+
+## Model
+
+Default: claude-opus-4-7 (complex reasoning)
+Use claude-sonnet-4-6 for: fast iteration
+```
+
+Imperative and direct.
+
+---
+
+## 3. 1500-Line AGENTS.md Files
+
+**Mistake:**
+
+```markdown
+# AGENTS.md
+
+(Exhaustive architecture overview)
+(50 commands documented in prose)
+(30 conventions explained in detail)
+(Complete troubleshooting guide)
+(Full API reference)
+
+Total: 1500 lines
+```
+
+Agents have limited context. A 1500-line file exhausts the token budget, forcing them to drop context or stop reading partway through.
+
+**Fix:**
+
+```markdown
+# AGENTS.md
+
+Overview (1 sentence)
+Commands (10 lines)
+Conventions (10 lines)
+Boundaries (5 lines)
+Links to deeper docs
+
+Total: ~100 lines
+
+→ See docs/ARCHITECTURE.md for detailed design
+→ See docs/API.md for API reference
+→ See CONTRIBUTING.md for contribution guide
+```
+
+Link to deeper docs instead of inlining everything.
+
+---
+
+## 4. Stale Content
+
+**Mistake:**
+
+```markdown
+# AGENTS.md
+
+Commands (verified 2025-06-01):  ← 10+ months stale
+  npm install
+  npm run dev    ← Migrated to pnpm 6 months ago
+  npm test
+
+Framework: Next.js 12  ← Upgraded to 15
+Database: MongoDB      ← Migrated to PostgreSQL
+```
+
+Agents follow outdated instructions. Commands fail, directories don't exist, conventions no longer apply.
+
+**Fix:**
+
+Add verification dates and stale-checking:
+
+```markdown
+# AGENTS.md
+
+Commands (verified 2026-04-17):  ← Recent
+  pnpm dev
+  pnpm test
+  pnpm build
+
+Tech Stack (verified 2026-04-15):
+  TypeScript
+  Next.js 15
+  PostgreSQL
+```
+
+Use `agentify score --dimension=context` to detect stale files automatically.
+
+---
+
+## 5. Duplication Across AGENTS.md, CLAUDE.md, .cursor/rules/
+
+**Mistake:**
+
+```markdown
+# AGENTS.md
+Commands (verified 2026-04-17):
+  pnpm dev
+  pnpm test
+
+# CLAUDE.md
+Commands:
+  pnpm dev       # ← Same commands, duplicated
+  pnpm test
+
+# .cursor/rules/commands.mdc
+Commands:
+  pnpm dev       # ← Same commands, tripled
+  pnpm test
+```
+
+Files drift out of sync. One gets updated; others stay stale. Agents see conflicting guidance.
+
+**Fix:**
+
+Single source of truth. AGENTS.md is canonical; others reference it:
+
+```markdown
+# AGENTS.md
+Commands (verified 2026-04-17):
+  pnpm dev
+  pnpm test
+
+# CLAUDE.md
+See AGENTS.md > Commands.
+
+Claude-specific:
+  - Use claude-opus-4-7 for complex tasks
+
+# .cursor/rules/commands.mdc
+See AGENTS.md > Commands for command reference.
+This file adds Cursor-specific tips.
+```
+
+Update once; all files reference it.
+
+---
+
+## 6. Boundaries Written as Aspirations, Not Rules
+
+**Mistake:**
+
+```markdown
+## Boundaries
+
+We try not to deploy to production directly.
+Usually we ask first before touching the database.
+We generally avoid deleting branches without discussion.
+```
+
+Agents see "we try" and "generally" as soft guidelines, not rules. They may guess that an action is OK, leading to unauthorized changes.
+
+**Fix:**
+
+Rules, not aspirations:
+
+```markdown
+## Boundaries
+
+Always:
+  - Read files
+  - Run tests
+  - Open draft PRs
+
+Ask first:
+  - Install dependencies
+  - Run migrations
+
+Never:
+  - Deploy to production
+  - Rotate credentials
+  - Delete branches
+```
+
+Explicit. Enforceable. No guessing.
+
+---
+
+## 7. Auto-Generated Context Files Nobody Curates
+
+**Mistake:**
+
+```markdown
+# CLAUDE.md
+
+Auto-generated by `/init` command. Last updated 2026-02-01.
+
+(Boilerplate sections with placeholder text)
+
+Model: claude-3-sonnet
+...
+```
+
+If not curated by hand, it accumulates outdated boilerplate. Agents follow generic advice instead of project-specific guidance.
+
+**Fix:**
+
+Hand-curated files, updated as the project evolves:
+
+```markdown
+# CLAUDE.md
+
+See AGENTS.md for core conventions.
+
+## Project-Specific
+
+This codebase has:
+  - Monorepo with 4 packages
+  - Strict TypeScript (no any)
+  - Memory tool for cross-session learnings
+  - Extended thinking for architecture decisions
+```
+
+Write from experience. Update when friction arises.
+
+---
+
+## Checklist
+
+Before committing context files:
+
+- [ ] AGENTS.md `` `<370` `` lines (or split into per-package files)
+- [ ] No marketing copy or verbose prose
+- [ ] All commands verified to work (within last 3 months)
+- [ ] All referenced directories exist
+- [ ] Tech stack versions current
+- [ ] CLAUDE.md references AGENTS.md, not duplicating
+- [ ] Cursor rules and Copilot instructions reference AGENTS.md
+- [ ] Permission boundaries explicit (always/ask/never), not aspirational
+- [ ] Links to deeper docs valid
+- [ ] No auto-generated boilerplate from `/init` without curation
+
+---
+
+## Bonus: Non-Obvious Gotchas Without Code References
+
+**Mistake:**
+
+```markdown
+## Gotchas
+
+- TypeScript requires special handling
+- Node versions can be tricky
+- Linting might fail sometimes
+```
+
+Too vague. Agents don't know what "special handling" or "tricky" means.
+
+**Fix:**
+
+```markdown
+## Gotchas
+
+- TypeScript strict mode enabled (.tsconfig.json); use // @ts-expect-error with comment if needed
+- Node 18.12+ required (enforced in .nvmrc); pnpm install fails with older versions
+- Prettier vs ESLint format conflicts; run pnpm lint --fix to resolve
+```
+
+Specific. Actionable. Reference the file enforcing it.
+
+---
+
+## See also
+
+- `/docs/context-files/agents-md` — proper AGENTS.md structure
+- `/docs/context-files/claude-md` — Claude override patterns
+- `/docs/context-files/drift-detection` — keeping files current

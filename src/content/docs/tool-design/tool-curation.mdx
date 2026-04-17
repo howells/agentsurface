@@ -1,0 +1,391 @@
+---
+title: Tool Curation
+description: Managing tool registries, role-based subsets, and dynamic tool selection
+---
+
+## Summary
+
+Curate task-specific tool subsets from a centralized registry, not monolithic all-at-once loading. An API with 100 endpoints shouldn't show all 100 tools; instead expose read-only set for auditors, mutation set for admins, focused set per workflow. Improves agent reasoning, reduces token cost, enforces permission boundaries. Patterns: role-based subsets (read, write, admin, dangerous categories), dynamic tool selection (BM25 search when >20 tools), pagination (cursor-based list), registry metadata (category, requiresAuth, rateLimit). Avoid tool sprawl: >20 tools hurt agent reasoning.
+
+- **Registry structure**: Metadata (category, auth, rate limit), handler, schema
+- **Subsets**: read-only, mutations, admin, dangerous (role-based)
+- **Dynamic selection**: BM25 when >20 tools exist (don't load all)
+- **Pagination**: Cursor-based for large tool lists
+- **Metadata**: Category, requiresAuth, rateLimit per tool
+- **Anti-pattern**: >20 tools at once (agent reasoning degrades)
+
+---
+
+An API might expose 100 endpoints. An agent should not see all 100 tools at once. Tool curation means curating a task-specific subset: read-only tools for auditors, mutation tools only for admins, a focused set for a specific workflow. This improves agent reasoning, reduces token cost, and enforces permission boundaries.
+
+## Tool Registries
+
+A tool registry is a centralized collection of all available tools with metadata. The agent system queries the registry to build task-specific subsets.
+
+### Registry Structure
+
+```typescript
+// tools/registry.ts
+import { z } from 'zod';
+
+interface ToolMetadata {
+  name: string;
+  description: string;
+  schema: z.ZodSchema;
+  handler: (params: any) => Promise<any>;
+  category: 'read' | 'write' | 'admin' | 'dangerous';
+  requiresAuth: boolean;
+  rateLimit?: { requestsPerMinute: number };
+}
+
+const toolRegistry: Record<string, ToolMetadata> = {
+  search_issues: {
+    name: 'search_issues',
+    description: 'Search for issues by text, assignee, or status...',
+    schema: searchIssuesSchema,
+    handler: searchIssuesHandler,
+    category: 'read',
+    requiresAuth: false,
+  },
+  
+  create_issue: {
+    name: 'create_issue',
+    description: 'Create a new issue in the tracker...',
+    schema: createIssueSchema,
+    handler: createIssueHandler,
+    category: 'write',
+    requiresAuth: true,
+  },
+  
+  delete_issue: {
+    name: 'delete_issue',
+    description: 'Permanently delete an issue (cannot be undone)...',
+    schema: deleteIssueSchema,
+    handler: deleteIssueHandler,
+    category: 'dangerous',
+    requiresAuth: true,
+    rateLimit: { requestsPerMinute: 1 },
+  },
+  
+  // ... more tools
+};
+
+export const getAllTools = () => Object.values(toolRegistry);
+```
+
+### Filtering by Category
+
+```typescript
+export function getToolsByCategory(category: string): ToolMetadata[] {
+  return Object.values(toolRegistry).filter(t => t.category === category);
+}
+
+// Usage
+const readOnlyTools = getToolsByCategory('read');
+const adminTools = getToolsByCategory('admin');
+```
+
+### Filtering by Permission
+
+```typescript
+export function getToolsForUser(userId: string): ToolMetadata[] {
+  const user = await getUserPermissions(userId);
+  
+  return Object.values(toolRegistry).filter(tool => {
+    if (tool.requiresAuth && !user.authenticated) return false;
+    if (tool.category === 'admin' && !user.isAdmin) return false;
+    if (tool.category === 'dangerous' && !user.isDangerousActionsAllowed) return false;
+    return true;
+  });
+}
+```
+
+## Role-Based Tool Kits
+
+Different roles need different tools. Create curated kits per role:
+
+```typescript
+const toolKits = {
+  auditor: {
+    description: 'Read-only access for compliance audits',
+    tools: [
+      'search_issues',
+      'get_issue',
+      'list_users',
+      'get_user',
+      'search_audit_logs',
+    ],
+  },
+  
+  developer: {
+    description: 'Create and update issues, code review workflows',
+    tools: [
+      'search_issues',
+      'create_issue',
+      'update_issue',
+      'search_pull_requests',
+      'create_pull_request',
+      'approve_pull_request',
+      'search_docs',
+    ],
+  },
+  
+  admin: {
+    description: 'Full access including dangerous operations',
+    tools: [
+      // All tools
+      ...Object.keys(toolRegistry),
+    ],
+  },
+};
+
+export function getToolKitForRole(role: string): ToolMetadata[] {
+  const kit = toolKits[role];
+  if (!kit) throw new Error(`Unknown role: ${role}`);
+  
+  return kit.tools
+    .map(name => toolRegistry[name])
+    .filter(t => t !== undefined);
+}
+```
+
+## Dynamic Tool Selection
+
+When a tool registry has >20 tools, do not load all tools into context at once. Use dynamic selection to load only the relevant tools for the current task.
+
+### BM25 Search (Anthropic Pattern)
+
+```typescript
+import { bm25Search } from '@anthropic-ai/sdk/utils';
+
+async function selectRelevantTools(
+  userQuery: string,
+  allTools: ToolMetadata[],
+  topK: number = 5
+): Promise<ToolMetadata[]> {
+  const scored = bm25Search(userQuery, allTools, {
+    topK,
+    fields: {
+      name: { boost: 2 },      // Tool name is most important
+      description: { boost: 1 },
+    },
+  });
+  
+  return scored;
+}
+
+// Usage
+const userQuery = 'Find all open bugs assigned to alice';
+const relevant = await selectRelevantTools(userQuery, getAllTools());
+
+const response = await query({
+  prompt: userQuery,
+  tools: relevant.map(t => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: zodToJsonSchema(t.schema),
+    execute: t.handler,
+  })),
+});
+```
+
+### Keyword-Based Selection
+
+Simple approach for explicit categories:
+
+```typescript
+function selectToolsByKeywords(
+  userQuery: string,
+  allTools: ToolMetadata[]
+): ToolMetadata[] {
+  const keywords = userQuery.toLowerCase().split(/\s+/);
+  
+  return allTools.filter(tool => {
+    const toolText = `${tool.name} ${tool.description}`.toLowerCase();
+    return keywords.some(kw => toolText.includes(kw));
+  });
+}
+```
+
+### Active Tools (Vercel AI SDK)
+
+```typescript
+const allTools = [...];
+
+const result = await generateText({
+  model,
+  tools: allTools,
+  activeTools: ['search_issues', 'create_issue'],  // Only these are loaded
+  prompt: userMessage
+});
+```
+
+## Read-Only vs Mutating Kits
+
+Distinguish safe (read) from risky (write) tools:
+
+```typescript
+export const readOnlyKit = {
+  description: 'Safe read operations for audit and discovery',
+  tools: Object.values(toolRegistry)
+    .filter(t => t.category === 'read')
+    .map(t => t.name),
+};
+
+export const mutatingKit = {
+  description: 'All read and write operations',
+  tools: Object.values(toolRegistry)
+    .filter(t => ['read', 'write'].includes(t.category))
+    .map(t => t.name),
+};
+
+export const dangerousKit = {
+  description: 'Full access including destructive operations',
+  tools: Object.keys(toolRegistry),
+};
+```
+
+Usage:
+
+```typescript
+// Audit agent — read-only
+const auditAgent = agent({
+  tools: readOnlyKit.tools.map(name => toolRegistry[name]),
+  model: 'claude-sonnet-4-6',
+});
+
+// Data migration — read + write
+const migrationAgent = agent({
+  tools: mutatingKit.tools.map(name => toolRegistry[name]),
+  model: 'claude-opus-4-7',
+  requiresHumanApproval: true,
+});
+
+// Admin — dangerous operations (requires approval)
+const adminAgent = agent({
+  tools: dangerousKit.tools.map(name => toolRegistry[name]),
+  model: 'claude-opus-4-7',
+  requiresHumanApproval: (toolName) => 
+    toolRegistry[toolName].category === 'dangerous',
+});
+```
+
+## Tool Deprecation and Evolution
+
+Tag tools with stability metadata:
+
+```typescript
+interface ToolMetadata {
+  name: string;
+  // ... other fields
+  stability: 'stable' | 'beta' | 'deprecated';
+  deprecatedAt?: Date;
+  replacedBy?: string;  // Name of successor tool
+}
+
+export function selectToolsForProduction(
+  allTools: ToolMetadata[]
+): ToolMetadata[] {
+  return allTools.filter(t => t.stability === 'stable');
+}
+
+export function selectToolsForBeta(
+  allTools: ToolMetadata[]
+): ToolMetadata[] {
+  return allTools.filter(t => 
+    t.stability === 'stable' || t.stability === 'beta'
+  );
+}
+```
+
+In descriptions, note deprecated tools:
+
+```typescript
+deprecated_search_issues: {
+  description: 'DEPRECATED: Use `search_issues` instead (supports more filters). ' +
+    'This tool will be removed 2026-06-01.',
+  // ...
+},
+```
+
+## Tool Discoverability
+
+Help users find the right tool:
+
+```typescript
+export function listToolsByPurpose(purpose: string): ToolMetadata[] {
+  const descriptions = Object.values(toolRegistry)
+    .map(t => ({ ...t, relevance: t.description.includes(purpose) ? 1 : 0 }))
+    .sort((a, b) => b.relevance - a.relevance);
+  
+  return descriptions
+    .filter(t => t.relevance > 0)
+    .map(({ relevance, ...t }) => t);
+}
+
+// Usage
+listToolsByPurpose('search')      // Returns search_* tools
+listToolsByPurpose('delete')      // Returns delete_* tools
+listToolsByPurpose('notification') // Returns notify_* tools
+```
+
+## Rate Limiting at the Registry Level
+
+Track tool call counts to enforce rate limits:
+
+```typescript
+const toolCallCounts = new Map<string, number>();
+const resetInterval = 60000; // 1 minute
+
+setInterval(() => {
+  toolCallCounts.clear();
+}, resetInterval);
+
+async function executeToolWithRateLimit(
+  toolName: string,
+  params: any
+): Promise<any> {
+  const tool = toolRegistry[toolName];
+  if (!tool) throw new Error(`Unknown tool: ${toolName}`);
+  
+  if (tool.rateLimit) {
+    const count = toolCallCounts.get(toolName) || 0;
+    if (count >= tool.rateLimit.requestsPerMinute) {
+      return {
+        isError: true,
+        content: [{
+          type: 'text',
+          text: `Rate limit exceeded: ${tool.rateLimit.requestsPerMinute} calls per minute max.`,
+        }],
+      };
+    }
+    toolCallCounts.set(toolName, count + 1);
+  }
+  
+  return await tool.handler(params);
+}
+```
+
+## Project Layout
+
+```
+src/
+├── tools/
+│   ├── registry.ts           # All tool metadata
+│   ├── kits.ts               # Role-based subsets
+│   ├── selection.ts          # Dynamic selection logic
+│   └── handlers/
+│       ├── search.ts
+│       ├── create.ts
+│       └── ...
+└── test/
+    ├── registry.test.ts      # Kit selection tests
+    └── selection.test.ts     # BM25 search tests
+```
+
+## See also
+
+- `/docs/tool-design/cross-framework-portability` — adapting registry tools to frameworks
+- `/templates/tools-and-orchestration/tool-registry.ts` — starter template
+- ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))

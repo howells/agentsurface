@@ -1,0 +1,505 @@
+---
+title: Scorecard Format
+description: JSON schema and TypeScript Zod schema for agentify scorecards
+---
+
+## Summary
+
+Machine-readable scorecard format (JSON + TypeScript Zod schema) capturing project metadata, dimension scores (0–3 + confidence level), evidence (file paths, grep, command output), findings (structured gaps + recommendations), overall rating (Human-only to Agent-first), and trend comparison to previous scorecard. Standard format enables tool consumption, historical tracking, and cross-project benchmarking. Includes full Zod schema for validation.
+
+- **Metadata**: Project name, date, repository, audit scope
+- **Dimension scores**: 0–3 per dimension, confidence (high/medium/low)
+- **Evidence**: File paths, grep results, command output, glob findings
+- **Findings**: Structured gaps with severity, file reference, fix steps
+- **Overall rating**: 0–30 scale mapped to human-readable band
+- **Trend**: Delta from previous scorecard (if re-audit)
+
+---
+
+Agentify emits structured scorecards as JSON. This page documents the schema, provides a TypeScript/Zod definition, and shows a worked example.
+
+## Schema Overview
+
+A scorecard captures:
+
+- **Project metadata** (name, date, repository)
+- **Dimension scores** (0/1/2/3 and confidence)
+- **Evidence** (file paths, grep results, command outputs)
+- **Findings** (structured gaps and recommendations)
+- **Overall rating** (human-only to agent-first)
+- **Trend** (comparison to previous scorecard)
+
+## TypeScript Zod Schema
+
+```typescript
+import { z } from 'zod';
+
+const DimensionName = z.enum([
+  'api-surface',
+  'cli-design',
+  'mcp-server',
+  'discovery-aeo',
+  'authentication',
+  'error-handling',
+  'tool-design',
+  'context-files',
+  'multi-agent',
+  'testing-evaluation',
+]);
+
+const ConfidenceLevel = z.enum(['high', 'medium', 'low']);
+
+const EvidenceItem = z.object({
+  type: z.enum(['file', 'grep', 'glob', 'command']),
+  description: z.string(),
+  location: z.string().describe('File path, grep pattern, glob pattern, or command'),
+  result: z.string().describe('Quoted output or finding'),
+});
+
+const Finding = z.object({
+  what: z.string().describe('Specific issue with file:line reference'),
+  why: z.string().describe('Why this matters for agent consumption'),
+  fix: z.string().describe('Concrete steps to resolve'),
+  dimension: DimensionName,
+  currentScore: z.number().int().min(0).max(3),
+  targetScore: z.number().int().min(0).max(3),
+  severity: z.enum(['critical', 'high', 'medium', 'low']),
+});
+
+const FindingCluster = z.object({
+  name: z.string().describe('Descriptive cluster name'),
+  rationale: z.string().describe('Why these findings belong together'),
+  findings: z.array(Finding),
+  suggestedApproach: z.string().describe('1-2 sentences on how to tackle'),
+  dependencies: z.array(z.string()).describe('Other cluster names to complete first'),
+});
+
+const Dimension = z.object({
+  name: DimensionName,
+  score: z.number().int().min(0).max(3).nullable().describe('null if N/A'),
+  confidence: ConfidenceLevel.nullable().describe('null if N/A'),
+  evidence: z.array(EvidenceItem),
+  findings: z.array(z.string()).describe('Finding IDs referencing FindingCluster.findings'),
+  notes: z.string().optional(),
+});
+
+const OverallRating = z.enum([
+  'human-only',
+  'agent-tolerant',
+  'agent-ready',
+  'agent-first',
+]);
+
+const Scorecard = z.object({
+  version: z.literal('1.0'),
+  project: z.object({
+    name: z.string(),
+    repository: z.string().url().optional(),
+    description: z.string().optional(),
+  }),
+  date: z.string().datetime().describe('ISO 8601, e.g., 2026-04-17T15:30:00Z'),
+  auditor: z.string().optional(),
+  dimensions: z.array(Dimension).length(10),
+  findingClusters: z.array(FindingCluster),
+  overall: z.object({
+    totalScore: z.number().int().min(0).max(30),
+    scaledScore: z.number().int().min(0).max(30).describe('Scaled if dimensions are N/A'),
+    rating: OverallRating,
+    percentile: z.number().min(0).max(100).optional(),
+  }),
+  trend: z.object({
+    previousDate: z.string().datetime().optional(),
+    previousScore: z.number().int().optional(),
+    delta: z.number().int().optional(),
+    status: z.enum(['improved', 'stable', 'regressed']).optional(),
+  }).optional(),
+});
+
+export type Scorecard = z.infer<typeof Scorecard>;
+```
+
+## Example Scorecard
+
+```json
+{
+  "version": "1.0",
+  "project": {
+    "name": "acme-api",
+    "repository": "https://github.com/acme/api",
+    "description": "Customer-facing REST API for SaaS platform"
+  },
+  "date": "2026-04-17T15:30:00Z",
+  "auditor": "agentify-cli@1.2.0",
+  "dimensions": [
+    {
+      "name": "api-surface",
+      "score": 2,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "OpenAPI spec exists",
+          "location": "docs/api/openapi.yaml",
+          "result": "40 endpoints, operationId on 38 (95%), descriptions 30-50 words"
+        },
+        {
+          "type": "grep",
+          "description": "Agent-oriented descriptions",
+          "location": "grep -A 2 'description:' docs/api/openapi.yaml",
+          "result": "Sample: 'Search for users by email. Use when you need to find user records.' (agent context present)"
+        },
+        {
+          "type": "grep",
+          "description": "Arazzo workflows",
+          "location": "grep -r 'Arazzo\\|x-action' docs/",
+          "result": "0 matches. No workflow definitions."
+        }
+      ],
+      "findings": ["api-missing-arazzo"],
+      "notes": "OpenAPI is well-documented with agent-oriented descriptions. Missing Arazzo workflows prevent multi-step operation definition."
+    },
+    {
+      "name": "cli-design",
+      "score": null,
+      "confidence": null,
+      "evidence": [],
+      "findings": [],
+      "notes": "N/A: Project is a web API with no CLI tool"
+    },
+    {
+      "name": "mcp-server",
+      "score": 0,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "glob",
+          "description": "MCP server config",
+          "location": "glob('**/.mcp.json')",
+          "result": "0 files"
+        },
+        {
+          "type": "grep",
+          "description": "MCP SDK imports",
+          "location": "grep -r '@modelcontextprotocol/sdk' .",
+          "result": "0 matches"
+        }
+      ],
+      "findings": ["mcp-not-implemented"],
+      "notes": "No MCP server. Project could expose tools to agents via MCP."
+    },
+    {
+      "name": "discovery-aeo",
+      "score": 1,
+      "confidence": "medium",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "AGENTS.md",
+          "location": "AGENTS.md (repo root)",
+          "result": "45 lines, covers commands and conventions"
+        },
+        {
+          "type": "glob",
+          "description": "Discovery files",
+          "location": "glob('**/llms.txt')",
+          "result": "0 files"
+        },
+        {
+          "type": "grep",
+          "description": "JSON-LD markup",
+          "location": "grep -r 'application/ld+json' docs/",
+          "result": "0 matches"
+        }
+      ],
+      "findings": ["discovery-llms-txt-missing", "discovery-json-ld-missing"],
+      "notes": "AGENTS.md present but minimal. No llms.txt or structured data for agent discovery."
+    },
+    {
+      "name": "authentication",
+      "score": 2,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "OAuth config",
+          "location": "src/auth/oauth.ts:10–45",
+          "result": "Client credentials grant implemented. Token expires in 1 hour."
+        },
+        {
+          "type": "grep",
+          "description": "JWT validation",
+          "location": "grep -A 5 'verify' src/auth/jwt.ts",
+          "result": "Validates signature, iss, aud, exp claims"
+        },
+        {
+          "type": "grep",
+          "description": "Token exchange (RFC 8693)",
+          "location": "grep -r 'token-exchange\\|RFC 8693' src/",
+          "result": "0 matches"
+        }
+      ],
+      "findings": ["auth-missing-token-exchange"],
+      "notes": "OAuth 2.1 M2M with scoped tokens. Missing RFC 8693 Token Exchange for narrowly-scoped ephemeral tokens."
+    },
+    {
+      "name": "error-handling",
+      "score": 2,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "Error middleware",
+          "location": "src/middleware/errors.ts:50–80",
+          "result": "Returns RFC 7807 Problem Details: { type, title, status, detail, instance }"
+        },
+        {
+          "type": "grep",
+          "description": "is_retriable field",
+          "location": "grep -r 'is_retriable\\|isRetriable' src/",
+          "result": "4 matches in error handler (not complete across all errors)"
+        },
+        {
+          "type": "command",
+          "description": "Error response test",
+          "location": "curl -s http://localhost:3000/api/users/invalid -H 'Accept: application/json'",
+          "result": "{ type: 'https://api.example.com/errors/not-found', title: 'Not Found', status: 404, detail: 'User ID not valid', is_retriable: false }"
+        }
+      ],
+      "findings": ["error-missing-suggestions", "error-incomplete-retriable"],
+      "notes": "RFC 7807 implemented. is_retriable present but not on all error types. Missing suggestions array and doc_uri."
+    },
+    {
+      "name": "tool-design",
+      "score": 1,
+      "confidence": "medium",
+      "evidence": [
+        {
+          "type": "glob",
+          "description": "Tool definitions",
+          "location": "glob('**/tools/**')",
+          "result": "tools/ directory found with 6 tool files"
+        },
+        {
+          "type": "file",
+          "description": "Tool descriptions",
+          "location": "tools/search-users.ts:1–20",
+          "result": "Description: 'Search for users' (3 words, no agent context)"
+        },
+        {
+          "type": "grep",
+          "description": "toModelOutput",
+          "location": "grep -r 'toModelOutput' tools/",
+          "result": "0 matches"
+        }
+      ],
+      "findings": ["tools-weak-descriptions", "tools-no-token-optimization"],
+      "notes": "Basic tool schemas exist but descriptions lack 'use when' context and disambiguation. No token optimization."
+    },
+    {
+      "name": "context-files",
+      "score": 2,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "AGENTS.md quality",
+          "location": "AGENTS.md",
+          "result": "Commands section present with exact invocations. Permission boundaries defined (always/ask-first/never). 45 lines."
+        },
+        {
+          "type": "file",
+          "description": "CLAUDE.md presence",
+          "location": "CLAUDE.md",
+          "result": "Not found"
+        },
+        {
+          "type": "grep",
+          "description": "Cursor rules",
+          "location": "glob('**/.cursor/rules/**')",
+          "result": "0 files"
+        }
+      ],
+      "findings": ["context-multi-tool-missing"],
+      "notes": "Good AGENTS.md. Missing Claude-specific and Cursor-specific overrides for multi-tool context."
+    },
+    {
+      "name": "multi-agent",
+      "score": null,
+      "confidence": null,
+      "evidence": [],
+      "findings": [],
+      "notes": "N/A: Project is a web API, not an agent system"
+    },
+    {
+      "name": "testing-evaluation",
+      "score": 1,
+      "confidence": "medium",
+      "evidence": [
+        {
+          "type": "glob",
+          "description": "Test files",
+          "location": "glob('**/*.test.ts')",
+          "result": "8 test files found"
+        },
+        {
+          "type": "grep",
+          "description": "MCP server tests",
+          "location": "grep -r 'InMemoryTransport' tests/",
+          "result": "0 matches (no MCP server to test)"
+        },
+        {
+          "type": "grep",
+          "description": "Error recovery tests",
+          "location": "grep -r 'isRetriable\\|retry' tests/",
+          "result": "2 matches (minimal coverage)"
+        },
+        {
+          "type": "command",
+          "description": "Test suite run",
+          "location": "npm test -- --coverage",
+          "result": "42 tests, 81% coverage. No error recovery or multi-step flow tests."
+        }
+      ],
+      "findings": ["testing-error-recovery-missing", "testing-multi-step-missing"],
+      "notes": "Basic tests exist but no agent-specific evaluation. Missing error recovery and multi-step flow testing."
+    }
+  ],
+  "findingClusters": [
+    {
+      "name": "Agent tool discoverability",
+      "rationale": "Agents struggle to find and understand tools because OpenAPI descriptions lack agent context and no MCP server exists.",
+      "findings": [
+        {
+          "what": "tools/search-users.ts:1–20: Tool descriptions are terse (3 words) with no 'use when' context",
+          "why": "Agents use tool descriptions as prompts. Terse descriptions lead to incorrect tool selection.",
+          "fix": "Rewrite descriptions to include: when to use, when NOT to use, required parameters, return type. Target 30-50 words.",
+          "dimension": "tool-design",
+          "currentScore": 1,
+          "targetScore": 2,
+          "severity": "high"
+        },
+        {
+          "what": "mcp-server: 0 files matching **/.mcp.json (no MCP server exists)",
+          "why": "Agents consume MCP servers to discover tools. Without MCP, agents must rely on API docs or CLI help.",
+          "fix": "Create .mcp.json and MCP server implementation. Expose 6 existing tools via MCP. Use InMemoryTransport for testing.",
+          "dimension": "mcp-server",
+          "currentScore": 0,
+          "targetScore": 2,
+          "severity": "critical"
+        },
+        {
+          "what": "llms.txt missing from web root",
+          "why": "Agent web crawlers look for llms.txt to understand project scope and API surface. Without it, discovery is harder.",
+          "fix": "Create llms.txt at project root with H2 sections for API, CLI, tools, and links to key docs.",
+          "dimension": "discovery-aeo",
+          "currentScore": 1,
+          "targetScore": 2,
+          "severity": "medium"
+        }
+      ],
+      "suggestedApproach": "Start with tool descriptions (1 hour). Add MCP server (4 hours). Add llms.txt (30 min). This cluster improves tool discoverability score from 1→2 across three dimensions.",
+      "dependencies": []
+    },
+    {
+      "name": "Error recovery for agents",
+      "rationale": "Agents cannot recover from errors because error responses lack suggestions, complete is_retriable markers, and doc_uri links.",
+      "findings": [
+        {
+          "what": "src/middleware/errors.ts: is_retriable present on ~50% of error types, missing on validation errors",
+          "why": "Agents need to know which errors are retriable. Partial implementation leaves ambiguity.",
+          "fix": "Add is_retriable to all error handlers. Validation errors are not retriable. Rate limit 429 is retriable.",
+          "dimension": "error-handling",
+          "currentScore": 2,
+          "targetScore": 3,
+          "severity": "high"
+        },
+        {
+          "what": "Error responses lack suggestions array (e.g., 'retry after 5s', 'increase timeout')",
+          "why": "Agents use suggestions to decide next steps. Without them, agents may retry immediately or give up.",
+          "fix": "Add suggestions[] array to error schema. Examples: rate limit 429 → ['wait 60s', 'reduce request size'].",
+          "dimension": "error-handling",
+          "currentScore": 2,
+          "targetScore": 3,
+          "severity": "high"
+        },
+        {
+          "what": "tests/: No error recovery tests. grep 'retry' returns 2 matches (minimal).",
+          "why": "Without tests, error recovery logic regresses. Agents depend on consistent behavior.",
+          "fix": "Add tests for: rate limit → retry, validation error → no retry, timeout → retry. Cover multi-step recovery.",
+          "dimension": "testing-evaluation",
+          "currentScore": 1,
+          "targetScore": 2,
+          "severity": "medium"
+        }
+      ],
+      "suggestedApproach": "Update error schema (1 hour). Add suggestions logic (1 hour). Write recovery tests (2 hours). Total: 4 hours.",
+      "dependencies": []
+    }
+  ],
+  "overall": {
+    "totalScore": 11,
+    "scaledScore": 14,
+    "rating": "agent-tolerant",
+    "percentile": 35
+  },
+  "trend": {
+    "previousDate": "2026-03-15T10:00:00Z",
+    "previousScore": 8,
+    "delta": 3,
+    "status": "improved"
+  }
+}
+```
+
+## Parsing the Scorecard in Code
+
+```typescript
+import { Scorecard } from './scorecard-schema';
+
+async function loadScorecard(filePath: string): Promise<Scorecard> {
+  const raw = await Deno.readTextFile(filePath);
+  const json = JSON.parse(raw);
+  return Scorecard.parse(json); // Zod validation
+}
+
+function displaySummary(scorecard: Scorecard): void {
+  const { overall, project } = scorecard;
+  console.log(`
+Project: ${project.name}
+Date: ${scorecard.date}
+Rating: ${overall.rating} (${overall.scaledScore}/30)
+
+Scores:
+${scorecard.dimensions
+  .filter((d) => d.score !== null)
+  .map((d) => `  ${d.name}: ${d.score}/3 (${d.confidence})`)
+  .join('\n')}
+  `);
+}
+
+function findHighSeverityIssues(scorecard: Scorecard): Finding[] {
+  return scorecard.findingClusters
+    .flatMap((cluster) => cluster.findings)
+    .filter((f) => f.severity === 'critical' || f.severity === 'high')
+    .sort((a, b) => {
+      const severity = { critical: 3, high: 2, medium: 1, low: 0 };
+      return severity[b.severity] - severity[a.severity];
+    });
+}
+```
+
+## Storage & Versioning
+
+Scorecards are stored in the audited project:
+
+```
+docs/agentify/scorecard-[YYYY-MM-DD].json  # Versioned snapshots
+docs/agentify/scorecard-latest.json        # Current snapshot (symlink or copy)
+docs/agentify/history.md                   # Human-readable changelog
+```
+
+Store version history in git so you can track trends over time:
+
+```bash
+git log docs/agentify/scorecard-*.json
+```

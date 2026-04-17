@@ -1,0 +1,307 @@
+---
+title: Metrics for Agent Evaluation
+description: Defining pass@k, tool-routing accuracy, schema conformance, and other quantitative measures
+---
+
+## Summary
+
+Quantitative measures that bridge "the agent works" and "the agent reliably solves production tasks." Covers pass@k (at least one of k trials succeeds) and pass^k (all k trials succeed) for non-determinism, tool-routing accuracy (F1 score), schema conformance (does output match spec), trajectory correctness (did agent take the right steps), and latency metrics. Core insight: agent metrics capture multi-step execution and failure modes invisible to unit tests.
+
+- **pass@k**: At least one of k attempts succeeds (capability)
+- **pass^k**: All k attempts succeed (consistency/reliability)
+- **Tool-routing F1**: Precision and recall of correct tool selection
+- **Schema conformance**: Output conforms to declared type/structure
+- **Trajectory correctness**: Agent steps in right order, correct tool params
+- **Latency & token**: Cost efficiency, speed benchmarks
+
+---
+
+Agent metrics bridge the gap between "the agent works" and "the agent reliably solves production tasks." Unlike LLM benchmarks that measure a single forward pass, agent metrics capture multi-step execution, non-determinism, and failure modes that are invisible to unit tests.
+
+## Core metrics
+
+### pass@k and pass^k
+
+These metrics measure agent capability and consistency under non-determinism.
+
+**pass@k** is the probability that at least one of k attempts succeeds. Use this when a single success demonstrates the agent is capable of the task.
+
+```typescript
+// Calculate pass@k given k independent trials
+function calculatePassAtK(results: boolean[], k: number): number {
+  if (results.length < k) {
+    throw new Error(`Need at least ${k} trials, got ${results.length}`);
+  }
+  
+  const successCount = results.slice(0, k).filter(r => r).length;
+  return successCount > 0 ? 1 : 0; // 1 if any pass, 0 if all fail
+}
+
+// Example: k=1..10
+const trials = [true, false, true, false, true, false, false, false, false, false];
+for (let k = 1; k <= 10; k++) {
+  console.log(`pass@${k}: ${calculatePassAtK(trials, k)}`);
+}
+// pass@1: 1 (first trial succeeded)
+// pass@2: 1 (at least one of first two succeeded)
+// pass@3: 1
+// ...
+// pass@10: 1 (at least one of all 10 succeeded)
+```
+
+**pass^k** (pass-caret-k) is the probability that all k attempts succeed. Use this when consistency is required — every execution must work.
+
+```typescript
+function calculatePassCaretK(results: boolean[], k: number): number {
+  if (results.length < k) {
+    throw new Error(`Need at least ${k} trials, got ${results.length}`);
+  }
+  
+  return results.slice(0, k).every(r => r) ? 1 : 0; // 1 only if all pass
+}
+
+// Same trials as above
+for (let k = 1; k <= 10; k++) {
+  console.log(`pass^${k}: ${calculatePassCaretK(trials, k)}`);
+}
+// pass^1: 1 (first trial succeeded)
+// pass^2: 0 (second trial failed, so not all succeeded)
+// pass^3: 0
+// ...
+// pass^10: 0 (many later trials failed)
+```
+
+For production agents, aim for pass@1 close to pass@k. A gap between these means the agent is "lucky" on some runs — reliable systems have consistent success, not just possible success.
+
+### Tool-routing accuracy
+
+The fraction of tool calls where the agent selected the correct tool for its intent. Measured as precision and recall (F1).
+
+```typescript
+interface ToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+function calculateToolF1(
+  expected: string[],
+  actual: string[]
+): { precision: number; recall: number; f1: number } {
+  const expectedSet = new Set(expected);
+  const actualSet = new Set(actual);
+  
+  const truePositives = Array.from(actualSet).filter(t => expectedSet.has(t)).length;
+  const falsePositives = Array.from(actualSet).filter(t => !expectedSet.has(t)).length;
+  const falseNegatives = Array.from(expectedSet).filter(t => !actualSet.has(t)).length;
+  
+  const precision = (truePositives + falsePositives === 0) 
+    ? 1 
+    : truePositives / (truePositives + falsePositives);
+  
+  const recall = (truePositives + falseNegatives === 0)
+    ? 1
+    : truePositives / (truePositives + falseNegatives);
+  
+  const f1 = (precision + recall === 0) 
+    ? 0 
+    : 2 * (precision * recall) / (precision + recall);
+  
+  return { precision, recall, f1 };
+}
+
+// Example
+const expected = ["search_docs", "read_file", "summarize"];
+const actual = ["search_docs", "search_docs", "read_file", "summarize"];
+const { f1 } = calculateToolF1(expected, actual);
+console.log(`Tool F1: ${f1.toFixed(2)}`); // 1.00 (all expected tools used, minor repetition)
+```
+
+### Schema conformance rate
+
+Fraction of tool calls where all required parameters are present and correctly typed. Measured by validating against the tool's JSON schema.
+
+```typescript
+interface ToolSchema {
+  properties: Record<string, { type: string }>;
+  required: string[];
+}
+
+function conformanceRate(
+  calls: ToolCall[],
+  schemas: Record<string, ToolSchema>
+): number {
+  let conformant = 0;
+  
+  for (const call of calls) {
+    const schema = schemas[call.name];
+    if (!schema) continue;
+    
+    // Check required fields
+    const hasAllRequired = schema.required.every(
+      field => call.arguments[field] !== undefined
+    );
+    
+    // Check types
+    const typesCorrect = Object.entries(call.arguments).every(
+      ([key, value]) => {
+        const spec = schema.properties[key];
+        if (!spec) return false; // Unknown field
+        
+        const actualType = typeof value;
+        return (spec.type === actualType) || 
+               (spec.type === "number" && actualType === "number");
+      }
+    );
+    
+    if (hasAllRequired && typesCorrect) {
+      conformant++;
+    }
+  }
+  
+  return calls.length > 0 ? conformant / calls.length : 1;
+}
+```
+
+### Mean time to recovery (MTTR)
+
+For agents that retry on failure, MTTR measures how many attempts it takes to recover after a transient error (rate limit, timeout, service unavailable).
+
+```typescript
+interface Attempt {
+  timestamp: number;
+  success: boolean;
+  error?: string;
+}
+
+function mttr(attempts: Attempt[]): number {
+  let totalRecoverySteps = 0;
+  let recoveryCount = 0;
+  let failureStart: number | null = null;
+  
+  for (let i = 0; i < attempts.length; i++) {
+    if (!attempts[i].success) {
+      if (failureStart === null) {
+        failureStart = i;
+      }
+    } else if (failureStart !== null) {
+      totalRecoverySteps += i - failureStart;
+      recoveryCount++;
+      failureStart = null;
+    }
+  }
+  
+  return recoveryCount > 0 ? totalRecoverySteps / recoveryCount : 0;
+}
+
+// Example: agent failed, retried, succeeded after 2 more attempts
+const attempts = [
+  { timestamp: 1, success: false },
+  { timestamp: 2, success: false },
+  { timestamp: 3, success: true },
+];
+console.log(`MTTR: ${mttr(attempts)} steps`); // 2
+```
+
+### Hallucination rate
+
+Fraction of tool calls where the agent invoked a tool that does not exist or passed arguments that violate the schema. Hallucinations indicate the agent's reasoning has diverged from the actual tool definitions.
+
+```typescript
+function hallucinationRate(
+  calls: ToolCall[],
+  availableTools: Set<string>,
+  schemas: Record<string, ToolSchema>
+): number {
+  let hallucinations = 0;
+  
+  for (const call of calls) {
+    // Non-existent tool
+    if (!availableTools.has(call.name)) {
+      hallucinations++;
+      continue;
+    }
+    
+    // Invalid schema
+    const schema = schemas[call.name];
+    const missingRequired = schema.required.some(
+      f => call.arguments[f] === undefined
+    );
+    
+    if (missingRequired) {
+      hallucinations++;
+    }
+  }
+  
+  return calls.length > 0 ? hallucinations / calls.length : 0;
+}
+
+const tools = new Set(["search", "read_file", "write_file"]);
+const badCalls = [
+  { name: "search", arguments: { q: "test" } },
+  { name: "delete_file", arguments: {} }, // Doesn't exist!
+  { name: "read_file", arguments: {} }, // Missing required 'path'
+];
+
+console.log(`Hallucination rate: ${hallucinationRate(badCalls, tools, schemas).toFixed(2)}`);
+// 0.67 (2 of 3 are hallucinations)
+```
+
+## Composite metrics
+
+### Cost per task
+
+Total API cost divided by successful tasks completed. Accounts for retries, LLM-as-judge costs, and model selection.
+
+```typescript
+interface TaskExecution {
+  success: boolean;
+  tokenCost: number; // Sum of input + output token costs
+  judgeCost?: number; // LLM-as-judge cost if applicable
+}
+
+function costPerTask(executions: TaskExecution[]): number {
+  const successful = executions.filter(e => e.success).length;
+  const totalCost = executions.reduce((sum, e) => 
+    sum + e.tokenCost + (e.judgeCost ?? 0), 0
+  );
+  
+  return successful > 0 ? totalCost / successful : Infinity;
+}
+```
+
+### Latency percentiles
+
+End-to-end latency for task completion, reported as p50, p95, p99.
+
+```typescript
+function percentile(values: number[], p: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil((p / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, index)];
+}
+
+const latencies = [100, 200, 250, 300, 500, 1000, 1500, 2000];
+console.log(`p50: ${percentile(latencies, 50)}ms`);
+console.log(`p95: ${percentile(latencies, 95)}ms`);
+console.log(`p99: ${percentile(latencies, 99)}ms`);
+```
+
+## When to measure what
+
+- **Capability evals** — use pass@k, F1, schema conformance to benchmark agent ability on new features
+- **Regression evals** — use pass@1 (or pass^5 for critical systems) to detect breakage in CI
+- **Production monitoring** — track pass@1, MTTR, cost, hallucination rate in real time
+- **Debugging** — capture full traces with tool-routing accuracy and parameter details to understand failure modes
+
+See [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for how to instrument code to collect these metrics.
+
+## References
+
+- Cite [Anthropic's demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) for pass@k / pass^k definitions
+- [OpenAI HumanEval](https://github.com/openai/human-eval) introduced pass@k as the standard metric for code generation
+
+## See also
+
+- `/docs/testing/evaluation-framework` — dataset and grader design
+- `/docs/testing/llm-as-judge` — calibrating judge models for hallucination detection
+- `/docs/testing/observability` — instrument agents to collect metrics

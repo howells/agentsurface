@@ -1,0 +1,16 @@
+{
+  "title": "MCP Servers",
+  "pages": [
+    "index",
+    "architecture",
+    "tool-best-practices",
+    "resources-prompts",
+    "transports",
+    "authentication",
+    "annotations",
+    "testing",
+    "nextjs-integration",
+    "auto-generation",
+    "real-world-examples"
+  ]
+}

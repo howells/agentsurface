@@ -1,0 +1,302 @@
+---
+title: Token Exchange
+description: RFC 8693 narrowing scope and delegation for sub-agents
+---
+
+## Summary
+
+An orchestrator exchanges its broad token for a narrower, audience-restricted token before delegating to sub-agents. The exchange endpoint validates the subject token, ensures requested scope is a subset of subject scope, and issues a short-lived token (15 minutes) with the actor chain via the `act` claim.
+
+```
+Orchestrator (broad token)
+    ↓ POST /oauth/token
+    ├─ grant_type: token-exchange
+    ├─ subject_token: (broad token)
+    ├─ actor_token: (sub-agent ID)
+    └─ scope: invoices:read (narrower)
+    ↓
+Sub-Agent (scoped token)
+```
+
+- Subject token validated (signature, issuer, expiry)
+- Requested scope must be subset of subject scope (no escalation)
+- New token includes `act` claim for delegation chain
+- Short-lived (15 minutes recommended for delegated tokens)
+- Audience-restricted to target service
+
+An orchestrator agent holds a broad token: `invoices:read invoices:write customers:read`. Before calling a sub-agent or passing control to a downstream service, the orchestrator should exchange that broad token for a narrower, audience-restricted token. RFC 8693 Token Exchange enables this: a single OAuth endpoint that accepts a subject token and returns a new token with reduced scope, different audience, or delegated actor chain.
+
+Token Exchange prevents token amplification — a downstream service cannot take the token it receives and use it beyond its intended scope.
+
+## The Exchange Request
+
+The orchestrator POSTs to the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`:
+
+```bash
+curl -X POST https://auth.example.com/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+  -d "subject_token=eyJhbGciOiJSUzI1NiI..." \
+  -d "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+  -d "actor_token=eyJhbGciOiJSUzI1NiI..." \
+  -d "actor_token_type=urn:ietf:params:oauth:token-type:jwt" \
+  -d "requested_token_type=urn:ietf:params:oauth:token-type:jwt" \
+  -d "audience=https://invoices-service.example.com/" \
+  -d "scope=invoices:read"
+```
+
+Parameters:
+
+- `subject_token` — the original token (the user's authority or the orchestrator's token)
+- `subject_token_type` — type of the subject token (usually `urn:ietf:params:oauth:token-type:jwt`)
+- `actor_token` — optional; the agent acting on behalf of the subject (for delegation chains)
+- `actor_token_type` — type of the actor token
+- `requested_token_type` — type of token to return (usually `urn:ietf:params:oauth:token-type:jwt`)
+- `audience` — the service that will consume the new token
+- `scope` — the scopes to include in the new token (must be a subset of subject token's scopes)
+
+The server returns a new access token:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiI...",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:jwt",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "scope": "invoices:read"
+}
+```
+
+Notice the short expiry: 900 seconds (15 minutes). Exchanged tokens are ephemeral, long enough for the operation but short enough to minimize exposure if they leak.
+
+## Use Case: Sub-Agent Delegation
+
+An orchestrator agent calls a sub-agent to summarize invoices. The orchestrator has `invoices:read invoices:write customers:read`. The sub-agent should only have `invoices:read` for the specific service.
+
+```typescript
+async function delegateToSubAgent(
+  orchestratorToken: string,
+  subAgentId: string,
+  downstreamServiceUri: string
+): Promise<string> {
+  const form = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    subject_token: orchestratorToken,
+    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    actor_token: subAgentId,
+    actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    audience: downstreamServiceUri,
+    scope: 'invoices:read',
+  });
+
+  const res = await fetch('https://auth.example.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(`Token exchange failed: ${err.error}`);
+  }
+
+  const { access_token } = await res.json();
+  return access_token;
+}
+
+// Orchestrator calls sub-agent
+const subAgentToken = await delegateToSubAgent(
+  orchestratorToken,
+  'sub-agent-summarize',
+  'https://invoices-service.example.com/'
+);
+
+// Sub-agent makes request with the narrowed token
+const res = await fetch('https://invoices-service.example.com/invoices', {
+  headers: { 'Authorization': `Bearer ${subAgentToken}` },
+});
+```
+
+The sub-agent receives a token that:
+- Is scoped to `invoices:read` only (cannot write)
+- Is only valid for `invoices-service.example.com` (audience-restricted)
+- Expires in 15 minutes (short-lived)
+- Includes the orchestrator's identity via the `act` claim
+
+## Use Case: User Delegation (On-Behalf-Of)
+
+A human user authorizes an agent to act on their behalf. The identity provider issues a token with the user's `sub` claim. The agent exchanges it for a token that includes both the user and the agent in the actor chain.
+
+```typescript
+async function exchangeForDelegatedAccess(
+  userToken: string,
+  agentId: string,
+  audience: string,
+  scope: string[]
+): Promise<string> {
+  const form = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    subject_token: userToken,
+    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    actor_token: agentId,
+    actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    audience: audience,
+    scope: scope.join(' '),
+  });
+
+  const res = await fetch('https://auth.example.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+
+  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
+  const { access_token } = await res.json();
+  return access_token;
+}
+
+// User authorizes agent
+const delegatedToken = await exchangeForDelegatedAccess(
+  userJwt,
+  'agent-process-invoices',
+  'https://invoices-service.example.com/',
+  ['invoices:read']
+);
+```
+
+The resulting token includes:
+- `sub`: the user's ID
+- `act`: the agent's ID
+- `scope`: `invoices:read` only
+- `aud`: the target service
+
+The target service can verify that the user authorized the agent, and the agent is acting within its delegated scope.
+
+## Server-Side Validation
+
+When receiving a delegated token, validate both the subject and the actor:
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose';
+
+const jwks = createRemoteJWKSet(
+  new URL('https://auth.example.com/.well-known/jwks.json')
+);
+
+async function validateDelegatedToken(token: string) {
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer: 'https://auth.example.com/',
+    audience: 'https://invoices-service.example.com/',
+  });
+
+  // Verify scopes
+  const scopes = (payload.scope as string || '').split(' ');
+  if (!scopes.includes('invoices:read')) {
+    throw new Error('Token lacks required scope');
+  }
+
+  // Verify subject (user)
+  const userId = payload.sub;
+
+  // Verify actor (agent) — included via the `act` claim
+  const actorId = (payload.act as any)?.sub || payload.azp;
+
+  // Log both for audit
+  console.log(`User ${userId} delegated to agent ${actorId}`);
+
+  // Apply authorization rules
+  return { userId, agentId: actorId, scopes };
+}
+```
+
+## Token Exchange Server Implementation
+
+A minimal token exchange endpoint:
+
+```typescript
+import { SignJWT, jwtVerify } from 'jose';
+
+async function handleTokenExchange(req: Request) {
+  const form = await req.formData();
+
+  const grantType = form.get('grant_type');
+  if (grantType !== 'urn:ietf:params:oauth:grant-type:token-exchange') {
+    return Response.json({ error: 'unsupported_grant_type' }, { status: 400 });
+  }
+
+  // Validate subject token
+  const subjectToken = form.get('subject_token') as string;
+  let subjectPayload;
+  try {
+    const { payload } = await jwtVerify(subjectToken, jwks, {
+      issuer: 'https://auth.example.com/',
+    });
+    subjectPayload = payload;
+  } catch (err) {
+    return Response.json({ error: 'invalid_request' }, { status: 400 });
+  }
+
+  // Validate actor token (optional)
+  const actorToken = form.get('actor_token') as string;
+  let actorPayload = null;
+  if (actorToken) {
+    try {
+      const { payload } = await jwtVerify(actorToken, jwks);
+      actorPayload = payload;
+    } catch (err) {
+      return Response.json({ error: 'invalid_request' }, { status: 400 });
+    }
+  }
+
+  // Validate requested scope is a subset of subject scope
+  const requestedScope = (form.get('scope') as string || '').split(' ');
+  const subjectScope = (subjectPayload.scope as string || '').split(' ');
+  const isValidScope = requestedScope.every(s => subjectScope.includes(s));
+  if (!isValidScope) {
+    return Response.json({ error: 'invalid_scope' }, { status: 400 });
+  }
+
+  // Create the new token
+  const now = Math.floor(Date.now() / 1000);
+  const audience = form.get('audience') as string;
+
+  const newToken = await new SignJWT({
+    sub: subjectPayload.sub,
+    act: actorPayload ? { sub: actorPayload.sub } : undefined,
+    scope: requestedScope.join(' '),
+    aud: audience,
+    iss: 'https://auth.example.com/',
+    iat: now,
+    exp: now + 900, // 15 minutes
+  })
+    .setProtectedHeader({ alg: 'RS256' })
+    .sign(privateKey);
+
+  return Response.json({
+    access_token: newToken,
+    token_type: 'Bearer',
+    expires_in: 900,
+    issued_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+  });
+}
+```
+
+## Checklist
+
+- [ ] Token Exchange endpoint is implemented at `/oauth/token`
+- [ ] Subject token is validated (signature, issuer, expiry)
+- [ ] Actor token is optional but validated if present
+- [ ] Requested scope is a subset of subject scope (cannot escalate)
+- [ ] New token includes `sub`, `act`, `scope`, `aud`, `exp`
+- [ ] New token is short-lived (15 minutes recommended for delegated tokens)
+- [ ] Audience claim is validated server-side on every request
+- [ ] Both `sub` (user/subject) and `act` (agent) are logged for audit
+
+## See Also
+
+- [Agent Identity](/docs/authentication/agent-identity) — actor chains and audit logging
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance and caching
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — advertising token exchange support
+- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — full specification

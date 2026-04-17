@@ -1,0 +1,298 @@
+---
+title: Emerging Standards & Complementary Specs
+description: Arazzo workflows, OpenTelemetry GenAI semconv, AGENTS.md, llms.txt, JSON-LD, schema.org, and agent discovery standards
+---
+
+## Summary
+
+Complementary standards address workflows (Arazzo), observability (OpenTelemetry GenAI), and discovery (AGENTS.md, llms.txt, JSON-LD). Arazzo is stable (1.0.1); OpenTelemetry GenAI semconv is stable; others are emerging. Publish discovery docs at well-known paths and use standards-based formats to avoid vendor lock-in.
+
+- Arazzo 1.0.1: machine-readable multi-step workflows on OpenAPI 3.1
+- OpenTelemetry GenAI: stable semantic conventions for agent observability
+- AGENTS.md: markdown describing agent context and capabilities
+- llms.txt / llms-full.txt: LLM-friendly API documentation
+- JSON-LD + schema.org: semantic markup for auto-discovery
+- Publish at: /AGENTS.md, /llms.txt, structured data in HTML head
+
+Beyond MCP, A2A, and ACP, a complementary tier of standards addresses workflows, observability, discovery documentation, and semantic metadata. Some are stable and production-ready; others are emerging. Understanding the landscape helps you build translation layers and avoid lock-in to any single discovery format.
+
+## Stable Complementary Standards
+
+### Arazzo 1.0.1 (Jan 2026) — Multi-Step Workflow Orchestration
+
+Arazzo defines machine-readable multi-step workflows layered on OpenAPI 3.1. Where OpenAPI describes individual operations, Arazzo describes the correct sequence of calls, conditional branching, error handling, and success/failure paths.
+
+```yaml
+workflows:
+  transfer_money:
+    steps:
+      - stepId: check_balance
+        operationId: account_get_balance
+        parameters:
+          - name: account_id
+            value: $request.body#/source_account
+      - stepId: perform_transfer
+        operationId: account_transfer_funds
+        parameters:
+          - name: source_account
+            value: $steps.check_balance#/account_id
+          - name: amount
+            value: $request.body#/amount
+        onSuccess:
+          - name: send_confirmation
+            operationId: notify_transfer_complete
+        onFailure:
+          - name: log_failure
+            operationId: audit_log_event
+```
+
+Use Arazzo when your API involves sequences that agents should follow predictably. It reduces agent reasoning load and improves determinism. Version 1.1.0 is in progress with AsyncAPI support.
+
+**Spec:** [Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)
+
+### OpenTelemetry GenAI Semantic Conventions (Stable)
+
+OpenTelemetry's GenAI semantic conventions standardize how to instrument LLM calls and agentic workflows. Metrics include request model, token counts, input/output content, system instructions, and tool call traces. Adoption by Traceloop, Langfuse, Datadog, and others makes this the baseline for observability.
+
+Key attributes for agent spans:
+- `gen_ai.provider.name` — "openai", "anthropic", "google"
+- `gen_ai.request.model` — model identifier
+- `gen_ai.input.messages` / `gen_ai.output.messages` — conversation content
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` — token counts
+- `gen_ai.system_instructions` — system prompt (if safe to log)
+- Child spans for tool calls: `tool.{tool_name}`
+
+**Spec:** [OpenTelemetry GenAI Semconv](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
+
+### AGENTS.md — Universal Agent Context Convention
+
+AGENTS.md is a Linux Foundation convention for documenting agent-accessible capabilities in any repository or service. It is not a protocol — it is a documentation standard that agents check at the root of projects.
+
+```markdown
+# AGENTS.md
+
+## MCP Servers
+
+- **billing-mcp** — Invoicing, payment tracking, customer management
+  - Endpoint: `npx @acme/billing-mcp@latest`
+  - Auth: `STRIPE_API_KEY` environment variable
+
+## Conventions
+
+- Monetary amounts in cents (integer) to avoid floating-point errors
+- Customer IDs are UUIDs with `cus_` prefix
+- Always use `billing_list_customers` before creating invoices
+
+## Boundaries
+
+Do not modify production database directly. All writes route through MCP servers.
+```
+
+Adoption is high: Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, and others read AGENTS.md. It costs nothing to maintain and immediately improves agent context. Over 60,000 public repositories already include it.
+
+**Homepage:** [agents.md](https://agents.md)
+
+### llms.txt — Concise Model-Friendly Documentation
+
+llms.txt is a lightweight alternative to full API docs, designed for LLM consumption. It uses markdown with a simple structure: H1 title, blockquote summary, optional H2 sections with links.
+
+```markdown
+# Acme Billing API
+
+> Invoice creation, payment tracking, refunds. No authentication for read-only operations; OAuth 2.1 for writes.
+
+## API Reference
+
+- [Invoice creation](#) — `POST /invoices`
+- [Payment tracking](#) — `GET /invoices/:id`
+- [Refunds](#) — `POST /invoices/:id/refund`
+
+## SDKs
+
+- TypeScript: `npm install @acme/billing-sdk`
+- Python: `pip install acme-billing`
+```
+
+A variant, `llms-full.txt`, concatenates full documentation in markdown. De facto adoption; no registry. Complementary to AGENTS.md.
+
+**Homepage:** [llmstxt.org](https://llmstxt.org)
+
+## Semantic Metadata Standards
+
+### JSON-LD & schema.org for Agent Discovery
+
+Embed schema.org structured data in HTML as JSON-LD. Tools like NLWeb (Microsoft) and many agent frameworks auto-generate MCP tools or A2A skills from schema.org metadata.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebAPI",
+  "name": "Acme Billing API",
+  "description": "Invoice and payment management",
+  "url": "https://api.acme.com",
+  "documentation": "https://docs.acme.com",
+  "termsOfService": "https://acme.com/tos",
+  "potentialAction": [
+    {
+      "@type": "TradeAction",
+      "name": "Create Invoice",
+      "target": {
+        "@type": "EntryPoint",
+        "url": "https://api.acme.com/invoices",
+        "httpMethod": "POST",
+        "inputSchema": { "@type": "PropertyValueSpecification", "name": "customer_id" }
+      }
+    }
+  ]
+}
+</script>
+```
+
+Relevant schema.org types: `SoftwareApplication`, `WebAPI`, `APIReference`, `Service`, `TradeAction`, `FAQPage`, `HowTo`, `TechArticle`, `Dataset`.
+
+### Discovery Fragmentation & IETF Drafts
+
+The IETF has multiple competing drafts for agent discovery (11+ as of April 2026). Three approaches dominate:
+
+1. **Well-known URI approach** — Capability documents at `/.well-known/agent.json` or `/.well-known/acp.json`. Already adopted by A2A and ACP.
+2. **DNS-based discovery** — Agent capabilities via DNS TXT or SRV records (no HTTP required).
+3. **Link header approach** — HTTP `Link` headers pointing to capability documents.
+
+The well-known URI approach has momentum due to A2A/ACP adoption. If building discovery today, use well-known URIs for compatibility.
+
+## Draft & Emerging Standards
+
+### ANP — W3C AI Agent Protocol
+
+ANP is being developed by the W3C AI Agent Protocol Community Group. It addresses the question that MCP and A2A do not: how do agents establish trusted identities and communicate when they have no shared authority to trust?
+
+### Core Design
+
+ANP uses three building blocks:
+
+**Decentralized Identifiers (DIDs)** — An agent's identity is a DID, a W3C standard for identifiers that do not require a central registry. A DID resolves to a DID Document containing the agent's public keys and service endpoints:
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/did/v1"],
+  "id": "did:web:agents.example.com:billing-agent",
+  "verificationMethod": [
+    {
+      "id": "did:web:agents.example.com:billing-agent#key-1",
+      "type": "Ed25519VerificationKey2020",
+      "controller": "did:web:agents.example.com:billing-agent",
+      "publicKeyMultibase": "z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+    }
+  ],
+  "service": [
+    {
+      "id": "did:web:agents.example.com:billing-agent#mcp",
+      "type": "MCPEndpoint",
+      "serviceEndpoint": "https://agents.example.com/billing-agent/mcp"
+    }
+  ]
+}
+```
+
+**JSON-LD Metadata** — Agent capability descriptions use JSON-LD, allowing semantic links between capability vocabularies and enabling inference over capability graphs.
+
+**End-to-End Encryption** — Messages between agents are encrypted using the public keys in each agent's DID Document. No intermediate party (including the transport layer) can read message contents.
+
+### Current Status
+
+ANP is a draft. The W3C Community Group has published working drafts of the DID integration approach, but no reference implementation has achieved production deployment. The spec is worth monitoring for teams building systems that need decentralized trust — cross-organization agent networks where no single OAuth provider can serve as the trust anchor.
+
+## OASF — Open Agent Schema Framework
+
+OASF defines standardized schemas for describing what an agent or tool is capable of. The goal is to make capability discovery work like package registries: search for tools by what they do, not by who publishes them.
+
+### Capability Schema Structure
+
+An OASF capability schema describes an agent's skills in a normalized format:
+
+```json
+{
+  "$schema": "https://oasf.org/schemas/capability/v0.2",
+  "agent_id": "did:web:agents.example.com:data-analyst",
+  "capabilities": [
+    {
+      "id": "statistical-analysis",
+      "name": "Statistical Analysis",
+      "category": "data",
+      "inputs": [
+        {
+          "name": "dataset",
+          "type": "tabular",
+          "formats": ["csv", "parquet", "json"]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "analysis_report",
+          "type": "document",
+          "formats": ["json", "markdown"]
+        }
+      ],
+      "constraints": {
+        "max_rows": 1000000,
+        "requires_auth": true
+      }
+    }
+  ]
+}
+```
+
+### Marketplace Integration
+
+OASF envisions capability marketplaces where orchestrators can search for tools and agents by capability category, input/output types, and constraints — rather than maintaining hardcoded registries.
+
+### Current Status
+
+OASF schemas are actively being developed but have not converged on a stable version. The tooling ecosystem (search indexes, registry operators) is nascent. This is a specification to contribute to and monitor, not build production dependencies on.
+
+
+
+### NLWeb — Microsoft's Natural Language Web
+
+NLWeb is a Microsoft initiative to make any web page or API natively accessible to AI agents using natural language. It adds two standard endpoints:
+
+**`/ask`** — Natural language interface that returns an answer plus Schema.org-structured context.
+
+**`/mcp`** — Auto-generates an MCP server endpoint from schema.org metadata, allowing agents to discover capabilities without custom integration.
+
+NLWeb is tool-driven by teams at Microsoft and will be relevant for teams publishing APIs with schema.org markup.
+
+## Practical Strategy
+
+1. **Adopt stable standards now:** AGENTS.md, llms.txt, schema.org JSON-LD, Arazzo workflows, OpenTelemetry GenAI semconv.
+2. **Build translation layers:** Your agent logic should not parse any single discovery format directly. Abstract it.
+3. **Publish well-known URIs:** For your services, publish `/.well-known/agent.json` (A2A), `/.well-known/acp.json` (commerce), and AGENTS.md (context).
+4. **Monitor draft standards:** Track ANP, OASF, and IETF discovery work, but do not build hard dependencies yet.
+
+## Spec References
+
+- [Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)
+- [OpenTelemetry GenAI Semconv](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
+- [AGENTS.md](https://agents.md)
+- [llms.txt](https://llmstxt.org)
+- [schema.org WebAPI](https://schema.org/WebAPI)
+- [NLWeb](https://github.com/microsoft/NLWeb)
+
+## Practical Strategy
+
+Given the fragmentation, three practices reduce migration risk:
+
+**Build translation layers.** Your core agent logic should not directly parse any specific discovery document format. Build an adapter layer that translates whatever external format you receive into your internal capability representation. When a standard wins or the spec changes, you update the adapter, not the agent.
+
+**Adopt AGENTS.md today.** It is the zero-cost, highest-signal discovery improvement available. Any agent framework that checks for it immediately gets better context.
+
+**Monitor ANP and OASF, do not depend on them.** Track the community group activity. When reference implementations appear and achieve adoption, evaluate migration from your current approach.
+
+**Standardize on well-known URIs for your own services.** Publish `/.well-known/agent-card.json` for A2A, `/.well-known/acp.json` for commerce, and `AGENTS.md` in your repositories. These are stable conventions with real tooling support.
+
+## Related Pages
+
+- [Protocol Comparison](/docs/protocols/comparison) — when to use MCP, A2A, ACP, and Arazzo
+- [MCP Protocol](/docs/protocols/mcp) — the stable foundation for tool connectivity
+- [A2A Protocol](/docs/protocols/a2a) — agent-to-agent delegation

@@ -1,0 +1,45 @@
+# Acme Agent Tools
+
+> TypeScript SDK, MCP server, and Next.js dashboard for building agent-consumable services. Implements MCP 2025-11-25, A2A v1.0 RC agent discovery, and RFC 9457 error handling.
+
+## Getting started
+
+- [Installation guide](https://example.com/docs/getting-started) — Quick setup with npm/pnpm.
+- [SDK quickstart](https://example.com/docs/sdk-intro) — Build your first agent in 5 minutes.
+- [Architecture overview](https://example.com/docs/architecture) — System design, component interaction.
+
+## SDK reference
+
+- [Agent API](https://example.com/docs/sdk/agent) — `Agent` class, tool registration, lifecycle.
+- [Tool design guide](https://example.com/docs/sdk/tools) — Schemas, namespacing, error handling.
+- [Examples](https://example.com/docs/sdk/examples) — Copy-pasteable code samples.
+
+## MCP server
+
+- [Server guide](https://example.com/docs/mcp-server) — Deploy MCP 2025-11-25 servers with typed tools.
+- [Tool implementation](https://example.com/docs/mcp-tools) — Register tools, handle tool calls, streaming.
+- [OAuth 2.0 integration](https://example.com/docs/mcp-oauth) — M2M client credentials for remote agents.
+
+## API reference
+
+- [REST endpoints](https://example.com/docs/api/endpoints) — Agent queries, tool calls, streaming responses.
+- [Schema validation](https://example.com/docs/api/schemas) — Request/response shapes, Zod validators.
+- [Error handling](https://example.com/docs/api/errors) — RFC 9457 `Problem+JSON` responses.
+
+## Discovery
+
+- [AGENTS.md](https://example.com/AGENTS.md) — Project conventions, commands, boundaries.
+- [robots.txt (AI)](https://example.com/robots-ai.txt) — Crawler policy for AI training bots.
+- [Agent card (A2A)](https://example.com/.well-known/agent.json) — Advertise as A2A v1.0 RC agent.
+
+## Advanced
+
+- [Content negotiation](https://example.com/docs/content-negotiation) — Serve markdown to `Accept: text/markdown`.
+- [JSON-LD schemas](https://example.com/docs/json-ld) — `SoftwareApplication`, `WebAPI`, `FAQPage`.
+- [NLWeb integration](https://example.com/docs/nlweb) — `/ask` endpoint for natural language queries.
+
+## Support
+
+- [GitHub issues](https://github.com/acme/agent-tools/issues) — Bug reports and feature requests.
+- [Discussions](https://github.com/acme/agent-tools/discussions) — Q&A and community guidance.
+

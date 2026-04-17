@@ -1,0 +1,274 @@
+---
+title: Resources and Prompts
+description: Exposing contextual data and reusable prompt templates through MCP
+---
+
+## Summary
+
+MCP exposes three primitives: tools (agent-invoked actions), resources (application-controlled contextual data), and prompts (reusable prompt templates). The decision rule: who controls when data is accessed? Resources are cacheable and subscribable; tools are not. Use resources for schemas, configs, templates; use tools for explicit actions and searches.
+
+```
+Data Type                    Use As
+─────────────────────────   ────────
+JSON Schema, configuration   Resource
+Specific customer record     Tool
+Search results              Tool
+Exchange rates (cached)     Resource
+Latest trending data        Resource
+```
+
+- Resources: static/semi-static, cacheable, subscribable
+- Tools: action-triggered, model-controlled invocation
+- Prompts: reusable prompt templates for consistent behavior
+- Resources reduce context cost through caching
+- Tools enable explicit workflows and error handling
+
+MCP servers expose three capability types: tools, resources, and prompts. Tools get the most attention, but resources and prompts solve distinct problems that tools are poorly suited for. Conflating them leads to servers that either force agents to make unnecessary tool calls or miss caching and subscription opportunities entirely.
+
+## Resources vs Tools: The Decision Rule
+
+The clearest way to choose between a resource and a tool is to ask who controls when the data is accessed:
+
+- **Application-controlled access** → resource. The agent reads it when building context, not as a step in a workflow. Examples: a configuration file, a schema definition, a list of available templates.
+- **Model-controlled invocation** → tool. The agent calls it as an action in a workflow, typically because something the user said triggered it. Examples: fetch a specific customer, run a search query, create a record.
+
+A secondary signal is whether the data is cacheable and subscribable. Resources support subscriptions — clients can ask to be notified when a resource changes. Tools do not. If your data changes infrequently and clients benefit from staying in sync passively, a resource is the right primitive.
+
+```
+Data type                           Primitive
+─────────────────────────────────── ────────────
+JSON Schema for your domain models  Resource
+OpenAPI spec for your API           Resource
+Configuration options               Resource
+Latest exchange rates (cached 1h)   Resource
+A specific customer record          Tool (get_customer)
+Search results                      Tool (search_customers)
+Creating a new record               Tool (create_customer)
+```
+
+## Static Resources
+
+Static resources have fixed URIs. They return the same content on every read (or content that changes only infrequently). Register them with `server.resource()`:
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export function registerInvoiceSchema(server: McpServer): void {
+  server.resource(
+    "invoice-schema",
+    "billing://schemas/invoice",
+    {
+      name: "Invoice JSON Schema",
+      description:
+        "The complete JSON Schema for invoice objects returned by billing tools. " +
+        "Read this before calling billing_create_invoice to understand all required and optional fields.",
+      mimeType: "application/json",
+    },
+    async () => {
+      return {
+        contents: [
+          {
+            uri: "billing://schemas/invoice",
+            mimeType: "application/json",
+            text: JSON.stringify(INVOICE_SCHEMA, null, 2),
+          },
+        ],
+      };
+    }
+  );
+}
+
+const INVOICE_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  title: "Invoice",
+  properties: {
+    id: { type: "string", format: "uuid" },
+    customer_id: { type: "string", format: "uuid" },
+    status: { type: "string", enum: ["draft", "open", "paid", "void"] },
+    amount_cents: { type: "integer", minimum: 100 },
+    currency: { type: "string", enum: ["usd", "eur", "gbp", "cad", "aud"] },
+    created_at: { type: "string", format: "date-time" },
+    due_date: { type: "string", format: "date" },
+  },
+  required: ["id", "customer_id", "status", "amount_cents", "currency"],
+};
+```
+
+## Dynamic Resources with URI Templates
+
+Dynamic resources use URI templates to accept parameters. The template variables appear in the URI pattern and are extracted when a client reads the resource:
+
+```typescript
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+export function registerInvoiceResource(
+  server: McpServer,
+  config: ServerConfig
+): void {
+  server.resource(
+    "invoice",
+    new ResourceTemplate("billing://invoices/{invoice_id}", {
+      list: undefined, // Disable listing — too many invoices
+    }),
+    {
+      name: "Invoice",
+      description:
+        "A single invoice record. URI format: billing://invoices/{invoice_id}. " +
+        "Use billing_list_invoices to discover invoice IDs first.",
+      mimeType: "application/json",
+    },
+    async (uri, params) => {
+      const invoiceId = params.invoice_id as string;
+      const invoice = await db.invoices.findById(invoiceId, config.databaseUrl);
+
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found`);
+      }
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(invoice, null, 2),
+          },
+        ],
+      };
+    }
+  );
+}
+```
+
+Clients read a dynamic resource by constructing the URI with a specific value:
+
+```
+Read: billing://invoices/inv_01HX4NP8VQ3DGXQ7R8S6MNVF5T
+```
+
+## Resource Subscriptions and listChanged Notifications
+
+When your server declares `resources.subscribe: true` in its capabilities, clients can subscribe to specific resource URIs and receive notifications when those resources change. This is useful for resources that represent frequently-updated state — a build status, a queue depth, an active agent run.
+
+```typescript
+const server = new McpServer({
+  name: "billing-mcp",
+  version: "1.0.0",
+  capabilities: {
+    resources: {
+      subscribe: true,
+      listChanged: true,
+    },
+  },
+});
+```
+
+Emit a subscription notification whenever a subscribed resource's content changes:
+
+```typescript
+// After updating an invoice in your database
+await db.invoices.update(invoiceId, { status: "paid" });
+
+// Notify any subscribers that this resource has changed
+await server.notification({
+  method: "notifications/resources/updated",
+  params: {
+    uri: `billing://invoices/${invoiceId}`,
+  },
+});
+```
+
+Emit a `listChanged` notification when the set of available resources changes — for example, when a new invoice is created and a new `billing://invoices/{id}` URI becomes readable:
+
+```typescript
+await server.notification({
+  method: "notifications/resources/list_changed",
+  params: {},
+});
+```
+
+<Callout type="info">
+Subscriptions are only meaningful when your server has a persistent connection to the client, such as with Streamable HTTP or SSE transport. Stdio servers that terminate after each interaction cannot maintain subscription state. See [Transport Selection](./transports) for details.
+</Callout>
+
+## When to Use Resources
+
+Resources are the right choice when:
+
+- **The data is consumed as context, not as a workflow step.** Agents read resources to understand the world before making tool calls. A schema describing your domain objects, a README with conventions, a config file listing available environments — all of these are better as resources than tools.
+
+- **The data is cacheable.** Clients can cache resource contents by URI. If your data does not change between requests or changes only on a known event, a resource avoids redundant fetches.
+
+- **The data is subscribable.** If clients benefit from receiving push notifications when the data changes, a resource with subscriptions is the right primitive. A tool can only be polled.
+
+- **The content is large.** Resources can return binary data (`blob`) and large text documents. Tools should return lean responses; resources can return comprehensive reference material that an agent reads once and retains in context.
+
+## Prompts
+
+Prompts are user-controlled, pre-built interaction patterns. They are not called automatically by agents — they appear as slash commands or menu items in client applications. A user selects a prompt to start a guided interaction.
+
+A prompt definition specifies its arguments (which the client collects from the user) and returns a sequence of messages that seed the conversation:
+
+```typescript
+export function registerBillingAssistant(server: McpServer): void {
+  server.prompt(
+    "billing-monthly-review",
+    "Guides you through reviewing last month's billing activity, flagging anomalies, and generating a summary report.",
+    [
+      {
+        name: "month",
+        description: "The month to review in YYYY-MM format (e.g. '2025-01')",
+        required: true,
+      },
+      {
+        name: "customer_id",
+        description: "Limit the review to a specific customer UUID. Omit to review all customers.",
+        required: false,
+      },
+    ],
+    async (args) => {
+      const scope = args.customer_id
+        ? `for customer ${args.customer_id}`
+        : "across all customers";
+
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text:
+                `Please review the billing activity for ${args.month} ${scope}. ` +
+                `Start by calling billing_list_invoices with the appropriate date range. ` +
+                `Flag any invoices that are overdue, unusually large, or have been voided. ` +
+                `Finish with a brief summary of total revenue, outstanding balances, and any anomalies.`,
+            },
+          },
+        ],
+      };
+    }
+  );
+}
+```
+
+The prompt arguments (`month`, `customer_id`) are collected by the client UI before the conversation begins. The user might see a dialog asking "Which month?" before the prompt is submitted. This makes prompts the right primitive for workflows that need structured user input before they can start — not for things the agent should do autonomously.
+
+## Prompt vs Tool vs Resource Decision Matrix
+
+```
+Question                                            Answer     Use
+─────────────────────────────────────────────────── ────────── ──────────
+Does an agent call this automatically during a run? Yes        Tool
+Does a user explicitly trigger this?                Yes        Prompt
+Is this reference data the agent reads for context? Yes        Resource
+Does the data change and should clients be notified? Yes       Resource + subscription
+Does this perform a write operation?                Yes        Tool
+Does this return results the agent acts on?         Yes        Tool
+Does this seed a conversation with initial context? Yes        Prompt
+```
+
+<Callout type="warn">
+Do not use resources as a workaround for tools with large responses. If an agent needs to search for data dynamically, that is a tool. Resources are for application-controlled, URI-addressable data — not for query results that depend on runtime parameters beyond what a URI template can express.
+</Callout>

@@ -1,0 +1,278 @@
+---
+title: Rubric Calibration
+description: Maintaining consistency and preventing score drift over time
+---
+
+## Summary
+
+Prevent score drift through calibration: ensure a score of 2 on API Surface means the same thing in January as July, and the same whether Alice or Bob scored it. Without calibration, scoring becomes subjective, trends become meaningless, benchmarking fails, and investment decisions suffer. Annual or per-5-projects calibration session: gather baseline scorecards, compare ratings from multiple raters, discuss discrepancies, document agreed interpretations, publish calibration snapshot.
+
+- **Why**: Reproducibility, trend validity, benchmark meaningfulness, investment confidence
+- **When**: Once per year or after 5+ projects scored
+- **How**: Baseline scorecards → multi-rater comparison → discussion → documented consensus
+- **Maintain**: Publish calibration snapshot, version rubric with date
+- **Monitor**: Track score drift over time via delta scorecard trends
+
+---
+
+As you audit multiple projects or teams audit the same rubric, scores naturally drift. One rater interprets "agent-oriented descriptions" loosely; another is strict. Over months, the rubric's meaning erodes.
+
+Calibration prevents drift. It ensures that a score of 2 on API Surface means the same thing in January as it does in July, and the same thing whether Alice or Bob scored the project.
+
+## Why Calibration Matters
+
+Without it:
+
+- **Scoring becomes subjective.** Two auditors score the same project differently.
+- **Trends become meaningless.** A project's "improvement" from 1 → 2 might just be looser scoring criteria.
+- **Benchmarking fails.** You can't compare a 2026-03 scorecard to a 2026-09 scorecard.
+- **Investment decisions suffer.** Which dimension actually needs work?
+
+With calibration:
+
+- All raters use the same mental bar
+- Scores are reproducible (same codebase, same score)
+- Trends reflect real progress
+- Benchmarks are meaningful
+
+## Annual Rubric Review
+
+Schedule a **calibration session once per year** (or when you audit 5+ projects). The process:
+
+### 1. Gather Baseline Scorecards (2 weeks before)
+
+Collect 3–5 scorecards from recent audits, across different project types (API, CLI, library, framework). Store them in a shared location.
+
+### 2. Review Criteria Against Reality (1 hour)
+
+For each dimension, ask:
+
+- **Are the rubric levels realistic?** Do real codebases exist at 3/3, or does level 3 set an unreachable bar?
+- **Are the detection signals clear?** Can two auditors independently verify them, or do they require judgment?
+- **Has the ecosystem changed?** RFC standards, new frameworks, or tool adoption may have shifted what "good" means.
+
+Example: In 2025, OAuth 2.1 was optional for Authentication 2/3. In 2026, it's standard, so move it to 1/3.
+
+### 3. Create a Calibration Set (2 hours)
+
+Pick 2 projects from your baseline scorecards—one scoring 1–2 on a dimension, one scoring 2–3. These become your reference projects for that dimension.
+
+For API Surface, example:
+- **Reference 1/2:** Project with OpenAPI but terse descriptions, missing examples
+- **Reference 2/3:** Project with OpenAPI, 30+ word descriptions, examples, agent context
+
+### 4. Re-audit Reference Projects (3 hours)
+
+Two independent auditors re-score the reference projects using the current rubric. Compare results.
+
+If Alice and Bob both score the project as "2/3: Good API design", the rubric is clear. If Alice says 1 and Bob says 3, the criteria need clarification.
+
+### 5. Document Ambiguities and Update (1 hour)
+
+For any disagreement >0.5 points, clarify the rubric:
+
+**Before (ambiguous):**
+> Agent-oriented descriptions with "use when" and disambiguation. Proper operationIds.
+
+**After (clear):**
+> Descriptions include both "Use this when..." AND "Do not use for..." on >90% of operations.
+> operationId on 100% of operations (missing operationId = score capped at 1).
+
+### 6. Version the Rubric
+
+Tag the rubric release: `agentify-rubric-v1.2` (date: 2026-09-01).
+
+Include in the CHANGELOG:
+
+```markdown
+## v1.2 (2026-09-01)
+
+**Calibration changes:**
+- API Surface 2/3: Clarified "agent-oriented descriptions" to require both
+  "Use when" AND "Do not use for" on >90% of operations.
+- Authentication 1/3: Updated to reflect OAuth 2.1 as baseline (moved from 2/3).
+- MCP Server 2/3: Added pagination requirement (was optional in v1.1).
+
+**Rationale:** Annual calibration against 5 reference projects. Aligned with
+ecosystem changes (OAuth 2.1 adoption, MCP 2025-11-25 spec).
+```
+
+## Inter-Rater Reliability (IRR)
+
+IRR measures agreement between raters. Use it to identify problem criteria.
+
+### Calculation
+
+Audit the same project with 2–3 independent auditors. Calculate agreement:
+
+```
+IRR = (agreements on same score) / (total dimensions scored)
+```
+
+**Targets:**
+
+- IRR > 0.85: Excellent calibration
+- IRR 0.70–0.85: Good, minor ambiguities
+- IRR < 0.70: Poor, rubric needs refinement
+
+### Example
+
+**Project: acme-api**
+
+| Dimension | Auditor A | Auditor B | Auditor C | Mode | Agreement |
+|-----------|-----------|-----------|-----------|------|-----------|
+| API Surface | 2 | 2 | 2 | 2 | ✓ |
+| MCP Server | 1 | 2 | 1 | 1 | ✗ |
+| Auth | 2 | 2 | 3 | 2 | ✗ |
+| Error Handling | 1 | 0 | 1 | 1 | ✗ |
+| Tool Design | 1 | 1 | 1 | 1 | ✓ |
+| Discovery | 2 | 2 | 2 | 2 | ✓ |
+| Context Files | 2 | 2 | 2 | 2 | ✓ |
+| CLI Design | N/A | N/A | N/A | N/A | ✓ |
+| Multi-Agent | N/A | N/A | N/A | N/A | ✓ |
+| Testing | 1 | 1 | 1 | 1 | ✓ |
+
+**IRR = 7/10 = 0.70** (Fair. MCP Server and Auth criteria need clarification.)
+
+### Resolving Disagreement
+
+For each disagreement, ask:
+
+1. **Evidence gap?** Did auditors examine different files?
+   - Solution: Standardize evidence checklist (grep for operationId, etc.)
+
+2. **Criterion ambiguity?** Did auditors interpret "agent-oriented" differently?
+   - Solution: Update rubric with explicit detection signals
+
+3. **Confidence mismatch?** Did one auditor flag Low confidence on a hard dimension?
+   - Solution: Allow Low confidence scores; note them for re-verification
+
+**Example: MCP Server disagreement**
+
+Auditor A: "Minimal MCP, basic tools, no pagination → 1/3"
+Auditor B: "MCP tools have annotations, outputSchema declared → 2/3"
+
+**Root cause:** Rubric doesn't specify whether annotations are required for 2/3 or nice-to-have.
+
+**Fix:** Update rubric:
+> Score 2 requires: annotations on all tools, outputSchema on tools returning structured data.
+> Score 3 requires: annotations + pagination on list operations + OAuth.
+
+## Pilot Testing on Recent Audits
+
+Before finalizing rubric changes, test them:
+
+1. **Select 3 recent scorecards** from past 3 months
+2. **Re-audit using new rubric** (2 auditors independently)
+3. **Compare old vs new scores** — should be small deltas unless rubric was truly misaligned
+4. **Document changes** in CHANGELOG
+5. **Gather feedback** from auditors on clarity
+
+If new rubric causes >2-point swings on random projects, reconsider the change.
+
+## Maintaining a Rubric History
+
+Store rubric versions in git:
+
+```
+rubric/
+├── CURRENT.md          (points to latest)
+├── v1.0/
+│   ├── index.md
+│   └── CHANGELOG.md
+├── v1.1/
+│   ├── index.md
+│   └── CHANGELOG.md
+└── v1.2/
+    ├── index.md
+    └── CHANGELOG.md
+```
+
+When auditing, log the rubric version used:
+
+```json
+{
+  "project": "acme-api",
+  "date": "2026-04-17T15:30:00Z",
+  "rubricVersion": "v1.1",
+  "rubricDate": "2026-01-15"
+}
+```
+
+This lets you track whether scorecard changes reflect real progress or rubric drift.
+
+## Quarterly Spot Checks
+
+Between annual reviews, do quarterly spot checks (15 minutes):
+
+1. **Pick one random recent scorecard**
+2. **Have a different auditor review the evidence**
+3. **Ask: Would you give the same score?** (Yes/No/Maybe)
+
+If the answer is "Maybe" or "No", flag the dimension for next year's calibration session.
+
+## Anti-Patterns
+
+**Anti-pattern 1: Never updating the rubric**
+
+Problem: The ecosystem evolves, but your rubric doesn't. MCP servers become standard, but you still score projects that don't have one at 0 without context.
+
+Solution: Annual review + quarterly spot checks
+
+**Anti-pattern 2: Overfitting to one project**
+
+Problem: You calibrate based on one "perfect" codebase, setting the bar unrealistically high.
+
+Solution: Use 3–5 diverse reference projects. Include both good and mediocre examples.
+
+**Anti-pattern 3: Ignoring low-confidence scores**
+
+Problem: Auditors mark scores as "Low confidence" but no one follows up.
+
+Solution: Quarterly re-audit of all Low confidence scores. Update rubric if the dimension is genuinely hard to assess.
+
+**Anti-pattern 4: Rubric creep (too many dimensions)**
+
+Problem: You add new dimensions without removing old ones. Rubric becomes unwieldy.
+
+Solution: Limit to 10 dimensions. If you want to add one, consider whether it overlaps with existing ones or if it's truly foundational.
+
+## Checklist: Annual Calibration
+
+```
+□ Gather 3–5 recent scorecards
+□ Review each dimension: are criteria realistic?
+□ Identify ecosystem changes (RFC updates, tool adoption)
+□ Select 2 reference projects per dimension (1/2 and 2/3 levels)
+□ Re-audit reference projects with 2+ independent raters
+□ Calculate inter-rater reliability
+□ Document ambiguities and update rubric language
+□ Update CHANGELOG with rationale
+□ Tag rubric version: agentify-rubric-vX.Y (date)
+□ Communicate changes to all auditors
+□ Run quarterly spot checks starting next quarter
+```
+
+## Example: 2026-09 Calibration Report
+
+```
+AGENTIFY RUBRIC CALIBRATION — 2026-09-15
+
+Baseline projects: acme-api, stripe-sdk, langchain-js, claude-docs, vercel-ai
+
+Inter-rater reliability:
+  Overall IRR: 0.79 (Good)
+  By dimension:
+    API Surface: 0.92 (Excellent)
+    MCP Server: 0.61 (Poor) ← Needs work
+    Discovery: 0.85 (Good)
+    Authentication: 0.75 (Fair) ← Needs clarification
+
+Changes recommended:
+  1. MCP Server: Add explicit "tools must have annotations" to 2/3 criterion
+  2. Authentication: Clarify whether OAuth 2.1 is required for 2/3 (was optional in v1.1)
+  3. Testing: Add explicit "pass@k metrics" example to 3/3 criterion
+
+Rubric updated: v1.1 → v1.2 (2026-09-15)
+Next calibration: 2027-09-15
+```

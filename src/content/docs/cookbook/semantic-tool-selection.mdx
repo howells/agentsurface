@@ -1,0 +1,384 @@
+---
+title: Semantic Tool Selection at Scale
+description: At >20 tools, use embedding-based selection. Pick ~12 per turn with cosine similarity + prepareStep hook.
+---
+
+## Summary
+
+Passing 50+ tool definitions to the model per request wastes tokens and dilutes focus. Semantic tool selection uses embeddings to pick ~12 relevant tools per turn based on the user's message. The "toolpick" pattern: embed tool descriptions once at startup, cache them, then at each step use cosine similarity to rank tools and pass only the top candidates.
+
+- **20-tool threshold**: Beyond 20 tools, token cost of listing all tools + context loss > benefit of pre-loaded tools.
+- **~12 tools per turn**: Empirically optimal; balances discovery vs. context window.
+- **"Always active" set**: Small, critical tools (web_search, search_tools, meta-tools) always available.
+- **Embedding cache**: Compute embeddings once at startup; reuse across requests (Redis or file cache).
+- **prepareStep hook**: Vercel AI SDK's integration point; called before model receives tools.
+
+---
+
+## The Problem
+
+```typescript
+// ❌ Don't do this at scale
+const agent = new ToolLoopAgent({
+  model: openai("gpt-4o-mini"),
+  instructions: systemPrompt,
+  tools: {
+    // 50+ tools, all passed to every request
+    customers_list: {...},
+    customers_get: {...},
+    customers_create: {...},
+    orders_list: {...},
+    orders_get: {...},
+    orders_update: {...},
+    invoices_list: {...},
+    // ... 40 more ...
+  },
+});
+```
+
+**Cost**: ~500 tokens just listing tool definitions. The model wastes context parsing irrelevant tools (order tools when asking about customers).
+
+---
+
+## The Pattern: Embedding-Based Selection
+
+The production app uses the `toolpick` library with OpenAI embeddings:
+
+```typescript
+// chat/tools.ts
+import { createToolIndex, fileCache } from "toolpick";
+import { openai } from "@ai-sdk/openai";
+import type { PrepareStepFunction, Tool } from "ai";
+
+let cachedIndex: ToolIndex | null = null;
+
+export async function ensureToolIndex(ctx: McpContext) {
+  if (cachedIndex) return cachedIndex;
+
+  // Step 1: Get all tool definitions from MCP
+  const toolDefinitions = await getMcpToolDefinitions();
+
+  // Step 2: Embed tool descriptions (one-time cost)
+  const index = await createToolIndex(toolDefinitions, {
+    embeddingModel: openai.embeddingModel("text-embedding-3-small"),
+    // Cache embeddings to disk; reuse across restarts
+    embeddingCache: fileCache(".toolpick-cache.json"),
+    // Define related-tool groups for discovery
+    relatedTools: {
+      customer_create: ["customer_get", "customer_list"],
+      order_create: ["customer_get", "product_list"],
+      invoice_create: ["customer_list", "order_list"],
+    },
+  });
+
+  // Step 3: Warm up (fetch embeddings)
+  await index.warmUp();
+
+  cachedIndex = index;
+  return index;
+}
+
+export function buildPrepareStep(options: {
+  maxTools: number;
+  alwaysActive?: string[];
+}): PrepareStepFunction {
+  if (!cachedIndex) {
+    throw new Error("Tool index not initialized");
+  }
+
+  const base = cachedIndex.prepareStep({ maxTools: options.maxTools });
+  const always = options.alwaysActive ?? [];
+
+  return async (stepOptions: any) => {
+    // Let toolpick select top N tools by cosine similarity
+    const step = await base(stepOptions);
+
+    // Append always-active tools (they don't get filtered by embeddings)
+    if (step?.activeTools) {
+      for (const name of always) {
+        if (!step.activeTools.includes(name)) {
+          step.activeTools.push(name);
+        }
+      }
+    }
+
+    return step;
+  };
+}
+```
+
+**How it works**:
+
+1. At startup, `createToolIndex` embeds all tool descriptions using OpenAI embeddings.
+2. Embeddings are cached (`.toolpick-cache.json`); subsequent restarts use cached values.
+3. When a user message arrives, `prepareStep` is called.
+4. `toolpick` computes the similarity between the user's message and all cached embeddings.
+5. Top-N tools (e.g., 12) are selected and passed to the model.
+6. Always-active tools (web_search, search_tools, meta-tools) are always appended.
+
+---
+
+## Integration with ToolLoopAgent
+
+```typescript
+// chat/assistant-runtime.ts
+import { ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+export async function streamAssistant(params: {
+  systemPrompt: string;
+  messages: ModelMessage[];
+  tools: Record<string, Tool>;
+}) {
+  // Ensure tool index is warm
+  await ensureToolIndex(ctx);
+
+  // Get all tools (needed for execution)
+  const allTools = params.tools;
+
+  // Build the prepareStep hook
+  const prepareStep = buildPrepareStep({
+    maxTools: 12,
+    // Always expose critical discovery tools
+    alwaysActive: ["web_search", "search_tools", "composio_search_tools", "composio_multi_execute"],
+  });
+
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: params.systemPrompt,
+    tools: allTools,
+    prepareStep, // ← Filter tools per turn
+    stopWhen: stepCountIs(10),
+  });
+
+  return agent.stream({
+    messages: params.messages,
+    experimental_transform: smoothStream(),
+  });
+}
+```
+
+**What happens**:
+
+1. User sends a message.
+2. Model receives system prompt + message + the ~12 most relevant tools (selected by prepareStep).
+3. Model reads tool descriptions and decides which (if any) to call.
+4. If model calls a tool, framework executes it.
+5. Result appended to conversation; loop continues.
+6. At the next turn, `prepareStep` re-runs with the updated conversation; different tools may be selected.
+
+---
+
+## Trade-offs
+
+### Pros
+- **Token savings**: ~500 tokens per request (tool list shrinks 50→12).
+- **Model clarity**: Model focuses on relevant tools; less distraction.
+- **Discovery**: Related tools are suggested via `relatedTools` config.
+
+### Cons
+- **Embedding latency**: ~50–100ms per request (slight increase).
+- **Cold start**: First request after server restart pays embedding cost (~2–5s).
+- **Coverage**: If a tool isn't in the top 12, the model can't use it directly. Mitigation: `search_tools` meta-tool lets model *search* for tools dynamically.
+
+---
+
+## Using search_tools for Discovery
+
+If the top-12 selection misses a tool, the model can call `search_tools` to find it:
+
+```typescript
+server.registerTool(
+  "search_tools",
+  {
+    title: "Search Available Tools",
+    description: "Search for a tool by name or capability. Use this when you can't find the tool you need.",
+    inputSchema: z.object({
+      query: z.string().describe("What do you want to do? (e.g., 'list reports', 'send email', 'delete invoice')"),
+    }),
+    outputSchema: z.object({
+      tools: z.array(z.object({
+        name: z.string(),
+        description: z.string(),
+      })),
+    }),
+  },
+  async (params) => {
+    // Search tool index by keyword + similarity
+    const results = await cachedIndex.search(params.query, { maxResults: 5 });
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(results),
+      }],
+      structuredContent: { tools: results },
+    };
+  }
+);
+```
+
+**Pattern**:
+1. User asks for something the model doesn't immediately recognize.
+2. Model (before calling a tool) calls `search_tools` with the user's intent.
+3. `search_tools` returns matching tools.
+4. Model picks the best match and uses it.
+
+Example:
+- User: "Send an email to alice@example.com"
+- Model (not in top-12, doesn't see email tool) calls `search_tools` with "send email"
+- `search_tools` returns `[composio_gmail_send_message, composio_sendgrid_send_email]`
+- Model calls one of them
+
+---
+
+## Warm-Up and Lifecycle
+
+```typescript
+// apps/api/src/index.ts (server startup)
+import { warmToolIndex } from "@api/chat/tools";
+
+// On server startup, pre-warm the tool index
+warmToolIndex().catch((err) => {
+  logger.warn("Tool index warm-up failed (will retry on first request)", { error: err.message });
+});
+
+app.listen(3000, () => {
+  logger.info("Server started");
+});
+```
+
+**What `warmToolIndex` does**:
+1. Creates a stub MCP context.
+2. Calls `ensureToolIndex` to trigger embedding computation.
+3. If embeddings are cached, returns immediately (~10ms).
+4. If not cached, computes and saves to disk (~3–5s).
+
+**Result**: First real user request gets instant semantic selection; no 3s latency on cold start.
+
+---
+
+## Tuning maxTools
+
+Different use cases have different optimal values:
+
+```typescript
+// Simple assistant (few domains)
+buildPrepareStep({ maxTools: 8, alwaysActive: ["web_search"] })
+
+// Moderate (internal + external tools)
+buildPrepareStep({ maxTools: 12, alwaysActive: ["web_search", "search_tools"] })
+
+// Complex (internal + Composio + external + search)
+buildPrepareStep({ 
+  maxTools: 15, 
+  alwaysActive: ["web_search", "search_tools", "composio_search_tools", "composio_multi_execute"] 
+})
+```
+
+**Guidelines**:
+- **Too low** (5–8): Model misses relevant tools; forced to use search_tools repeatedly.
+- **Optimal** (10–15): Balance between context efficiency and coverage.
+- **Too high** (>20): Defeats the purpose; tokens saved are negligible.
+
+Start at 12; measure token usage and model accuracy; adjust ±3 based on results.
+
+---
+
+## Caching Strategy
+
+The embedded cache is critical for performance:
+
+```typescript
+// .toolpick-cache.json (auto-managed by fileCache)
+{
+  "customers_list": [0.123, -0.456, ..., 0.789],
+  "customers_get": [0.234, -0.567, ..., 0.890],
+  // ... one vector per tool
+}
+```
+
+**Key points**:
+- Cache is built once; reused across requests and server restarts.
+- If you add/remove tools, `toolpick` automatically recomputes affected embeddings.
+- Cache is keyed by tool name; renaming a tool invalidates its embedding.
+- For production, consider caching in Redis instead of disk:
+
+```typescript
+import Redis from "redis";
+
+const redis = Redis.createClient();
+const embeddingCache = redisCache(redis, "toolpick:embeddings");
+
+const index = await createToolIndex(toolDefinitions, {
+  embeddingModel: openai.embeddingModel("text-embedding-3-small"),
+  embeddingCache,
+});
+```
+
+---
+
+## Monitoring and Observability
+
+Log tool selection to debug misses:
+
+```typescript
+// chat/tools.ts
+export function buildPrepareStep(options: {
+  maxTools: number;
+  alwaysActive?: string[];
+}): PrepareStepFunction {
+  const base = cachedIndex.prepareStep({ maxTools: options.maxTools });
+
+  return async (stepOptions: any) => {
+    const step = await base(stepOptions);
+
+    // Log tool selection for debugging
+    logger.debug("[toolpick] Selected tools", {
+      userMessage: stepOptions.messages[stepOptions.messages.length - 1]?.content?.slice(0, 100),
+      selectedTools: step.activeTools,
+      count: step.activeTools.length,
+    });
+
+    // Append always-active
+    if (step?.activeTools) {
+      for (const name of options.alwaysActive ?? []) {
+        if (!step.activeTools.includes(name)) {
+          step.activeTools.push(name);
+        }
+      }
+    }
+
+    return step;
+  };
+}
+```
+
+**Metrics to track**:
+- Average tools selected per request.
+- Frequency of `search_tools` calls (high frequency = selection misses).
+- Token usage before/after (should drop significantly).
+- Model accuracy (did the model pick the right tool?).
+
+---
+
+## Checklist
+
+- [ ] Add `toolpick` library: `npm install toolpick`.
+- [ ] Create `ensureToolIndex` with embedding cache (file or Redis).
+- [ ] Build `buildPrepareStep` hook; append always-active tools.
+- [ ] Integrate with `ToolLoopAgent` via `prepareStep` option.
+- [ ] Add `search_tools` meta-tool for dynamic discovery.
+- [ ] Warm up tool index on server startup.
+- [ ] Measure token usage; confirm significant savings.
+- [ ] Monitor `search_tools` call frequency; adjust `maxTools` if too high.
+- [ ] Cache embeddings in Redis for production.
+- [ ] Test tool selection with diverse user queries.
+
+---
+
+## See Also
+
+- [Agentic Loop](/docs/cookbook/agentic-loop) — prepareStep integration.
+- [External-App Routing](/docs/cookbook/external-app-routing) — meta-tools for discovery.
+- [Tool Design](/docs/tool-design) — tool description best practices.
+

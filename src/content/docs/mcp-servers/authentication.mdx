@@ -1,0 +1,349 @@
+---
+title: MCP Authentication
+description: Securing MCP servers with bearer tokens, identity proxies, and OAuth 2.1
+---
+
+## Summary
+
+MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers (November 2025 spec). Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
+
+```
+Use Case              Approach
+──────────────────   ──────────────────
+Local development     Bearer token
+Single user/team      Bearer token
+Internal network      Identity proxy
+Public servers        OAuth 2.1
+```
+
+- Bearer token: environment variable, timing-safe comparison
+- Identity proxy: add authorization layer between client and server
+- OAuth 2.1: standards-based, public-scale, with PKCE
+- Never expose tokens in logs or responses
+- Use HTTPS for all network transports
+
+An unauthenticated MCP server is an unauthenticated API. Any tool it exposes — including destructive ones — is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
+
+The November 2025 MCP specification mandates OAuth 2.1 for publicly accessible servers. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
+
+## Approach 1: Bearer Token
+
+The simplest approach for servers used by a small number of clients in a controlled environment. Generate a long random token, store it in an environment variable on both the server and the client, and reject requests that do not present it.
+
+```typescript
+// middleware/auth.ts
+import type { Request, Response, NextFunction } from "express";
+
+export function bearerTokenAuth(requiredToken: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({
+        error: "unauthorized",
+        error_description: "Missing Bearer token in Authorization header",
+      });
+      return;
+    }
+
+    const token = authHeader.slice(7);
+
+    // Use timing-safe comparison to prevent timing attacks
+    const expected = Buffer.from(requiredToken);
+    const received = Buffer.from(token);
+
+    if (
+      expected.length !== received.length ||
+      !crypto.timingSafeEqual(expected, received)
+    ) {
+      res.status(401).json({
+        error: "unauthorized",
+        error_description: "Invalid token",
+      });
+      return;
+    }
+
+    next();
+  };
+}
+```
+
+```typescript
+// Apply to the MCP endpoint
+app.use("/mcp", bearerTokenAuth(process.env.MCP_TOKEN!));
+app.post("/mcp", mcpHandler);
+```
+
+The client provides the token in the `Authorization` header:
+
+```
+POST /mcp HTTP/1.1
+Authorization: Bearer mcp_live_Xk9p2QrT8nV4mB7wL1sE6
+Content-Type: application/json
+```
+
+**When to use bearer tokens:** internal tools, developer workstations, CI pipelines, single-tenant servers where the operator controls both ends of the connection.
+
+## Approach 2: Identity Proxy
+
+An identity proxy sits in front of your MCP server and handles authentication on its behalf. The proxy validates the incoming credentials (OAuth token, API key, session cookie) and forwards requests to your server with a trusted identity header:
+
+```
+┌──────────┐     Bearer token      ┌───────────┐    X-User-Id: usr_123    ┌───────────┐
+│  Client  │ ──────────────────── ▶ │   Proxy   │ ────────────────────── ▶ │ MCP Server│
+└──────────┘                        └───────────┘                           └───────────┘
+```
+
+Your MCP server trusts the proxy and reads identity from the forwarded header. It never handles token validation itself.
+
+```typescript
+// In your MCP server — trust the proxy's identity assertion
+app.post("/mcp", (req, res, next) => {
+  const userId = req.headers["x-user-id"];
+  const userScopes = req.headers["x-user-scopes"];
+
+  if (!userId) {
+    res.status(401).json({ error: "Missing identity header from proxy" });
+    return;
+  }
+
+  // Attach to request context for use in tool handlers
+  (req as AuthedRequest).userId = userId as string;
+  (req as AuthedRequest).scopes = (userScopes as string)?.split(",") ?? [];
+
+  next();
+});
+```
+
+<Callout type="warn">
+Only accept identity headers from a trusted proxy IP range. If any client can send `X-User-Id: admin`, your authorization is meaningless. Configure your server to only accept these headers from the proxy's known IP addresses.
+</Callout>
+
+## Approach 3: OAuth 2.1 with PKCE
+
+OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers as of the November 2025 MCP specification. It is the only authentication method that supports delegated authorization — where an agent acts on behalf of a user without the user handing over their credentials.
+
+### Required .well-known Endpoints
+
+Your server must expose two discovery endpoints. Clients read these to learn how to authenticate before they attempt a connection:
+
+**`GET /.well-known/oauth-protected-resource`** — declares that this resource requires OAuth and points to the authorization server:
+
+```json
+{
+  "resource": "https://billing-mcp.example.com",
+  "authorization_servers": ["https://auth.example.com"],
+  "bearer_methods_supported": ["header"],
+  "scopes_supported": ["billing:read", "billing:write", "billing:admin"]
+}
+```
+
+**`GET /.well-known/oauth-authorization-server`** — describes the authorization server's capabilities (if you are running your own):
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "authorization_endpoint": "https://auth.example.com/oauth/authorize",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "response_types_supported": ["code"],
+  "code_challenge_methods_supported": ["S256"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "scopes_supported": ["billing:read", "billing:write", "billing:admin"]
+}
+```
+
+### PKCE Flow
+
+PKCE (Proof Key for Code Exchange) prevents authorization code interception. The client generates a random `code_verifier`, hashes it to produce a `code_challenge`, and sends only the hash to the authorization server. When it later exchanges the code for a token, it proves it holds the original verifier.
+
+**S256 only.** The `plain` method is insecure and must not be used.
+
+```typescript
+// Client-side PKCE generation (for reference — this runs in the MCP client)
+import { createHash, randomBytes } from "node:crypto";
+
+function generatePKCE() {
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const codeChallenge = createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
+
+  return { codeVerifier, codeChallenge };
+}
+
+// Authorization URL construction
+const { codeVerifier, codeChallenge } = generatePKCE();
+
+const authUrl = new URL("https://auth.example.com/oauth/authorize");
+authUrl.searchParams.set("response_type", "code");
+authUrl.searchParams.set("client_id", "mcp-client-id");
+authUrl.searchParams.set("redirect_uri", "http://localhost:8080/callback");
+authUrl.searchParams.set("scope", "billing:read billing:write");
+authUrl.searchParams.set("code_challenge", codeChallenge);
+authUrl.searchParams.set("code_challenge_method", "S256");
+authUrl.searchParams.set("state", randomBytes(16).toString("hex")); // CSRF protection
+```
+
+### JWT Validation
+
+Your MCP server validates the Bearer token on each request. For JWT tokens, validation must check all of: signature, issuer, audience, and expiry.
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from "jose";
+
+const JWKS = createRemoteJWKSet(
+  new URL("https://auth.example.com/.well-known/jwks.json")
+);
+
+export async function validateToken(
+  token: string
+): Promise<{ userId: string; scopes: string[] }> {
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer: "https://auth.example.com",     // Validates iss claim
+    audience: "https://billing-mcp.example.com", // Validates aud claim
+    // exp claim is validated automatically by jose
+  });
+
+  const userId = payload.sub;
+  if (!userId) {
+    throw new Error("Token missing sub claim");
+  }
+
+  const scopes = ((payload.scope as string) ?? "").split(" ").filter(Boolean);
+
+  return { userId, scopes };
+}
+```
+
+Use `createRemoteJWKSet` with caching (the default) rather than a static public key. This allows the authorization server to rotate keys without requiring you to redeploy.
+
+### Scope Enforcement Per Tool
+
+After validating the token, enforce scopes at the tool level:
+
+```typescript
+function requireScope(scopes: string[], required: string): void {
+  if (!scopes.includes(required)) {
+    throw new Error(
+      `Insufficient scope. Required: ${required}. ` +
+      `Granted: ${scopes.join(", ") || "none"}. ` +
+      `Request a new token with the ${required} scope.`
+    );
+  }
+}
+
+// In your tool handler
+async (params, context) => {
+  requireScope(context.scopes, "billing:write");
+
+  // proceed with creating the invoice
+}
+```
+
+Throwing from a scope check causes the tool to return an MCP error. Return it as an `isError: true` response instead for better agent recovery:
+
+```typescript
+async (params, context) => {
+  if (!context.scopes.includes("billing:write")) {
+    return {
+      isError: true,
+      content: [{
+        type: "text",
+        text: "Insufficient permissions. The billing:write scope is required to create invoices. " +
+              "Request a new authorization token with the billing:write scope.",
+      }],
+    };
+  }
+
+  // proceed
+}
+```
+
+### On-Behalf-Of (OBO) Pattern
+
+When your MCP server needs to call downstream APIs on behalf of the authenticated user, use the On-Behalf-Of flow to exchange the user's token for a token scoped to the downstream service:
+
+```typescript
+async function getDownstreamToken(
+  userToken: string,
+  targetAudience: string
+): Promise<string> {
+  const response = await fetch("https://auth.example.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      subject_token: userToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      audience: targetAudience,
+      scope: "stripe:read stripe:write",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Token exchange failed: ${error.error_description}`);
+  }
+
+  const { access_token } = await response.json();
+  return access_token;
+}
+```
+
+This preserves the audit trail — the downstream API sees that the request is `on_behalf_of` the original user, not just your service identity.
+
+## Using experimental_withMcpAuth
+
+The `@vercel/mcp-adapter` package provides an `experimental_withMcpAuth` wrapper that integrates OAuth validation directly into the Vercel route handler:
+
+```typescript
+// app/mcp/route.ts
+import { createMcpHandler, experimental_withMcpAuth } from "@vercel/mcp-adapter";
+import { createServer } from "@/lib/billing-mcp/server";
+
+const mcpHandler = createMcpHandler(
+  (req) => createServer({
+    stripeApiKey: process.env.STRIPE_API_KEY!,
+    databaseUrl: process.env.DATABASE_URL!,
+    // Pass the authenticated user from the request context
+    userId: (req as any).mcpAuth?.userId,
+    scopes: (req as any).mcpAuth?.scopes ?? [],
+  })
+);
+
+async function validateAuth(token: string) {
+  const result = await validateToken(token);
+  return result; // { userId, scopes }
+}
+
+export const { GET, POST, DELETE } = experimental_withMcpAuth(
+  mcpHandler,
+  validateAuth
+);
+
+export const maxDuration = 60;
+```
+
+## 5 Critical Security Mistakes
+
+**1. Token passthrough without validation.** Forwarding the client's token directly to downstream services without validating it first. Always validate signature, issuer, audience, and expiry before trusting a token.
+
+**2. Missing audience claim validation.** A token issued for `https://other-service.example.com` is not valid for your server. Without `aud` validation, tokens stolen from other services work against yours. Always pass your server's URL as the expected audience.
+
+**3. Wildcard redirect URIs.** Registering `https://myapp.example.com/*` as a redirect URI allows an attacker to redirect the authorization code to any path on your domain. Register exact URIs only: `https://myapp.example.com/auth/callback`.
+
+**4. Missing CSRF protection on the callback.** The `state` parameter in OAuth prevents CSRF attacks on the authorization flow. Verify that the `state` returned in the callback matches the `state` you sent. If it does not match, reject the response.
+
+**5. Storing tokens in plaintext.** Access tokens and refresh tokens stored in plaintext in a database or log file are a breach waiting to happen. Encrypt tokens at rest. Never log token values, even in debug output.
+
+```typescript
+// WRONG: logging token values
+console.error(`Received token: ${token}`);
+
+// CORRECT: log only non-sensitive metadata
+console.error(`Received token: iss=${payload.iss} sub=${payload.sub} exp=${payload.exp}`);
+```
+
+<Callout type="warn">
+HTTPS is required for all OAuth flows. The `code_challenge` mechanism of PKCE protects the authorization code in transit, but the access token itself is a bearer credential — anyone who intercepts it can use it. Never run an OAuth-authenticated MCP server over plain HTTP in production.
+</Callout>

@@ -1,0 +1,42 @@
+---
+title: Getting Started
+description: Quick start guide for making your codebase agent-ready
+---
+
+## Summary
+
+A quick assessment and prioritized roadmap for making any codebase agent-ready in weeks, not months. Evaluate seven key questions about discovery, APIs, CLI output, authentication, error handling, and testing. Then implement in priority order, starting with low-effort high-impact items like AGENTS.md and --json output.
+
+- Discovery (llms.txt, AGENTS.md)
+- CLI JSON output and machine-readable formats
+- Structured error handling (RFC 7807)
+- OAuth 2.1 Client Credentials authentication
+- MCP server exposure
+- Workflow definitions (Arazzo)
+- Evaluation suite (evals, metrics, red-teaming)
+
+## Quick Assessment
+
+Before diving into specific dimensions, assess where your codebase stands:
+
+1. **Can an AI agent discover your capabilities?** (Discovery & AEO)
+2. **Can an AI agent call your APIs programmatically?** (API Surface)
+3. **Does your CLI produce machine-readable output?** (CLI Design)
+4. **Do you expose an MCP server?** (MCP Servers)
+5. **Can agents authenticate without browser flows?** (Authentication)
+6. **Do your errors tell agents how to recover?** (Error Handling)
+7. **Can you verify agent interactions work?** (Testing)
+
+## Priority Order
+
+If you're starting from zero, implement in this order:
+
+1. Write an `AGENTS.md` and `llms.txt` file
+2. Add `--json` output to your CLI
+3. Implement RFC 7807 structured errors
+4. Switch to OAuth 2.1 Client Credentials for M2M auth
+5. Expose an MCP server for your API
+6. Add Arazzo workflow definitions
+7. Build an evaluation suite
+
+Each subsequent section of this reference covers one dimension in depth.

@@ -1,0 +1,345 @@
+---
+title: Delta Scorecard
+description: Computing and visualizing improvements between two scorecards
+---
+
+## Summary
+
+Computed diff between before and after scorecards (typically pre and post transformation) showing per-dimension improvements, overall score change, rating progression (e.g., Agent-tolerant → Agent-ready), and cluster impact identification. Use delta scorecard to validate transformation work actually improved scores, identify which fixes had highest impact, plan remaining priorities, and communicate progress to stakeholders. Essential for tracking improvement over time and justifying effort.
+
+- **Per-dimension delta**: Score change (1 → 2, +1 point)
+- **Overall delta**: Total score change (11/30 → 16/30, +5 points)
+- **Rating delta**: Band change (Agent-tolerant → Agent-ready)
+- **Cluster impact**: Which work clusters drove improvement
+- **Trend tracking**: Scorecard history for long-term progress
+- **Stakeholder communication**: Before/after visualization
+
+---
+
+A delta scorecard measures progress. By comparing before and after scorecards (typically before and after transformation), you can quantify which dimensions improved, which stayed flat, and which regressed.
+
+## Concept
+
+A delta scorecard is a computed diff. It shows:
+
+- **Score change per dimension** (e.g., API Surface: 1 → 2)
+- **Overall score change** (e.g., 11/30 → 16/30)
+- **Rating change** (e.g., Agent-tolerant → Agent-ready)
+- **Which clusters were tackled** and their impact
+
+Use delta scorecards to:
+
+1. Validate that transformation work actually improved scores
+2. Identify which fixes had the most impact
+3. Plan next priorities (address remaining high-severity issues)
+4. Communicate progress to stakeholders
+
+## TypeScript Function
+
+```typescript
+import { Scorecard } from './scorecard-schema';
+
+interface DeltaDimension {
+  name: string;
+  scoreBefore: number | null;
+  scoreAfter: number | null;
+  delta: number;
+  confidenceBefore: string | null;
+  confidenceAfter: string | null;
+  improved: boolean;
+  regressed: boolean;
+}
+
+interface DeltaScorecard {
+  projectName: string;
+  dateBefore: string;
+  dateAfter: string;
+  dimensions: DeltaDimension[];
+  totalBefore: number;
+  totalAfter: number;
+  scaledBefore: number;
+  scaledAfter: number;
+  ratingBefore: string;
+  ratingAfter: string;
+  overallDelta: number;
+  clustersApproached: string[];
+}
+
+/**
+ * Compute delta between two scorecards.
+ * Assumes both scorecards are from the same project.
+ */
+export function deltaScorecard(
+  before: Scorecard,
+  after: Scorecard
+): DeltaScorecard {
+  // Validate project match
+  if (before.project.name !== after.project.name) {
+    throw new Error(
+      `Project mismatch: ${before.project.name} vs ${after.project.name}`
+    );
+  }
+
+  // Dimension deltas
+  const dimensions: DeltaDimension[] = before.dimensions.map((dimBefore) => {
+    const dimAfter = after.dimensions.find((d) => d.name === dimBefore.name);
+    if (!dimAfter) {
+      throw new Error(`Dimension ${dimBefore.name} not found in after scorecard`);
+    }
+
+    const scoreBefore = dimBefore.score;
+    const scoreAfter = dimAfter.score;
+
+    // Handle N/A dimensions
+    const delta =
+      scoreBefore === null || scoreAfter === null
+        ? 0
+        : scoreAfter - scoreBefore;
+
+    return {
+      name: dimBefore.name,
+      scoreBefore,
+      scoreAfter,
+      delta,
+      confidenceBefore: dimBefore.confidence,
+      confidenceAfter: dimAfter.confidence,
+      improved: delta > 0,
+      regressed: delta < 0,
+    };
+  });
+
+  // Overall scores
+  const totalBefore = before.overall.totalScore;
+  const totalAfter = after.overall.totalScore;
+  const overallDelta = totalAfter - totalBefore;
+
+  // Cluster impact
+  const clustersApproached = after.findingClusters
+    .filter((cluster) =>
+      cluster.findings.some(
+        (finding) => finding.currentScore < finding.targetScore
+      )
+    )
+    .map((c) => c.name);
+
+  return {
+    projectName: before.project.name,
+    dateBefore: before.date,
+    dateAfter: after.date,
+    dimensions,
+    totalBefore,
+    totalAfter,
+    scaledBefore: before.overall.scaledScore,
+    scaledAfter: after.overall.scaledScore,
+    ratingBefore: before.overall.rating,
+    ratingAfter: after.overall.rating,
+    overallDelta,
+    clustersApproached,
+  };
+}
+
+/**
+ * Format delta scorecard for display.
+ */
+export function formatDeltaScorecard(delta: DeltaScorecard): string {
+  const lines: string[] = [
+    '╔════════════════════════════════════════════════════════╗',
+    '║              AGENTIFY DELTA SCORECARD                 ║',
+    `║              ${delta.projectName.padEnd(47)}║`,
+    '╠════════════════════════════════════════════════════════╣',
+    '',
+    '  Dimension                    Before  After   Delta',
+    '  ─────────────────────────────────────────────────────',
+  ];
+
+  delta.dimensions.forEach((d) => {
+    const before = d.scoreBefore === null ? 'N/A' : `${d.scoreBefore}/3`;
+    const after = d.scoreAfter === null ? 'N/A' : `${d.scoreAfter}/3`;
+    const deltaStr =
+      d.delta > 0
+        ? `+${d.delta} ✦`
+        : d.delta < 0
+          ? `${d.delta} ✗`
+          : '  —';
+    const status = d.improved ? '↑' : d.regressed ? '↓' : '→';
+    lines.push(
+      `  ${d.name.padEnd(30)}${before.padStart(6)}  ${after.padStart(5)}  ${deltaStr.padStart(6)} ${status}`
+    );
+  });
+
+  lines.push('');
+  lines.push('  ─────────────────────────────────────────────────────');
+  lines.push(
+    `  TOTAL: ${delta.totalBefore}/27 → ${delta.totalAfter}/27 (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`
+  );
+  lines.push(
+    `  RATING: ${delta.ratingBefore} → ${delta.ratingAfter} ${delta.overallDelta > 0 ? '✦' : delta.overallDelta < 0 ? '✗' : '—'}`
+  );
+  lines.push('');
+
+  if (delta.clustersApproached.length > 0) {
+    lines.push(`  Clusters tackled:`);
+    delta.clustersApproached.forEach((c) => {
+      lines.push(`    • ${c}`);
+    });
+    lines.push('');
+  }
+
+  lines.push('╚════════════════════════════════════════════════════════╝');
+
+  return lines.join('\n');
+}
+```
+
+## Worked Example: Before & After
+
+### Before Scorecard
+
+Project: `acme-api` audited on 2026-03-15
+
+```
+API Surface:        0/3 (no OpenAPI)
+CLI Design:         N/A
+MCP Server:         0/3 (no MCP)
+Discovery & AEO:    1/3 (AGENTS.md only)
+Authentication:     1/3 (API keys only)
+Error Handling:     0/3 (generic HTTP)
+Tool Design:        0/3 (no tool definitions)
+Context Files:      1/3 (auto-generated AGENTS.md)
+Multi-Agent:        N/A
+Testing:            0/3 (no agent tests)
+
+Total: 3/24 (scaled: 4/30)
+Rating: Human-only
+```
+
+### Transformation Work
+
+Following the agentify plan, the team:
+
+1. **Created OpenAPI spec** (2 hours)
+   - 40 endpoints with operationIds
+   - Agent-oriented descriptions (30–50 words each)
+   - Examples on all parameters
+
+2. **Implemented MCP server** (4 hours)
+   - Exposed 10 tools with proper annotations
+   - Structured error handling with `isError`
+   - Tested with `InMemoryTransport`
+
+3. **Upgraded authentication** (2 hours)
+   - Added OAuth 2.1 Client Credentials grant
+   - Scoped tokens (read:api, write:config)
+   - JWT validation (iss, aud, exp)
+
+4. **Enhanced error handling** (1.5 hours)
+   - RFC 7807 Problem Details format
+   - `is_retriable` on all errors
+   - `suggestions` array with recovery steps
+
+5. **Improved tool descriptions** (1 hour)
+   - "Use when" context on all tools
+   - "Do not use for" disambiguation
+   - Parameter examples
+
+6. **Wrote agent tests** (2 hours)
+   - Tool selection tests
+   - Error recovery tests
+   - Multi-step flow tests
+
+### After Scorecard
+
+Project: `acme-api` audited on 2026-04-17
+
+```
+API Surface:        2/3 (OpenAPI with agent descriptions, no Arazzo)
+CLI Design:         N/A
+MCP Server:         2/3 (well-structured, no pagination)
+Discovery & AEO:    2/3 (AGENTS.md + llms.txt, no JSON-LD)
+Authentication:     3/3 (OAuth 2.1 M2M, scoped tokens)
+Error Handling:     2/3 (RFC 7807, missing doc_uri)
+Tool Design:        2/3 (good descriptions, no toModelOutput)
+Context Files:      2/3 (AGENTS.md curated, no CLAUDE.md)
+Multi-Agent:        N/A
+Testing:            2/3 (tool + error recovery, no evals)
+
+Total: 16/24 (scaled: 18/30)
+Rating: Agent-ready
+```
+
+### Delta Computation
+
+```typescript
+const before = JSON.parse(fs.readFileSync('scorecard-2026-03-15.json', 'utf-8'));
+const after = JSON.parse(fs.readFileSync('scorecard-2026-04-17.json', 'utf-8'));
+
+const delta = deltaScorecard(before, after);
+console.log(formatDeltaScorecard(delta));
+```
+
+Output:
+
+```
+╔════════════════════════════════════════════════════════╗
+║              AGENTIFY DELTA SCORECARD                 ║
+║              acme-api                                  ║
+╠════════════════════════════════════════════════════════╣
+
+  Dimension                    Before  After   Delta
+  ─────────────────────────────────────────────────────
+  api-surface                   0/3    2/3   +2 ✦     ↑
+  cli-design                     N/A    N/A    —      →
+  mcp-server                     0/3    2/3   +2 ✦     ↑
+  discovery-aeo                  1/3    2/3   +1 ✦     ↑
+  authentication                 1/3    3/3   +2 ✦     ↑
+  error-handling                 0/3    2/3   +2 ✦     ↑
+  tool-design                    0/3    2/3   +2 ✦     ↑
+  context-files                  1/3    2/3   +1 ✦     ↑
+  multi-agent                     N/A    N/A    —      →
+  testing-evaluation             0/3    2/3   +2 ✦     ↑
+
+  ─────────────────────────────────────────────────────
+  TOTAL: 3/24 → 16/24 (scaled: 4/30 → 18/30)
+  RATING: Human-only → Agent-ready ✦
+
+  Clusters tackled:
+    • Agent tool discoverability
+    • Error recovery for agents
+    • Machine-readable authentication
+
+╚════════════════════════════════════════════════════════╝
+```
+
+## Interpreting the Delta
+
+**Strong improvements** (✦):
+
+- **Authentication** jumped from 1 → 3: OAuth 2.1 Client Credentials + scoped tokens is complete
+- **API Surface** 0 → 2: OpenAPI spec exists with agent-oriented descriptions (missing Arazzo for 3)
+- **MCP Server** 0 → 2: Tools exposed via MCP with proper structure (missing pagination for 3)
+- **Error Handling** 0 → 2: RFC 7807 with is_retriable (missing doc_uri for 3)
+
+**Partial improvements** (↑):
+
+- **Discovery & AEO** 1 → 2: Added llms.txt (missing JSON-LD and content negotiation for 3)
+- **Tool Design** 0 → 2: Descriptions improved (missing toModelOutput optimization for 3)
+- **Context Files** 1 → 2: Curated AGENTS.md (missing CLAUDE.md overrides for 3)
+- **Testing** 0 → 2: Tool + error tests (missing evals metrics for 3)
+
+**Overall:**
+
+- **Rating upgraded**: Human-only → Agent-ready (crossed the 15-point threshold)
+- **Score improvement**: +14 points in 33 hours of work
+- **Impact**: Agents can now reliably use the API with proper auth, error recovery, and tool discovery
+
+## Next Steps
+
+From the delta, the team can prioritize remaining gaps:
+
+1. **API Surface 2 → 3**: Add Arazzo workflows for multi-step operations (2 hours)
+2. **MCP Server 2 → 3**: Implement pagination on list tools (1.5 hours)
+3. **Error Handling 2 → 3**: Add `doc_uri` to error responses (1 hour)
+4. **Discovery 2 → 3**: Add JSON-LD schema + content negotiation (2 hours)
+5. **Testing 2 → 3**: Set up eval suite with pass@k metrics (3 hours)
+
+Tackling these would push the score to 25–27/30 (Agent-first range).

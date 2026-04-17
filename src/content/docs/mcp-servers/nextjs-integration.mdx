@@ -1,0 +1,258 @@
+---
+title: MCP in Next.js
+description: Integrating MCP servers with Next.js — both dev tooling and production domain servers
+---
+
+## Summary
+
+Two distinct Next.js-MCP patterns: next-devtools-mcp (dev environment tooling) and mcp-handler (production domain servers). The first exposes your dev environment to Claude Desktop and Cursor via .mcp.json discovery. The second builds domain-specific MCP servers hosted inside a Next.js app. Both are useful but serve different purposes.
+
+- next-devtools-mcp: local server, exposes errors, routes, components
+- Setup: .mcp.json discovery in project root
+- mcp-handler: production servers, domain-specific capabilities
+- Use .mcp.json for local development; deploy domain servers separately
+- Auto-discovery via .mcp.json works with Claude Desktop and Cursor
+
+Next.js and MCP intersect in two completely different ways that are easy to conflate. The first is `next-devtools-mcp`, a tool that exposes your Next.js development environment to AI assistants. The second is building your own domain-specific MCP server hosted inside a Next.js application using `mcp-handler`. Both are useful, but they serve entirely different purposes.
+
+## next-devtools-mcp: Dev Environment Tooling
+
+`next-devtools-mcp` is a local MCP server that exposes your Next.js dev environment to Claude Desktop, Cursor, and other MCP-capable editors. It runs as a subprocess on your development machine alongside `next dev`. Agents connected to it can inspect errors, read routes, and query your Next.js application state without leaving the conversation.
+
+**Setup:** Create a `.mcp.json` file in your project root:
+
+```json
+{
+  "mcpServers": {
+    "next-devtools": {
+      "command": "npx",
+      "args": ["-y", "@next/mcp", "--port", "3000"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
+```
+
+Clients that support `.mcp.json` discovery (Claude Desktop, Cursor) will pick this up automatically when the project is opened.
+
+**Tools exposed by next-devtools-mcp:**
+
+| Tool | Description |
+| ---|---|
+| `get_errors` | Returns current compilation errors and runtime errors from the dev server |
+| `get_routes` | Lists all App Router and Pages Router routes with their file paths |
+| `get_route_info` | Returns the source code and metadata for a specific route |
+| `get_components` | Lists React components defined in the project |
+| `get_environment_variables` | Returns public (non-secret) environment variable names |
+| `get_build_output` | Returns the most recent build output |
+| `run_build` | Triggers `next build` and returns the result |
+
+These tools are intentionally development-only. `next-devtools-mcp` does not run in production and does not expose any of your application's business logic or data.
+
+## Building a Domain MCP Server with mcp-handler
+
+If you want to expose your application's own capabilities through MCP — letting agents call your business logic, read your data, or trigger your workflows — you build a domain MCP server hosted inside your Next.js application.
+
+Install the adapter:
+
+```bash
+pnpm add @vercel/mcp-adapter
+```
+
+**Basic route handler** in `app/mcp/[transport]/route.ts`:
+
+```typescript
+import { createMcpHandler } from "@vercel/mcp-adapter";
+import { z } from "zod";
+
+const handler = createMcpHandler((server) => {
+  server.tool(
+    "get_project_status",
+    "Returns the current status of a project by its slug.",
+    {
+      project_slug: z
+        .string()
+        .describe("The URL slug of the project to look up"),
+    },
+    async ({ project_slug }) => {
+      const project = await db.projects.findBySlug(project_slug);
+
+      if (!project) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Project '${project_slug}' not found.` }],
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            id: project.id,
+            name: project.name,
+            status: project.status,
+            updated_at: project.updatedAt,
+          }),
+        }],
+      };
+    }
+  );
+});
+
+export const maxDuration = 60;
+
+export { handler as GET, handler as POST, handler as DELETE };
+```
+
+The dynamic `[transport]` segment in the path lets `mcp-handler` handle both `POST /mcp/http` (standard requests) and `GET /mcp/sse` (streaming) with a single route definition.
+
+**Connecting clients:** Point your MCP client at `https://your-app.vercel.app/mcp`.
+
+## Organizing a Larger Domain Server
+
+For servers with many tools, keep the route handler thin and move tool registration into a factory function — the same pattern described in [Server Architecture](./architecture):
+
+```typescript
+// lib/mcp/server.ts
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerProjectTools } from "./tools/projects.js";
+import { registerDeploymentTools } from "./tools/deployments.js";
+import { registerTeamTools } from "./tools/teams.js";
+
+export interface McpContext {
+  userId: string;
+  orgId: string;
+  scopes: string[];
+}
+
+export function registerTools(server: McpServer, ctx: McpContext): void {
+  registerProjectTools(server, ctx);
+  registerDeploymentTools(server, ctx);
+  registerTeamTools(server, ctx);
+}
+```
+
+```typescript
+// app/mcp/[transport]/route.ts
+import { createMcpHandler, experimental_withMcpAuth } from "@vercel/mcp-adapter";
+import { registerTools } from "@/lib/mcp/server";
+import { validateToken } from "@/lib/auth/validate-token";
+
+const mcpHandler = createMcpHandler(
+  (server, req) => {
+    const ctx = (req as any).mcpAuth;
+    registerTools(server, ctx);
+  },
+  {
+    basePath: "/mcp",
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+async function authenticate(token: string) {
+  return validateToken(token); // Returns { userId, orgId, scopes }
+}
+
+export const maxDuration = 60;
+
+export const { GET, POST, DELETE } = experimental_withMcpAuth(
+  mcpHandler,
+  authenticate
+);
+```
+
+The `experimental_withMcpAuth` wrapper calls `authenticate` on every request, attaches the result to the request as `req.mcpAuth`, and rejects unauthenticated requests with a 401 before the handler runs.
+
+## Stateless Mode for Serverless
+
+Next.js on Vercel runs as serverless functions — each invocation is a fresh process. There is no shared in-memory state between requests. The `mcp-handler` package handles this by defaulting to stateless mode when deployed on Vercel.
+
+For tools that require session state across calls, store state externally:
+
+```typescript
+import { createMcpHandler } from "@vercel/mcp-adapter";
+import { kv } from "@vercel/kv";
+
+const handler = createMcpHandler((server) => {
+  server.tool(
+    "continue_analysis",
+    "Continues a multi-step analysis started with start_analysis. " +
+    "Requires the session_id returned by start_analysis.",
+    {
+      session_id: z.string().describe("Session ID from start_analysis"),
+      next_step: z.enum(["summarize", "compare", "export"]),
+    },
+    async ({ session_id, next_step }) => {
+      const state = await kv.get<AnalysisState>(`analysis:${session_id}`);
+
+      if (!state) {
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: `Session ${session_id} not found or expired. Call start_analysis to begin a new analysis.`,
+          }],
+        };
+      }
+
+      // Process next step using stored state
+      const result = await processStep(state, next_step);
+
+      // Update stored state
+      await kv.set(`analysis:${session_id}`, result.newState, { ex: 3600 });
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(result.output) }],
+      };
+    }
+  );
+});
+```
+
+## maxDuration and Fluid Compute
+
+Long-running tools — those that process files, call slow external APIs, or run batch operations — need a `maxDuration` large enough for the operation to complete. The default is 10 seconds on Vercel's Hobby plan.
+
+```typescript
+// Route-level configuration
+export const maxDuration = 60; // Pro plan maximum for serverless
+```
+
+For tools that may run longer than 60 seconds, or for servers handling concurrent SSE connections, enable Fluid Compute in `vercel.json`:
+
+```json
+{
+  "functions": {
+    "app/mcp/[transport]/route.ts": {
+      "maxDuration": 300,
+      "fluid": true
+    }
+  }
+}
+```
+
+Fluid Compute keeps the function instance alive between requests and allows concurrent execution. This is what enables long-lived SSE connections on Vercel without the function timing out between SSE events.
+
+<Callout type="info">
+`maxDuration` of 300 seconds requires the Vercel Pro plan or higher. For tools that may run indefinitely, use a streaming response pattern to heartbeat the SSE connection while work proceeds in the background, rather than blocking the function for the full duration.
+</Callout>
+
+## Environment Variables for MCP in Next.js
+
+MCP route handlers run as server-side code and have access to all server-side environment variables. Do not prefix MCP-related secrets with `NEXT_PUBLIC_` — that exposes them to the browser bundle.
+
+```bash
+# .env.local (development)
+MCP_AUTH_SECRET=your-bearer-token
+DATABASE_URL=postgres://...
+STRIPE_API_KEY=sk_test_...
+
+# Never:
+NEXT_PUBLIC_MCP_AUTH_SECRET=... # ← This goes into the browser bundle
+```
+
+Access them in your route handler via `process.env.VARIABLE_NAME` — they are available without any additional configuration in Next.js server components and route handlers.

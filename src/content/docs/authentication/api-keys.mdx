@@ -1,0 +1,210 @@
+---
+title: API Keys
+description: When to use them, scoping, rotation, and the places they must never appear
+---
+
+## Summary
+
+API keys are the simplest credential: a pre-shared secret passed as a Bearer token. Use them only when scope is narrow, rotation is fast (days not months), and the service is trusted infrastructure. They break with broad scope, slow rotation, or leakage in logs or commit history.
+
+- Use only for trusted infrastructure, narrow scope, short-lived keys
+- Store in environment variables at startup, fail fast if missing
+- Each key scoped to minimum permissions (invoices:read, not admin)
+- Rotate with overlap window: issue new, deploy, verify, revoke old
+- Never in URLs, logs, or code; handle 401 by refreshing and retrying
+
+API keys are the simplest machine credential: a pre-shared secret in an environment variable, passed as a Bearer token on every request. They work when the service is your own infrastructure, the scope is narrow, and the key is short-lived. They break when scope is broad, rotation is slow, or the key ends up in a log or commit history.
+
+## When API Keys Are OK
+
+API keys are appropriate when:
+- The calling service is trusted infrastructure you control.
+- The key's permissions are narrow (`resource:read` only, not `admin`).
+- The key can be rotated in hours or days, not months.
+- The target service has no OAuth implementation or it's prohibitively complex.
+
+API keys are not appropriate when:
+- The key grants broad permissions (`admin`, `*`, all operations).
+- Third-party agents or services need independent credential revocation.
+- You need per-user delegation or on-behalf-of semantics.
+- The key will persist for months without rotation.
+
+When in doubt, use OAuth 2.1 Client Credentials instead.
+
+## Environment Variable Storage
+
+Store keys in environment variables or secret managers, never in code:
+
+```typescript
+const apiKey = process.env.STRIPE_API_KEY;
+if (!apiKey) throw new Error('STRIPE_API_KEY is required');
+
+const res = await fetch('https://api.stripe.com/v1/charges', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${apiKey}` },
+  body: new URLSearchParams({ amount: '2000', currency: 'usd' }),
+});
+```
+
+Read keys once at startup. Fail fast if missing — a `KeyError` at boot is better than an auth error in production.
+
+## Scoping Keys
+
+Every key must be scoped to the minimum permissions required for its task. A key that reads invoices should not create them. A key for one resource type should not touch another.
+
+Design discrete scopes:
+
+```
+invoices:read    read and list
+invoices:write   create and update
+customers:read
+customers:write
+payments:read
+admin            only when truly necessary
+```
+
+Request only what you need:
+
+```typescript
+// Summarizing invoices: only read, not write
+const readKey = process.env.INVOICES_READ_KEY;
+
+// Creating invoices: separate key with write scope
+const writeKey = process.env.INVOICES_WRITE_KEY;
+```
+
+Enforce scopes in your API routes:
+
+```typescript
+function requireScope(scope: string) {
+  return (req: Request) => {
+    const keyScopes = req.auth?.scopes || [];
+    if (!keyScopes.includes(scope)) {
+      return Response.json(
+        {
+          type: 'https://example.com/errors/forbidden',
+          title: 'Insufficient scope',
+          detail: `Requires scope: ${scope}`,
+          granted_scopes: keyScopes,
+        },
+        { status: 403 }
+      );
+    }
+  };
+}
+
+router.get('/invoices', requireScope('invoices:read'), listInvoices);
+router.post('/invoices', requireScope('invoices:write'), createInvoice);
+```
+
+## Rotation and Expiry
+
+Issue keys with explicit expiry dates (days or weeks, not months or years). Shorter-lived keys limit blast radius if leaked.
+
+```json
+{
+  "key": "ak_live_...",
+  "key_id": "key_01HV3K8MNP",
+  "created_at": "2025-01-01T00:00:00Z",
+  "expires_at": "2025-01-15T00:00:00Z",
+  "scopes": ["invoices:read"]
+}
+```
+
+Agents should check expiry proactively:
+
+```typescript
+async function getValidKey(store: KeyStore): Promise<string> {
+  const key = await store.getCurrent();
+  const expiresAt = new Date(key.expires_at);
+  const now = new Date();
+
+  // Refresh if within 1 hour of expiry
+  if (expiresAt.getTime() - now.getTime() < 60 * 60 * 1000) {
+    const newKey = await store.rotateKey(key.key_id);
+    return newKey.key;
+  }
+
+  return key.key;
+}
+```
+
+Rotation uses an overlap window to prevent interruptions:
+
+1. Issue new key while old key is still valid
+2. Deploy new key to all services using it
+3. Verify services are using the new key (check logs, metrics)
+4. Revoke the old key
+
+```typescript
+async function rotateKey(keyId: string, client: KeyManagementClient) {
+  const newKey = await client.issueKey({
+    scopes: ['invoices:read'],
+    expires_in_days: 14,
+  });
+
+  await secretsStore.set('API_KEY', newKey.key);
+
+  // Grace period for in-flight requests
+  await new Promise(r => setTimeout(r, 5 * 60 * 1000));
+
+  await client.revokeKey(keyId);
+}
+```
+
+Services should handle 401 by refreshing and retrying once:
+
+```typescript
+async function callWithRetry(url: string, options: RequestInit) {
+  let res = await fetch(url, { ...options, headers: withAuth(options.headers) });
+
+  if (res.status === 401) {
+    await rotateKey();
+    res = await fetch(url, { ...options, headers: withAuth(options.headers) });
+  }
+
+  return res;
+}
+```
+
+## Where Keys Must Never Appear
+
+Never in query strings. URLs are logged everywhere:
+
+```bash
+# Wrong
+curl "https://api.example.com/data?api_key=sk_live_..."
+
+# Right
+curl -H "Authorization: Bearer sk_live_..." "https://api.example.com/data"
+```
+
+Never in logs. Redact before serializing:
+
+```typescript
+function sanitizeHeaders(headers: Record<string, string>) {
+  const clean = { ...headers };
+  if (clean.authorization) clean.authorization = '[REDACTED]';
+  return clean;
+}
+
+logger.info('Request', { url, headers: sanitizeHeaders(headers) });
+```
+
+Never in Referer headers. Never hardcoded in source code.
+
+## Checklist
+
+- [ ] Keys are read from environment variables at startup
+- [ ] Missing keys fail fast with a clear error
+- [ ] Each key is scoped to the minimum required permissions
+- [ ] Keys expire in days or weeks, not months or years
+- [ ] Key rotation uses an overlap window (new before revoke)
+- [ ] 401 responses trigger key refresh and retry
+- [ ] Keys never appear in URLs, logs, or code
+- [ ] Broad-scoped static keys are migrated to OAuth Client Credentials
+
+## See Also
+
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — the preferred M2M flow
+- [Auth Anti-Patterns](/docs/authentication/anti-patterns) — credential mistakes to avoid

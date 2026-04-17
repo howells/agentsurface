@@ -1,0 +1,313 @@
+---
+title: Testing MCP Servers
+description: Unit tests, in-memory integration tests, and interactive debugging with MCP Inspector
+---
+
+## Summary
+
+Three testing levels catch different problems: unit tests (individual tool handlers), in-memory integration tests (full protocol stack), and MCP Inspector (interactive debugging). The createServer() factory pattern is essential — it enables testing without network I/O, ports, or process management. Tests use in-memory transport and can exercise servers synchronously.
+
+- Level 1: Unit tests for tool registration and handlers
+- Level 2: In-memory integration tests via InMemoryTransport
+- Level 3: Interactive MCP Inspector for debugging
+- createServer() factory enables testing without network
+- Mock external dependencies; use in-memory databases
+- Test invalid inputs, edge cases, and error paths
+
+Testing an MCP server has three distinct levels: unit tests for individual tool handlers, in-memory integration tests that exercise the full protocol stack, and interactive inspection via the MCP Inspector. Each level catches different classes of problems — none of them is sufficient on its own.
+
+## Why the createServer() Factory Matters for Testing
+
+The `createServer()` factory pattern described in [Server Architecture](./architecture) exists primarily to enable testing. A server that starts a network listener in its constructor cannot be tested without ports, process management, and timing concerns. A factory function that returns a configured `McpServer` can be connected to an `InMemoryTransport` in a test and exercised synchronously.
+
+```typescript
+// src/server.ts — the pattern that enables testing
+export function createServer(config: ServerConfig): McpServer {
+  const server = new McpServer({ name: "billing-mcp", version: "1.0.0" });
+  registerCreateInvoice(server, config);
+  registerListInvoices(server, config);
+  registerVoidInvoice(server, config);
+  return server;
+}
+```
+
+Every test calls `createServer()` with a test configuration — an in-memory database URL, a mock API key, reduced limits. No subprocesses, no ports, no cleanup between tests beyond what the test framework provides.
+
+## Level 1: Unit Tests
+
+Unit tests cover individual tool registration functions. They verify that the schema validates correctly, that the handler returns expected output for valid inputs, and that it returns `isError: true` for invalid domain conditions.
+
+```typescript
+// src/tools/create-invoice.test.ts
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerCreateInvoice } from "./create-invoice.js";
+import * as db from "../db.js";
+
+vi.mock("../db.js");
+
+describe("billing_create_invoice", () => {
+  let server: McpServer;
+
+  beforeEach(() => {
+    server = new McpServer({ name: "test", version: "0.0.0" });
+    registerCreateInvoice(server, {
+      stripeApiKey: "sk_test_key",
+      databaseUrl: ":memory:",
+    });
+  });
+
+  it("returns isError when customer does not exist", async () => {
+    vi.mocked(db.customers.findById).mockResolvedValue(null);
+
+    const result = await callTool(server, "billing_create_invoice", {
+      customer_id: "00000000-0000-0000-0000-000000000001",
+      amount_cents: 5000,
+      currency: "usd",
+      due_date: "2025-12-31",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("not found");
+    expect(result.content[0].text).toContain("billing_list_customers");
+  });
+
+  it("rejects invalid amount_cents", async () => {
+    const result = await callTool(server, "billing_create_invoice", {
+      customer_id: "00000000-0000-0000-0000-000000000001",
+      amount_cents: -100, // negative
+      currency: "usd",
+      due_date: "2025-12-31",
+    });
+
+    expect(result.isError).toBe(true);
+  });
+});
+
+// Helper — exercise the tool handler without a transport
+async function callTool(
+  server: McpServer,
+  toolName: string,
+  params: Record<string, unknown>
+) {
+  const tool = (server as any)._registeredTools.get(toolName);
+  if (!tool) throw new Error(`Tool not registered: ${toolName}`);
+  return tool.handler(params, {});
+}
+```
+
+## Level 2: In-Memory Integration Tests
+
+Integration tests exercise the full MCP protocol stack using `InMemoryTransport.createLinkedPair()`. The client and server communicate via the MCP JSON-RPC protocol over an in-memory channel — the same code paths that run in production, without any network.
+
+```typescript
+// src/server.integration.test.ts
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "./server.js";
+
+describe("billing-mcp integration", () => {
+  let client: Client;
+  let cleanup: () => Promise<void>;
+
+  beforeEach(async () => {
+    const server = createServer({
+      stripeApiKey: "sk_test_key",
+      databaseUrl: ":memory:",
+      maxInvoicesPerPage: 10,
+    });
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    client = new Client(
+      { name: "test-client", version: "1.0.0" },
+      { capabilities: {} }
+    );
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    cleanup = async () => {
+      await client.close();
+    };
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  it("lists all registered tools", async () => {
+    const { tools } = await client.listTools();
+
+    const toolNames = tools.map((t) => t.name);
+    expect(toolNames).toContain("billing_create_invoice");
+    expect(toolNames).toContain("billing_list_invoices");
+    expect(toolNames).toContain("billing_void_invoice");
+  });
+
+  it("returns tool descriptions", async () => {
+    const { tools } = await client.listTools();
+
+    const createTool = tools.find((t) => t.name === "billing_create_invoice");
+    expect(createTool?.description).toBeTruthy();
+    expect(createTool?.description?.length).toBeGreaterThan(50);
+  });
+
+  it("validates required fields on billing_create_invoice", async () => {
+    const result = await client.callTool({
+      name: "billing_create_invoice",
+      arguments: {
+        // Missing required fields: amount_cents, currency, due_date
+        customer_id: "00000000-0000-0000-0000-000000000001",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  it("returns isError for non-existent customer", async () => {
+    const result = await client.callTool({
+      name: "billing_create_invoice",
+      arguments: {
+        customer_id: "00000000-0000-0000-0000-000000000099",
+        amount_cents: 5000,
+        currency: "usd",
+        due_date: "2025-12-31",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const message = (result.content as Array<{ text: string }>)[0]?.text;
+    expect(message).toMatch(/not found/i);
+  });
+
+  it("creates an invoice successfully", async () => {
+    // Seed a customer first
+    await db.customers.create({ id: TEST_CUSTOMER_ID, ... });
+
+    const result = await client.callTool({
+      name: "billing_create_invoice",
+      arguments: {
+        customer_id: TEST_CUSTOMER_ID,
+        amount_cents: 5000,
+        currency: "usd",
+        due_date: "2025-12-31",
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const data = JSON.parse(
+      (result.content as Array<{ text: string }>)[0].text
+    );
+    expect(data.invoice_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    expect(data.status).toBe("draft");
+  });
+
+  it("lists resources", async () => {
+    const { resources } = await client.listResources();
+    const uris = resources.map((r) => r.uri);
+    expect(uris).toContain("billing://schemas/invoice");
+  });
+
+  it("reads the invoice schema resource", async () => {
+    const result = await client.readResource({
+      uri: "billing://schemas/invoice",
+    });
+
+    expect(result.contents).toHaveLength(1);
+    const schema = JSON.parse(result.contents[0].text as string);
+    expect(schema.$schema).toBeTruthy();
+    expect(schema.properties).toHaveProperty("id");
+  });
+});
+```
+
+The `InMemoryTransport.createLinkedPair()` call returns two transport objects that are wired together. Anything written to one appears on the other. There are no async I/O operations — the transport is synchronous in memory. Tests run at the full speed of the JavaScript runtime.
+
+## Testing Approach Matrix
+
+| Scenario | Level | Tool |
+| ---|---|---|
+| Schema validation rejects bad input | Unit | Direct handler call |
+| isError returned for domain errors | Unit | Direct handler call |
+| All tools are registered | Integration | `client.listTools()` |
+| Tool descriptions are non-empty | Integration | `client.listTools()` |
+| Full happy path creates correct output | Integration | `client.callTool()` |
+| Resources are readable | Integration | `client.readResource()` |
+| Prompts return expected messages | Integration | `client.getPrompt()` |
+| Human-friendly interactive testing | Interactive | MCP Inspector |
+| Authentication is enforced | Integration | Custom auth middleware test |
+
+## MCP Inspector
+
+The MCP Inspector is an interactive browser-based tool for exploring and testing MCP servers. It connects to a running server and lets you browse tools, call them with custom arguments, inspect responses, and debug protocol messages.
+
+**Launch against a local stdio server:**
+
+```bash
+npx @modelcontextprotocol/inspector node dist/cli.js
+```
+
+**Launch against an HTTP server:**
+
+```bash
+npx @modelcontextprotocol/inspector --url http://localhost:3000/mcp
+```
+
+**With debug logging enabled:**
+
+```bash
+MCP_INSPECTOR_LOG_LEVEL=debug npx @modelcontextprotocol/inspector node dist/cli.js
+```
+
+By default, the Inspector opens on port 5173 (UI) and 3000 (proxy). If those ports are in use:
+
+```bash
+npx @modelcontextprotocol/inspector --port 5174 --proxy-port 3001 node dist/cli.js
+```
+
+**Inspector features:**
+
+- Browse the full tool list with names, descriptions, and input schemas
+- Fill in tool arguments using a generated form UI
+- Call tools and inspect the raw MCP response, including `isError` state
+- Browse resources and read their content
+- List and preview prompt templates
+- View the raw JSON-RPC message log for debugging protocol issues
+- Test server capabilities advertised during initialization
+
+Use the Inspector for exploratory testing, verifying that descriptions read well, and debugging tool failures before writing regression tests. It is not a substitute for automated tests — errors you find in the Inspector should become test cases.
+
+<Callout type="info">
+The Inspector connects using the same MCP client library used by Claude Desktop and other MCP clients. If something works in the Inspector but fails in your actual agent client, the issue is in the client configuration or authentication layer, not the server implementation.
+</Callout>
+
+## Vitest Configuration
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["src/tools/**", "src/resources/**", "src/prompts/**"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+      },
+    },
+  },
+});
+```
+
+Coverage thresholds on the `tools/`, `resources/`, and `prompts/` directories enforce that the core server logic is tested. The server factory (`server.ts`) and CLI entry point (`cli.ts`) are integration-tested via the in-memory tests rather than unit-tested directly.

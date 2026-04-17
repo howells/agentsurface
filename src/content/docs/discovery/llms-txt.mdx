@@ -1,0 +1,231 @@
+---
+title: llms.txt
+description: The llms.txt specification for giving AI agents a curated, token-efficient index of your site
+---
+
+## Summary
+
+llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation (costly in tokens), llms.txt lets you declare upfront what matters most. As of mid-2025, over 844,000 sites serve llms.txt. Primary consumers are IDE integrations like Cursor and Claude Code.
+
+- Served at /llms.txt as text/plain; charset=utf-8
+- Required: H1 with product/site name
+- Recommended: blockquote summary, H2 sections with links and descriptions
+- Link format: - [Title](url): description
+- Total size under 5,000 tokens for efficiency
+- Use ## Optional section for lower-priority content
+
+The `llms.txt` specification, proposed by Jeremy Howard in September 2024 at [llmstxt.org](https://llmstxt.org), gives sites a standard location to publish a curated, token-efficient index of their content. Where a sitemap describes every URL for crawlers, `llms.txt` describes the most important content for AI agents — with enough context to navigate without crawling the full site.
+
+## The Problem It Solves
+
+An AI agent trying to use your API or understand your product faces a practical constraint: context windows are finite. Crawling your entire documentation site could cost hundreds of thousands of tokens before the agent answers a single question. `llms.txt` moves the curation work to the publisher, letting you declare in advance what an AI needs to know and where to find it.
+
+As of mid-2025, over 844,000 sites serve an `llms.txt` file. The primary confirmed consumers are IDE integrations — Cursor, Claude Code, and similar tools that index `llms.txt` during project setup or on demand.
+
+## Canonical Format
+
+`llms.txt` is served at the root path (`/llms.txt`) as `text/plain; charset=utf-8`. The format is a subset of Markdown with a specific structure:
+
+```markdown
+# Product Name
+
+> One-paragraph summary of what this product is and who it's for.
+
+## Section Name
+
+- [Page Title](https://example.com/page.md): Short description of what this page covers.
+- [Page Title](https://example.com/other.md): Short description.
+
+## Another Section
+
+- [Page Title](https://example.com/more.md): Short description.
+
+## Optional
+
+- [Less Critical Page](https://example.com/optional.md): Lower-priority content.
+```
+
+The only required element is the H1 (`#`) with the product or site name. Everything else is recommended but optional.
+
+**H1** — Required. Site or product name. One per file.
+
+**Blockquote summary** — Recommended. One paragraph describing the product and its intended users. Appears directly below the H1.
+
+**H2 sections** — Group related links. Section names are free-form.
+
+**Link list items** — Each item is `[Title](URL): Description`. The colon-and-description suffix is optional but strongly recommended. Descriptions help agents prioritize which links to fetch.
+
+**`## Optional` section** — A specially named section that agents can skip when operating under context pressure. Put supplementary content — changelog entries, older tutorials, edge-case reference — in this section.
+
+## The .md URL Convention
+
+Links in `llms.txt` should point to the Markdown version of each page, not the HTML version. The convention is appending `.md` to the URL path:
+
+```
+https://docs.example.com/authentication       → HTML page for browsers
+https://docs.example.com/authentication.md    → Markdown for agents
+```
+
+If your site does not yet serve `.md` endpoints, link to the HTML pages as a fallback. See [Content Negotiation](./content-negotiation) for how to implement Markdown serving.
+
+## Token Budget
+
+Keep the full `llms.txt` under 5,000 tokens. This fits comfortably in a single context window turn and ensures agents can load the entire index at once without truncation.
+
+The Anthropic `llms.txt` is a useful reference point: their index file is approximately 8,364 tokens and their `llms-full.txt` is approximately 481,349 tokens. Both extremes demonstrate what is possible, but the index should be the compact version — agents fetch the full content when they need depth.
+
+## Real Examples
+
+**Anthropic** publishes two files:
+- `/llms.txt` — 8,364-token index with sections for Claude models, APIs, and product features
+- `/llms-full.txt` — 481,349-token file with all documentation content inlined
+
+**Stripe** publishes three files across their domains:
+- `stripe.com/llms.txt` — product overview and marketing content
+- `docs.stripe.com/llms.txt` — full API and integration documentation
+- `support.stripe.com/llms.txt` — help center and troubleshooting content
+
+Stripe also uses an `## Instructions` section (see below) to give behavioral guidance to AI agents about how to handle Stripe-specific concepts.
+
+**Vercel** organizes sections by product area:
+- Deployment, Edge Functions, Storage, Observability, and CLI each appear as separate H2 sections
+- Each link includes a description that differentiates it from adjacent pages
+- The file is kept under 3,000 tokens despite covering dozens of products
+
+## The Instructions Section
+
+Stripe's pattern of adding an `## Instructions` section is worth adopting. Unlike a pure index, this section gives behavioral guidance to AI agents:
+
+```markdown
+## Instructions
+
+- When discussing pricing, always refer users to the current pricing page rather than quoting figures directly.
+- The API uses camelCase for JSON keys in requests and snake_case in webhook payloads — these are not inconsistencies.
+- Authentication is always via Bearer token in the Authorization header, never via query parameters.
+- Rate limit errors use HTTP 429 with a Retry-After header. Always surface this to the user.
+```
+
+Agents reading this section before answering questions will follow these directives. This is particularly useful for:
+
+- Correcting common misconceptions agents develop from training data
+- Flagging which information goes stale quickly (pricing, feature availability)
+- Clarifying naming conventions and terminology that conflict with common usage
+- Directing agents to authoritative sources for specific topics
+
+## llms-full.txt
+
+`llms-full.txt` is the companion to `llms.txt`. Where the index links to pages, the full file inlines all content:
+
+```markdown
+# Product Name
+
+> Summary of the product.
+
+## Authentication
+
+### API Keys
+
+[Full content of the authentication page...]
+
+### OAuth 2.0
+
+[Full content of the OAuth page...]
+```
+
+`llms-full.txt` serves two distinct use cases:
+
+**RAG pipelines** — Teams building internal knowledge bases chunk and embed `llms-full.txt` rather than crawling and parsing HTML. A single well-structured file is easier to process than hundreds of HTML pages.
+
+**IDE indexing** — Tools like Cursor and Claude Code download `llms-full.txt` once and index it locally. Subsequent queries against your documentation happen without network round trips.
+
+Maintain `llms-full.txt` as a generated artifact. Inlining content manually does not scale. See [Generation Tools](#generation-tools) below.
+
+## Serving Requirements
+
+Serve both files as `text/plain; charset=utf-8`. Do not use `text/html` or `text/markdown`. Some agents and tools check the Content-Type header and will reject files served under the wrong type.
+
+```
+Content-Type: text/plain; charset=utf-8
+Cache-Control: public, max-age=86400
+```
+
+A 24-hour cache is appropriate since `llms.txt` changes infrequently. If your documentation deploys frequently, use a shorter TTL or add a `Last-Modified` header so agents can revalidate efficiently.
+
+You can also reference `llms.txt` from `robots.txt`:
+
+```
+# robots.txt
+User-agent: *
+Allow: /
+
+# LLM index
+Sitemap: https://example.com/sitemap.xml
+# llms.txt: https://example.com/llms.txt
+```
+
+The `# llms.txt:` comment line is an informal convention — it is not part of the robots.txt specification but some crawlers recognize it.
+
+## Generation Tools
+
+Most documentation platforms now generate `llms.txt` automatically:
+
+**Mintlify** — generates `llms.txt` and `llms-full.txt` from your docs config. No additional configuration required.
+
+**Fern** — generates `llms.txt` alongside OpenAPI documentation. Configurable section grouping.
+
+**GitBook** — generates `llms.txt` from your space's table of contents.
+
+**Docusaurus** — community plugin `docusaurus-plugin-llms-txt` generates both files at build time.
+
+**WordPress** — plugins available for major documentation themes.
+
+**Next.js** — implement as a route handler:
+
+```typescript
+// app/llms.txt/route.ts
+import { source } from '@/lib/source'
+
+export async function GET() {
+  const pages = source.getPages()
+
+  const sections = groupPagesBySection(pages)
+
+  const lines = [
+    '# Your Product Name',
+    '',
+    '> What your product does and who it serves.',
+    '',
+  ]
+
+  for (const [section, sectionPages] of Object.entries(sections)) {
+    lines.push(`## ${section}`, '')
+    for (const page of sectionPages) {
+      lines.push(`- [${page.data.title}](${page.url}.md): ${page.data.description}`)
+    }
+    lines.push('')
+  }
+
+  return new Response(lines.join('\n'), {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, max-age=86400',
+    },
+  })
+}
+```
+
+## Directories
+
+If you want to verify your file is discoverable:
+
+- **llmstxthub.com** — directory of submitted `llms.txt` files with category browsing
+- **llms-txt-hub** — GitHub-based registry with programmatic access
+- **llms-txt.io** — validation tool that checks format and token count
+
+Submission to directories is optional. The primary value of `llms.txt` comes from agents discovering the file at the standard path, not from directory listings.
+
+## Adoption and Consumption
+
+As of early 2025, no major LLM provider has confirmed that `llms.txt` is consumed at inference time during web browsing or RAG retrieval. The confirmed value is in development tools: IDE extensions that index documentation, agents that fetch the file when starting a task, and internal RAG pipelines that use `llms-full.txt` for knowledge base construction.
+
+This may change. Several browser agents and web-augmented models have indicated `llms.txt` awareness in their system prompts. Publishing the file costs nothing and positions your site for adoption as the standard matures.

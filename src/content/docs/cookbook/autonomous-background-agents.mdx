@@ -1,0 +1,433 @@
+---
+title: Autonomous Background Agents
+description: Scheduled workers that proactively generate insights, match records, send reminders. Separate from interactive agents.
+---
+
+## Summary
+
+Background agents run on schedules (hourly, daily, weekly) independent of user requests. They proactively generate insights, match records, reconcile data, send reminders, or batch process events. They use the same tools and prompts as interactive agents but run in workers, not chat loops. Batching (10–60 min windows) prevents spam; idempotency tracking prevents duplicates.
+
+- **Separate from chat agents**: No user interaction; runs on cron/schedule.
+- **Proactive actions**: Generate weekly insights, match pending records, send overdue reminders.
+- **Batched**: Collect changes during a window; send one summary instead of many notifications.
+- **Idempotent**: Track processed items; don't reprocess on retry.
+- **Orchestration**: Temporal, Inngest, or Bun cron + database state.
+
+---
+
+## Use Cases
+
+1. **Weekly insights generator**: "Here's your top-spending category this week; up 20% from last week."
+2. **Smart reconciliation**: Auto-match incoming records (receipts, invoices, transactions) based on heuristics.
+3. **Overdue reminders**: Every day at 9am, send reminders for unpaid invoices due in `` `<3` `` days.
+4. **Data enrichment**: Background task enriches customer records with LinkedIn/web data.
+5. **Batch notifications**: Collect 10 events; send one "You have 10 new items" instead of 10 notifications.
+6. **Compliance reports**: Scheduled tasks run month-end reports and store as PDFs.
+
+---
+
+## Pattern: Scheduled Job with ToolLoopAgent
+
+```typescript
+// apps/worker/src/processors/insights-generator.ts
+import { ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { db } from "@midday/db";
+
+export async function generateWeeklyInsights(teamId: string) {
+  // 1. Load team context
+  const team = await db.getTeam(teamId);
+  const userIds = await db.getTeamUserIds(teamId);
+
+  // 2. Fetch this week's data
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7);
+  
+  const transactions = await db.getTransactions(teamId, {
+    startDate,
+    endDate: new Date(),
+  });
+
+  // 3. Build insight generation prompt
+  const systemPrompt = `
+You are a financial insights analyst for a SaaS. Generate a brief weekly summary.
+
+Data for analysis:
+- Transactions this week: ${transactions.length}
+- Total revenue: $${transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)}
+- Total expenses: $${transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)}
+
+Task: Generate 3-5 bullet-point insights comparing this week to last week.
+Use ONLY the data provided; don't invent numbers.
+Keep it under 200 words.
+`;
+
+  // 4. Run agent to generate insights
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: systemPrompt,
+    tools: {
+      compare_periods: {
+        description: "Compare metrics between two periods",
+        parameters: z.object({
+          metric: z.enum(["revenue", "expenses", "transactions"]),
+          period1: z.string(),
+          period2: z.string(),
+        }),
+        execute: async (params) => {
+          const prev = await db.getMetric(teamId, params.metric, params.period1);
+          const curr = await db.getMetric(teamId, params.metric, params.period2);
+          return {
+            previous: prev,
+            current: curr,
+            change: ((curr - prev) / prev * 100).toFixed(1) + "%",
+          };
+        },
+      },
+    },
+    stopWhen: stepCountIs(5),
+  });
+
+  const stream = await agent.stream({
+    messages: [{ role: "user", content: "Generate insights" }],
+  });
+
+  const result = await stream.finalMessage();
+  const insights = result.content[0].text;
+
+  // 5. Store and notify
+  await db.createInsight(teamId, {
+    type: "weekly_summary",
+    content: insights,
+    generatedAt: new Date(),
+  });
+
+  // Notify all team users
+  for (const userId of userIds) {
+    await notificationService.send(userId, {
+      title: "Weekly Insights",
+      body: insights.split("\n")[0], // First line as preview
+      data: {
+        type: "insight",
+        insightId: insight.id,
+      },
+    });
+  }
+
+  logger.info("[Worker] Generated weekly insights", { teamId, userCount: userIds.length });
+}
+```
+
+---
+
+## Scheduled Execution
+
+Use Temporal (production-grade), Inngest (simpler), or Bun cron:
+
+### Temporal
+
+```typescript
+// apps/worker/src/workflows/insights-workflow.ts
+import { proxyActivities } from "@temporalio/workflow";
+
+const activities = proxyActivities<typeof insightsActivities>({
+  startToCloseTimeout: "10 minutes",
+});
+
+export async function insightsWorkflow(teamId: string) {
+  // Run every Sunday at 9am
+  const result = await activities.generateWeeklyInsights(teamId);
+  return result;
+}
+
+// Register schedule
+const client = new WorkflowClient();
+const schedule = await client.schedule.create({
+  scheduleId: `insights-${teamId}`,
+  spec: {
+    intervals: [{ every: "1 week", offset: "sunday 09:00:00" }],
+  },
+  action: {
+    type: "StartWorkflow",
+    workflowType: "insightsWorkflow",
+    args: [teamId],
+  },
+});
+```
+
+### Inngest
+
+```typescript
+// apps/worker/src/inngest.ts
+import { inngest } from "@inngest/sdk";
+
+export const generateWeeklyInsights = inngest.createFunction(
+  { id: "generate-weekly-insights" },
+  { cron: "0 9 ? * SUN" }, // Every Sunday at 9am UTC
+  async ({ event, step }) => {
+    const teams = await db.getAllTeams();
+
+    for (const team of teams) {
+      // Each team gets its own insight generation
+      await step.run("generate-insights", () =>
+        generateWeeklyInsights(team.id)
+      );
+    }
+  }
+);
+```
+
+### Bun Cron
+
+```typescript
+// apps/worker/src/cron.ts
+import { CronJob } from "cron";
+
+// Every Sunday at 9am
+const job = new CronJob("0 9 ? * SUN", async () => {
+  const teams = await db.getAllTeams();
+  for (const team of teams) {
+    await generateWeeklyInsights(team.id);
+  }
+});
+
+job.start();
+```
+
+---
+
+## Idempotency: Prevent Duplicates
+
+If a job runs twice (retry, network issue), don't process the same data twice:
+
+```typescript
+// apps/worker/src/processors/insights-generator.ts
+export async function generateWeeklyInsights(teamId: string, executionId: string) {
+  // Check if already processed
+  const existing = await db.getInsightExecution({
+    teamId,
+    executionId, // Unique ID per scheduled run
+  });
+
+  if (existing?.completed) {
+    logger.info("[Worker] Insights already generated for this execution", {
+      teamId,
+      executionId,
+    });
+    return existing.result;
+  }
+
+  try {
+    // ... generate insights ...
+
+    // Mark as complete
+    await db.createInsightExecution({
+      teamId,
+      executionId,
+      result: insights,
+      completed: true,
+      completedAt: new Date(),
+    });
+
+    return insights;
+  } catch (err) {
+    // Mark as failed (can retry)
+    await db.updateInsightExecution({
+      teamId,
+      executionId,
+      completed: false,
+      error: err.message,
+    });
+
+    throw err;
+  }
+}
+```
+
+**Temporal/Inngest handle `executionId` automatically; Bun requires manual tracking.**
+
+---
+
+## Batching: Prevent Notification Spam
+
+Instead of 10 notifications, collect changes and send one summary:
+
+```typescript
+// apps/worker/src/processors/batch-notifier.ts
+export async function batchNotifyNewRecords() {
+  // 1. Collect all new records created in the last 10 minutes
+  const window = new Date(Date.now() - 10 * 60 * 1000); // 10 min window
+  const newRecords = await db.getRecordsCreatedAfter(window);
+
+  // 2. Group by user/team
+  const grouped = groupBy(newRecords, (r) => r.teamId);
+
+  // 3. For each team, create one batch notification
+  for (const [teamId, records] of Object.entries(grouped)) {
+    const team = await db.getTeam(teamId);
+    const userIds = await db.getTeamUserIds(teamId);
+
+    if (records.length === 0) continue;
+
+    // Summary: "You have 5 new records: 3 orders, 2 invoices"
+    const summary = `You have ${records.length} new records: ${summarizeRecords(records)}`;
+
+    // Send to all team users
+    for (const userId of userIds) {
+      await notificationService.send(userId, {
+        title: "New Records",
+        body: summary,
+        data: {
+          type: "batch_records",
+          recordIds: records.map((r) => r.id),
+        },
+      });
+    }
+
+    logger.info("[Worker] Sent batch notification", {
+      teamId,
+      recordCount: records.length,
+      userCount: userIds.length,
+    });
+  }
+}
+
+// Cron: every 10 minutes
+new CronJob("*/10 * * * *", batchNotifyNewRecords).start();
+```
+
+---
+
+## Smart Matching/Reconciliation
+
+Background worker auto-matches records (receipts to expenses, invoices to payments):
+
+```typescript
+// apps/worker/src/processors/smart-matcher.ts
+export async function matchPendingRecords(teamId: string) {
+  // Find unmatched records
+  const pending = await db.getUnmatchedRecords(teamId);
+
+  for (const record of pending) {
+    // Use agent to find matching records
+    const agent = new ToolLoopAgent({
+      model: openai("gpt-4o-mini"),
+      instructions: `
+You are a record matching specialist. Find the best match for this record:
+${JSON.stringify(record)}
+
+Rules:
+1. Amount must match (within 0.5%)
+2. Date must be within 5 days
+3. Vendor/customer names should match (fuzzy OK)
+
+Use the find_candidates tool to search. Then call match_record to confirm.
+`,
+      tools: {
+        find_candidates: {
+          description: "Find records that might match",
+          parameters: z.object({ query: z.string() }),
+          execute: async (params) => {
+            const candidates = await db.searchRecords(teamId, params.query);
+            return candidates.slice(0, 5);
+          },
+        },
+        match_record: {
+          description: "Confirm a match between two records",
+          parameters: z.object({
+            recordId: z.string(),
+            candidateId: z.string(),
+            confidence: z.number().min(0).max(1),
+          }),
+          execute: async (params) => {
+            if (params.confidence > 0.8) {
+              await db.linkRecords(teamId, params.recordId, params.candidateId);
+              return { success: true };
+            }
+            return { success: false, reason: "Confidence too low" };
+          },
+        },
+      },
+      stopWhen: stepCountIs(5),
+    });
+
+    const stream = await agent.stream({
+      messages: [
+        {
+          role: "user",
+          content: `Find and match this record: ${record.description}`,
+        },
+      ],
+    });
+
+    await stream.finalMessage();
+  }
+
+  logger.info("[Worker] Matched pending records", { teamId, count: pending.length });
+}
+```
+
+---
+
+## Monitoring & Alerting
+
+Track background job health:
+
+```typescript
+// apps/worker/src/health.ts
+export async function checkWorkerHealth() {
+  const jobs = [
+    "generate-weekly-insights",
+    "batch-notify-new-records",
+    "match-pending-records",
+  ];
+
+  for (const jobName of jobs) {
+    const lastRun = await db.getJobLastRun(jobName);
+    const expectedInterval = getExpectedInterval(jobName); // 7 days, 10 min, etc.
+
+    const timeSinceRun = Date.now() - lastRun.completedAt.getTime();
+
+    if (timeSinceRun > expectedInterval * 1.5) {
+      // Job is overdue
+      alert.send({
+        level: "warning",
+        message: `Worker job ${jobName} overdue (last run: ${lastRun.completedAt})`,
+      });
+    }
+
+    if (lastRun.error) {
+      alert.send({
+        level: "error",
+        message: `Worker job ${jobName} failed: ${lastRun.error}`,
+      });
+    }
+  }
+}
+
+// Run health check every hour
+new CronJob("0 * * * *", checkWorkerHealth).start();
+```
+
+---
+
+## Checklist
+
+- [ ] Define background job: what data to process, what agent should generate/decide.
+- [ ] Build agent with ToolLoopAgent; use same tools + prompts as chat agent.
+- [ ] Set up scheduler: Temporal, Inngest, or cron.
+- [ ] Implement idempotency: track execution IDs, don't reprocess.
+- [ ] Batch notifications: collect changes in a window; send one summary.
+- [ ] Add error handling: retry failed jobs; alert on repeated failures.
+- [ ] Monitor job health: track last-run times, duration, error rates.
+- [ ] Test with real data: verify insights/matches are correct.
+- [ ] Document job schedules: link to observability dashboard.
+
+---
+
+## See Also
+
+- [Agentic Loop](/docs/cookbook/agentic-loop) — ToolLoopAgent for background jobs.
+- [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — composing prompts for specialized tasks.
+- [Tool Design](/docs/tool-design) — designing tools for worker contexts.
+

@@ -1,0 +1,204 @@
+# Arazzo 1.0.1 Workflow — Multi-step agent orchestration
+#
+# Canonical spec: https://www.openapis.org/arazzo-specification
+# Aligned with: OpenAPI 3.1.x
+# Use case: Compose multi-step agent workflows (create → validate → notify)
+#
+# When to use this:
+# - Multi-step operations that must occur in sequence
+# - Workflows requiring data flow between steps
+# - Agent-discoverable workflows (agents understand successCriteria)
+# - Retry logic and conditional branching
+#
+# Customization checklist:
+# ✓ Update sourceDescriptions[] with your API spec URLs
+# ✓ Update workflow steps with actual operationIds from spec
+# ✓ Set successCriteria based on real response conditions
+# ✓ Configure retryPolicy for flaky operations
+# ✓ Add onFailure actions (rollback, notify, etc.)
+# ✓ Declare workflow outputs
+# ✓ Test against real API
+
+arazzo: 1.0.1
+info:
+  title: Agent Onboarding Workflow
+  version: 1.0.0
+  description: |
+    Multi-step workflow to create a new agent, validate configuration, and send notification.
+
+    Demonstrates:
+    - Sequential step orchestration
+    - Data flow between steps ($steps.X.outputs.Y)
+    - Success criteria validation
+    - Failure actions with rollback
+    - Structured workflow outputs
+
+    Spec: https://www.openapis.org/arazzo-specification
+
+sourceDescriptions:
+  - url: https://api.example.com/v1/openapi.json
+    description: Main API specification
+
+workflows:
+  agentOnboarding:
+    title: Create and Onboard New Agent
+    description: |
+      End-to-end workflow: create agent → validate config → trigger welcome notification.
+
+      Demonstrates agent-ready workflow composition with explicit success/failure handling.
+
+    parameters:
+      - name: agent_name
+        description: Name of the new agent
+        required: true
+      - name: agent_model
+        description: Model to use (claude-opus-4-7 | claude-sonnet-4-6 | claude-haiku-4-5-20251001)
+        required: true
+      - name: admin_email
+        description: Email to notify of creation
+        required: true
+
+    steps:
+      # Step 1: Create the agent
+      - stepId: create_agent
+        operationId: create_agent
+        description: Create agent with specified configuration
+        requestBody:
+          contentType: application/json
+          payload:
+            name: $inputs.agent_name
+            description: "Onboarded agent (created via workflow)"
+            model: $inputs.agent_model
+            tools: []
+            max_steps: 20
+        successCriteria:
+          # HTTP 201 indicates successful creation
+          - condition: "$response.statusCode == 201"
+            description: Agent created successfully
+          - condition: "$response.body.id != null"
+            description: Response contains agent ID
+
+      # Step 2: Validate the agent configuration
+      - stepId: validate_agent
+        description: Validate that the new agent can be retrieved and is in active state
+        operationId: get_agent_by_id
+        parameters:
+          agent_id: $steps.create_agent.outputs.id
+        successCriteria:
+          - condition: "$response.statusCode == 200"
+            description: Agent is retrievable
+          - condition: "$response.body.status == 'active'"
+            description: Agent is in active state
+        onFailure:
+          - condition: "$response.statusCode == 404"
+            description: Agent not found (timing issue)
+            actions:
+              - type: retry
+                maxAttempts: 3
+                backoffMultiplier: 2
+                initialDelaySeconds: 1
+                description: Retry with exponential backoff (1s, 2s, 4s)
+
+      # Step 3: Send welcome notification
+      - stepId: notify_admin
+        description: Send notification email to admin
+        operationId: send_notification
+        requestBody:
+          contentType: application/json
+          payload:
+            to: $inputs.admin_email
+            subject: "New Agent Created"
+            template: "agent-welcome"
+            variables:
+              agent_name: $steps.create_agent.outputs.name
+              agent_id: $steps.create_agent.outputs.id
+              model: $steps.create_agent.outputs.model
+              created_at: $steps.create_agent.outputs.created_at
+        successCriteria:
+          - condition: "$response.statusCode >= 200 && $response.statusCode < 300"
+            description: Notification sent successfully
+
+    outputs:
+      agent_id:
+        description: Unique identifier of the created agent
+        value: $steps.create_agent.outputs.id
+      agent_name:
+        description: Name of the created agent
+        value: $steps.create_agent.outputs.name
+      agent_model:
+        description: Model used by the agent
+        value: $steps.create_agent.outputs.model
+      agent_url:
+        description: URL to access the agent in the UI
+        value: "https://app.example.com/agents/$steps.create_agent.outputs.id"
+      created_at:
+        description: Timestamp of creation
+        value: $steps.create_agent.outputs.created_at
+      notification_sent:
+        description: Whether admin notification was delivered
+        value: $steps.notify_admin.outputs.success
+
+    onFailure:
+      # If notification fails, don't fail the whole workflow (best-effort)
+      - condition: "$steps.notify_admin.statusCode >= 400"
+        description: Notification delivery failed but agent was created
+        actions:
+          - type: returnOutput
+            output: |
+              Agent created successfully but notification could not be delivered.
+              Notify admin separately: $inputs.admin_email
+
+      # If validation fails, rollback the creation
+      - condition: "$steps.validate_agent.statusCode != 200"
+        description: Agent validation failed - delete the created agent
+        actions:
+          - type: requestOperation
+            operationId: delete_agent
+            parameters:
+              agent_id: $steps.create_agent.outputs.id
+            description: Rollback agent creation
+          - type: returnError
+            statusCode: 500
+            message: "Agent creation succeeded but validation failed. Agent has been deleted."
+
+---
+# Alternative workflow: Parallel validation steps (optional)
+# Demonstrates concurrent execution and gather pattern
+agentHealthCheck:
+  title: Agent Health Check
+  description: Verify agent configuration and recent execution status in parallel
+  parameters:
+    - name: agent_id
+      description: Agent ID to health-check
+      required: true
+
+  steps:
+    # Step 1: Get agent metadata
+    - stepId: get_agent_config
+      operationId: get_agent_by_id
+      parameters:
+        agent_id: $inputs.agent_id
+      successCriteria:
+        - condition: "$response.statusCode == 200"
+
+    # Step 2: Get recent executions (parallel)
+    - stepId: get_recent_executions
+      operationId: list_executions
+      parameters:
+        agent_id: $inputs.agent_id
+        limit: 5
+      successCriteria:
+        - condition: "$response.statusCode == 200"
+
+  outputs:
+    agent_name:
+      value: $steps.get_agent_config.outputs.name
+    agent_status:
+      value: $steps.get_agent_config.outputs.status
+    recent_execution_count:
+      value: "$steps.get_recent_executions.outputs.data.length"
+    health_status:
+      value: |
+        $steps.get_agent_config.outputs.status == 'active'
+        && $steps.get_recent_executions.outputs.data.length > 0
+        ? 'healthy' : 'degraded'

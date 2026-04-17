@@ -1,0 +1,14 @@
+{
+  "title": "Discovery & AEO",
+  "pages": [
+    "index",
+    "llms-txt",
+    "agents-md",
+    "structured-data",
+    "content-negotiation",
+    "well-known-endpoints",
+    "robots-txt",
+    "content-structure",
+    "aeo-checklist"
+  ]
+}

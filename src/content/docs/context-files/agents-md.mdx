@@ -1,0 +1,315 @@
+---
+title: AGENTS.md
+description: The universal baseline for agent context, governed by the Agentic AI Foundation
+---
+
+## Summary
+
+Plain markdown (no YAML, no JSON) governed by the Linux Foundation, read by 9+ tools (Claude Code, Cursor, Copilot, Codex, Aider, etc.). 60,000+ public repos ship AGENTS.md. Structure: project purpose (1–3 sentences), quick-start commands (with exact invocations and timing), tech stack, testing expectations, permission boundaries (always/ask-first/never), gotchas, and links to detailed docs. Keep tight (~150 lines for root file), commands-first, use regex-parseable structure. Monorepos need per-package AGENTS.md with narrower scope.
+
+```
+# AGENTS.md
+Project purpose (1-3 sentences)
+
+## Quick Start
+pnpm install
+pnpm dev       # 5 seconds
+
+## Tech Stack
+...
+
+## Permissions
+Always: Read src/
+Ask first: pnpm add
+Never: Deploy prod
+```
+
+---
+
+AGENTS.md is governed by the [Agentic AI Foundation (Linux Foundation)](https://agents.md). It is plain markdown with no schema—no YAML frontmatter, no JSON. This simplicity is intentional: agents must parse it with regex and heuristics, so readability and structural consistency matter more than strict formats.
+
+AGENTS.md is read by 9+ tools: Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, Aider, Jules, Zed, Warp, RooCode. More than 60,000 public repositories ship AGENTS.md.
+
+## Structure
+
+### 1. Project Purpose (1–3 sentences)
+
+Why does this repo exist? What does it do?
+
+```markdown
+# AGENTS.md
+
+Monorepo for SaaS analytics platform. API server (Node/Fastify), 
+Web (Next.js 15), shared type definitions. Handles time-series data 
+ingestion, real-time dashboards, and user management.
+```
+
+### 2. Quick-Start Commands (with exact invocations)
+
+Ship actual command lines, not prose. Include timing, which commands block CI.
+
+```markdown
+## Quick Start
+
+Development (fast):
+  pnpm dev          # Start API + Web (http://localhost:3000)
+  pnpm test         # All tests (~10s)
+  pnpm test:watch   # Watch mode
+  pnpm lint         # ESLint + Prettier (~3s)
+
+Build (slow):
+  pnpm build        # Production bundles (~3m)
+  turbo run test --parallel -- --coverage
+
+Database:
+  pnpm db:migrate   # Apply pending migrations (~30s)
+  pnpm db:seed      # Populate test data
+```
+
+Include timing. Mark slow commands (>30s). Include `--json`, `--dry-run`, and other agent-affecting flags.
+
+### 3. Tech Stack / Directory Map
+
+Link to key directories. No generic descriptions.
+
+```markdown
+## Tech Stack
+
+API server (packages/api):
+  - Fastify + TypeScript
+  - Prisma ORM + PostgreSQL
+  - Routes: src/routes/
+  - Tests: src/routes/__tests__/
+
+Web (packages/web):
+  - Next.js 15 + React 19
+  - TailwindCSS + shadcn/ui
+  - Components: src/components/
+  - Pages: src/app/
+
+Shared (packages/shared):
+  - Type definitions: src/types/
+  - Zod schemas: src/schemas/
+  - Utilities: src/lib/
+```
+
+Be specific. "/src/routes/" not "/the routes directory".
+
+### 4. Coding Conventions
+
+Naming, import style, tools used.
+
+```markdown
+## Conventions
+
+Filenames: kebab-case
+Functions: camelCase
+Types: PascalCase
+API routes: /api/v1/...
+Environment: .env.example tracked; .env.local ignored
+
+Imports: absolute paths (src/..., not ../../../)
+Linting: ESLint + Prettier (pnpm lint --fix)
+Type checking: TypeScript strict mode (pnpm type-check)
+```
+
+### 5. Testing Expectations
+
+Which tests block merge? CI integration. How to add tests.
+
+```markdown
+## Testing
+
+Unit: Vitest (pnpm test)
+Integration: Supertest on API routes
+E2E: Playwright in packages/web
+Coverage: --coverage flag for reports
+
+Blocks merge:
+  - Unit tests must pass (pnpm test)
+  - No TypeScript errors (pnpm type-check)
+  - Lint errors block CI (pnpm lint)
+
+Add tests: Create .test.ts alongside source files.
+```
+
+### 6. Permission Boundaries (three-tier)
+
+Always / Ask first / Never. Explicit and enforceable.
+
+```markdown
+## Boundaries
+
+Always:
+  - Read files in src/, tests/, docs/
+  - Run tests: pnpm test
+  - Run linting: pnpm lint
+  - Open draft PRs: gh pr create --draft
+  - Review error messages and logs
+
+Ask first:
+  - Install new dependencies (pnpm add ...)
+  - Run migrations (pnpm db:migrate)
+  - Modify TypeScript config or build settings
+  - Commit directly to main (use PR instead)
+  - Deploy to staging
+
+Never:
+  - Deploy to production
+  - Rotate API keys or secrets
+  - Delete branches or tags
+  - Modify .env files in git
+  - Run sudo or system-wide commands
+```
+
+Make boundaries rules, not aspirations.
+
+### 7. Non-Obvious Gotchas
+
+Conventions with code references.
+
+```markdown
+## Gotchas
+
+- pnpm install requires Node 18.12+ (enforced in .nvmrc)
+- TypeScript strict mode enabled; use // @ts-expect-error with comment if needed
+- Changesets required for npm publish; CI blocks merge without them
+- Database: migrations are append-only; rollback only in dev
+- Reusable components must include unit tests (blocks merge)
+- API breaking changes require major version bump and migration guide
+```
+
+Link to the file or path where the gotcha is enforced (e.g., ".nvmrc", "ci.yml").
+
+### 8. Links to Deeper Docs
+
+Point to ADRs, architecture guides, runbooks, CONTRIBUTING guide.
+
+```markdown
+## More Info
+
+- Architecture: docs/ARCHITECTURE.md
+- Contributing: CONTRIBUTING.md
+- API reference: packages/api/README.md
+- Changelog: CHANGELOG.md
+- Runbooks: docs/runbooks/ (deployments, incident response)
+```
+
+## Writing Style
+
+- **Imperative voice**: "Run pnpm dev", not "running the dev server"
+- **Headings short**; bullets tight. Aim for scannability.
+- **Cite file paths** with relative root. `src/lib/`, not `~/projects/my-app/src/lib/`
+- **Never describe what code does** when a file reference suffices. Instead of "We use Zod for schema validation," write "See `src/schemas/` for Zod types."
+- **Update iteratively**. When an agent gets something wrong, update the file. AGENTS.md is live documentation.
+
+## Length Guidelines
+
+- **Ideal**: 80–200 lines. Command-dense, boundary-explicit, ready to ship.
+- **Acceptable**: Up to 370 lines (split if longer).
+- **Red flag**: >500 lines. Break into per-package files or link to deeper docs.
+
+## Example: TypeScript Monorepo
+
+```markdown
+# AGENTS.md
+
+SaaS analytics platform: API (Fastify + Node), Web (Next.js 15), Shared types.
+
+## Quick Start
+
+Dev:
+  pnpm dev        # Both API + Web
+  pnpm test       # All packages (~10s)
+  pnpm lint       # ESLint + Prettier
+
+Build & release:
+  pnpm build      # Production builds (~3m)
+  changeset add   # Stage version bump
+  pnpm release    # Publish to npm
+
+## Commands by Package
+
+API (packages/api):
+  pnpm --filter=@app/api dev         # http://localhost:3001
+  pnpm --filter=@app/api test:watch
+  pnpm --filter=@app/api db:migrate  # Ask before running
+
+Web (packages/web):
+  pnpm --filter=@app/web dev         # http://localhost:3000
+  pnpm --filter=@app/web build
+
+Shared (packages/shared):
+  pnpm --filter=@app/shared type-check
+  pnpm --filter=@app/shared build    # Emits TS + ESM
+
+## Conventions
+
+Filenames: kebab-case
+Functions: camelCase
+API routes: /api/v1/...
+Imports: absolute paths (src/...)
+Type checking: Strict mode enabled
+
+## Testing
+
+Unit: Vitest (pnpm test)
+E2E: Playwright
+Coverage: --coverage flag
+
+Blocks merge:
+  - pnpm test must pass
+  - pnpm type-check must pass (strict mode)
+  - pnpm lint must pass (no manual overrides)
+
+## Boundaries
+
+Always:
+  - Read files in src/, tests/, docs/
+  - Run tests, linting, type-check
+  - Open draft PRs: gh pr create --draft
+
+Ask first:
+  - Install dependencies
+  - Run migrations
+  - Modify TypeScript config
+
+Never:
+  - Deploy to production
+  - Rotate credentials or modify .env
+  - Delete branches or tags
+
+## Gotchas
+
+- Node 18.12+ required (.nvmrc enforced)
+- Changesets required for version bumps (CI gate)
+- Strict TypeScript; use // @ts-expect-error sparingly
+- DB migrations append-only; only rollback in dev
+- Reusable components need unit tests
+- API breaking changes require major version bump
+
+## More Info
+
+- Architecture: docs/ARCHITECTURE.md
+- Contributing: CONTRIBUTING.md
+- Runbooks: docs/runbooks/
+```
+
+This example is ~110 lines, command-first, boundary-explicit.
+
+## Cross-Tool Compatibility
+
+Each tool reads AGENTS.md slightly differently:
+
+- **Claude Code** reads all sections; supports AGENTS.md + CLAUDE.md overlay.
+- **Cursor** reads structure via regex; `.cursor/rules/` overrides specific sections.
+- **GitHub Copilot** reads full file but has smaller token budget; keep concise.
+- **Gemini CLI** reads AGENTS.md if GEMINI.md missing; treats as fallback.
+
+## See also
+
+- ([agents.md specification](https://agents.md))
+- `/docs/context-files/claude-md` — Claude-specific overrides
+- `/docs/context-files/cursor-and-copilot` — Cursor/Copilot variants
+- `/docs/context-files/monorepos` — per-package patterns
+- `/templates/discovery/AGENTS.md` — starter template

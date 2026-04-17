@@ -1,0 +1,258 @@
+---
+title: Dense Text Embeddings
+description: Model selection, Matryoshka embeddings, cost/quality/latency trade-offs
+---
+
+Embeddings are dense vectors (1,024–3,072 dimensions) that represent text semantically. They power vector similarity search: the model converts queries and documents into vectors, and nearest-neighbor search returns semantically similar results.
+
+## Summary
+
+Dense embeddings transform text into fixed-length vectors suitable for nearest-neighbor search. April 2026: **open-source models now match or exceed commercial APIs on MTEB leaderboard.** Choose based on cost sensitivity, latency SLA (API calls slower than self-hosted), and specialized domains (legal, code, medical models exist). **Matryoshka embeddings** (supported by OpenAI 3-large and Cohere v4) let you store full dimensions but truncate to 256–512 at query time for cost savings without recomputing.
+
+**Key takeaways:**
+- Commercial APIs (OpenAI, Voyage, Cohere) are integrated but expensive ($0.01–0.12 per 1M tokens).
+- Open-source (BGE-M3, E5-Mistral, Nomic) compete on MTEB; zero API costs, variable latency.
+- Matryoshka: store 1,536 dims, truncate to 256/512 at query time for 4–36x speedup + cost drop.
+- Specialized models beat generalists on domain-specific benchmarks (legal, medical, code).
+
+## Model selection matrix
+
+| Model | Dims | Cost | MTEB Score | Latency (self-host) | Notes |
+|-------|------|------|-----------|-------------------|-------|
+| **OpenAI text-embedding-3-large** | 3,072 (Matryoshka) | $0.02/1M | 62.5 | 100–300ms (API) | De facto standard; integrated file_search |
+| **OpenAI text-embedding-3-small** | 1,536 (Matryoshka) | $0.02/1M | 62.0 | 100–300ms (API) | Cheaper than 3-large; nearly same quality |
+| **Voyage 3** | 1,536 | $0.01/1M | 64.8 | 50–150ms (API) | Rerank-2.5 companion; MongoDB-owned |
+| **Voyage 4** | 1,536 | $0.01/1M | 65.5 | 50–150ms (API) | Latest Voyage; slightly better than v3 |
+| **Cohere Embed v4** | 1,536 (Matryoshka) | $0.12/1M | 64.2 | 100–300ms (API) | Multimodal (text + images); enterprise rerank |
+| **BGE-M3** | 1,024 | Free | 65.1 | 10–20ms (GPU) | Open-source; multilingual; beat commercial APIs March 2026 |
+| **E5-Mistral-7B** | 768 | Free | 63.8 | 20–40ms (GPU) | Compact; semantic-focused |
+| **Nomic Embed 1.5** | 384 | Free | 62.1 | 5–10ms (CPU) | Smallest; matryoshka-native |
+| **Jina V3** | 1,024 | Free | 64.5 | 15–30ms (GPU) | Long-context (8,191 tokens) |
+| **Google Gemini Embedding 2** | 768 | ~$0.02/1M | 68.3 | 100–300ms (API) | **Top MTEB leaderboard** (March 2026); all-modality (text, image, video, audio, code) |
+
+## Matryoshka embeddings: truncation without recomputing
+
+Matryoshka embeddings allow storing full dimensions (1,536) but using smaller dimensions (256, 512) at query time:
+
+```typescript
+import { Pinecone } from '@pinecone-client/web';
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+const pinecone = new Pinecone();
+
+// Embed once at full 3,072 dims
+const response = await openai.embeddings.create({
+  model: 'text-embedding-3-large',
+  input: 'The quick brown fox jumps over the lazy dog',
+  dimensions: 3072, // Store full
+});
+
+let vector = response.data[0].embedding;
+
+// Upsert full to vector DB
+await pinecone.index('main').upsert([{
+  id: 'doc-1',
+  values: vector,
+  metadata: { text: '...' },
+}]);
+
+// At query time, truncate to smaller dimension for speed/cost
+const queryResponse = await openai.embeddings.create({
+  model: 'text-embedding-3-large',
+  input: 'fox jumps',
+  dimensions: 256, // Query with smaller dim
+});
+
+let queryVector = queryResponse.data[0].embedding.slice(0, 256);
+
+// Search: Pinecone still uses full 3,072 stored dims
+// but query vector is smaller (faster, lower latency)
+const results = await pinecone.index('main').query({
+  vector: queryVector,
+  topK: 10,
+});
+```
+
+**Benefits:**
+- 4x–36x faster queries (smaller vectors fit more in CPU cache)
+- 50–80% cost reduction (fewer floating-point ops)
+- No re-embedding needed (truncation is lossless for Matryoshka models)
+- Trade: ~2–5% accuracy loss at 256 dims vs. full
+
+## Specialized embedding models
+
+**Legal documents:** Use domain-specific models (LexGPT embeddings, FinBERT).  
+**Medical/biomedical:** SciBERT, BioGPT embeddings.  
+**Code:** Code2Vec, CodeBERT, or specialized models like GitCode embeddings.  
+**Multilingual:** BGE-M3 (67 languages), LABSE, mBERT embeddings.
+
+These **outperform generalists by 10–20% on domain-specific retrieval benchmarks.**
+
+## API vs. self-hosted trade-offs
+
+### API (OpenAI, Voyage, Cohere)
+
+**Pros:**
+- Integrated frameworks (Langchain, LlamaIndex, Vercel AI SDK)
+- Quality guarantee (vendor maintains model)
+- No infrastructure overhead
+
+**Cons:**
+- $0.01–0.12 per 1M tokens (adds up at scale)
+- 100–300ms latency (network + API)
+- Privacy: text sent to third parties
+- Rate limits
+
+### Self-hosted (open-source)
+
+**Pros:**
+- Zero token cost (after initial download)
+- 5–40ms latency (local GPU/CPU)
+- Privacy: data never leaves your infrastructure
+- No rate limits
+
+**Cons:**
+- Infrastructure cost (GPU rental or owned)
+- Model updates are manual
+- Quality variance (open-source models less mature)
+- Latency unpredictable on CPU-only (Nomic Embed 1.5 is exception)
+
+**Decision:** API if latency < 500ms acceptable and scale < 1M docs/month. Self-hosted if embedding 1M+ docs/month or privacy-critical (legal, medical, finance).
+
+## Batch embedding with retry logic
+
+For production embedding pipelines:
+
+```typescript
+import { batch } from 'lodash';
+import pRetry from 'p-retry';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function embedBatch(texts: string[], batchSize: number = 100) {
+  const batches = batch(texts, batchSize);
+  const results: number[][] = [];
+
+  for (const batchTexts of batches) {
+    const embedded = await pRetry(
+      () =>
+        openai.embeddings.create({
+          model: 'text-embedding-3-large',
+          input: batchTexts,
+          dimensions: 1536, // Use Matryoshka for cost
+        }),
+      {
+        retries: 3,
+        onFailedAttempt: (error) => {
+          console.warn(
+            `Embedding batch attempt ${error.attemptNumber} failed.`,
+            error.message
+          );
+        },
+      }
+    );
+
+    const sortedResults = embedded.data.sort((a, b) => a.index - b.index);
+    results.push(...sortedResults.map((r) => r.embedding));
+
+    // Rate limit: OpenAI allows 500K tokens/min
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return results;
+}
+```
+
+## Evaluation: MTEB leaderboard
+
+**MTEB** (Massive Text Embedding Benchmark) covers 56+ tasks:
+- Retrieval (BEIR-style)
+- Classification
+- Clustering
+- Semantic similarity
+- Paraphrase detection
+- Reranking
+
+Check [MTEB Leaderboard](https://huggingface.co/mteb) for latest scores. **Caveats:**
+- Text-only (no multimodal tasks)
+- No cross-lingual retrieval (e.g., Chinese query → English doc)
+- Limited coverage of long documents (> 10K tokens)
+- No MRL (Matryoshka) truncation tests
+
+For production, combine MTEB scores with **domain-specific evaluation** (RAGAS faithfulness, custom recall@k on your data).
+
+## Cost estimation
+
+For embedding 1M documents with text-embedding-3-large at 500 tokens/doc average:
+
+```
+Cost = (1,000,000 docs × 500 tokens/doc) × ($0.02 / 1M tokens) = $10
+Matryoshka cost at query time:
+- 10,000 queries × 200 tokens = 2M tokens × $0.02 / 1M = $0.04/month
+```
+
+At 100K docs with self-hosted BGE-M3 on GPU ($0.25/hour):
+```
+Embedding time: 100K docs / 1000 tokens-per-sec ≈ 50 seconds ≈ $0.003
+Subsequent queries: ~free (GPU already rented)
+```
+
+**Decision:** API for `` `<100K` `` docs/month or unknown scale. Self-hosted for `` `>1M` `` docs/month or privacy-sensitive data.
+
+## Code example: async batch embed with progress
+
+```typescript
+import * as fs from 'fs';
+import OpenAI from 'openai';
+import { batch } from 'lodash';
+
+async function embedLargeDataset(
+  inputFile: string,
+  outputFile: string,
+  batchSize: number = 100
+) {
+  const lines = fs
+    .readFileSync(inputFile, 'utf-8')
+    .split('\n')
+    .filter((l) => l.trim());
+
+  const batches = batch(lines, batchSize);
+  const client = new OpenAI();
+  const results: Array<{ text: string; embedding: number[] }> = [];
+
+  for (let i = 0; i < batches.length; i++) {
+    const batchTexts = batches[i];
+    const response = await client.embeddings.create({
+      model: 'text-embedding-3-large',
+      input: batchTexts,
+      dimensions: 512, // Matryoshka: small dims for cost
+    });
+
+    const sorted = response.data.sort((a, b) => a.index - b.index);
+    sorted.forEach((item, idx) => {
+      results.push({
+        text: batchTexts[idx],
+        embedding: item.embedding,
+      });
+    });
+
+    console.log(`Progress: ${((i + 1) / batches.length) * 100}%`);
+  }
+
+  fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
+  console.log(`Embedded ${results.length} texts to ${outputFile}`);
+}
+
+// Usage
+await embedLargeDataset('documents.txt', 'embeddings.json', 100);
+```
+
+## See also
+
+- [Cohere Embed v4 docs](https://docs.cohere.com/docs/embeddings)
+- [OpenAI Embeddings API](https://platform.openai.com/docs/guides/embeddings)
+- [Voyage AI docs](https://docs.voyageai.com)
+- [MTEB Leaderboard](https://huggingface.co/mteb)
+- [BGE-M3 GitHub](https://github.com/FlagOpen/FlagEmbedding)

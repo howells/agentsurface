@@ -1,0 +1,291 @@
+---
+title: Server Architecture
+description: Structuring MCP servers for testability, maintainability, and production reliability
+---
+
+## Summary
+
+MCP server architecture determines testability and maintainability. Single-responsibility servers own one domain (billing, documents, CRM). The createServer() factory pattern enables testing without network I/O by returning a configured McpServer. Recommended project structure separates tools, resources, and prompts into distinct files.
+
+- Single responsibility: one domain per server
+- createServer() factory returns configured server (enables testing)
+- Domain-specific servers reduce context overhead and tool explosion
+- Project structure: src/server.ts (factory), src/tools/, src/resources/, src/prompts/
+- Shared code in common packages; servers isolated in apps/
+- Support multiple transports (stdio, HTTP) via pluggable transport layer
+
+A well-structured MCP server is not simply a file with tools registered in sequence. The architecture determines whether your server can be unit-tested without network I/O, deployed to multiple environments without modification, and extended by other developers without needing to understand the entire codebase.
+
+## Single Responsibility
+
+Each MCP server should own one clear domain. A server for your billing system exposes billing tools. A server for your document store exposes document tools. They do not share a codebase.
+
+This is not just organizational tidiness — it has practical consequences for agents:
+
+- Agents connecting to a billing server get a tool list that is entirely relevant to billing. There is no noise from unrelated domains.
+- Smaller tool lists mean less token overhead in the agent's context window when the server's capabilities are described.
+- Deployment, versioning, and access control operate at the server level. One server per domain means one access decision per domain.
+
+When you find yourself building a server that does "everything an agent might need," that is a signal to split it into domain-specific servers and expose them together through a gateway or by registering multiple servers in the agent's configuration.
+
+## Recommended Project Structure
+
+For a TypeScript monorepo hosting multiple MCP servers, this layout keeps servers isolated while sharing common packages:
+
+```
+my-mcp/
+├── apps/
+│   ├── billing-mcp/
+│   │   ├── src/
+│   │   │   ├── server.ts        # createServer() factory — the main export
+│   │   │   ├── cli.ts           # Entry point for subprocess/stdio mode
+│   │   │   ├── tools/
+│   │   │   │   ├── create-invoice.ts
+│   │   │   │   ├── list-invoices.ts
+│   │   │   │   └── void-invoice.ts
+│   │   │   ├── resources/
+│   │   │   │   └── invoice-schema.ts
+│   │   │   └── prompts/
+│   │   │       └── billing-assistant.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── documents-mcp/
+│       └── ...
+└── packages/
+    ├── shared-auth/             # JWT validation, token helpers
+    ├── shared-types/            # Shared TypeScript types
+    └── shared-zod/              # Common Zod schemas
+```
+
+Each `apps/` directory is an independently deployable server. The `packages/` directory holds code that multiple servers share — authentication helpers, common Zod schemas, shared TypeScript types.
+
+## The createServer() Factory Pattern
+
+The single most important architectural decision is separating server construction from server startup. The `createServer()` factory creates and configures the server but does not connect it to any transport. The `cli.ts` entry point calls `createServer()` and then connects it to a transport.
+
+```typescript
+// src/server.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerCreateInvoice } from "./tools/create-invoice.js";
+import { registerListInvoices } from "./tools/list-invoices.js";
+import { registerVoidInvoice } from "./tools/void-invoice.js";
+import { registerInvoiceSchema } from "./resources/invoice-schema.js";
+import { registerBillingAssistant } from "./prompts/billing-assistant.js";
+
+export interface ServerConfig {
+  stripeApiKey: string;
+  databaseUrl: string;
+  maxInvoicesPerPage?: number;
+}
+
+export function createServer(config: ServerConfig): McpServer {
+  const server = new McpServer({
+    name: "billing-mcp",
+    version: "1.0.0",
+  });
+
+  registerCreateInvoice(server, config);
+  registerListInvoices(server, config);
+  registerVoidInvoice(server, config);
+  registerInvoiceSchema(server, config);
+  registerBillingAssistant(server);
+
+  return server;
+}
+```
+
+```typescript
+// src/cli.ts
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
+
+const config = {
+  stripeApiKey: process.env.STRIPE_API_KEY!,
+  databaseUrl: process.env.DATABASE_URL!,
+  maxInvoicesPerPage: Number(process.env.MAX_INVOICES_PER_PAGE ?? 50),
+};
+
+if (!config.stripeApiKey) throw new Error("STRIPE_API_KEY is required");
+if (!config.databaseUrl) throw new Error("DATABASE_URL is required");
+
+const server = createServer(config);
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+This separation means tests can call `createServer({ stripeApiKey: "test_key", databaseUrl: ":memory:" })` and connect the result to an `InMemoryTransport` without any subprocess or network involvement. See [Testing MCP Servers](./testing) for the full test setup.
+
+## Tool Registration Pattern
+
+Each tool lives in its own file and exports a `register` function that accepts the server and config:
+
+```typescript
+// src/tools/create-invoice.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import type { ServerConfig } from "../server.js";
+
+const CreateInvoiceSchema = z.object({
+  customer_id: z
+    .string()
+    .uuid()
+    .describe("The UUID of the customer to invoice"),
+  amount_cents: z
+    .number()
+    .int()
+    .positive()
+    .describe("Invoice amount in cents to avoid floating point issues"),
+  currency: z
+    .enum(["usd", "eur", "gbp"])
+    .describe("ISO 4217 currency code"),
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .describe("Due date in YYYY-MM-DD format"),
+  description: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("Optional line-item description shown on the invoice"),
+});
+
+export function registerCreateInvoice(server: McpServer, config: ServerConfig): void {
+  server.tool(
+    "billing_create_invoice",
+    "Creates a new invoice for a customer. Use when the user wants to charge a customer or bill for services. Requires a valid customer ID — call billing_list_customers first if you only have a customer name.",
+    CreateInvoiceSchema,
+    async (params) => {
+      // implementation
+    }
+  );
+}
+```
+
+Each registration function is pure: given a server and config, it registers exactly one tool. Nothing else. This makes the files short, focused, and easy to test in isolation.
+
+## Defense in Depth
+
+Production MCP servers need multiple overlapping protection layers. A single validation check at the boundary is not enough — each layer catches different failure modes.
+
+```
+┌─────────────────────────────────────┐
+│  Network Layer                      │
+│  TLS termination, rate limiting,    │
+│  IP allowlisting for HTTP servers   │
+├─────────────────────────────────────┤
+│  Authentication Layer               │
+│  Bearer token / OAuth validation,   │
+│  token expiry, audience check       │
+├─────────────────────────────────────┤
+│  Authorization Layer                │
+│  Scope validation per tool,         │
+│  resource-level access control      │
+├─────────────────────────────────────┤
+│  Input Validation Layer             │
+│  Zod schema parsing on every tool,  │
+│  reject unknown fields              │
+├─────────────────────────────────────┤
+│  Business Logic Layer               │
+│  Domain invariants, idempotency,    │
+│  rate limits per customer           │
+├─────────────────────────────────────┤
+│  Monitoring Layer                   │
+│  Structured logs, tool call traces, │
+│  error rate alerting                │
+└─────────────────────────────────────┘
+```
+
+Each layer should fail closed. If authentication cannot be verified, the request is rejected — not allowed through with reduced permissions. If schema validation fails, the tool returns an `isError: true` response with a recovery-oriented message, rather than attempting to proceed with partial data.
+
+## Build Tooling with tsdown
+
+MCP servers distributed as npm packages or deployed to edge runtimes need bundling. `tsdown` (built on Rolldown) produces fast, tree-shaken output with correct ESM/CJS dual output:
+
+```json
+// package.json
+{
+  "scripts": {
+    "build": "tsdown src/cli.ts src/server.ts",
+    "dev": "tsdown --watch src/cli.ts"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    }
+  },
+  "bin": {
+    "billing-mcp": "./dist/cli.js"
+  }
+}
+```
+
+```typescript
+// tsdown.config.ts
+import { defineConfig } from "tsdown";
+
+export default defineConfig({
+  entry: ["src/cli.ts", "src/server.ts"],
+  format: ["esm", "cjs"],
+  dts: true,
+  clean: true,
+  external: ["@modelcontextprotocol/sdk"],
+});
+```
+
+Marking `@modelcontextprotocol/sdk` as external prevents it from being bundled into your output — consumers install it as a peer dependency. The `dts: true` option generates type declarations, which allows other servers to import and re-use your `ServerConfig` type.
+
+## Capability Declaration
+
+The server capabilities you declare at construction time tell clients what your server supports. Only declare capabilities you actually implement:
+
+```typescript
+const server = new McpServer({
+  name: "billing-mcp",
+  version: "1.0.0",
+  capabilities: {
+    tools: {},              // Server supports tools
+    resources: {
+      subscribe: true,     // Clients can subscribe to resource changes
+      listChanged: true,   // Server will notify when resource list changes
+    },
+    prompts: {},           // Server supports prompts
+    logging: {},           // Server can send log messages to the client
+  },
+});
+```
+
+Declaring `resources.subscribe: true` without implementing the `resources/subscribe` handler will cause client errors. Declare only what you implement.
+
+<Callout type="warn">
+Never declare `experimental_sampling` in capabilities unless you have implemented the full sampling request handler. Clients that send sampling requests to an unimplemented handler will receive protocol errors that are difficult to debug.
+</Callout>
+
+## Environment Variable Conventions
+
+MCP servers launched as subprocesses inherit the parent process's environment. Servers deployed as HTTP services read from the deployment environment. In both cases, environment variables are the correct configuration mechanism — never configuration files bundled into the binary.
+
+```typescript
+// A robust config loader with validation
+function loadConfig(): ServerConfig {
+  const required = ["STRIPE_API_KEY", "DATABASE_URL"] as const;
+
+  for (const key of required) {
+    if (!process.env[key]) {
+      throw new Error(
+        `Missing required environment variable: ${key}. ` +
+        `See README for setup instructions.`
+      );
+    }
+  }
+
+  return {
+    stripeApiKey: process.env.STRIPE_API_KEY!,
+    databaseUrl: process.env.DATABASE_URL!,
+    maxInvoicesPerPage: Number(process.env.MAX_INVOICES_PER_PAGE ?? 50),
+    environment: (process.env.NODE_ENV ?? "production") as "production" | "staging" | "test",
+  };
+}
+```
+
+Throwing on startup with a clear error message is always better than proceeding with `undefined` values and producing cryptic errors later during tool execution.

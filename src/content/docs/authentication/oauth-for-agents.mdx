@@ -1,0 +1,252 @@
+---
+title: OAuth 2.1 for Agents
+description: Client Credentials grant, PKCE, token caching, and JWT validation for M2M auth
+---
+
+## Summary
+
+The Client Credentials grant is the baseline for agents. Agents POST client_id and client_secret to the token endpoint, receive a short-lived JWT, cache and reuse it for its full lifetime. JWT validation checks signature, issuer, audience, and expiry before trusting any claim inside.
+
+- Client Credentials grant: single POST, no redirect, no human interaction
+- Short-lived tokens (1–4 hours) cached and refreshed proactively
+- Scopes follow principle of least privilege (resource:action pairs)
+- JWT validation: always verify signature, issuer, audience, expiry
+- Optional: PKCE for authorization code flows, Token Exchange for narrowing scope
+
+Agents need OAuth 2.1, but not the browser-based Authorization Code flow. The grant for agents is **Client Credentials** ([RFC 6749 §4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)): service makes a single POST to the token endpoint with credentials, receives a short-lived JWT, caches it, and uses it on every request. No redirect, no user interaction, no session state. OAuth 2.1 ([draft-ietf-oauth-v2-1-13](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) consolidates 2.0 + best practices: PKCE is mandatory on auth-code flows, implicit and password grants are removed, and refresh token rotation is required. For agents calling APIs, the focus is Client Credentials + proper token lifecycle.
+
+## Client Credentials Request
+
+POST to the token endpoint with `client_id`, `client_secret`, and the scopes your agent needs:
+
+```bash
+curl -X POST https://auth.example.com/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=agent_01HV3K8MNP" \
+  -d "client_secret=cs_live_..." \
+  -d "scope=invoices:read customers:read"
+```
+
+Response includes the access token, type, expiry in seconds, and the granted scopes:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "invoices:read customers:read"
+}
+```
+
+No `refresh_token`. When the token expires, request a new one using the same credentials. The credentials themselves are the persistent authorization.
+
+## Token Caching and Lifecycle
+
+Short-lived tokens (1–4 hours) are cheap to issue and validate. Cache them and reuse for their lifetime. Refresh proactively before expiry with a buffer (typically 5 minutes).
+
+```typescript
+import { jwtDecode } from 'jose';
+
+interface TokenCache {
+  accessToken: string;
+  expiresAt: number; // Unix timestamp
+}
+
+let cache: TokenCache | null = null;
+
+async function getAccessToken(config: {
+  clientId: string;
+  clientSecret: string;
+  tokenUrl: string;
+  scopes: string[];
+}): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const bufferSeconds = 5 * 60;
+
+  // Return cached token if valid (with 5-minute buffer)
+  if (cache && cache.expiresAt - now > bufferSeconds) {
+    return cache.accessToken;
+  }
+
+  const form = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    scope: config.scopes.join(' '),
+  });
+
+  const res = await fetch(config.tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(`Token request failed: ${err.error} — ${err.error_description}`);
+  }
+
+  const { access_token, expires_in } = await res.json();
+
+  cache = {
+    accessToken: access_token,
+    expiresAt: now + expires_in,
+  };
+
+  return access_token;
+}
+```
+
+Use the cached token on all requests:
+
+```typescript
+const token = await getAccessToken(config);
+const res = await fetch('https://api.example.com/invoices', {
+  headers: { 'Authorization': `Bearer ${token}` },
+});
+```
+
+Calling the token endpoint per request multiplies auth load by request volume. Cache aggressively.
+
+## Scopes: The Principle of Least Privilege
+
+Each token should carry only the scopes required for that specific task. A reporting agent that reads invoices does not need `invoices:write` or `admin`. An agent that lists users does not need `users:write` or `payments:*`.
+
+Design scopes as `resource:action` pairs:
+
+```
+invoices:read            read and list invoices
+invoices:write           create and update invoices
+customers:read           read and list customers
+customers:write          create and update customers
+reports:generate         export reports
+admin                    everything (rarely needed)
+```
+
+Request the minimum for each operation:
+
+```typescript
+// Reading invoices: only invoices:read
+const readToken = await getAccessToken({
+  ...config,
+  scopes: ['invoices:read'],
+});
+
+// Creating invoices: only invoices:write
+const writeToken = await getAccessToken({
+  ...config,
+  scopes: ['invoices:write'],
+});
+```
+
+For multi-step workflows where scope requirements vary, use Token Exchange (RFC 8693) to derive narrow, time-limited tokens per step.
+
+## JWT Validation
+
+Tokens from OAuth servers are JWTs. Validate before trusting any claim inside. Use `jose`:
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose';
+
+const jwks = createRemoteJWKSet(
+  new URL('https://auth.example.com/.well-known/jwks.json')
+);
+
+async function validateToken(token: string): Promise<Record<string, any>> {
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer: 'https://auth.example.com/',
+    audience: 'https://api.example.com/',
+  });
+
+  // payload.iss, payload.aud, payload.exp, payload.scope are now trusted
+  return payload;
+}
+```
+
+Validation checks, in order:
+
+1. **Signature:** Fetch the issuer's JWKS and verify the JWT signature. Never skip.
+2. **Issuer (`iss`):** Must match your auth server's URI.
+3. **Audience (`aud`):** Must include your service's identifier.
+4. **Expiry (`exp`):** Must be a Unix timestamp in the future (with small clock skew allowance).
+
+If your tokens include `org_id` or `tenant_id`, validate those as part of authorization — not authentication:
+
+```typescript
+async function authorize(token: string, resourceOrgId: string): Promise<void> {
+  const payload = await validateToken(token);
+
+  const scopes = (payload.scope as string || '').split(' ');
+  if (!scopes.includes('invoices:read')) {
+    throw new Error('Missing scope: invoices:read');
+  }
+
+  if (payload.org_id !== resourceOrgId) {
+    throw new Error('Token org does not match resource');
+  }
+}
+```
+
+## Authorization Code + PKCE (when needed)
+
+For flows where agents interact with browser-based authorization (rare, but MCP servers can expose this):
+
+```typescript
+import { openidClient } from '@panva/oauth4webapi';
+
+async function authorizationCodeFlow(clientId: string, clientSecret: string) {
+  const as = await openidClient.discoveryRequest(
+    new URL('https://auth.example.com')
+  );
+  const client = { client_id: clientId, client_secret: clientSecret };
+
+  // Generate PKCE code verifier + challenge
+  const codeVerifier = openidClient.generateRandomCodeVerifier();
+  const codeChallenge = openidClient.calculatePKCECodeChallenge(codeVerifier);
+
+  // Build authorization URL
+  const authorizationUrl = new URL(as.authorization_endpoint);
+  authorizationUrl.searchParams.set('client_id', clientId);
+  authorizationUrl.searchParams.set('response_type', 'code');
+  authorizationUrl.searchParams.set('redirect_uri', 'http://localhost:3000/callback');
+  authorizationUrl.searchParams.set('scope', 'openid profile invoices:read');
+  authorizationUrl.searchParams.set('code_challenge', codeChallenge);
+  authorizationUrl.searchParams.set('code_challenge_method', 'S256');
+
+  // User (or agent with browser capability) navigates to authorizationUrl
+  // Server redirects back with authorization code
+
+  // Exchange code for token
+  const tokenRequest = openidClient.buildClientCredentialsRequest(client, {
+    code: authorizationCode,
+    code_verifier: codeVerifier,
+    redirect_uri: 'http://localhost:3000/callback',
+  });
+
+  const tokenResponse = await openidClient.processResponse(as, client, tokenRequest);
+  return tokenResponse.access_token;
+}
+```
+
+PKCE ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)) is mandatory in OAuth 2.1 even for confidential clients. It prevents authorization-code interception attacks.
+
+## Checklist
+
+- [ ] Client Credentials is used for all M2M auth
+- [ ] Tokens are cached for their full lifetime
+- [ ] Token cache refreshes proactively (5+ minutes before expiry)
+- [ ] Each request asks for only the minimum required scopes
+- [ ] JWT validation checks signature, `iss`, `aud`, and `exp`
+- [ ] Custom claims like `org_id` are validated as authorization, not authentication
+- [ ] Token Exchange (RFC 8693) is used when narrowing scope for downstream services
+- [ ] Bearer tokens are in `Authorization` headers, never in query strings
+
+## See Also
+
+- [Token Exchange](/docs/authentication/token-exchange) — narrowing scope for sub-agents
+- [API Keys](/docs/authentication/api-keys) — simpler alternative for single-service credentials
+- [Agent Identity](/docs/authentication/agent-identity) — first-class agent principals and audit trails
+- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
+- ([OAuth 2.1 draft](https://oauth.net/2.1/)) — final specification
+- ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) — Client Credentials and token endpoints

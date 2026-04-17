@@ -1,0 +1,390 @@
+---
+title: Anti-Patterns
+description: Ten common tool design mistakes and short fixes
+---
+
+## Summary
+
+Common tool design mistakes that cause routing errors, hallucinated parameters, and failed operations. Includes: terse descriptions (no "when to use"), missing pagination (returns 1000 items instead of top-k), nullable parameters (ambiguous), opaque IDs (no semantic meaning), nested unions (OpenAI strict mode rejects), missing examples, >20 tools at once, thrown errors (should return with isError: true), tools without discrimination ("get_data" too vague), and no way for agent to discover pagination continuation. Each includes short fix pattern.
+
+- **1. Terse descriptions**: Add "Use when...", "Do not use for..."
+- **2. No pagination**: Return top-k + cursor, not all
+- **3. Nullable parameters**: Avoid `string | null`; use optional + description
+- **4. Opaque IDs**: Use semantic values or detailed examples
+- **5. Nested unions**: Break into separate tools (OpenAI strict mode constraint)
+- **6. No examples**: Provide input examples in schema
+- **7. >20 tools**: Use dynamic selection, BM25 search
+- **8. Throw errors**: Return `{ isError: true, content: [...] }`
+- **9. Vague names**: Use verb_noun pattern
+- **10. No continuation signal**: Return has_more, next_cursor, or similar
+
+---
+
+Well-designed tools are silent—agents use them and succeed. Poorly-designed tools scream their mistakes in the form of routing errors, hallucinated parameters, and failed operations. This page catalogs ten patterns that reliably cause failure and how to fix them.
+
+## 1. Terse Descriptions
+
+**Mistake:**
+
+```typescript
+server.tool(
+  'search_issues',
+  'Searches for issues.',  // Too vague
+  schema,
+  handler
+);
+```
+
+The agent has no signal for when to use this tool vs similar ones, what the edge cases are, or how to construct inputs.
+
+**Fix:**
+
+```typescript
+server.tool(
+  'search_issues',
+  'Search for existing issues by text, assignee, or status. Use when finding tickets matching criteria. ' +
+  'Do not use for creating new issues (use create_issue). Returns paginated results; use next_offset for subsequent pages.',
+  schema,
+  handler
+);
+```
+
+**Pattern:** "What it does. When to use it. When NOT to use it. Edge cases."
+
+---
+
+## 2. 30+ Tools on One Agent
+
+**Mistake:**
+
+```typescript
+const agent = new Agent({
+  tools: [
+    search_issues,
+    create_issue,
+    update_issue,
+    // ... 27 more tools
+  ],
+});
+```
+
+Agents cannot reason over large tool sets. Accuracy degrades sharply above 15–20 tools.
+
+**Fix:**
+
+```typescript
+// Role-based kits
+const toolsForDeveloper = [
+  search_issues,
+  create_issue,
+  update_issue,
+  search_pull_requests,
+  create_pull_request,
+  // 5–8 tools total
+];
+
+const agent = new Agent({ tools: toolsForDeveloper });
+```
+
+**Pattern:** Curate task-specific subsets. Use dynamic selection (BM25) for large registries.
+
+---
+
+## 3. Opaque IDs Without Lookup Tools
+
+**Mistake:**
+
+```typescript
+// Tool returns
+{
+  results: [
+    { user_id: 'usr_123', status: 'active' },
+    { user_id: 'usr_456', status: 'active' },
+  ]
+}
+
+// Agent cannot resolve what 'usr_123' is—no lookup tool
+```
+
+The agent cannot do anything with the result because it cannot resolve the ID to semantic content.
+
+**Fix:**
+
+```typescript
+// Return semantic content alongside IDs
+{
+  results: [
+    { user_id: 'usr_123', name: 'Alice', email: 'alice@example.com', status: 'active' },
+    { user_id: 'usr_456', name: 'Bob', email: 'bob@example.com', status: 'active' },
+  ]
+}
+
+// Or provide a lookup tool
+server.tool(
+  'get_user',
+  'Fetch user by ID. Required when search_users returns only IDs.',
+  schema,
+  handler
+);
+```
+
+**Pattern:** Return semantic names, not opaque IDs alone. Or expose a paired getter.
+
+---
+
+## 4. Nested Union Types (OpenAI Strict Mode)
+
+**Mistake:**
+
+```typescript
+const schema = z.object({
+  result: z.union([
+    z.object({ type: z.literal('success'), data: z.any() }),
+    z.object({ type: z.literal('error'), message: z.string() }),
+  ]),
+});
+```
+
+OpenAI strict mode rejects union types. Schema validation fails.
+
+**Fix:**
+
+```typescript
+// Flat discriminated union
+const schema = z.object({
+  success: z.boolean(),
+  data: z.any().optional(),
+  error_message: z.string().optional(),
+});
+
+// Or use separate tools
+server.tool('operation_dry_run', ...);  // Returns preview
+server.tool('operation_execute', ...);  // Returns result
+```
+
+**Pattern:** Flatten schemas. Use separate tools for distinct operation modes.
+
+---
+
+## 5. Nullable Parameters
+
+**Mistake:**
+
+```typescript
+const schema = z.object({
+  assignee: z.string().nullable().optional(),  // Both null and undefined
+});
+```
+
+Different frameworks handle null differently. OpenAI requires explicit omission, not null.
+
+**Fix:**
+
+```typescript
+const schema = z.object({
+  assignee: z.string().optional(),  // Omit entirely if not needed
+});
+```
+
+**Pattern:** Use optional fields without null. Omit rather than pass null.
+
+---
+
+## 6. Inconsistent Naming Across Tools
+
+**Mistake:**
+
+```typescript
+server.tool('create_user', ...);
+server.tool('list_customers', ...);  // Why "customer" vs "user"?
+server.tool('get_person', ...);
+```
+
+The agent is confused by inconsistent terminology.
+
+**Fix:**
+
+```typescript
+server.tool('create_user', ...);
+server.tool('list_users', ...);
+server.tool('get_user', ...);
+```
+
+**Pattern:** Choose a noun and stick with it. `user`, not `customer` and `person`.
+
+---
+
+## 7. Side-Effectful Tools That Throw Errors
+
+**Mistake:**
+
+```typescript
+async (params) => {
+  const user = await db.users.findById(params.id);
+  if (!user) {
+    throw new Error(`User not found`);  // Unhandled exception
+  }
+  // ...
+}
+```
+
+Uncaught exceptions produce MCP protocol errors with generic messages. Agents cannot recover.
+
+**Fix:**
+
+```typescript
+async (params) => {
+  const user = await db.users.findById(params.id);
+  if (!user) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `User ${params.id} not found. Call list_users to find the correct ID.`,
+      }],
+    };
+  }
+  // ...
+}
+```
+
+**Pattern:** Return errors in the response body so agents can reason about recovery.
+
+---
+
+## 8. Destructive Tools Without Annotations
+
+**Mistake:**
+
+```typescript
+server.tool(
+  'delete_invoice',
+  'Deletes an invoice.',
+  schema,
+  handler
+  // No annotations
+);
+```
+
+Downstream systems cannot tell this tool is dangerous.
+
+**Fix:**
+
+```typescript
+server.tool(
+  'delete_invoice',
+  'Permanently deletes an invoice. This cannot be undone. ' +
+  'Use only when the invoice was created in error.',
+  schema,
+  handler,
+  {
+    destructiveHint: true,    // Signals danger
+    idempotentHint: false,    // Not safe to retry
+  }
+);
+```
+
+**Pattern:** Mark all destructive tools with `destructiveHint: true` (MCP) or call it out in the description.
+
+---
+
+## 9. No Disambiguation Between Similar Tools
+
+**Mistake:**
+
+```typescript
+search_issues();
+filter_issues();
+query_issues();
+find_issues();
+```
+
+Four tools that do nearly the same thing. Agent has no signal for which to use.
+
+**Fix:**
+
+```typescript
+// One search tool with clear disambig
+search_issues: 'Search for existing issues by text, assignee, or status. ' +
+  'Use for finding tickets matching criteria. Returns paginated results.',
+
+// If variants are needed, be explicit
+search_issues_simple(query);       // Fast, limited filters
+search_issues_advanced(filters);   // Full filter surface
+```
+
+**Pattern:** Have one primary tool per intent. Variants (simple/advanced) are acceptable if each is unambiguous.
+
+---
+
+## 10. Required Fields with No Examples
+
+**Mistake:**
+
+```typescript
+const schema = z.object({
+  date_range: z.string()
+    .describe('The date range to filter by'),
+});
+```
+
+What format is "date_range"? "2025-01-01 to 2025-01-31"? An ISO interval? A Slack-style "last_7_days"?
+
+**Fix:**
+
+```typescript
+const schema = z.object({
+  date_range: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{4}-\d{2}-\d{2}$/)
+    .describe('Date range in ISO format. Examples: "2025-01-01T2025-01-31", "2025-02-01T2025-02-28".'),
+});
+```
+
+**Pattern:** Every parameter must have examples. Use regex to encode format constraints.
+
+---
+
+## Bonus: Marketing Copy Instead of Prompting
+
+**Mistake:**
+
+```typescript
+'Harness the power of our best-in-class document management system ' +
+'to unlock the potential of your knowledge management workflows.'
+```
+
+Not a prompt. The agent learns nothing about when to call this tool.
+
+**Fix:**
+
+```typescript
+'Search internal documents by keyword or metadata. Use for finding ' +
+'runbooks, architecture guides, and troubleshooting steps. ' +
+'Do not use for general knowledge (use web search). Returns snippets ranked by relevance.'
+```
+
+**Pattern:** Write descriptions as instructions, not marketing copy.
+
+---
+
+## Checklist
+
+Before shipping a tool:
+
+- [ ] Description includes "Use when..." and "Do not use for..."
+- [ ] All parameters have `.describe()` with examples
+- [ ] `` `<20` `` tools per agent session (or use dynamic selection)
+- [ ] All responses include semantic content (names, not opaque IDs)
+- [ ] Destructive tools marked with `destructiveHint` or called out in description
+- [ ] All errors returned as `isError: true` responses, never thrown
+- [ ] Naming consistent across tool set (same noun, verb_noun pattern)
+- [ ] Read tools marked `readOnlyHint: true`; write tools marked clearly
+- [ ] Idempotent tools (or those supporting idempotency keys) marked `idempotentHint: true`
+- [ ] No nullable parameters; use optional instead
+
+## See also
+
+- `/docs/tool-design/naming-and-descriptions`
+- `/docs/tool-design/schemas`
+- `/docs/tool-design/idempotency-and-safety`
+- `/docs/error-handling`

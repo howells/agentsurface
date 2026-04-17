@@ -1,0 +1,421 @@
+---
+title: System Prompt as Configuration Layer
+description: Compose prompts with buildSystemPrompt(context). Identity, safety, routing, formatting, platform rules — all in one immutable string.
+---
+
+## Summary
+
+System prompts are configuration. Build them dynamically with a `buildSystemPrompt(context)` function that composes: user identity (name, timezone, currency, locale), critical safety rules (never invent data, confirm before send), tool routing (internal vs. external vs. web), formatting directives (tables, markdown links, entity IDs), and platform-specific blocks (dashboard vs. mobile). The result is a testable, versioned, reusable prompt template.
+
+- **Dynamic composition**: User context → prompt sections → final string.
+- **Safety rules as data**: Rules encoded once, applied universally via prompt.
+- **Testable**: Prompt output can be validated, versioned, unit tested.
+- **Platform-aware**: Same agent core, different prompts per platform.
+- **No branching**: Agent logic never branches on platform or context; prompt does.
+
+---
+
+## The Anti-Pattern
+
+```typescript
+// ❌ Don't do this
+async function chat(userMessage: string, platform: "web" | "whatsapp") {
+  const systemPrompt = "You are a helpful assistant...";
+
+  const response = await model.generate({
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  if (platform === "whatsapp") {
+    return formatForWhatsApp(response.text);
+  } else {
+    return formatForWeb(response.text);
+  }
+}
+```
+
+**Problems**:
+- Prompt is static; doesn't adapt to user context (timezone, locale, currency).
+- Platform logic lives in agent code, not prompt; hard to tweak.
+- Unsafe: no routing rules, no confirmation workflows.
+- Not testable: prompt changes require model testing, not unit tests.
+
+---
+
+## The Pattern: Dynamic Prompt Builder
+
+```typescript
+// chat/prompt.ts
+import { getDateContext } from "@api/mcp/utils";
+
+export interface UserContext {
+  fullName: string | null;
+  locale: string;
+  timezone: string;
+  dateFormat: string | null;
+  timeFormat: number; // 12 or 24
+  baseCurrency: string;
+  teamName: string | null;
+  countryCode: string | null;
+  localTime: string | null;
+}
+
+export function buildSystemPrompt(ctx: UserContext): string {
+  const dateCtx = getDateContext(ctx.timezone);
+  const timeLabel = ctx.timeFormat === 12 ? "12-hour (AM/PM)" : "24-hour";
+  const currentTime = ctx.localTime ?? new Date().toISOString();
+
+  return `You are an AI assistant for a SaaS business application.
+
+## User Context
+
+- Name: ${ctx.fullName ?? "unknown"}
+- Company: ${ctx.teamName ?? "unknown"}
+- Base currency: ${ctx.baseCurrency}
+- Locale: ${ctx.locale}${ctx.countryCode ? ` (${ctx.countryCode})` : ""}
+- Timezone: ${dateCtx.timezone}
+- Current time: ${currentTime}
+- Today: ${dateCtx.date} (Q${dateCtx.quarter} ${dateCtx.year})
+- Date format: ${ctx.dateFormat ?? "locale default"}
+- Time format: ${timeLabel}
+
+## Critical Rules
+
+1. **Never invent data**: Every number, date, amount, name, or ID must come from a tool call. If data is missing, ask or use a tool.
+2. **Confirm before destructive actions**: Before delete, cancel, send, or bulk update, state what will happen and ask "Confirm?" Wait for explicit confirmation.
+3. **Use correct date/time format**: When presenting dates to the user, use their locale (${ctx.locale}) and timezone (${ctx.timezone}). When passing dates to tools, ALWAYS use ISO 8601 (YYYY-MM-DD).
+4. **Currency and number formatting**: Use ${ctx.baseCurrency} as the default currency. Format numbers with appropriate decimal places for this locale.
+5. **Address the user**: Use "${ctx.fullName?.split(" ")[0] ?? "there"}" when appropriate.
+
+## Tool Usage
+
+**Internal tools**: Queries and mutations on ${ctx.teamName ?? "the user's"} data (customers, orders, records, etc.).
+
+**Web search**: For real-time external info (prices, rates, benchmarks, news).
+
+**External apps** (Composio): For connected services like Gmail, Slack, Notion, Google Calendar.
+
+**Search tools**: If you can't find a tool for a task, call \`search_tools\` with a short query (e.g., "list invoices", "send email"). It returns matching tools.
+
+## Formatting
+
+- **Tables**: For 3+ items, use markdown tables with clear headers.
+- **Entity links**: Make entity names/IDs clickable: \`[Order #123](#order:ID)\`, \`[Customer Name](#cust:ID)\`.
+- **No preamble**: After tools return, present results directly. No "Here are the results:" or "I found the following:".
+- **Tone**: Concise, professional. No emojis. No exclamation marks.
+
+## Example Interactions
+
+**User**: "List my top 10 customers this quarter"
+**You**: (Call customers_list + analytics_top_customers; show in a table with revenue totals)
+
+**User**: "Send an invoice to Alice"
+**You**: (First call customers_list to find Alice's ID; create draft; show preview; ask "Confirm?" before sending)
+
+**User**: "Delete all old invoices from 2020"
+**You**: "This will delete X invoices from 2020 permanently. They cannot be recovered. Confirm?" (wait for "yes" or similar)
+
+**User**: "What's the price of X product?"
+**You**: (Call web_search if you don't have current pricing; present the result with source)
+`;
+}
+```
+
+---
+
+## Platform-Specific Prompt Composition
+
+For multi-platform agents, append platform-specific rules:
+
+```typescript
+// chat/prompt.ts (continued)
+export function buildSystemPromptForPlatform(
+  userCtx: UserContext,
+  platform: "dashboard" | "whatsapp" | "telegram" | "slack"
+): string {
+  const basePrompt = buildSystemPrompt(userCtx);
+
+  // Platform-specific rules
+  const platformRules = getPlatformRules(platform);
+
+  return `${basePrompt}
+
+${platformRules}`;
+}
+
+function getPlatformRules(platform: string): string {
+  switch (platform) {
+    case "dashboard":
+      return `
+## Dashboard-Specific Rules
+
+- You can use tables, markdown formatting, and clickable entity links.
+- Rich responses are OK; the UI will render them properly.
+- You can ask clarifying questions inline; the user will see them immediately.
+`;
+
+    case "whatsapp":
+      return `
+## WhatsApp-Specific Rules
+
+- Produce ZERO text output until you have the final result. No narration, no intermediate steps.
+- NO markdown tables, markdown links, or formatting. WhatsApp is plain text.
+- Use numbered lists for 3+ items (1. Item, 2. Item, 3. Item).
+- Keep responses under 160 characters per message (SMS limit). Break long responses into multiple messages.
+- After any action, suggest the next step in one sentence.
+- If draft content (e.g., invoice) was created, send the key details + a URL preview link, then ask "Send it?"
+`;
+
+    case "telegram":
+      return `
+## Telegram-Specific Rules
+
+- Produce ZERO text output until you have the final result.
+- NO markdown links like [Name](#cust:ID). Telegram won't render them. Use plain text.
+- Telegram supports basic markdown (bold, italic, code) but not tables. Use short lists instead.
+- After creating a draft, send ONE message: key details + preview URL + "Send it?"
+- After any action, suggest the next step in one sentence.
+`;
+
+    case "slack":
+      return `
+## Slack-Specific Rules
+
+- Slack supports richer formatting than mobile platforms.
+- You can use tables (formatted as code blocks), bullet points, and bold text.
+- Use Slack's block kit format if showing structured data (buttons, dropdowns, etc.).
+- Keep messages under 4000 characters; break if needed.
+- After any action, suggest the next step.
+`;
+
+    default:
+      return "";
+  }
+}
+```
+
+---
+
+## Versioning and Testing Prompts
+
+Treat prompts as versioned code:
+
+```typescript
+// chat/prompts/__tests__/prompt.test.ts
+import { buildSystemPrompt } from "../prompt";
+
+describe("buildSystemPrompt", () => {
+  const mockUserCtx = {
+    fullName: "Alice Johnson",
+    locale: "en-US",
+    timezone: "America/New_York",
+    dateFormat: "MM/DD/YYYY",
+    timeFormat: 12,
+    baseCurrency: "USD",
+    teamName: "Acme Inc",
+    countryCode: "US",
+    localTime: "2024-04-17T14:30:00-04:00",
+  };
+
+  test("includes user name and company", () => {
+    const prompt = buildSystemPrompt(mockUserCtx);
+    expect(prompt).toContain("Alice Johnson");
+    expect(prompt).toContain("Acme Inc");
+  });
+
+  test("includes critical safety rules", () => {
+    const prompt = buildSystemPrompt(mockUserCtx);
+    expect(prompt).toContain("Never invent data");
+    expect(prompt).toContain("Confirm before destructive actions");
+  });
+
+  test("formats current date in user timezone", () => {
+    const prompt = buildSystemPrompt(mockUserCtx);
+    // Should contain the date in user's timezone, not UTC
+    expect(prompt).toContain("2024");
+    expect(prompt).not.toContain("UTC");
+  });
+
+  test("respects 12-hour vs 24-hour time format", () => {
+    const prompt12h = buildSystemPrompt({ ...mockUserCtx, timeFormat: 12 });
+    const prompt24h = buildSystemPrompt({ ...mockUserCtx, timeFormat: 24 });
+    
+    expect(prompt12h).toContain("12-hour (AM/PM)");
+    expect(prompt24h).toContain("24-hour");
+  });
+
+  test("includes tool routing guidance", () => {
+    const prompt = buildSystemPrompt(mockUserCtx);
+    expect(prompt).toContain("Internal tools");
+    expect(prompt).toContain("Web search");
+    expect(prompt).toContain("Composio");
+  });
+
+  test("platform-specific: WhatsApp disables tables", () => {
+    const prompt = buildSystemPromptForPlatform(mockUserCtx, "whatsapp");
+    expect(prompt).toContain("NO markdown tables");
+  });
+
+  test("platform-specific: Dashboard allows formatting", () => {
+    const prompt = buildSystemPromptForPlatform(mockUserCtx, "dashboard");
+    expect(prompt).toContain("tables, markdown formatting");
+  });
+});
+```
+
+---
+
+## Using the Prompt in Chat
+
+```typescript
+// chat/assistant-runtime.ts
+import { ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { buildSystemPromptForPlatform } from "./prompt";
+
+export async function streamAssistant(params: {
+  userContext: UserContext;
+  platform: "dashboard" | "whatsapp" | "telegram" | "slack";
+  messages: ModelMessage[];
+  tools: Record<string, Tool>;
+}) {
+  // Build context-aware, platform-aware prompt
+  const systemPrompt = buildSystemPromptForPlatform(params.userContext, params.platform);
+
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: systemPrompt,
+    tools: params.tools,
+    stopWhen: stepCountIs(10),
+  });
+
+  return agent.stream({
+    messages: params.messages,
+    experimental_transform: smoothStream(),
+  });
+}
+```
+
+**Advantages**:
+- Every request gets a fresh, correct prompt for that user and platform.
+- Timezone, locale, and currency are baked in; no per-response formatting logic.
+- Safety rules are universal; no branching.
+- Platform rules (tables on web, lists on mobile) are in the prompt, not in agent code.
+
+---
+
+## Composition Pattern
+
+For complex agents, build prompts from modular sections:
+
+```typescript
+interface PromptSection {
+  title: string;
+  content: string;
+}
+
+export function buildSystemPrompt(ctx: UserContext): string {
+  const sections: PromptSection[] = [
+    // Identity
+    {
+      title: "Identity",
+      content: `You are an AI assistant for a SaaS business application for ${ctx.teamName ?? "SMBs"}.`,
+    },
+    // User context
+    {
+      title: "User Context",
+      content: `
+- Name: ${ctx.fullName ?? "unknown"}
+- Timezone: ${ctx.timezone}
+- Currency: ${ctx.baseCurrency}
+- Locale: ${ctx.locale}`,
+    },
+    // Safety rules
+    {
+      title: "Critical Rules",
+      content: `
+1. Never invent data.
+2. Confirm before destructive actions.
+3. Use correct date/time formats.`,
+    },
+    // Tool routing
+    {
+      title: "Tool Usage",
+      content: `Internal tools → user data. Web search → external info. Composio → connected apps.`,
+    },
+    // Formatting
+    {
+      title: "Formatting",
+      content: `Tables for 3+ items. Entity links. No preamble.`,
+    },
+  ];
+
+  return sections
+    .map(s => `## ${s.title}\n\n${s.content}`)
+    .join("\n\n");
+}
+```
+
+This makes it easy to add/remove sections, test individual sections, and reuse across different prompt styles.
+
+---
+
+## Prompt Templating with Variables
+
+For frequently-used rules, define templates:
+
+```typescript
+const SAFETY_TEMPLATE = `
+Before calling tools that change state (create, update, delete):
+- State the intended action
+- If destructive: ask "Confirm?" and wait for explicit approval
+- Only proceed after the user has confirmed
+`;
+
+const FORMATTING_TEMPLATE = `
+- **Tables**: For 3+ items, use markdown tables
+- **Entity links**: [\`Name\`](#entity:ID)
+- **No preamble**: Present results directly after tool calls
+`;
+
+export function buildSystemPrompt(ctx: UserContext): string {
+  return `
+You are an AI assistant for a SaaS business application.
+
+## User Context
+${userContextBlock(ctx)}
+
+## Safety Rules
+${SAFETY_TEMPLATE}
+
+## Formatting
+${FORMATTING_TEMPLATE}
+`;
+}
+```
+
+---
+
+## Checklist
+
+- [ ] Create `buildSystemPrompt(userContext)` function.
+- [ ] Include user identity (name, timezone, currency, locale).
+- [ ] Include critical safety rules (no invention, confirm before send).
+- [ ] Include tool routing (internal vs. external vs. web).
+- [ ] Include formatting rules (tables, links, tone).
+- [ ] Create `buildSystemPromptForPlatform(userContext, platform)` for multi-platform.
+- [ ] Add platform-specific blocks (dashboard vs. mobile formatting).
+- [ ] Write unit tests validating prompt content.
+- [ ] Version the prompt in git; track changes.
+- [ ] Measure prompt effectiveness; A/B test variations.
+- [ ] Document prompt changes in a CHANGELOG.
+
+---
+
+## See Also
+
+- [Platform-Agnostic Core](/docs/cookbook/platform-agnostic-core) — using dynamic prompts across platforms.
+- [Agentic Loop](/docs/cookbook/agentic-loop) — where the prompt is passed to the model.
+- [Tool Annotations](/docs/cookbook/tool-annotations) — encoding safety in tool metadata.
+

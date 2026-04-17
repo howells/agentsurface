@@ -1,0 +1,286 @@
+---
+title: Transport Selection
+description: Choosing and configuring the right transport for your MCP server deployment
+---
+
+## Summary
+
+The transport layer affects latency, deployment, scalability, and state management. Stdio is simplest (subprocess, no network), best for local development. SSE and HTTP enable distributed deployment and horizontal scaling. Critical rule: write logs to stderr only; stdout is reserved for MCP JSON-RPC frames. Choose transport early — rearchitecting for a different one is painful.
+
+- Stdio: simplest, no network, logs to stderr
+- SSE: one-way server-to-client stream, good for simple cases
+- HTTP (Streamable HTTP): bidirectional, most scalable
+- Select early in design — transport affects lifecycle and state management
+- Always write logs to stderr, never stdout
+
+The transport layer determines how messages flow between the MCP client and your server. The choice affects latency, deployment model, horizontal scalability, and how you handle authentication. Getting it wrong early is painful to unwind — a server designed for stdio cannot be trivially converted to HTTP without rethinking connection lifecycle and state management.
+
+## Stdio Transport
+
+Stdio is the simplest transport. The client launches your server as a subprocess and communicates over the process's stdin and stdout. There is no network involved.
+
+```typescript
+// cli.ts
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
+
+const server = createServer({
+  stripeApiKey: process.env.STRIPE_API_KEY!,
+  databaseUrl: process.env.DATABASE_URL!,
+});
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+// Process stays alive, reading from stdin
+```
+
+**Write logs to stderr, never stdout.** The MCP protocol uses stdout exclusively for message exchange. Any writes to stdout that are not valid MCP JSON-RPC frames will corrupt the transport.
+
+```typescript
+// WRONG: corrupts the stdio transport
+console.log("Server started");
+
+// CORRECT: stderr is safe for diagnostic output
+console.error("Server started");
+
+// BETTER: use the MCP logging facility
+await server.sendLoggingMessage({
+  level: "info",
+  logger: "billing-mcp",
+  data: "Server started",
+});
+```
+
+**Client configuration for stdio (Claude Desktop example):**
+
+```json
+{
+  "mcpServers": {
+    "billing": {
+      "command": "node",
+      "args": ["/path/to/billing-mcp/dist/cli.js"],
+      "env": {
+        "STRIPE_API_KEY": "sk_live_...",
+        "DATABASE_URL": "postgres://..."
+      }
+    }
+  }
+}
+```
+
+**When to use stdio:**
+
+- Local development tools running on a developer's machine
+- CLI-invoked servers where every invocation is a fresh session
+- Tools that need to access local filesystem or system resources
+- Situations where zero network overhead matters
+- Servers that should not be exposed to network traffic
+
+## Streamable HTTP Transport
+
+Streamable HTTP is the correct transport for servers deployed as cloud services. It exposes a single HTTP endpoint (conventionally `/mcp`) that accepts POST requests. Responses can be single JSON objects or SSE streams, depending on whether the operation requires streaming.
+
+```typescript
+// src/http-server.ts
+import express from "express";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createServer } from "./server.js";
+
+const app = express();
+app.use(express.json());
+
+const transports = new Map<string, StreamableHTTPServerTransport>();
+
+app.post("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+  let transport: StreamableHTTPServerTransport;
+
+  if (sessionId && transports.has(sessionId)) {
+    transport = transports.get(sessionId)!;
+  } else {
+    // New session — create a fresh transport and server pair
+    transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => crypto.randomUUID(),
+      onsessioninitialized: (id) => {
+        transports.set(id, transport);
+      },
+    });
+
+    transport.onclose = () => {
+      if (transport.sessionId) {
+        transports.delete(transport.sessionId);
+      }
+    };
+
+    const server = createServer(loadConfig());
+    await server.connect(transport);
+  }
+
+  await transport.handleRequest(req, res, req.body);
+});
+
+// Handle GET for SSE streaming and DELETE for session termination
+app.get("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  if (!sessionId || !transports.has(sessionId)) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  await transports.get(sessionId)!.handleRequest(req, res);
+});
+
+app.delete("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  if (sessionId && transports.has(sessionId)) {
+    transports.get(sessionId)!.close();
+    transports.delete(sessionId);
+  }
+  res.status(204).send();
+});
+
+app.listen(3000);
+```
+
+## Stateless Mode for Horizontal Scaling
+
+The stateful session map above does not scale horizontally — sessions created on one instance are not visible to another. For serverless deployments and horizontally scaled services, use stateless mode by setting `sessionIdGenerator: undefined`:
+
+```typescript
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined, // Disable session tracking
+});
+```
+
+In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process.
+
+For operations that require state across calls — maintaining context between tool invocations in a multi-turn session — store state externally in Redis or another shared store, keyed on a session identifier the client provides in a request header:
+
+```typescript
+app.post("/mcp", async (req, res) => {
+  const sessionId = req.headers["x-session-id"] as string;
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+
+  const server = createServer(loadConfig());
+
+  // Inject session state from Redis before processing
+  if (sessionId) {
+    const sessionState = await redis.get(`mcp:session:${sessionId}`);
+    if (sessionState) {
+      server.setSessionState(JSON.parse(sessionState));
+    }
+  }
+
+  server.onSessionStateChanged = async (state) => {
+    if (sessionId) {
+      await redis.set(
+        `mcp:session:${sessionId}`,
+        JSON.stringify(state),
+        "EX",
+        3600
+      );
+    }
+  };
+
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+});
+```
+
+## SSE as a Standalone Transport
+
+The older SSE transport (`/sse` for the stream, `/message` for posting) is deprecated as of the November 2024 MCP specification update. Do not build new servers against it. Streamable HTTP supersedes it and supports SSE as an optional response mode when the server needs to stream a long-running tool result.
+
+If you have clients that only support the legacy SSE transport, you can run both side by side during a migration period, but plan to remove the SSE-only endpoint.
+
+## Transport Decision Guide
+
+```
+Deployment context                     Transport
+────────────────────────────────────── ─────────────────
+Developer's local machine              Stdio
+CI/CD runner, scripted automation      Stdio
+Serverless function (Vercel, Lambda)   Streamable HTTP (stateless)
+Long-running container (single)        Streamable HTTP (stateful)
+Horizontally scaled service            Streamable HTTP (stateless + Redis)
+Embedded in CLI tool                   Stdio
+Shared public service (multiple users) Streamable HTTP + OAuth
+```
+
+## Production Deployment on Vercel
+
+Vercel's serverless platform requires specific configuration for MCP servers due to request duration limits and streaming behavior.
+
+**Route handler for Next.js App Router:**
+
+```typescript
+// app/mcp/route.ts
+import { createMcpHandler } from "@vercel/mcp-adapter";
+import { createServer } from "@/lib/billing-mcp/server";
+
+const handler = createMcpHandler(
+  createServer({
+    stripeApiKey: process.env.STRIPE_API_KEY!,
+    databaseUrl: process.env.DATABASE_URL!,
+  }),
+  {
+    basePath: "/mcp",
+  }
+);
+
+export const maxDuration = 60; // seconds — requires Vercel Pro or higher
+
+export { handler as GET, handler as POST, handler as DELETE };
+```
+
+**Enable Fluid Compute** on your Vercel project to allow concurrent streaming requests on the same function instance. Without Fluid Compute, a function handling an SSE stream blocks other requests. Configure it in your `vercel.json`:
+
+```json
+{
+  "functions": {
+    "app/mcp/route.ts": {
+      "maxDuration": 60,
+      "fluid": true
+    }
+  }
+}
+```
+
+<Callout type="info">
+`maxDuration` of 60 seconds requires a Pro plan. On the Hobby plan, the limit is 10 seconds. For tools with long-running operations (file processing, external API calls), either upgrade the plan or use a streaming response to heartbeat the connection while work proceeds.
+</Callout>
+
+**The `mcp-handler` package** (`@vercel/mcp-adapter`) handles transport setup, session management, and the GET/POST/DELETE routing automatically. The `basePath` option tells the adapter which path prefix to strip when constructing client-facing URLs.
+
+## Using mcp-handler with Dynamic Transport Selection
+
+For servers that need to support both stdio (local) and HTTP (deployed), expose the transport as a runtime decision based on how the process was invoked:
+
+```typescript
+// src/main.ts
+import { createServer } from "./server.js";
+
+const server = createServer(loadConfig());
+
+// If invoked via node cli.js, use stdio
+// If invoked via HTTP (detected by PORT env var), use HTTP
+if (process.env.PORT) {
+  const { startHttpServer } = await import("./http-server.js");
+  await startHttpServer(server, Number(process.env.PORT));
+} else {
+  const { StdioServerTransport } = await import(
+    "@modelcontextprotocol/sdk/server/stdio.js"
+  );
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+```
+
+This pattern avoids bundling HTTP server dependencies into the stdio binary and vice versa — each transport path imports its dependencies lazily.
+
+<Callout type="warn">
+Never use the same `McpServer` instance across multiple transport connections. The server maintains state about the connected client. Create a new server instance per connection when using the Streamable HTTP transport.
+</Callout>

@@ -1,0 +1,420 @@
+---
+title: Drift Detection
+description: Keeping context files current through CI checks and automated audits
+---
+
+## Summary
+
+Context files go stale as code evolves: commands removed, directories moved, tech stack upgraded, permissions changed. Agents following outdated files fail silently. Detect drift via CI checks: run all commands in AGENTS.md to verify they exist and succeed, verify referenced directories exist, grep tech stack to confirm current versions, compare permission boundaries to actual code. Run automated audits (agentify score --dimension=context) monthly or quarterly. Add lint rules for AGENTS.md format consistency. Version control changes with git history indicating maintenance.
+
+- **Stale commands**: pnpm dev removed from package.json
+- **Deleted directories**: src/components moved to packages/web/components
+- **Outdated tech**: Node 16 EOL but still in AGENTS.md
+- **Drift detection**: CI checks, monthly audits, git log inspection
+- **Lint rules**: Require AGENTS.md format consistency
+- **Maintenance signal**: Recent git commits on AGENTS.md
+
+---
+
+Context files go stale. Commands change, directories move, conventions evolve. Agents that follow outdated instructions fail silently—running non-existent commands, trying to access deleted files, applying superceded conventions.
+
+Drift detection catches this via CI checks and automated audits.
+
+## Common Drift Patterns
+
+### Stale Commands
+
+```markdown
+# AGENTS.md (outdated)
+
+pnpm dev       # But package.json has "dev" removed; now it's "start"
+npm install    # But migrated to pnpm; npm install will fail
+```
+
+### Deleted Directories
+
+```markdown
+# AGENTS.md (outdated)
+
+See src/components/    # But moved to packages/web/components/
+```
+
+### Outdated Tech
+
+```markdown
+# AGENTS.md (outdated)
+
+Framework: Next.js 12  # But upgraded to Next.js 15
+Database: MySQL        # But migrated to PostgreSQL
+```
+
+### Removed Conventions
+
+```markdown
+# AGENTS.md (outdated)
+
+Testing: Jest          # Migrated to Vitest 6 months ago
+Linter: ESLint v7      # Upgraded to ESLint v9
+```
+
+## Detection Strategies
+
+### Manual: Verification Dates
+
+Tag entries with last-verified dates:
+
+```markdown
+# AGENTS.md
+
+Commands (verified 2026-04-15):
+  pnpm dev        # Last verified 2026-04-15
+  pnpm test       # Last verified 2026-04-15
+  pnpm build      # Last verified 2026-04-01 — STALE, verify soon
+
+Tech Stack (verified 2026-03-01):
+  TypeScript      # Last verified 2026-03-01
+  Next.js 15      # Last verified 2026-04-10 — recently updated
+  PostgreSQL      # Last verified 2026-02-15 — STALE, mark verified
+```
+
+Red-flag entries older than 3 months. Require re-verification before merge.
+
+### Automated: CI Checks
+
+Add a pre-commit or CI script to validate commands:
+
+```bash
+#!/bin/bash
+# scripts/validate-agents.sh
+
+set -e
+
+echo "Validating AGENTS.md commands..."
+
+# Check that commands exist
+pnpm -v > /dev/null || (echo "✗ pnpm not found" && exit 1)
+turbo --version > /dev/null || (echo "✗ turbo not found" && exit 1)
+
+# Check that scripts exist in package.json
+for cmd in dev test lint build; do
+  grep -q "\"$cmd\":" package.json || \
+    (echo "✗ pnpm $cmd script not found in package.json" && exit 1)
+done
+
+echo "✓ All commands validated"
+```
+
+Run on every commit:
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+bash scripts/validate-agents.sh
+```
+
+### Automated: Directory Checks
+
+Verify directories referenced in AGENTS.md still exist:
+
+```bash
+#!/bin/bash
+# scripts/check-paths.sh
+
+set -e
+
+echo "Checking referenced directories..."
+
+dirs=(
+  "src/"
+  "tests/"
+  "docs/"
+  "packages/api/"
+  "packages/web/"
+)
+
+for dir in "${dirs[@]}"; do
+  [ -d "$dir" ] || (echo "✗ Directory $dir not found" && exit 1)
+done
+
+echo "✓ All directories exist"
+```
+
+### Automated: Content Validation
+
+Check that AGENTS.md sections haven't been removed:
+
+```bash
+#!/bin/bash
+# scripts/validate-agents-content.sh
+
+set -e
+
+echo "Validating AGENTS.md sections..."
+
+# Check required sections exist
+required_sections=(
+  "Quick Start"
+  "Conventions"
+  "Testing"
+  "Boundaries"
+)
+
+for section in "${required_sections[@]}"; do
+  grep -q "## $section" AGENTS.md || \
+    (echo "✗ Required section '## $section' missing from AGENTS.md" && exit 1)
+done
+
+# Check line count (warn if >370)
+lines=$(wc -l < AGENTS.md)
+if [ "$lines" -gt 370 ]; then
+  echo "⚠ AGENTS.md is $lines lines (recommend `` `<370` ``)"
+  exit 1
+fi
+
+echo "✓ AGENTS.md structure valid"
+```
+
+### Automated: Tool Integration
+
+Use `agentify` CLI to audit context files:
+
+```bash
+# Command-line audit
+agentify score --dimension=context
+
+# Outputs:
+# context-files dimension:
+#   Score: 2/3
+#   Issues:
+#     - AGENTS.md: 425 lines (recommend `` `<370` ``)
+#     - CLAUDE.md: Last verified 2026-02-01 (>60 days stale)
+#     - Missing .cursor/rules/ for Cursor users
+#   Recommendations:
+#     - Split AGENTS.md or link to deeper docs
+#     - Re-verify CLAUDE.md against current behavior
+```
+
+Integrate into CI:
+
+```yaml
+# .github/workflows/lint.yml
+name: Lint
+
+on: [push, pull_request]
+
+jobs:
+  context-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g agentify
+      - run: agentify score --dimension=context --fail-below 2
+```
+
+This CI gate fails if context files score `` `<2` `` (poor).
+
+## Maintenance Cadence
+
+### Quarterly Review
+
+Every 3 months, re-verify AGENTS.md sections:
+
+```markdown
+# AGENTS.md
+
+## Quick Start
+
+Commands (verified 2026-04-17):
+  pnpm dev        # ✓ 2026-04-17
+  pnpm test       # ✓ 2026-04-17
+  pnpm build      # ✗ 2026-01-15 — RE-VERIFY
+
+## Boundaries (verified 2026-04-01)
+  - Last verified when changed; no recent updates
+```
+
+Create quarterly reminder task:
+
+```bash
+# scripts/quarterly-review.sh
+#!/bin/bash
+
+cat << EOF
+# Quarterly AGENTS.md Review
+
+Verify these sections:
+- [ ] Commands still exist and work
+- [ ] Directories referenced still exist
+- [ ] Tech stack versions current
+- [ ] Permission boundaries still enforced
+- [ ] Testing setup matches reality
+- [ ] All links point to existing files
+
+Run full test suite:
+  pnpm test
+
+If anything changed, update dates:
+  Commands (verified 2026-04-17):
+    pnpm dev  # ✓ 2026-04-17
+EOF
+```
+
+### Event-Driven Updates
+
+Update AGENTS.md immediately when:
+
+- Package manager changes (npm → pnpm)
+- Major version upgrades (Next.js 12 → 15)
+- File structure changes (src/ moved to lib/)
+- Command names change
+- Permission boundaries change
+- Testing framework changes
+
+**Commit message pattern:**
+
+```
+docs(AGENTS.md): Update Next.js version to 15
+
+- Verified all dev commands work with Next.js 15
+- Updated build output paths in CLAUDE.md
+- No breaking changes to existing commands
+```
+
+### Stale Content Removal
+
+Remove sections that are no longer relevant:
+
+**Before:**
+
+```markdown
+## Legacy Setup
+
+If using Node `` `<18` ``, install node-gyp separately:
+  npm install -g node-gyp
+
+(Node `` `<18` `` no longer supported; .nvmrc enforces 18+)
+```
+
+**After:** Delete the section. Update instead:
+
+```markdown
+## Requirements
+
+Node.js 18.12+. Enforced in .nvmrc.
+```
+
+## Tooling Integration
+
+### Pre-Commit Hook
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+echo "Validating context files..."
+
+# Run validation scripts
+bash scripts/validate-agents.sh || exit 1
+bash scripts/check-paths.sh || exit 1
+bash scripts/validate-agents-content.sh || exit 1
+
+echo "✓ Context files OK"
+exit 0
+```
+
+### CI Workflow
+
+```yaml
+# .github/workflows/validate-context.yml
+
+name: Validate Context Files
+
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate commands
+        run: bash scripts/validate-agents.sh
+      
+      - name: Check directories
+        run: bash scripts/check-paths.sh
+      
+      - name: Check structure
+        run: bash scripts/validate-agents-content.sh
+      
+      - name: Run agentify audit
+        run: |
+          npm install -g agentify
+          agentify score --dimension=context --fail-below 2
+```
+
+Blocks merge if validation fails.
+
+### Manual Audit Checklist
+
+Use before committing changes that affect conventions:
+
+```markdown
+# Context File Audit Checklist
+
+Before merging code changes, verify context files:
+
+- [ ] All commands in AGENTS.md work (pnpm dev, pnpm test, pnpm build)
+- [ ] Directories referenced still exist
+- [ ] Tech stack versions current
+- [ ] Permission boundaries match actual permissions
+- [ ] Testing commands match actual test setup
+- [ ] No deprecated libraries or patterns
+- [ ] File count reasonable (`` `<370` `` lines for AGENTS.md)
+- [ ] Links to deeper docs still valid
+- [ ] CLAUDE.md references AGENTS.md (no duplication)
+- [ ] Cursor rules and Copilot instructions reference AGENTS.md
+
+If any fail, update AGENTS.md and re-verify.
+```
+
+## Metrics
+
+Track context file health over time:
+
+```typescript
+// scripts/measure-context-health.ts
+
+interface ContextMetrics {
+  agentsMdLines: number;
+  commandsVerified: number;
+  commandsStale: number;
+  lastFullAudit: Date;
+  stalenessScore: number; // 0–100, higher is better
+}
+
+function calculateMetrics(): ContextMetrics {
+  const content = readFile('AGENTS.md');
+  
+  const lines = content.split('\n').length;
+  const verified = (content.match(/✓ \d{4}-\d{2}-\d{2}/g) || []).length;
+  const stale = (content.match(/✗ \d{4}-\d{2}-\d{2}/g) || []).length;
+  
+  const stalenessScore = (verified / (verified + stale)) * 100;
+  
+  return {
+    agentsMdLines: lines,
+    commandsVerified: verified,
+    commandsStale: stale,
+    lastFullAudit: new Date(), // Manually update
+    stalenessScore: Math.round(stalenessScore),
+  };
+}
+```
+
+Log metrics in CI and track over time. Alert if stalenessScore drops below 80%.
+
+## See also
+
+- `/docs/context-files/agents-md` — AGENTS.md spec
+- `/docs/context-files/anti-patterns` — stale content patterns
+- `/templates/discovery/AGENTS.md` — starter template

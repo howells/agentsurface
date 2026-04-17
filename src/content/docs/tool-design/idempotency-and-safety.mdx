@@ -1,0 +1,310 @@
+---
+title: Idempotency and Safety
+description: Designing tools to be safely retryable and clearly annotated as read or write
+---
+
+## Summary
+
+Design tools to be safely retryable given network timeouts, rate limits, and model stochasticity. Idempotent tools produce identical results when called multiple times with the same inputs (critical for reliability). Patterns: upsert instead of create+update, tag systems with idempotency keys, dry-run modes before mutations, clear read vs. write classification. Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint in MCP) enable downstream safety reasoning. Avoid hidden state changes; minimize side effects.
+
+- **Idempotency**: Same inputs → same results on retry
+- **Upsert pattern**: Single operation instead of create + update
+- **Idempotency keys**: Client-provided UUID for deduplication
+- **Dry-run modes**: Test mutations before execution
+- **Read vs. write**: Clear classification, read-only tools safe to retry
+- **Annotations**: MCP hints for downstream reasoning
+
+---
+
+Agents are not deterministic. Network timeouts, rate limits, and model stochasticity mean tools are called multiple times with the same inputs. Tools must be idempotent or explicitly marked as destructive so downstream systems can reason about safety.
+
+## Idempotency
+
+An idempotent tool produces the same result when called multiple times with identical inputs. This is critical for reliable agent automation.
+
+### Patterns
+
+**Upsert instead of create + update:**
+
+```typescript
+// Anti-pattern: two separate operations
+create_user(name: string, email: string)
+update_user(id: string, name: string, email: string)
+
+// Better: idempotent single operation
+upsert_user(
+  email: string,
+  name: string,
+  id?: string  // If provided, update; if omitted, create
+)
+```
+
+The agent calls `upsert_user` once. If the call succeeds, the user exists with the provided data. If the call fails and the agent retries, the result is identical.
+
+**Idempotency keys:**
+
+```typescript
+const createInvoiceSchema = z.object({
+  customer_id: z.string().uuid(),
+  amount_cents: z.number().int().positive(),
+  idempotency_key: z.string()
+    .describe('Unique key (e.g., UUID) for this operation. Prevents duplicate invoices if retried.'),
+});
+
+// Handler
+async (params) => {
+  const existing = await db.invoices.findByIdempotencyKey(params.idempotency_key);
+  if (existing) {
+    return {
+      content: [{
+        type: 'text',
+        text: `Invoice ${existing.id} already exists (idempotency key: ${params.idempotency_key}).`,
+      }],
+    };
+  }
+  
+  const invoice = await createInvoice(params);
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({ invoice_id: invoice.id, status: invoice.status }),
+    }],
+  };
+}
+```
+
+If the agent retries with the same `idempotency_key`, it gets the same invoice back—no duplicate charge.
+
+**For read-only tools:**
+
+All read tools are idempotent by definition. Calling `search_issues` ten times with the same query returns the same result set (ignoring time-series changes). No special handling needed.
+
+### When to Mark as Idempotent
+
+Use the MCP `idempotentHint` annotation:
+
+```typescript
+server.tool(
+  'upsert_user',
+  'Creates a user or updates if exists. Idempotent.',
+  schema,
+  handler,
+  {
+    idempotentHint: true,  // Safe to retry
+    destructiveHint: false,  // Does not delete
+  }
+);
+```
+
+## Read vs Write Classification
+
+Every tool must be clearly classified as read-only or write (mutating).
+
+### Read-Only Tools
+
+Tools that query without side effects:
+
+```typescript
+server.tool(
+  'search_issues',
+  'Search for existing issues...',
+  searchSchema,
+  handler,
+  {
+    readOnlyHint: true,      // No mutations
+    destructiveHint: false,   // Nothing deleted
+    idempotentHint: true,     // Always safe to retry
+    openWorldHint: false,     // All effects local to this API
+  }
+);
+```
+
+Read-only tools can be called in parallel without coordination. Agents may call five read tools simultaneously without risk.
+
+### Write Tools
+
+Tools that create, update, or mutate state:
+
+```typescript
+server.tool(
+  'create_invoice',
+  'Creates a new invoice...',
+  createSchema,
+  handler,
+  {
+    readOnlyHint: false,       // Mutates database
+    destructiveHint: false,    // Does not delete (can be reversed)
+    idempotentHint: true,      // Supports idempotency keys
+    openWorldHint: false,      // All effects local
+  }
+);
+```
+
+Write tools should typically be called sequentially or in known dependency order. If multiple write tools are called in parallel, the agent must understand and handle conflicts.
+
+### Destructive Tools
+
+Tools that delete, void, or irreversibly modify data:
+
+```typescript
+server.tool(
+  'delete_invoice',
+  'Permanently deletes an invoice. This cannot be undone...',
+  deleteSchema,
+  handler,
+  {
+    readOnlyHint: false,
+    destructiveHint: true,     // Irreversible mutation
+    idempotentHint: false,     // Not safe to retry (second call will fail)
+    openWorldHint: false,
+  }
+);
+```
+
+Agents may require explicit human approval before calling destructive tools. See `/docs/error-handling` for error design around destructive operations.
+
+## Dry-Run Modes
+
+For risky operations, expose a preview tool that describes what would happen without actually doing it:
+
+```typescript
+// Preview tool
+server.tool(
+  'preview_migration',
+  'Shows what tables and columns would change without executing...',
+  migrationSchema,
+  async (params) => {
+    const plan = await generateMigrationPlan(params.migration_id);
+    return {
+      content: [{
+        type: 'text',
+        text: `Would create tables: ${plan.tablesToCreate.join(', ')}. Would add columns: ${plan.columnsToAdd.join(', ')}.`,
+      }],
+    };
+  },
+  { readOnlyHint: true }
+);
+
+// Execution tool (called only after preview approved)
+server.tool(
+  'execute_migration',
+  'Executes the migration. Call preview_migration first to review changes...',
+  migrationSchema,
+  async (params) => {
+    const result = await runMigration(params.migration_id);
+    return { content: [{ type: 'text', text: `Migration ${params.migration_id} applied.` }] };
+  },
+  { destructiveHint: true, idempotentHint: false }
+);
+```
+
+The agent calls `preview_migration` first to show the human what will happen, then calls `execute_migration` only after approval.
+
+## Tool Composition for Safety
+
+### List Before Get
+
+Destructive tools often require a valid ID. Ensure the corresponding list operation exists:
+
+```typescript
+list_invoices()      // Returns invoice_ids
+get_invoice(id)      // Fetches full details
+delete_invoice(id)   // Requires valid id from list or get
+```
+
+Agents cannot delete safely if they cannot list and inspect targets first.
+
+### Conditional Mutations
+
+When possible, use conditional mutations instead of separate delete tools:
+
+```typescript
+// Instead of: delete_invoice(id)
+// Offer: update_invoice(id, status: 'void' | 'delete')
+update_invoice(
+  id: string,
+  status: z.enum(['draft', 'open', 'void', 'archive']).optional(),
+  // ... other fields
+)
+```
+
+This gives agents finer control and reversibility. Voiding an invoice is safer than deleting it.
+
+## Documenting Safety Constraints
+
+In descriptions, explicitly state:
+
+1. **Whether the tool is idempotent** — "Safe to retry with same inputs"
+2. **Whether it's reversible** — "This cannot be undone" vs "Can be reverted with `archive_invoice`"
+3. **What approvals are required** — "Requires human approval before executing"
+4. **Rate limits** — "Max 10 calls per minute"
+
+```typescript
+server.tool(
+  'send_invoice_email',
+  'Sends the invoice to the customer via email. Idempotent: calling twice ' +
+  'on the same invoice does not send duplicate emails. The customer receives ' +
+  'the hosted payment link in the email body. This can be reverted by calling ' +
+  '`revoke_sent_invoice` if sent in error.',
+  schema,
+  handler,
+  { idempotentHint: true }
+);
+```
+
+## Error Handling for Destructive Operations
+
+See `/docs/error-handling/idempotency` for structured error patterns. For destructive operations, always return structured errors rather than throwing:
+
+```typescript
+async (params) => {
+  const invoice = await db.invoices.findById(params.invoice_id);
+  
+  if (!invoice) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Invoice ${params.invoice_id} not found. Cannot delete.`,
+      }],
+    };
+  }
+  
+  if (invoice.status === 'paid') {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Cannot delete paid invoice. Call \`void_invoice\` instead to prevent future charges.`,
+      }],
+    };
+  }
+  
+  await db.invoices.delete(invoice.id);
+  return {
+    content: [{
+      type: 'text',
+      text: `Invoice ${invoice.id} deleted.`,
+    }],
+  };
+}
+```
+
+## MCP Annotations Reference
+
+([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+
+| Annotation | Default | Meaning |
+|-----------|---------|---------|
+| `readOnlyHint` | false | Tool does not modify server state |
+| `destructiveHint` | false | Tool may delete or irreversibly modify data |
+| `idempotentHint` | false | Calling multiple times with same inputs has same effect |
+| `openWorldHint` | false | Tool interacts with external systems beyond the server |
+
+All annotations default to false (worst-case assumption). Set to true only when the property is **guaranteed**.
+
+## See also
+
+- `/docs/error-handling/idempotency` — retry logic and recovery patterns
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+- ([Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system))

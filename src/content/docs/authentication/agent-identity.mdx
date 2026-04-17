@@ -1,0 +1,186 @@
+---
+title: Agent Identity
+description: First-class agent principals, audit trails, and the actor chain
+---
+
+## Summary
+
+Rather than running all agents under a shared service account, give each agent its own principal with a unique token encoding its name, task, and permission ceiling. Sub-agents cannot exceed their parent's scope via Token Exchange. Audit logs capture both agent_id and actor_chain for full traceability.
+
+```
+Orchestrator (own credentials)
+  ├── Sub-Agent A (own credentials, scoped)
+  └── Sub-Agent B (own credentials, scoped)
+```
+
+- Each agent is a first-class principal with distinct credentials
+- Token Exchange for delegation with scope narrowing and audience restriction
+- JWT includes `sub`, `act` (actor chain), `agent_name`, `task_id`, `parent_task_id`
+- Audit logging captures agent identity and the full delegation chain
+- Human instruction is threaded through all downstream actions
+
+When a human calls an API, you know who they are: user ID, organization, IP. When an agent calls, the picture is fuzzier. You see the OAuth client, but which agent within the deployment made this call? What task? What human instruction triggered it? RFC 8693 Token Exchange and JWT `act` (actor) claims establish agents as first-class principals with independent credentials, bounded scopes, and full audit trails.
+
+## The Identity Hierarchy
+
+Traditional approach: all agent traffic under one service account.
+
+```
+Human ──→ Service Account ──→ API
+Agent ────→ (same account)
+```
+
+Modern approach: each agent has its own identity and scoped credentials.
+
+```
+Orchestrator Agent (own credentials)
+  ├── Sub-Agent A (own credentials, scoped)
+  └── Sub-Agent B (own credentials, scoped)
+```
+
+Every agent gets credentials encoding its name, task, and permission ceiling. A sub-agent cannot exceed its parent's scope. If the parent holds `invoices:read`, the sub-agent can receive at most `invoices:read` via Token Exchange — it cannot manufacture broader permissions.
+
+## Token Exchange for Delegation
+
+RFC 8693 Token Exchange enables the orchestrator to derive narrow, time-limited tokens for sub-agents:
+
+```typescript
+async function exchangeTokenForSubAgent(
+  orchestratorToken: string,
+  subAgentId: string,
+  audience: string,
+  scopes: string[]
+): Promise<string> {
+  const form = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    subject_token: orchestratorToken,
+    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    actor_token: subAgentId,  // or undefined if no actor token
+    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    audience: audience,
+    scope: scopes.join(' '),
+  });
+
+  const res = await fetch('https://auth.example.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+
+  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
+  const { access_token } = await res.json();
+  return access_token;
+}
+```
+
+The resulting token has:
+- Narrower scope (e.g., `invoices:read` only, not `*`)
+- Shorter lifetime (15 min vs 1 hour)
+- Audience-restricted (only accepted by the target service)
+- Actor chain via the `act` claim
+
+See [Token Exchange](/docs/authentication/token-exchange) for the full details.
+
+## JWT Claims for Agent Identity
+
+Trust identity claims in the JWT, not in custom headers. The token should include:
+
+```json
+{
+  "iss": "https://auth.example.com/",
+  "aud": "https://invoices-service.example.com/",
+  "sub": "orchestrator_agent",
+  "act": {
+    "sub": "sub_agent_a"
+  },
+  "agent_name": "InvoiceSummaryOrchestrator",
+  "agent_version": "1.0.0",
+  "task_id": "task_abc123",
+  "parent_task_id": "task_parent_xyz",
+  "org_id": "org_acme",
+  "scope": "invoices:read",
+  "exp": 1750000000
+}
+```
+
+- `sub` — the calling agent identity
+- `act` — optional actor chain for nested delegation (agent → agent → service)
+- `agent_name` — human-readable agent identifier (for logs)
+- `task_id` — correlates all actions from this execution
+- `parent_task_id` — links to parent task in multi-agent chains
+- `org_id` — tenant isolation
+
+The `act` claim is essential for tracing who actually made a request. If agent A delegates to agent B, the token includes both identities.
+
+## Audit Logging
+
+Log both `sub` (agent making the request) and `act` (if any) on every action:
+
+```typescript
+async function logAction(req: Request, action: string) {
+  const token = await validateToken(req.headers.get('authorization'));
+  
+  auditLog.write({
+    timestamp: new Date().toISOString(),
+    agent_id: token.sub,
+    agent_name: token.agent_name,
+    agent_version: token.agent_version,
+    actor_chain: token.act ? [token.act.sub] : [],
+    task_id: token.task_id,
+    parent_task_id: token.parent_task_id,
+    org_id: token.org_id,
+    action: action,
+    scope: token.scope,
+    ip: req.ip,
+  });
+}
+```
+
+Include the original human instruction if available:
+
+```json
+{
+  "timestamp": "2025-04-17T10:22:01.432Z",
+  "agent_id": "orchestrator_agent",
+  "agent_name": "InvoiceSummary",
+  "task_id": "task_abc123",
+  "human_instruction": "Summarize outstanding invoices for Q1 2025",
+  "action": "list_invoices",
+  "resource": "/invoices",
+  "method": "GET",
+  "response_status": 200,
+  "duration_ms": 142,
+  "org_id": "org_acme"
+}
+```
+
+From this log, an auditor can reconstruct exactly what happened: which agent, what task, what instruction, when, and with what result.
+
+## X-Agent-Request Header (Informational)
+
+Agents may send `X-Agent-Request: true` to signal agent-originated traffic, but do not rely on this for security:
+
+```bash
+curl -H "Authorization: Bearer ..." \
+  -H "X-Agent-Request: true" \
+  -H "X-Agent-Name: InvoiceSummary/1.0" \
+  https://api.example.com/invoices
+```
+
+Any client can set this header. Use it only for non-security purposes: returning structured error responses, suppressing interactive UI elements, adjusting rate limits. For identity claims, use the JWT.
+
+## Checklist
+
+- [ ] Agents have distinct principals, not a shared service account
+- [ ] Token Exchange is used to derive sub-agent tokens with narrower scope
+- [ ] Sub-agent scopes cannot exceed parent scope
+- [ ] JWT includes `sub`, `act`, `agent_name`, `task_id`, `parent_task_id`
+- [ ] Audit logs include both `agent_id` and `actor_chain` (for delegation)
+- [ ] Human instruction is captured and threaded through all downstream actions
+- [ ] Parent task ID is propagated on every sub-agent call
+
+## See Also
+
+- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 implementation
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance
+- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — delegation and narrowing

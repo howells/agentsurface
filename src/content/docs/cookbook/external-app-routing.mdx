@@ -1,0 +1,386 @@
+---
+title: External-App Routing via Meta-Tools
+description: Use search_tools + multi_execute to reach external apps dynamically. No pre-registration overhead.
+---
+
+## Summary
+
+Instead of pre-registering 500 Composio tools, expose two meta-tools: `search_tools` (find actions in external apps) and `multi_execute_tool` (run them). The agent dynamically discovers and calls external app actions without loading all tools into memory or the prompt. Trade: slightly higher latency per discovery vs. massive context savings and real-time extensibility.
+
+- **search_tools**: "I want to send an email" → returns matching actions from connected apps.
+- **multi_execute_tool**: Execute a discovered action with parameters.
+- **Dynamic discovery**: Works with any external app added post-deployment; no code changes.
+- **Composio pattern**: Composio uses this; proven at scale with 200+ apps.
+
+---
+
+## Problem: Pre-Registration Overhead
+
+```typescript
+// ❌ Pre-registering all tools
+const tools = {
+  composio_gmail_send_message: { ... },
+  composio_gmail_list_messages: { ... },
+  composio_slack_post_message: { ... },
+  composio_slack_list_channels: { ... },
+  composio_notion_create_page: { ... },
+  composio_notion_update_page: { ... },
+  // ... 200+ more ...
+};
+
+// Cost: ~10KB of token tokens just listing tools.
+// Only ~5% are relevant per request.
+```
+
+---
+
+## Solution: Meta-Tools for Discovery
+
+```typescript
+// ✅ Two meta-tools instead of 200+
+const tools = {
+  search_tools: {
+    description: "Search for available external app actions",
+    inputSchema: z.object({
+      query: z.string().describe("What do you want to do? e.g., 'send email', 'create Notion page'"),
+      app: z.string().optional().describe("Filter by app name (optional)"),
+      limit: z.number().optional().default(5),
+    }),
+  },
+  multi_execute_tool: {
+    description: "Execute a discovered action from an external app",
+    inputSchema: z.object({
+      actionId: z.string().describe("ID returned from search_tools"),
+      parameters: z.record(z.any()).describe("Parameters for the action"),
+    }),
+  },
+};
+```
+
+---
+
+## Implementation: search_tools
+
+```typescript
+// mcp/tools/search-tools.ts
+import { composioClient } from "@api/composio/client";
+
+server.registerTool(
+  "search_tools",
+  {
+    title: "Search Available Tools",
+    description: "Find actions in connected external apps (Gmail, Slack, Notion, etc.)",
+    inputSchema: z.object({
+      query: z.string(),
+      app: z.string().optional(),
+      limit: z.number().optional().default(5),
+    }),
+    outputSchema: z.object({
+      tools: z.array(z.object({
+        id: z.string(),
+        app: z.string(),
+        name: z.string(),
+        description: z.string(),
+        parameters: z.record(z.any()),
+      })),
+    }),
+  },
+  async (params) => {
+    // Search Composio's action catalog
+    const results = await composioClient.actions.search({
+      query: params.query,
+      apps: params.app ? [params.app] : undefined,
+      limit: params.limit,
+    });
+
+    // Filter to only connected/enabled apps for this user
+    const userApps = await db.getUserConnectedApps(ctx.userId);
+    const filtered = results.filter(r => userApps.includes(r.app));
+
+    return {
+      content: [{
+        type: "text",
+        text: `Found ${filtered.length} actions:\n${filtered.map(t => `- ${t.app}: ${t.name} - ${t.description}`).join("\n")}`,
+      }],
+      structuredContent: {
+        tools: filtered.map(t => ({
+          id: t.id,
+          app: t.app,
+          name: t.name,
+          description: t.description,
+          parameters: t.inputSchema,
+        })),
+      },
+    };
+  }
+);
+```
+
+**Example execution**:
+
+```
+User: "Send an email to john@example.com"
+
+Agent calls: search_tools(query="send email")
+Response: [
+  { id: "composio_gmail_send", app: "gmail", name: "Send Message", ... },
+  { id: "composio_sendgrid_send", app: "sendgrid", name: "Send Email", ... }
+]
+
+Agent picks the best match (gmail) and calls multi_execute_tool(actionId="composio_gmail_send", ...)
+```
+
+---
+
+## Implementation: multi_execute_tool
+
+```typescript
+// mcp/tools/multi-execute.ts
+server.registerTool(
+  "multi_execute_tool",
+  {
+    title: "Execute External Action",
+    description: "Run a discovered action from an external app with your parameters",
+    inputSchema: z.object({
+      actionId: z.string().describe("Action ID from search_tools results"),
+      parameters: z.record(z.any()).describe("Parameters for the action"),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      result: z.record(z.any()),
+      message: z.string().optional(),
+    }),
+  },
+  async (params) => {
+    try {
+      // Execute via Composio
+      const result = await composioClient.actions.execute({
+        actionId: params.actionId,
+        input: params.parameters,
+        userId: ctx.userId,
+      });
+
+      // Log the action
+      await db.logExternalAction(ctx.userId, params.actionId, params.parameters, result);
+
+      return {
+        content: [{
+          type: "text",
+          text: `Action executed successfully.\n${JSON.stringify(result, null, 2)}`,
+        }],
+        structuredContent: {
+          success: true,
+          result,
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return {
+        content: [{
+          type: "text",
+          text: `Action failed: ${message}`,
+        }],
+        structuredContent: {
+          success: false,
+          result: {},
+          message,
+        },
+        isError: true,
+      };
+    }
+  }
+);
+```
+
+---
+
+## System Prompt Guidance
+
+Teach the agent how to use meta-tools:
+
+```typescript
+const systemPrompt = `
+## External App Workflow
+
+You have access to external services (Gmail, Slack, Notion, Google Calendar, etc.)
+that the user has connected.
+
+**Workflow**:
+1. User asks: "Send an email to Alice" or "Create a Notion page"
+2. You call \`search_tools\` with the action name (e.g., "send email", "create page")
+3. \`search_tools\` returns matching actions
+4. You pick the best match and call \`multi_execute_tool\` with the action ID + parameters
+
+**Example**:
+- User: "Post a message in Slack"
+- You: search_tools(query="post slack message")
+- Response: [ {id: "composio_slack_post_message", app: "slack", ...} ]
+- You: multi_execute_tool(actionId="composio_slack_post_message", parameters={channel: "#general", text: "..."})
+
+**Rules**:
+- Always call \`search_tools\` first; don't assume action IDs
+- If \`search_tools\` returns no results, the app may not be connected or the action may not exist
+- Include app name in the search query when possible (e.g., "send email via Gmail", not just "send email")
+`;
+```
+
+---
+
+## Comparison: Pre-Registered vs. Meta-Tools
+
+| Aspect | Pre-Registered (50+ tools) | Meta-Tools |
+|--------|---------------------------|-----------|
+| **Tokens per request** | 500–1000 (all tools listed) | 100 (just 2 meta-tools) |
+| **Discovery latency** | None (tools pre-loaded) | +100–200ms (search query) |
+| **Adding new apps** | Code change + redeploy | Works immediately |
+| **User clarity** | Many irrelevant tools visible | Curated results per query |
+| **Rate limit cost** | ~50 token calls per request | ~5 token calls per request |
+
+**When to use each**:
+- **Pre-registered**: `` `<10` `` critical external apps; high discovery frequency.
+- **Meta-tools**: >20 external apps OR frequent app additions (Slack workspaces, Zapier integrations).
+
+---
+
+## Advanced: Caching & Ranking
+
+For frequently-used actions, cache search results:
+
+```typescript
+// mcp/tools/search-tools.ts (enhanced)
+const searchCache = new Map<string, ToolResult[]>();
+
+server.registerTool("search_tools", ..., async (params) => {
+  const cacheKey = `${params.query}:${ctx.userId}`;
+  
+  // Check cache (valid for 1 hour)
+  if (searchCache.has(cacheKey)) {
+    const cached = searchCache.get(cacheKey)!;
+    if (Date.now() - cached.timestamp < 60 * 60 * 1000) {
+      return { content: [...], structuredContent: { tools: cached.tools } };
+    }
+  }
+
+  // Search
+  const results = await composioClient.actions.search({
+    query: params.query,
+    apps: params.app ? [params.app] : undefined,
+    limit: params.limit,
+  });
+
+  // Rank by frequency (user's most-used apps appear first)
+  const userAppFreq = await db.getUserAppFrequency(ctx.userId);
+  const ranked = results.sort((a, b) => {
+    const aFreq = userAppFreq[a.app] || 0;
+    const bFreq = userAppFreq[b.app] || 0;
+    return bFreq - aFreq;
+  });
+
+  // Cache for next request
+  searchCache.set(cacheKey, { tools: ranked, timestamp: Date.now() });
+
+  return {
+    content: [...],
+    structuredContent: { tools: ranked },
+  };
+});
+```
+
+---
+
+## Observability
+
+Track which meta-tools are used and how often:
+
+```typescript
+// Log external app actions
+logger.info("[External Action]", {
+  userId: ctx.userId,
+  app: result.app,
+  action: result.name,
+  success: result.success,
+  latency: result.latencyMs,
+});
+
+// Metrics
+metrics.histogram("external_action_latency", result.latencyMs);
+metrics.counter("external_action_executed", { app: result.app, success: result.success });
+```
+
+**Key metrics**:
+- Search-tool hit rate (how often results are used after discovery).
+- Execution success rate per app.
+- Most-used external apps.
+- Average latency of search + execute.
+
+---
+
+## Integrations: Beyond Composio
+
+If you're not using Composio, implement your own meta-tool adapter:
+
+```typescript
+// mcp/tools/search-tools.ts (custom apps)
+interface ExternalApp {
+  id: string;
+  name: string;
+  actions: Array<{
+    id: string;
+    name: string;
+    description: string;
+    inputSchema: JSONSchema;
+  }>;
+}
+
+const externalApps: ExternalApp[] = [
+  {
+    id: "stripe",
+    name: "Stripe",
+    actions: [
+      {
+        id: "stripe_create_payment",
+        name: "Create Payment Intent",
+        description: "Create a new payment intent",
+        inputSchema: { ... },
+      },
+      // ...
+    ],
+  },
+  // ... more apps ...
+];
+
+server.registerTool("search_tools", ..., async (params) => {
+  const results = [];
+  for (const app of externalApps) {
+    for (const action of app.actions) {
+      if (action.name.toLowerCase().includes(params.query.toLowerCase())) {
+        results.push({ app: app.name, ...action });
+      }
+    }
+  }
+  return { ... };
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Replace pre-registered external tools with `search_tools` + `multi_execute_tool`.
+- [ ] Implement search_tools to query Composio (or custom app catalog).
+- [ ] Implement multi_execute_tool to run discovered actions.
+- [ ] Add system prompt guidance on meta-tool workflow.
+- [ ] Cache search results for performance.
+- [ ] Rank results by user frequency.
+- [ ] Monitor search + execution latency.
+- [ ] Test with real user queries (send email, create Notion page, etc.).
+- [ ] Document supported apps in onboarding flow.
+
+---
+
+## See Also
+
+- [Agentic Loop](/docs/cookbook/agentic-loop) — where tools are called.
+- [Tool Design](/docs/tool-design) — tool schema and descriptions.
+- [Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — another scaling pattern for large tool counts.
+

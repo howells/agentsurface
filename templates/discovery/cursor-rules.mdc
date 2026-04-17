@@ -1,0 +1,317 @@
+---
+alwaysApply: true
+globs: ["src/**/*.ts", "src/**/*.tsx", "tests/**/*", "AGENTS.md", "package.json"]
+---
+
+<!--
+cursor-rules.mdc — Cursor IDE rules for agent-focused development.
+
+What: A Cursor rules file (YAML frontmatter + markdown) that guides Cursor's code
+completion and refactoring behavior. Scoped to specific file patterns.
+
+When to use: When Cursor should behave differently from the baseline AGENTS.md.
+If no Cursor-specific guidance is needed, omit this file.
+
+What to customize:
+1. globs: Match your file patterns (src/**/*.ts, tests/**, etc.)
+2. Replace code style rules with your actual conventions
+3. Update tool/schema recommendations
+4. Add Cursor-specific hints (keyboard shortcuts, command palettes)
+5. Reference AGENTS.md for shared context
+
+Spec: https://docs.cursor.com/context/rules
+Cursor docs: https://docs.cursor.com
+
+Usage:
+1. Place at .cursor/rules/project.mdc
+2. Cursor auto-loads on startup
+3. Rules apply to matched file globs
+4. alwaysApply: true = apply to all matched files (not optional)
+-->
+
+# Cursor IDE Rules — Acme Agent Tools
+
+## Overview
+
+This file guides Cursor IDE's code generation and refactoring for the Acme Agent Tools monorepo.
+
+**For shared context (commands, testing, boundaries):** See [AGENTS.md](../../AGENTS.md).
+
+This file contains Cursor-specific enhancements only.
+
+---
+
+## Code generation
+
+### TypeScript conventions
+
+- Strict mode always: `"strict": true` in `tsconfig.json`
+- No implicit `any`; use `unknown` and narrow
+- Prefer explicit return types on functions: `function foo(): string { ... }`
+- Use Zod for runtime validation on all API inputs
+- No `// @ts-ignore`; use `// @ts-expect-error: <reason>` with comments
+
+Example:
+
+```typescript
+// Good
+import { z } from 'zod';
+
+const userSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  createdAt: z.date(),
+});
+
+type User = z.infer<typeof userSchema>;
+
+function getUserById(id: string): Promise<User | null> {
+  // implementation
+}
+
+// Bad (avoid)
+function getUser(id) {  // no return type
+  return user;
+}
+```
+
+### Import ordering
+
+1. External packages (alphabetical)
+2. Acme monorepo (@acme/*)
+3. Local relative imports
+
+```typescript
+import { z } from 'zod';
+import { Agent, Tool } from '@acme/sdk';
+import { AgentSchema } from '@acme/shared';
+import { executeAgent } from './execute';
+import { validateInput } from '../utils';
+```
+
+### Naming conventions
+
+- **Files:** kebab-case (`agent-executor.ts`, not `AgentExecutor.ts`)
+- **Functions & variables:** camelCase
+- **React components:** PascalCase
+- **Constants:** UPPER_SNAKE_CASE
+- **Zod schemas:** singular noun + "Schema" suffix (`userSchema`, `toolInputSchema`)
+
+### Avoid
+
+- Wildcard imports (`import * as utils`)
+- Default exports (use named exports)
+- Optional chaining without null checks in hot paths
+- Large object spreads; explicitly assign fields instead
+
+---
+
+## React / Next.js patterns
+
+### Components
+
+- Prefer functional components with `React.FC<Props>`
+- Use `React.memo()` for expensive re-renders; include explicit dependency array in comment
+- Keep components <300 lines; extract sub-components if larger
+- Props interface: always named, inline in file
+
+```typescript
+// app/agents/[id]/page.tsx
+import React from 'react';
+
+interface AgentDetailPageProps {
+  params: { id: string };
+}
+
+export default function AgentDetailPage({ params }: AgentDetailPageProps) {
+  const { id } = params;
+  return <AgentDetail agentId={id} />;
+}
+```
+
+### App Router
+
+- Use `generateMetadata()` for SEO + JSON-LD
+- `use client` at top of file if using hooks
+- Fetch data in server components where possible
+- Streaming: `Suspense` + loading UI
+
+```typescript
+// app/docs/[slug]/page.tsx
+import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
+
+export const generateMetadata = async ({
+  params,
+}: {
+  params: { slug: string };
+}): Promise<Metadata> => ({
+  title: `Docs: ${params.slug}`,
+  description: '...',
+});
+
+export default async function DocsPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const doc = await fetchDoc(params.slug);
+  if (!doc) notFound();
+  return <article>{/* ... */}</article>;
+}
+```
+
+---
+
+## Testing
+
+### Vitest patterns
+
+- Test file location: colocated alongside implementation (`src/agent.test.ts` next to `src/agent.ts`)
+- Describe blocks: group by function name
+- Use `it()` or `test()` (either is fine; be consistent)
+- Mock MCP server: `InMemoryTransport.createLinkedPair()`
+
+```typescript
+// src/agent.test.ts
+import { describe, it, expect } from 'vitest';
+import { Agent } from './agent';
+
+describe('Agent', () => {
+  describe('query()', () => {
+    it('should execute tool calls in order', async () => {
+      const agent = new Agent({ /* ... */ });
+      const result = await agent.query({ prompt: 'test' });
+      expect(result.success).toBe(true);
+    });
+  });
+});
+```
+
+### Coverage expectations
+
+- Aim for >80% branch coverage
+- Focus on happy path + error cases
+- Skip trivial getters/setters
+- Run: `pnpm test --coverage`
+
+---
+
+## MCP / Tool development
+
+### Tool naming & descriptions
+
+- Names: `service_action` or `resource_action` (snake_case)
+- Descriptions: readable as onboarding docs; include "Use when..." and "Do not use for..."
+- Parameters: explicit, no hidden context; include examples
+
+```typescript
+const searchUsers = Tool.define({
+  name: 'search_users',
+  description:
+    'Find users by email, name, or ID. Use when you need to locate specific users ' +
+    'for agent-to-user operations. Do not use for bulk user lists; use list_users instead.',
+  parameters: {
+    query: {
+      type: 'string',
+      description: 'Search term (email, full name, or user ID). Example: alice@example.com',
+    },
+    limit: { type: 'number', default: 10 },
+  },
+  handler: async ({ query, limit }) => {
+    // implementation
+    return { success: true, data: users };
+  },
+});
+```
+
+### Error handling (RFC 9457)
+
+Return errors as data, not thrown exceptions:
+
+```typescript
+{
+  success: false,
+  error: {
+    type: 'validation_error',
+    status: 400,
+    detail: 'Email is required and must be valid.',
+    instance: '/api/users/create#email',
+  }
+}
+```
+
+---
+
+## Monorepo commands
+
+### Filtered commands (use these!)
+
+- `pnpm --filter=@acme/sdk dev` — Fast development in one package
+- `pnpm --filter=@acme/api test:watch` — Watch tests in one package
+- `turbo run build --filter=@acme/dashboard` — Build single package
+
+### Avoid
+
+- `cd packages/X && npm install` (breaks workspace hoisting)
+- Hand-editing package.json versions (use `changeset add`)
+
+---
+
+## Debugging in Cursor
+
+### Breakpoints
+
+1. Set breakpoint in editor (click gutter)
+2. Run test with Cursor's debugger: press `Ctrl+Shift+D` (or Debug sidebar)
+3. Step through code with F10 (step over) or F11 (step into)
+
+For monorepo debugging:
+- If step-through doesn't work, try `cd packages/X` first, then debug
+
+### Console inspection
+
+- Use `console.log()` for quick debugging
+- For structured output: `console.table(data)`
+- For agent tracing: enable `process.env.DEBUG=* pnpm test`
+
+---
+
+## Cursor commands & shortcuts
+
+- **Generate tests:** Select function, `Cmd+K` → "Generate unit tests"
+- **Document function:** `Cmd+K` → "Add JSDoc comments"
+- **Refactor code:** Select code, `Cmd+K` → "Refactor to use Zod"
+- **Find references:** `Shift+Alt+F12`
+- **Rename symbol:** `F2`
+
+---
+
+## Known gotchas
+
+**MCP server lifecycle:** After modifying tool definitions, Cursor may cache old definitions.
+Workaround: Restart the IDE or start a fresh terminal session.
+
+**pnpm hoisting:** If dependencies aren't visible in code completion, run `pnpm install` (not `npm`).
+
+**Type narrowing:** Cursor sometimes shows imported types as `unknown`. Workaround: Use `.parse()` on Zod schemas before tool call.
+
+**Monorepo paths:** Code completion works best if you're in the package root (e.g., `packages/sdk/`).
+IDE debugging (breakpoints) also requires this.
+
+---
+
+## Lint & format
+
+- Run `pnpm lint` before committing (ESLint + Prettier)
+- Cursor integrates ESLint warnings; fix inline or run `pnpm lint --fix`
+- Pre-commit hook prevents commits with lint errors
+
+---
+
+## See also
+
+- [Cursor documentation](https://docs.cursor.com)
+- [AGENTS.md](../../AGENTS.md) — Shared project context
+- [CLAUDE.md](../../CLAUDE.md) — Claude Code-specific rules (different tool)
+- `.github/copilot-instructions.md` — GitHub Copilot rules (different tool)

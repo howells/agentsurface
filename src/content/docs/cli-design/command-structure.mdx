@@ -1,0 +1,370 @@
+---
+title: Command Structure Best Practices
+description: Noun-verb grammar, exit code semantics, non-interactive defaults, and structured help output for agent-navigable CLIs
+---
+
+## Summary
+
+Command structure is the grammar of a CLI. Agents discover CLIs hierarchically and expect noun-verb order (resource first, action second), consistent verb vocabulary, and predictable flag semantics. This enables agents to infer behavior without testing each combination. Non-interactive defaults and consistent exit codes complete the picture.
+
+- Noun-verb order: `` `mytool <resource> <action>` ``
+- Standard verbs: create, list, get, update, delete, archive
+- Non-interactive by default when piped (skip prompts)
+- Consistent flag naming: --yes, --dry-run, --json, --fields
+- Meaningful exit codes: 0 (success), 1 (usage error), 2 (not found), etc.
+
+Command structure is the grammar of a CLI. An agent exploring your CLI for the first time will attempt to discover its shape hierarchically — learning what nouns exist, what verbs apply to each noun, and how the flag namespace is organized. A consistent, predictable structure makes that discovery reliable. An inconsistent structure forces the agent to memorize exceptions.
+
+## Noun-Verb Grammar
+
+Commands should follow noun-verb order: `` `mytool <resource> <action>` ``. This means resources are first-class citizens in the command tree, and verbs apply to them consistently.
+
+```bash
+# Noun-verb — correct
+mytool user create
+mytool user list
+mytool user delete
+mytool dns record create
+mytool dns record update
+mytool deployment trigger
+mytool deployment rollback
+
+# Verb-noun — avoid
+mytool create-user
+mytool list-users
+mytool delete-user
+```
+
+Noun-verb ordering has two properties that matter for agents:
+
+1. **Hierarchical exploration.** `mytool user` lists all available actions on users. The agent can query the tree level by level.
+2. **Consistent verb vocabulary.** The same verbs apply across all resources. An agent that knows `create`, `list`, `get`, `update`, and `delete` work for users can infer they work for DNS records, deployments, and everything else — without testing each one.
+
+## Standard Verb Vocabulary
+
+Use these verbs consistently across all resource types:
+
+| Verb | Meaning |
+|------|---------|
+| `create` | Create a new resource |
+| `get` | Retrieve a single resource by ID |
+| `list` | Retrieve a collection of resources |
+| `update` | Modify an existing resource |
+| `delete` | Remove a resource permanently |
+| `archive` | Soft-delete or deactivate a resource |
+| `restore` | Reverse an archive operation |
+| `trigger` | Initiate an asynchronous operation |
+| `cancel` | Stop an in-progress operation |
+| `describe` | Return the schema for a command or command group |
+
+Do not introduce synonyms. If you use `delete` for users, do not use `remove` for DNS records. The agent will not infer they are equivalent.
+
+## Consistent Hierarchical Exploration
+
+Every command group must be explorable via the parent command. Running `mytool user` with no subcommand should list available subcommands — not error out.
+
+```bash
+$ mytool user
+Manage user accounts.
+
+Usage:
+  mytool user <command>
+
+Available commands:
+  create    Create a new user account
+  get       Get a user by ID
+  list      List users with optional filtering
+  update    Update a user's profile or role
+  delete    Delete a user permanently
+  archive   Suspend a user account
+
+$ mytool user --help --json
+{
+  "name": "user",
+  "description": "Manage user accounts",
+  "commands": [
+    {"name": "create", "description": "Create a new user account"},
+    {"name": "get", "description": "Get a user by ID"},
+    {"name": "list", "description": "List users with optional filtering"},
+    {"name": "update", "description": "Update a user's profile or role"},
+    {"name": "delete", "description": "Delete a user permanently"},
+    {"name": "archive", "description": "Suspend a user account"}
+  ]
+}
+```
+
+The structured `--help --json` on the group node is the entry point for schema introspection (see [Schema Introspection](./schema-introspection)). An agent can traverse the entire command tree by recursively fetching `--help --json` at each level.
+
+## The Command Tree as JSON
+
+A top-level `describe` or `--help --json` with no subcommand should return the complete command tree:
+
+```bash
+$ mytool --help --json
+```
+
+```json
+{
+  "name": "mytool",
+  "version": "2.4.1",
+  "description": "CLI for the Example Platform",
+  "commands": [
+    {
+      "name": "user",
+      "description": "Manage user accounts",
+      "commands": [
+        {
+          "name": "create",
+          "description": "Create a new user account",
+          "flags": [
+            {"name": "name", "type": "string", "required": true},
+            {"name": "email", "type": "string", "format": "email", "required": true},
+            {"name": "role", "type": "string", "enum": ["admin", "member", "viewer"], "default": "member"}
+          ]
+        },
+        {
+          "name": "list",
+          "description": "List users with optional filtering",
+          "flags": [
+            {"name": "status", "type": "string", "enum": ["active", "suspended", "pending"]},
+            {"name": "fields", "type": "string", "description": "Comma-separated field names"},
+            {"name": "all", "type": "boolean", "description": "Fetch all pages"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dns",
+      "description": "Manage DNS records",
+      "commands": [...]
+    }
+  ]
+}
+```
+
+This single call gives an agent the complete vocabulary of the CLI without requiring it to explore each branch separately.
+
+## Exit Codes with Semantics
+
+Exit codes are the primary signal an agent uses to determine whether a command succeeded and what to do next. A CLI that returns 0 for all failures, or 1 for all errors regardless of cause, forces the agent to parse error text to understand what happened.
+
+Use these exit codes consistently:
+
+| Code | Meaning | When to use |
+|------|---------|-------------|
+| `0` | Success | Command completed as expected |
+| `1` | Failure | Operation failed (API error, network error, internal error) |
+| `2` | Usage error | Invalid flags, missing required arguments, malformed input |
+| `3` | Not found | Resource does not exist |
+| `4` | Permission denied | Insufficient permissions or authentication failure |
+| `5` | Conflict | Resource already exists or state prevents the operation |
+
+```typescript
+const EXIT_CODES = {
+  SUCCESS: 0,
+  FAILURE: 1,
+  USAGE_ERROR: 2,
+  NOT_FOUND: 3,
+  PERMISSION_DENIED: 4,
+  CONFLICT: 5,
+} as const;
+
+async function getUser(userId: string, flags: Flags) {
+  try {
+    const user = await api.getUser(userId);
+    output(user, flags);
+    process.exit(EXIT_CODES.SUCCESS);
+  } catch (err) {
+    if (err.status === 404) {
+      outputError({ error: 'not_found', message: `User ${userId} does not exist` }, flags);
+      process.exit(EXIT_CODES.NOT_FOUND);
+    }
+    if (err.status === 403 || err.status === 401) {
+      outputError({ error: 'permission_denied', message: 'Insufficient permissions' }, flags);
+      process.exit(EXIT_CODES.PERMISSION_DENIED);
+    }
+    if (err.status === 409) {
+      outputError({ error: 'conflict', message: err.message }, flags);
+      process.exit(EXIT_CODES.CONFLICT);
+    }
+    outputError({ error: 'api_error', message: err.message, status: err.status }, flags);
+    process.exit(EXIT_CODES.FAILURE);
+  }
+}
+```
+
+An agent can use exit codes for decision logic without parsing error text:
+
+```bash
+# Agent pseudocode pattern:
+# - Exit 3 (not found): create the resource instead
+# - Exit 4 (permission denied): escalate or stop
+# - Exit 5 (conflict): fetch the existing resource
+# - Exit 2 (usage error): fix the invocation and retry
+
+mytool user get "$USER_ID" --json
+case $? in
+  0) echo "User found" ;;
+  3) mytool user create --name "$NAME" --email "$EMAIL" --json ;;
+  4) echo "Permission denied — check API key scope" ;;
+  5) echo "Conflict — resource already exists" ;;
+  *) echo "Unexpected error" ;;
+esac
+```
+
+## Non-Interactive Defaults
+
+Commands should not prompt for input when all required flags are provided. Interactive behavior is opt-in, not the default.
+
+The rule is simple: if the command has all required information, run without asking. If information is missing:
+
+- **In a TTY:** prompt interactively for missing flags
+- **In a non-TTY:** return a structured `missing_required_flags` error and exit with code 2
+
+```typescript
+async function runCommand(flags: Flags, required: FlagDefinition[]) {
+  const missing = required.filter(def => flags[def.name] === undefined);
+
+  if (missing.length > 0) {
+    if (!isTTY()) {
+      // Non-interactive: structured error
+      outputError({
+        error: 'missing_required_flags',
+        message: 'Required flags are missing',
+        missing: missing.map(def => ({
+          flag: `--${def.name}`,
+          type: def.type,
+          description: def.description,
+        })),
+      });
+      process.exit(EXIT_CODES.USAGE_ERROR);
+    }
+    // Interactive: prompt
+    await promptForMissingFlags(flags, missing);
+  }
+
+  // Execute with complete flags
+  await executeCommand(flags);
+}
+```
+
+## `--help --json` Structured Help
+
+Every command — not just command groups — must support `--help --json` returning structured schema output. This is the foundation of agent schema introspection (see [Schema Introspection](./schema-introspection)).
+
+The structured help output must include:
+
+- Command name and description
+- All flags with names, types, required status, defaults, and enums
+- Argument descriptions (positional arguments)
+- Return schema (what the command outputs on success)
+- Related commands
+
+```bash
+$ mytool user create --help --json
+```
+
+```json
+{
+  "command": "user create",
+  "description": "Create a new user account",
+  "usage": "mytool user create [flags]",
+  "flags": [
+    {
+      "name": "name",
+      "short": "n",
+      "type": "string",
+      "required": true,
+      "description": "Display name for the user"
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": "email",
+      "required": true,
+      "description": "Email address for login and notifications"
+    },
+    {
+      "name": "role",
+      "type": "string",
+      "enum": ["admin", "member", "viewer"],
+      "default": "member",
+      "required": false,
+      "description": "Access role for the user"
+    },
+    {
+      "name": "welcome",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "description": "Send welcome email on creation"
+    },
+    {
+      "name": "dry-run",
+      "type": "boolean",
+      "default": false,
+      "required": false,
+      "description": "Preview the operation without executing it"
+    },
+    {
+      "name": "json",
+      "type": "boolean",
+      "default": false,
+      "required": false,
+      "description": "Output result as JSON"
+    },
+    {
+      "name": "fields",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated field names to include in the response"
+    }
+  ],
+  "returns": {
+    "$ref": "#/components/schemas/User"
+  },
+  "related": [
+    {"command": "user list", "description": "List user accounts"},
+    {"command": "user update", "description": "Update a user's profile"},
+    {"command": "user delete", "description": "Delete a user permanently"}
+  ],
+  "examples": [
+    {
+      "description": "Create an admin user",
+      "command": "mytool user create --name \"Alice Chen\" --email alice@example.com --role admin --json"
+    },
+    {
+      "description": "Preview creation without executing",
+      "command": "mytool user create --name \"Bob\" --email bob@example.com --dry-run --json"
+    }
+  ]
+}
+```
+
+## Consistency Checklist for Command Structure
+
+When adding a new command or resource to your CLI, verify:
+
+- [ ] Command follows noun-verb grammar (`resource action`)
+- [ ] Verb is from the standard vocabulary (`create`, `list`, `get`, `update`, `delete`, `archive`, `restore`, `trigger`, `cancel`, `describe`)
+- [ ] Parent command lists the new subcommand when invoked with no arguments
+- [ ] `--help --json` returns complete structured schema for the new command
+- [ ] Exit codes follow the standard semantics (0, 1, 2, 3, 4, 5)
+- [ ] Command runs without interactive prompts when all required flags are provided
+- [ ] Missing required flags in non-TTY return structured `missing_required_flags` error
+- [ ] `--dry-run` is implemented if the command mutates state
+- [ ] `--json` flag is available (or TTY auto-detection is in place)
+- [ ] `--fields` flag is available if the command returns resource data
+
+## Scoring
+
+Command structure is a prerequisite for all other Agent DX CLI Scale axes. A command tree that cannot be explored hierarchically or that lacks consistent exit codes undermines schema introspection, input hardening, and safety rails — regardless of how well each individual feature is implemented.
+
+There is no separate axis for command structure on the scale; it is the foundation that the scored axes build on.
+
+## Related Pages
+
+- [Machine-Readable Output](./machine-readable-output) — structured output from every command
+- [Schema Introspection](./schema-introspection) — `--help --json` and the `describe` command
+- [Safety Rails](./safety-rails) — non-interactive defaults and `--dry-run`
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

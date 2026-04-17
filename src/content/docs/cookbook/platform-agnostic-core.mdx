@@ -1,0 +1,496 @@
+---
+title: Platform-Agnostic Agent Core + Adapters
+description: One agent core, N platform adapters. Use getPlatformInstructions() to inject formatting, not branching logic.
+---
+
+## Summary
+
+Build one agent core (chat loop, tools, logic). Connect it to multiple platforms (web dashboard, WhatsApp, Telegram, Slack, email) via thin adapters that inject platform-specific formatting rules. The agent logic never branches on platform; the system prompt does. Each adapter translates inbound user messages to a standard format, calls the core agent, and translates the response back to platform constraints.
+
+- **Single core**: Request → normalize → core agent → platform adapter → send.
+- **No platform branching**: System prompt includes `getPlatformInstructions(platform)` block; that's it.
+- **Thin adapters**: 50–100 lines each; just message translation and formatting.
+- **Fallback formatting**: If platform is unknown, use a sensible default (plain text).
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Platform Handlers                             │
+│  Web API │ WhatsApp │ Telegram │ Slack │ Email                  │
+└────────────┬──────────┬────────────┬────────┬──────────────────┘
+             │          │            │        │
+             └──────────┴────────────┴────────┴──────────────┐
+                                                              │
+                    ┌─────────────────────────────────────────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │   Message Normalizer   │ (platform-agnostic)
+        │  - Extract text        │
+        │  - Extract user ID     │
+        │  - Extract attachments │
+        └───────┬───────────────┘
+                │
+                ▼
+        ┌─────────────────────────────────────────┐
+        │    Core Agent (ToolLoopAgent)            │
+        │  - System prompt                         │
+        │  - Tool execution                        │
+        │  - Max steps                             │
+        │  + Platform instructions injected        │
+        └────────┬──────────────────────────────────┘
+                 │
+                 ▼
+        ┌──────────────────────┐
+        │ Platform Formatter    │ (platform-specific)
+        │ - Tables → lists      │
+        │ - Links → URLs        │
+        │ - Markdown → plaintext│
+        └──────┬───────────────┘
+               │
+               ▼
+        ┌──────────────────────────┐
+        │ Platform Sender          │
+        │ - Send to WhatsApp API   │
+        │ - Post to Slack          │
+        │ - HTTP response          │
+        └──────────────────────────┘
+```
+
+---
+
+## Core Agent (Platform-Agnostic)
+
+```typescript
+// chat/core-agent.ts
+import { ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
+import type { ModelMessage } from "ai";
+import { buildSystemPromptForPlatform } from "./prompt";
+
+export async function runCoreAgent(params: {
+  userContext: UserContext;
+  platform: "dashboard" | "whatsapp" | "telegram" | "slack" | "email";
+  messages: ModelMessage[];
+  tools: Record<string, Tool>;
+}) {
+  const systemPrompt = buildSystemPromptForPlatform(params.userContext, params.platform);
+
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: systemPrompt,
+    tools: params.tools,
+    stopWhen: stepCountIs(10),
+  });
+
+  // Stream the response
+  const stream = await agent.stream({
+    messages: params.messages,
+    experimental_transform: smoothStream(),
+  });
+
+  return stream;
+}
+```
+
+**Key**: The core agent knows about platforms only via the prompt. No `if (platform === "whatsapp")` logic.
+
+---
+
+## Message Normalizer
+
+Convert inbound platform messages to a standard format:
+
+```typescript
+// platforms/message-normalizer.ts
+import type { WhatsAppMessage, TelegramMessage, SlackMessage } from "@platform/types";
+
+export interface NormalizedMessage {
+  platform: "dashboard" | "whatsapp" | "telegram" | "slack" | "email";
+  userId: string;
+  teamId: string;
+  text: string;
+  attachments?: Array<{ type: string; url: string }>;
+  replyTo?: string; // Message ID being replied to
+  metadata?: Record<string, any>;
+}
+
+export function normalizeWhatsAppMessage(raw: WhatsAppMessage): NormalizedMessage {
+  return {
+    platform: "whatsapp",
+    userId: raw.from,
+    teamId: raw.waBusinessAccountId,
+    text: raw.text?.body || "",
+    attachments: raw.image
+      ? [{ type: "image", url: raw.image.link }]
+      : raw.document
+        ? [{ type: "document", url: raw.document.link }]
+        : [],
+    replyTo: raw.context?.messageId,
+  };
+}
+
+export function normalizeTelegramMessage(raw: TelegramMessage): NormalizedMessage {
+  return {
+    platform: "telegram",
+    userId: String(raw.from.id),
+    teamId: raw.chat.id.toString(), // Simplified; real app maps chat to team
+    text: raw.text || "",
+    attachments: raw.photo
+      ? [{ type: "image", url: raw.photo[0].file_id }]
+      : raw.document
+        ? [{ type: "document", url: raw.document.file_id }]
+        : [],
+    replyTo: raw.reply_to_message?.message_id.toString(),
+  };
+}
+
+export function normalizeSlackMessage(raw: SlackMessage): NormalizedMessage {
+  return {
+    platform: "slack",
+    userId: raw.user,
+    teamId: raw.team_id,
+    text: raw.text || "",
+    attachments: raw.files?.map(f => ({
+      type: f.mimetype?.split("/")[0] || "file",
+      url: f.url_private,
+    })),
+    replyTo: raw.thread_ts,
+  };
+}
+```
+
+---
+
+## Platform-Specific Adapters
+
+Each platform adapter is thin: normalize input, call core agent, format output.
+
+### WhatsApp Adapter
+
+```typescript
+// platforms/whatsapp/handler.ts
+import { twilioClient } from "@platform/whatsapp/client";
+import { runCoreAgent } from "@chat/core-agent";
+import { formatForWhatsApp } from "./formatter";
+
+export async function handleWhatsAppMessage(raw: WhatsAppMessage) {
+  const message = normalizeWhatsAppMessage(raw);
+
+  // Load user context
+  const userCtx = await db.getUserContext(message.userId, message.teamId);
+
+  // Get conversation history
+  const messages = await db.getConversationHistory(message.userId, message.teamId, 10);
+
+  // Get tools (same for all platforms)
+  const tools = await getTools(message.teamId);
+
+  // Run core agent
+  const stream = await runCoreAgent({
+    userContext: userCtx,
+    platform: "whatsapp",
+    messages: [...messages, { role: "user", content: message.text }],
+    tools,
+  });
+
+  // Format response for WhatsApp
+  const response = await stream.finalMessage();
+  const formatted = formatForWhatsApp(response.content[0].text);
+
+  // Send via Twilio
+  await twilioClient.messages.create({
+    from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+    to: `whatsapp:${message.userId}`,
+    body: formatted,
+  });
+
+  // Store in conversation history
+  await db.addMessage(message.userId, message.teamId, {
+    role: "assistant",
+    content: response.content[0].text,
+    platform: "whatsapp",
+  });
+}
+```
+
+### Slack Adapter
+
+```typescript
+// platforms/slack/handler.ts
+import { slackClient } from "@platform/slack/client";
+import { runCoreAgent } from "@chat/core-agent";
+import { formatForSlack } from "./formatter";
+
+export async function handleSlackMessage(raw: SlackMessage) {
+  const message = normalizeSlackMessage(raw);
+
+  const userCtx = await db.getUserContext(message.userId, message.teamId);
+  const messages = await db.getConversationHistory(message.userId, message.teamId, 10);
+  const tools = await getTools(message.teamId);
+
+  const stream = await runCoreAgent({
+    userContext: userCtx,
+    platform: "slack",
+    messages: [...messages, { role: "user", content: message.text }],
+    tools,
+  });
+
+  const response = await stream.finalMessage();
+  const formatted = formatForSlack(response.content[0].text);
+
+  await slackClient.chat.postMessage({
+    channel: raw.channel,
+    blocks: formatted, // Slack block kit format
+    thread_ts: message.replyTo || raw.ts,
+  });
+
+  await db.addMessage(message.userId, message.teamId, {
+    role: "assistant",
+    content: response.content[0].text,
+    platform: "slack",
+  });
+}
+```
+
+### Web Dashboard Adapter
+
+```typescript
+// api/chat/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { runCoreAgent } from "@chat/core-agent";
+
+export async function POST(req: NextRequest) {
+  const { messages, platform } = await req.json();
+
+  const session = await getSession(req);
+  const userCtx = await db.getUserContext(session.userId, session.teamId);
+  const tools = await getTools(session.teamId);
+
+  const stream = await runCoreAgent({
+    userContext: userCtx,
+    platform: platform || "dashboard",
+    messages,
+    tools,
+  });
+
+  // Stream response to client
+  return new Response(stream.toReadableStream());
+}
+```
+
+---
+
+## Platform-Specific Formatters
+
+Each formatter translates the agent's response to platform constraints:
+
+```typescript
+// platforms/whatsapp/formatter.ts
+export function formatForWhatsApp(text: string): string {
+  // Remove markdown
+  let formatted = text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Remove links
+    .replace(/\*\*([^\*]+)\*\*/g, "*$1*")    // Bold: ** → *
+    .replace(/###\s+/g, "")                   // Remove headings
+    .replace(/\n- /g, "\n• ");               // Bullet to unicode
+
+  // Truncate to SMS limit
+  if (formatted.length > 1600) {
+    formatted = formatted.slice(0, 1600) + "...";
+  }
+
+  return formatted;
+}
+
+// platforms/slack/formatter.ts
+export function formatForSlack(text: string): SlackBlock[] {
+  const blocks: SlackBlock[] = [];
+
+  // Parse markdown → Slack blocks
+  const paragraphs = text.split("\n\n");
+
+  for (const para of paragraphs) {
+    if (para.startsWith("- ") || para.startsWith("* ")) {
+      // Bullet list
+      const items = para.split("\n").map(l => l.replace(/^[-*]\s+/, ""));
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: items.map(i => `• ${i}`).join("\n"),
+        },
+      });
+    } else if (para.includes("|")) {
+      // Markdown table → code block
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `\`\`\`\n${para}\n\`\`\``,
+        },
+      });
+    } else {
+      // Plain paragraph
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: para,
+        },
+      });
+    }
+  }
+
+  return blocks;
+}
+
+// platforms/dashboard/formatter.ts
+export function formatForDashboard(text: string): string {
+  // Dashboard supports full markdown; return as-is
+  return text;
+}
+```
+
+---
+
+## Platform Routing
+
+Route inbound requests to the appropriate handler:
+
+```typescript
+// platforms/router.ts
+import { handleWhatsAppMessage } from "./whatsapp/handler";
+import { handleTelegramMessage } from "./telegram/handler";
+import { handleSlackMessage } from "./slack/handler";
+
+export async function routeMessage(platform: string, rawPayload: any) {
+  switch (platform) {
+    case "whatsapp":
+      return handleWhatsAppMessage(rawPayload);
+    case "telegram":
+      return handleTelegramMessage(rawPayload);
+    case "slack":
+      return handleSlackMessage(rawPayload);
+    default:
+      throw new Error(`Unknown platform: ${platform}`);
+  }
+}
+
+// Example: Express/Hono routing
+app.post("/webhook/whatsapp", async (req, res) => {
+  await routeMessage("whatsapp", req.body);
+  res.json({ ok: true });
+});
+
+app.post("/webhook/telegram", async (req, res) => {
+  await routeMessage("telegram", req.body);
+  res.json({ ok: true });
+});
+
+app.post("/webhook/slack", async (req, res) => {
+  await routeMessage("slack", req.body);
+  res.json({ ok: true });
+});
+```
+
+---
+
+## User Context Per Platform
+
+Adapters load platform-specific user context:
+
+```typescript
+// db/user-context.ts
+export async function getUserContext(
+  userId: string,
+  teamId: string,
+  platform?: string
+): Promise<UserContext> {
+  const user = await db.getUser(userId);
+  const team = await db.getTeam(teamId);
+
+  // Platform-specific overrides
+  let timezone = user.timezone;
+  let locale = user.locale;
+
+  if (platform === "telegram") {
+    // Telegram provides timezone in updates
+    timezone = await telegramApi.getUserTimezone(userId) || timezone;
+  }
+
+  return {
+    fullName: user.fullName,
+    timezone,
+    locale,
+    dateFormat: user.dateFormat,
+    timeFormat: user.timeFormat,
+    baseCurrency: team.currency,
+    teamName: team.name,
+    countryCode: user.countryCode,
+    localTime: new Date().toLocaleString("en-US", {
+      timeZone: timezone,
+    }),
+  };
+}
+```
+
+---
+
+## Testing
+
+Test the core agent independently from platforms:
+
+```typescript
+// __tests__/core-agent.test.ts
+import { runCoreAgent } from "@chat/core-agent";
+
+test("core agent handles web and mobile prompts differently", async () => {
+  const mockTools = { customers_list: mockCustomersTool };
+  const mockContext = { fullName: "Alice", timezone: "UTC", ... };
+
+  const webResult = await runCoreAgent({
+    userContext: mockContext,
+    platform: "dashboard",
+    messages: [{ role: "user", content: "List customers" }],
+    tools: mockTools,
+  });
+
+  const mobileResult = await runCoreAgent({
+    userContext: mockContext,
+    platform: "whatsapp",
+    messages: [{ role: "user", content: "List customers" }],
+    tools: mockTools,
+  });
+
+  // Web result should include tables; mobile should use lists
+  expect(webResult).toContain("|");
+  expect(mobileResult).not.toContain("|");
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Build `runCoreAgent()` with platform-aware system prompt.
+- [ ] Create message normalizer for each platform (WhatsApp, Telegram, Slack, etc.).
+- [ ] Create formatter for each platform (WhatsApp, Slack, dashboard).
+- [ ] Set up routing: webhook → normalizer → core → formatter → send.
+- [ ] Test core agent independently; formatters independently.
+- [ ] Store conversation history per user/team.
+- [ ] Load user context per platform (timezone, locale, etc.).
+- [ ] Verify formatters remove unsupported markdown per platform.
+- [ ] Add observability: log platform, message flow, response time.
+
+---
+
+## See Also
+
+- [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — dynamic prompt composition.
+- [Notification-to-Conversation](/docs/cookbook/notification-to-conversation) — conversation continuity across platforms.
+- [Agentic Loop](/docs/cookbook/agentic-loop) — core agent loop.
+

@@ -1,0 +1,176 @@
+---
+title: Agentic Patterns Cookbook
+description: Battle-tested patterns from production agentic SaaS — 10 transferable designs for scaling agents beyond proof-of-concept.
+---
+
+## Summary
+
+This cookbook distills 10 patterns extracted from a real-world production agentic application (Bun + Turborepo + Next.js + TypeScript + Vercel AI SDK + MCP + Composio + multi-platform bots). Each pattern solves a specific scaling challenge: loop commodity, tool safety, semantic selection, configuration, multi-platform adaptation, notification continuity, confirmation workflows, external connectivity, dynamic routing, and autonomous behavior.
+
+- **Agentic Loop as Commodity**: Use framework abstractions (`ToolLoopAgent`, `generateText` with `stopWhen`, Claude Agent SDK) instead of custom state machines.
+- **Tool Annotations (READ_ONLY/WRITE/DESTRUCTIVE)**: Declare intent once; drive system prompts, client UI, and safety rules automatically.
+- **Semantic Tool Selection**: At >20 tools, use embedding-based picking (~12 per turn) instead of passing all tools every request.
+- **System Prompt as Configuration**: Compose identity, safety, routing, formatting, and platform rules into one immutable string.
+- **Platform-Agnostic Core**: Single agent logic + N platform adapters (web, WhatsApp, Slack, email) injecting formatting deltas.
+- **Notification-to-Conversation Continuity**: Persist context from notifications; inject into next user turn so the agent knows what they're replying to.
+- **Two-Step Confirmation for Writes**: Create-as-draft → show user → confirm → send/commit. Eliminates accidental sends.
+- **MCP as External API**: Ship your MCP server publicly so external AIs (Claude, ChatGPT, Cursor) can use your agent's tools.
+- **External-App Routing via Meta-Tools**: Use `search_tools` + `multi_execute` to reach external apps dynamically (Composio style).
+- **Autonomous Background Agents**: Scheduled workers (hourly, daily) that proactively generate insights, match records, send reminders.
+
+---
+
+## Quick Reference Table
+
+| Pattern | When to Use | Complexity | ROI |
+|---------|-----------|-----------|-----|
+| **Agentic Loop as Commodity** | Building any agent (web, bot, worker) | Low | High — save 500+ lines of state logic |
+| **Tool Annotations** | >5 tools, need safety/UI hints | Low | High — single source of truth |
+| **Semantic Tool Selection** | >20 tools, hitting token limits | Medium | Medium–High — reduces noise |
+| **System Prompt as Configuration** | Multi-tenant, platform-aware agents | Low | Medium — easier to test & iterate |
+| **Platform-Agnostic Core** | Supporting web + mobile + chat | High | High — code reuse, fast iteration |
+| **Notification-to-Conversation** | Mobile/chat agents with async updates | Medium | High — UX feels conversational |
+| **Two-Step Confirmation** | Any destructive action (send, delete) | Low | Critical — prevents data loss |
+| **MCP as External API** | Want users to integrate elsewhere | Medium | Medium — network effect; differentiation |
+| **External-App Routing** | Connecting to >5 external services | Medium | Medium — no pre-registration overhead |
+| **Autonomous Background Agents** | Proactive insights, batch processing | High | Medium–High — runs at off-peak hours |
+
+---
+
+## Patterns Overview
+
+### 1. Agentic Loop as Commodity
+**The core insight**: The "loop" is a solved problem. Stop building custom tool-call orchestration. Use `ToolLoopAgent` (Vercel AI), `generateText` with `stopWhen`/`maxSteps` (Vercel AI), Claude Agent SDK `query()`, or OpenAI `@openai/agents`. The *agentic* part is the tools and prompts, not the control flow.
+
+**Stack**: Vercel AI SDK 0.6+, Claude Agent SDK, OpenAI Agents.
+
+**Key files**: [`agentic-loop.mdx`](/docs/cookbook/agentic-loop)
+
+---
+
+### 2. Every CRUD as Tool + Annotations
+**The core insight**: Expose every CRUD operation as an MCP tool. Declare intent with annotations: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. System prompt reads annotations to inject safety rules; client UI reads them to show confirmations.
+
+**Annotation types**:
+- `READ_ONLY`: Safe to call repeatedly; no state change.
+- `WRITE`: Idempotent state change; can be safely retried.
+- `DESTRUCTIVE`: Irreversible; requires confirmation before exposure to the model.
+
+**Stack**: MCP 0.6+, Zod for schema validation.
+
+**Key files**: [`tool-annotations.mdx`](/docs/cookbook/tool-annotations)
+
+---
+
+### 3. Semantic Tool Selection at Scale
+**The core insight**: At >20 tools, embedding-based selection ("toolpick") cuts tokens and context bloat. Embed tool descriptions once, pick ~12 per turn using cosine similarity + a `prepareStep` hook. Keep a small "always active" set (e.g., `web_search`, `search_tools`, meta-tools).
+
+**Trade-off**: Slightly higher latency per turn (embedding lookup) vs. massive token savings and model clarity.
+
+**Stack**: OpenAI embeddings, `toolpick` library, Vercel AI SDK `prepareStep`.
+
+**Key files**: [`semantic-tool-selection.mdx`](/docs/cookbook/semantic-tool-selection)
+
+---
+
+### 4. System Prompt as Configuration Layer
+**The core insight**: Build prompts with a `buildSystemPrompt(context)` function. Compose: user identity (name, timezone, currency), safety rules (no invention, confirm before send), tool routing (internal vs. Composio vs. web), formatting rules (tables for 3+, markdown links), and platform-specific blocks.
+
+**Benefit**: Prompts become testable, versioned, and platform-aware without branching agent logic.
+
+**Stack**: TypeScript string templating, test harnesses for prompt validation.
+
+**Key files**: [`system-prompt-as-config.mdx`](/docs/cookbook/system-prompt-as-config)
+
+---
+
+### 5. Platform-Agnostic Agent Core + Platform-Specific Formatting
+**The core insight**: One agent core (chat loop, tools, logic). N platform adapters (web, WhatsApp, Slack, email) that inject formatting rules via `getPlatformInstructions(platform)`. No branching of agent logic by platform.
+
+**Example**: "tables work on the dashboard" → injected into prompt for web only. Mobile platforms get short lists instead.
+
+**Stack**: Next.js + handlers for each platform, platform-specific prompt fragments.
+
+**Key files**: [`platform-agnostic-core.mdx`](/docs/cookbook/platform-agnostic-core)
+
+---
+
+### 6. Notification-to-Conversation Continuity
+**The core insight**: When a user replies to a push notification (e.g., "You have 3 new orders"), the agent needs context. Store `lastNotificationContext` per user (in Redis); inject into the next prompt so the agent knows what they're replying to.
+
+**Example**: Notification fires "Order #123 needs approval"; user replies "approve it". Without context, the agent doesn't know what "it" is.
+
+**Stack**: Redis, Next.js API route, notification dispatcher.
+
+**Key files**: [`notification-to-conversation.mdx`](/docs/cookbook/notification-to-conversation)
+
+---
+
+### 7. Two-Step Confirmation for Writes
+**The core insight**: Every destructive or costly action (send invoice, delete record, bulk update) follows: `prepare_draft` (show user what will happen) → `confirm_draft` (user approves) → `execute` (commit). Never expose direct-send tools to the model unprompted.
+
+**Benefit**: Eliminates accidental sends and unintended bulk operations.
+
+**Stack**: MCP tools with draft/confirm semantics.
+
+**Key files**: [`two-step-confirmation.mdx`](/docs/cookbook/two-step-confirmation)
+
+---
+
+### 8. MCP as External API
+**The core insight**: Ship your MCP server publicly (OAuth 2.1 + DPoP). Users connect Claude, ChatGPT, or Cursor directly to your agent's tools. "Use us where you already work" becomes a distribution channel.
+
+**Stack**: MCP 0.6+, OAuth 2.1, DPoP (Demonstration of Proof-of-Possession).
+
+**Key files**: [`mcp-as-external-api.mdx`](/docs/cookbook/mcp-as-external-api)
+
+---
+
+### 9. External-App Routing via Meta-Tools
+**The core insight**: Instead of pre-registering 500 Composio tools, expose two meta-tools: `search_tools` (find actions in external apps) and `multi_execute_tool` (run them). The agent dynamically discovers and calls actions without pre-loading.
+
+**Trade-off**: Slightly slower than direct tools, but massively reduces cognitive load and pre-registration overhead.
+
+**Stack**: Composio, meta-tool adapters.
+
+**Key files**: [`external-app-routing.mdx`](/docs/cookbook/external-app-routing)
+
+---
+
+### 10. Autonomous Background Agents
+**The core insight**: Separate interactive agents (chat, bots) from autonomous workers (hourly, daily). Workers proactively generate insights, match records, send reminders. Scheduled via Temporal, Inngest, or cron; batched in 10–60 min windows to avoid spam.
+
+**Stack**: Temporal, Inngest, or Bun cron + idempotency tracking.
+
+**Key files**: [`autonomous-background-agents.mdx`](/docs/cookbook/autonomous-background-agents)
+
+---
+
+## How to Read This Cookbook
+
+- **New to agentic SaaS?** Start with [`agentic-loop.mdx`](/docs/cookbook/agentic-loop) and [`system-prompt-as-config.mdx`](/docs/cookbook/system-prompt-as-config). Those two unlock the baseline.
+- **Scaling beyond 10 tools?** Jump to [`semantic-tool-selection.mdx`](/docs/cookbook/semantic-tool-selection) and [`tool-annotations.mdx`](/docs/cookbook/tool-annotations).
+- **Multi-platform?** [`platform-agnostic-core.mdx`](/docs/cookbook/platform-agnostic-core) is essential.
+- **Mobile/chat bots?** [`notification-to-conversation.mdx`](/docs/cookbook/notification-to-conversation) + [`two-step-confirmation.mdx`](/docs/cookbook/two-step-confirmation).
+- **Sharing your agent?** [`mcp-as-external-api.mdx`](/docs/cookbook/mcp-as-external-api).
+- **External integrations?** [`external-app-routing.mdx`](/docs/cookbook/external-app-routing).
+- **Always-on helpers?** [`autonomous-background-agents.mdx`](/docs/cookbook/autonomous-background-agents).
+
+---
+
+## Source & Attribution
+
+These patterns are extracted from a real-world production agentic SaaS application profiled in 2024–2025. The application processes millions of requests across multiple platforms (web, WhatsApp, Telegram, Slack, iMessage) using a Bun + Turborepo monorepo, Next.js, TypeScript, Vercel AI SDK, MCP, and Composio.
+
+**Stack**: Bun + Turborepo monorepo, Next.js, React, TypeScript, Vercel AI SDK 0.6+, MCP 0.6+, Composio, multi-platform bot adapters (WhatsApp, Telegram, Slack, iMessage via Sendblue).
+
+No product names or proprietary details are disclosed. Patterns are generic and transferable to any agent-powered SaaS.
+
+---
+
+## Related Documentation
+
+- **[Tool Design](/docs/tool-design)** — tool schema, MCP transport, discovery.
+- **[Multi-Agent](/docs/multi-agent)** — orchestrating multiple agents, delegation patterns.
+- **[MCP Servers](/docs/mcp-servers)** — authoring and deploying MCP servers.
+

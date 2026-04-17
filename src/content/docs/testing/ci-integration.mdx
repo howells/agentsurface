@@ -1,0 +1,347 @@
+---
+title: CI Integration and Regression Testing
+description: PR-gated evals, shadow evaluation, statistical significance, budget guardrails
+---
+
+## Summary
+
+Detect regressions before production via PR-gated evals. Use layered strategy: Stage 1 (`` `<1` `` min, deterministic routing tests, temp 0, mocked tools, Vitest); Stage 2 (1-3 min, real calls, real LLM, baseline comparison vs. main); Stage 3 (optional, 5-10 min nightly, red-team suite). Track statistical significance (pass@k improvements matter, not single run), token budget guardrails (cost per eval case), and baseline regression detection (compare to main-branch results). Fail fast strategy: fail on Stage 1, run Stage 2 in parallel, skip Stage 3 on PRs.
+
+```
+Stage 1: Fast routing (`<1` min)
+         ↓
+Stage 2: Regression suite (1-3 min)
+         ↓
+Stage 3: Red-team (nightly, optional)
+```
+
+---
+
+Agent evals in CI detect regressions before they reach production. The challenge is balancing speed (evals must run in `<5` min) with confidence (evals must catch real regressions).
+
+## Strategy: layered evaluation
+
+Run evals in stages, failing fast:
+
+**Stage 1 (Fast, `<1` min)** — Deterministic routing tests. Temperature 0, mock tool responses, Vitest harness.
+
+**Stage 2 (Medium, 1-3 min)** — Regression suite. Real tool calls, real LLM, against baseline from main branch.
+
+**Stage 3 (Optional, 5-10 min)** — Red-team suite. Runs nightly or on explicit trigger. Too slow for every PR.
+
+```yaml
+# .github/workflows/evals.yml
+name: Agent Evals
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm run test:routing
+        # Vitest harness, temperature 0, mock tools
+        # Should complete in `<1` min
+      - name: Fail fast on routing errors
+        if: failure()
+        run: exit 1
+
+  regression:
+    needs: routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm ci
+      
+      - name: Download baseline
+        run: |
+          aws s3 cp s3://evals-baseline/main-latest.json baseline.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      - name: Run regression evals
+        run: npx promptfoo eval -c regression-suite.yaml --output current.json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      
+      - name: Compare to baseline
+        run: npm run evals:compare baseline.json current.json
+        # Outputs: pass_rate=0.89 (vs 0.92), delta=-3%
+      
+      - name: Check for regressions
+        run: |
+          DELTA=$(npm run evals:compare baseline.json current.json | grep delta | cut -d'=' -f2)
+          if (( $(echo "$DELTA < -5" | bc -l) )); then
+            echo "Regression detected: $DELTA%. Failing check."
+            exit 1
+          fi
+      
+      - name: Comment results on PR
+        uses: actions/github-script@v6
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const baseline = JSON.parse(fs.readFileSync('baseline.json'));
+            const current = JSON.parse(fs.readFileSync('current.json'));
+            
+            const baselinePass = baseline.summary.pass_rate.toFixed(2);
+            const currentPass = current.summary.pass_rate.toFixed(2);
+            const delta = ((current.summary.pass_rate - baseline.summary.pass_rate) * 100).toFixed(1);
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Eval Results\n\nBaseline: ${baselinePass}%\nCurrent: ${currentPass}%\nDelta: ${delta}%\n\n${delta < -5 ? '⚠️ REGRESSION' : '✅ PASS'}`
+            });
+
+  redteam:
+    if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'security')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm ci
+      - run: npx promptfoo eval -c red-team-suite.yaml --output redteam.json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Check red-team results
+        run: |
+          FAILED=$(jq '.results[] | select(.pass == false) | length' redteam.json)
+          if [ "$FAILED" -gt 0 ]; then
+            echo "Red-team attacks succeeded! Fix before merging."
+            exit 1
+          fi
+```
+
+## Statistical significance
+
+A single regression is noise. Use statistical tests to distinguish signal from noise.
+
+### Bootstrap confidence intervals
+
+```typescript
+import { bootstrapCI } from "simple-statistics";
+
+function comparePasses(baseline: boolean[], current: boolean[]) {
+  // Example: baseline=[T,F,T,T], current=[T,T,T,F]
+  const baselineRate = baseline.filter(x => x).length / baseline.length; // 0.75
+  const currentRate = current.filter(x => x).length / current.length; // 0.75
+  
+  // Bootstrap 95% CI on the difference
+  const samples = 1000;
+  const diffs = [];
+  
+  for (let i = 0; i < samples; i++) {
+    // Resample with replacement
+    const bsBaseline = baseline.sort(() => Math.random() - 0.5).slice(0, baseline.length);
+    const bsCurrent = current.sort(() => Math.random() - 0.5).slice(0, current.length);
+    
+    const bsBaselineRate = bsBaseline.filter(x => x).length / bsBaseline.length;
+    const bsCurrentRate = bsCurrent.filter(x => x).length / bsCurrent.length;
+    
+    diffs.push(bsCurrentRate - bsBaselineRate);
+  }
+  
+  const sorted = diffs.sort((a, b) => a - b);
+  const ci95Lower = sorted[Math.floor(sorted.length * 0.025)];
+  const ci95Upper = sorted[Math.floor(sorted.length * 0.975)];
+  
+  console.log(`95% CI on difference: [${ci95Lower.toFixed(3)}, ${ci95Upper.toFixed(3)}]`);
+  
+  // If CI includes 0, no significant difference
+  if (ci95Lower < 0 && ci95Upper > 0) {
+    return "No significant difference";
+  }
+  
+  return ci95Lower < 0 ? "Regression (significant)" : "Improvement";
+}
+```
+
+### Paired t-test
+
+If you have `<30` samples or small differences, use a paired t-test:
+
+```typescript
+function pairedTTest(baseline: number[], current: number[]): number {
+  // t = mean(differences) / (stdev / sqrt(n))
+  const diffs = baseline.map((b, i) => current[i] - b);
+  const mean = diffs.reduce((a, b) => a + b) / diffs.length;
+  
+  const variance = diffs.reduce((sum, d) => sum + Math.pow(d - mean, 2), 0) / (diffs.length - 1);
+  const stdev = Math.sqrt(variance);
+  
+  const t = mean / (stdev / Math.sqrt(diffs.length));
+  
+  // p-value lookup (simplified; use scipy.stats.ttest_rel in production)
+  const p = t > 2.5 ? 0.01 : t > 1.96 ? 0.05 : 0.1;
+  
+  return p; // If p < 0.05, difference is significant
+}
+```
+
+## Shadow evaluation
+
+Deploy code to shadow traffic without gating on evals. Collect eval metrics on real production tasks, then gate on those metrics.
+
+```yaml
+# Deploy agent v2 to shadow traffic (5% of requests)
+# Both v1 and v2 run; only v1's response is used
+# But v2's evals are stored
+
+job_params:
+  shadow_model_weight: 0.05
+
+# Collect evals after 24h
+aws s3 cp s3://eval-results/shadow-2025-04-17.json .
+
+# Query: pass@1=0.88, tool_f1=0.94
+# If both above thresholds, promote v2 to 100%
+```
+
+Benefits:
+- No risk to users (real requests still use v1)
+- Real production data (not synthetic test cases)
+- Unbiased eval (evaluator doesn't know if it's v1 or v2)
+
+## Cost and latency budgets
+
+Cap eval costs and latencies to prevent runaway expenses:
+
+```typescript
+interface EvalBudget {
+  maxCostPerEval: number; // $ per eval run
+  maxLatencyP99: number; // milliseconds
+  maxTokensPerTask: number;
+}
+
+async function runEvalWithBudget(budget: EvalBudget) {
+  let totalCost = 0;
+  let totalTokens = 0;
+  const latencies: number[] = [];
+  
+  for (const task of testCases) {
+    const start = Date.now();
+    
+    const result = await agent.run(task);
+    
+    const latency = Date.now() - start;
+    latencies.push(latency);
+    
+    const cost = estimateTokenCost(result.tokensUsed);
+    totalCost += cost;
+    totalTokens += result.tokensUsed;
+    
+    // Check budgets in real time
+    if (totalCost > budget.maxCostPerEval) {
+      throw new Error(`Cost budget exceeded: $${totalCost}`);
+    }
+    
+    if (totalTokens > budget.maxTokensPerTask * testCases.length) {
+      throw new Error(`Token budget exceeded`);
+    }
+    
+    if (latency > budget.maxLatencyP99) {
+      console.warn(`Single task latency ${latency}ms exceeds budget ${budget.maxLatencyP99}ms`);
+    }
+  }
+  
+  const latencies_sorted = latencies.sort((a, b) => a - b);
+  const p99 = latencies_sorted[Math.floor(latencies_sorted.length * 0.99)];
+  
+  console.log(`Cost: $${totalCost.toFixed(2)}, P99 latency: ${p99}ms`);
+}
+```
+
+Set budgets based on previous runs:
+
+```yaml
+# If last eval cost $50 and took 5 min, allow ±20% slack
+cost_budget: $60
+latency_budget: 6min
+token_budget: 150k
+```
+
+## Slicing by scenario
+
+Separate evals for different scenarios to catch category-specific regressions:
+
+```yaml
+testCases:
+  - category: "happy_path"
+    description: "Well-formed intent, standard tools"
+    skip_in_ci: false
+  
+  - category: "edge_case"
+    description: "Malformed input, missing context"
+    skip_in_ci: false
+  
+  - category: "adversarial"
+    description: "Prompt injection, jailbreak attempts"
+    skip_in_ci: true # Too slow, run nightly instead
+
+# Report separately
+evals_happy_path: 0.95
+evals_edge_case: 0.82
+evals_adversarial: 0.98
+```
+
+## Example workflow
+
+```typescript
+// scripts/eval-compare.ts
+import { readFileSync } from "fs";
+
+interface EvalResult {
+  summary: {
+    pass_rate: number;
+    tool_f1: number;
+    cost: number;
+  };
+}
+
+const baseline = JSON.parse(readFileSync("baseline.json", "utf8")) as EvalResult;
+const current = JSON.parse(readFileSync("current.json", "utf8")) as EvalResult;
+
+const passRateDelta = (current.summary.pass_rate - baseline.summary.pass_rate) * 100;
+const f1Delta = (current.summary.tool_f1 - baseline.summary.tool_f1) * 100;
+const costDelta = ((current.summary.cost - baseline.summary.cost) / baseline.summary.cost) * 100;
+
+console.log(`Pass rate: ${baseline.summary.pass_rate.toFixed(2)} → ${current.summary.pass_rate.toFixed(2)} (${passRateDelta > 0 ? "+" : ""}${passRateDelta.toFixed(1)}%)`);
+console.log(`Tool F1: ${baseline.summary.tool_f1.toFixed(2)} → ${current.summary.tool_f1.toFixed(2)} (${f1Delta > 0 ? "+" : ""}${f1Delta.toFixed(1)}%)`);
+console.log(`Cost: $${baseline.summary.cost.toFixed(2)} → $${current.summary.cost.toFixed(2)} (${costDelta > 0 ? "+" : ""}${costDelta.toFixed(1)}%)`);
+
+// Gate on regression
+if (passRateDelta < -5 || f1Delta < -5) {
+  console.error("Regression detected. Please fix before merging.");
+  process.exit(1);
+}
+
+if (costDelta > 20) {
+  console.warn("Cost increased by >20%. Review before merging.");
+}
+```
+
+## References
+
+- Bootstrap CIs: https://en.wikipedia.org/wiki/Bootstrapping_(statistics)
+- Paired t-tests: https://en.wikipedia.org/wiki/Paired_difference_test
+- Statistical power for evals: Anthropic's blog on evaluation design
+
+## See also
+
+- `/docs/testing/metrics` — pass@k, F1, cost metrics
+- `/docs/testing/promptfoo` — CI-friendly YAML configs
+- `/docs/testing/vitest-harness` — fast deterministic tests

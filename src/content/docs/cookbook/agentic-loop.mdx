@@ -1,0 +1,425 @@
+---
+title: Agentic Loop as Commodity
+description: Stop building custom orchestration. Use ToolLoopAgent, generateText stopWhen, or Claude Agent SDK. The loop is solved.
+---
+
+## Summary
+
+The "agentic loop" — request user message, call tool, stream response, repeat until done — is a commodity problem solved by modern AI frameworks. `ToolLoopAgent` (Vercel AI), `generateText`/`streamText` with `stopWhen`+`maxSteps`, Claude Agent SDK `query()`, and OpenAI `@openai/agents` all handle state, streaming, tool execution, and max-step limits. The value is in tools, prompts, and error handling, not in reinventing control flow.
+
+- **Vercel AI SDK**: `ToolLoopAgent` class; integrates with 50+ model providers; built-in streaming support.
+- **Claude Agent SDK**: `query()` method; simplest API; agents run in Claude's infrastructure.
+- **OpenAI Agents**: `@openai/agents` library; OpenAI-only models; beta feature.
+- **Custom loops**: 500–1000 lines of state management, streaming, tool execution, error retry. High maintenance.
+
+---
+
+## Why Not Build Custom?
+
+Custom loops are tempting because they feel "transparent." In practice:
+
+1. **Streaming complexity**: Tokenization, chunk boundaries, partial JSON parsing.
+2. **Tool execution**: Schema validation, error recovery, timeout handling.
+3. **Max-step enforcement**: Preventing infinite loops while handling edge cases.
+4. **State reconstruction**: Managing conversation history across API calls.
+5. **Testing**: Mocking AI responses, tool calls, and partial failures.
+
+Production agentic apps pay this cost once in the framework, not once per feature.
+
+---
+
+## Pattern: Vercel AI SDK ToolLoopAgent
+
+The most common pattern in the profiled production app.
+
+```typescript
+// apps/api/src/chat/assistant-runtime.ts
+import { ToolLoopAgent } from "ai";
+import { openai } from "@ai-sdk/openai";
+import type { ModelMessage } from "ai";
+
+export async function streamAssistant(params: {
+  systemPrompt: string;
+  messages: ModelMessage[];
+  tools: Record<string, Tool>;
+  maxSteps?: number;
+}) {
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: params.systemPrompt,
+    tools: params.tools,
+    stopWhen: stepCountIs(params.maxSteps ?? 10),
+    // Optional: semantic tool selection
+    prepareStep: buildPrepareStep({ maxTools: 12 }),
+  });
+
+  return agent.stream({
+    messages: params.messages,
+    experimental_transform: smoothStream(),
+  });
+}
+```
+
+**Key features**:
+
+- **`tools`**: Flat object of tool definitions (`{ [name]: Tool }`).
+- **`stopWhen`**: Predicate that receives step count; return `true` to halt.
+- **`prepareStep`**: Hook to select which tools are exposed per turn (enables semantic selection).
+- **`experimental_transform`**: Smooths token emission for better UX.
+- **No explicit loop**: `ToolLoopAgent` manages request/response cycles internally.
+
+**Execution flow**:
+
+1. Model reads system prompt + messages + available tools.
+2. Model decides: respond, call tools, or stop.
+3. If tools called: framework executes them, appends results to conversation.
+4. Loop continues until `stopWhen` is true or model says "done."
+5. Stream emitted in real time via `agent.stream()`.
+
+---
+
+## Pattern: Vercel AI SDK generateText with stopWhen
+
+For batch/non-streaming scenarios (background workers, bulk operations).
+
+```typescript
+// apps/worker/src/processors/insights-generator.ts
+import { generateText, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+export async function generateMonthlyInsights(params: {
+  userId: string;
+  monthData: TransactionData[];
+}): Promise<string> {
+  const { text } = await generateText({
+    model: openai("gpt-4o-mini"),
+    system: buildInsightsPrompt(params.userId),
+    messages: [
+      {
+        role: "user",
+        content: `Analyze this month's transactions: ${JSON.stringify(params.monthData)}`,
+      },
+    ],
+    tools: {
+      fetch_comparison: {
+        description: "Fetch same month from last year for comparison",
+        parameters: z.object({ year: z.number() }),
+        execute: async (args) => {
+          return await db.getTransactions(params.userId, args.year);
+        },
+      },
+      calculate_trend: {
+        description: "Calculate spending trend across months",
+        parameters: z.object({ months: z.number().min(3).max(12) }),
+        execute: async (args) => {
+          // ...
+        },
+      },
+    },
+    stopWhen: stepCountIs(5), // Max 5 tool calls
+    maxSteps: 10, // Safety limit
+  });
+
+  return text;
+}
+```
+
+**Use when**:
+- No streaming required (worker scripts, scheduled jobs).
+- Deterministic input/output (not user-facing chat).
+- You need the final text without token-by-token updates.
+
+---
+
+## Pattern: Claude Agent SDK query()
+
+Simplest API. Agents run in Anthropic's infrastructure; no local orchestration.
+
+```typescript
+// Requires: Claude Agent SDK (beta)
+import Anthropic from "@anthropic-ai/sdk";
+import { Tool } from "@anthropic-ai/sdk/lib/agents";
+
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+async function askAgent(userMessage: string) {
+  const response = await client.agents.query({
+    system: "You are a helpful business assistant...",
+    tools: [
+      {
+        name: "get_customer",
+        description: "Fetch a customer by ID",
+        input_schema: {
+          type: "object",
+          properties: {
+            customerId: { type: "string" },
+          },
+          required: ["customerId"],
+        },
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ],
+    max_iterations: 10,
+  });
+
+  // response.messages contains full conversation
+  return response.messages;
+}
+```
+
+**Pros**:
+- Minimal code; no orchestration overhead.
+- Managed by Anthropic; always up-to-date model.
+- No tool execution on client; security is handled.
+
+**Cons**:
+- Tool results returned as messages; less control over streaming.
+- Limited semantic tool selection.
+- Requires internet call for every user request.
+
+---
+
+## Pattern: OpenAI Agents (Beta)
+
+```typescript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+async function runOpenAIAgent(userMessage: string) {
+  const stream = await client.agents.stream({
+    name: "my-agent",
+    model: "gpt-4-turbo",
+    instructions: "You are a helpful assistant...",
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "get_order",
+          description: "Retrieve order details",
+          parameters: {
+            type: "object",
+            properties: {
+              orderId: { type: "string" },
+            },
+            required: ["orderId"],
+          },
+        },
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ],
+  });
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta") {
+      console.log(event.delta.text);
+    }
+  }
+}
+```
+
+**Status**: Beta; API may change.
+
+---
+
+## Handling Tool Execution
+
+All frameworks accept a `tools` object where each tool has:
+
+```typescript
+interface Tool {
+  description: string; // For model understanding
+  parameters: ZodSchema; // Input schema
+  execute: (params: Parsed) => Promise<ToolResult>; // Handler
+}
+```
+
+**Framework difference**: Vercel AI and Claude SDK execute tools in-band; OpenAI Agents may return tool calls for client-side execution.
+
+### Error Handling
+
+```typescript
+const tools = {
+  fetch_customer: {
+    description: "Get customer by ID",
+    parameters: z.object({ id: z.string() }),
+    execute: async (params) => {
+      try {
+        const customer = await db.getCustomer(params.id);
+        if (!customer) {
+          return {
+            content: [{
+              type: "text",
+              text: `Customer ${params.id} not found`,
+            }],
+            isError: true, // Framework marks this as failed
+          };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(customer),
+          }],
+        };
+      } catch (err) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          }],
+          isError: true,
+        };
+      }
+    },
+  },
+};
+```
+
+**Framework behavior**:
+- Tools that return `isError: true` are shown to the model as failures; the model can retry.
+- Use `isError` to distinguish recoverable errors (not found, validation) from fatal ones (network timeout).
+
+---
+
+## Max Steps and Stopping
+
+All frameworks support max iterations to prevent runaway loops.
+
+```typescript
+// Vercel AI
+const agent = new ToolLoopAgent({
+  model,
+  instructions,
+  tools,
+  stopWhen: stepCountIs(10), // Stop after 10 steps
+  maxSteps: 15, // Safety limit (shouldn't reach this)
+});
+
+// Claude Agent SDK
+const response = await client.agents.query({
+  max_iterations: 10,
+});
+
+// OpenAI Agents
+const stream = await client.agents.stream({
+  max_iterations: 10,
+});
+```
+
+**Best practice**: Set `maxSteps` or `max_iterations` to 2–3x your expected step count. For most agents, 5–10 steps suffices; 15 is a safety limit.
+
+---
+
+## Streaming vs. Non-Streaming
+
+**Streaming** (real-time user feedback):
+- Use `agent.stream()` or `client.agents.stream()`.
+- Emit tokens as they arrive.
+- Better UX for chat interfaces.
+- Use Vercel AI or Claude Agent SDK.
+
+**Non-streaming** (background jobs, deterministic output):
+- Use `generateText()` or `client.agents.query()`.
+- Wait for final result.
+- Easier for workers; no streaming infrastructure needed.
+- Lower cost if you batch multiple requests.
+
+---
+
+## Migration: From Custom Loop to Framework
+
+If you have a custom loop:
+
+1. **Extract tools**: Map your tool handlers to the framework's `Tool` interface.
+2. **Extract prompt**: Move system prompt to `instructions`.
+3. **Remove orchestration**: Delete your request/response loop; the framework handles it.
+4. **Test tool execution**: Verify error handling matches the framework's `isError` contract.
+5. **Adjust max steps**: Framework defaults are often too high; dial down to 5–10.
+
+**Before** (custom loop):
+```typescript
+async function chatLoop(userMessage: string) {
+  const messages = [{ role: "user", content: userMessage }];
+  
+  for (let step = 0; step < 10; step++) {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      tools: Object.entries(toolDefs).map(([name, def]) => ({
+        type: "function",
+        function: { name, ...def },
+      })),
+    });
+
+    if (response.stop_reason === "end_turn") break;
+    
+    for (const call of response.tool_calls ?? []) {
+      const result = await executeTool(call.function.name, call.function.arguments);
+      messages.push({
+        role: "assistant",
+        content: response.content ?? "",
+        tool_calls: [call],
+      });
+      messages.push({
+        role: "user",
+        content: JSON.stringify(result),
+      });
+    }
+  }
+  
+  return messages[messages.length - 1].content;
+}
+```
+
+**After** (Vercel AI):
+```typescript
+async function chatLoop(userMessage: string) {
+  const agent = new ToolLoopAgent({
+    model: openai("gpt-4o-mini"),
+    instructions: systemPrompt,
+    tools,
+    stopWhen: stepCountIs(10),
+  });
+
+  const result = await agent.stream({
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  return result;
+}
+```
+
+---
+
+## Checklist
+
+- [ ] Choose framework: Vercel AI (recommended), Claude Agent SDK, or OpenAI Agents.
+- [ ] Define tools with `execute` handlers and error recovery.
+- [ ] Set system prompt with domain context, safety rules, and tool descriptions.
+- [ ] Wrap agent call in streaming handler (for chat) or `generateText` (for workers).
+- [ ] Test max-step limit; most agents should not exceed 5–10 steps.
+- [ ] Add observability: log tool calls, model responses, and step count.
+- [ ] Benchmark token usage; consider semantic tool selection if >20 tools.
+
+---
+
+## See Also
+
+- [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — composing prompts with context.
+- [Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — selecting ~12 tools at >20 tool scale.
+- [Tool Annotations](/docs/cookbook/tool-annotations) — declaring tool intent (READ_ONLY, WRITE, DESTRUCTIVE).
+

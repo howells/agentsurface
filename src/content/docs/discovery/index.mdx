@@ -1,0 +1,27 @@
+---
+title: Discovery & AEO
+description: Making your capabilities findable by AI agents through structured discovery mechanisms
+---
+
+## Summary
+
+Agent Engine Optimization (AEO) makes capabilities discoverable to AI systems. This section covers llms.txt (token-efficient site index), AGENTS.md (repo context), structured data (JSON-LD), content negotiation (Markdown over HTML), well-known endpoints, robots.txt rules, and content structure best practices. Together these patterns ensure agents find, understand, and accurately cite your documentation.
+
+- llms.txt: curated index at /llms.txt for token efficiency
+- AGENTS.md: repository context standard for AI coding agents
+- Structured data (JSON-LD): enables AI Overview inclusion
+- Content negotiation: serve Markdown to agents, HTML to browsers
+- Well-known endpoints: /.well-known/ai for capability discovery
+- robots.txt: control training vs. retrieval crawler access
+
+Before an agent can use your API, it has to find it. Agent Engine Optimization (AEO) is the practice of making your capabilities discoverable by AI systems — the agent equivalent of SEO.
+
+## What This Section Covers
+
+- **llms.txt** — the emerging standard for telling AI agents what your site offers, how to use it, and where to find machine-readable specs
+- **AGENTS.md** — a structured file that describes your repository's agent-facing capabilities, tool locations, and integration patterns
+- **Structured data** — JSON-LD, Schema.org markup, and OpenAPI links that search-augmented agents can parse
+- **Content negotiation** — serving different response formats (HTML for browsers, JSON for agents) based on Accept headers
+- **robots.txt for agents** — controlling which parts of your site agents can access and index
+- **Well-known URIs** — using `/.well-known/` endpoints to advertise capabilities like MCP server locations and OAuth metadata
+- **SEO as AEO** — how traditional SEO practices (clean URLs, semantic HTML, meta descriptions) directly improve agent discoverability

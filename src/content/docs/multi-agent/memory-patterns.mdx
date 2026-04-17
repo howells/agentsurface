@@ -1,0 +1,440 @@
+---
+title: Agent Memory Patterns
+description: The four types of agent memory, how to implement each, and how to share state between agents in a multi-agent system
+---
+
+## Summary
+
+Four types of memory address different needs: message history (current thread), working memory (per-session key-value), semantic recall (long-term embeddings), and observational memory (compressed background facts). Most systems need all four; relying only on message history caps performance at context window size.
+
+| Memory Type | Scope | Example |
+|------------|-------|---------|
+| Message History | Current thread | Last 4,096 tokens of conversation |
+| Working Memory | Per-session | "customer_id": "cust_abc123" |
+| Semantic Recall | Cross-thread, months | Vector search for "similar past issue" |
+| Observational | Compressed background | "This customer churn-risk: high" |
+
+- Message history: trim by token budget or summarize when exceeding threshold
+- Working memory: structured key-value store for session state
+- Semantic recall: vector embeddings + similarity search for long-term facts
+- Observational: background agent that compresses insights into summaries
+
+Agent memory is not a single thing. The term covers at least four distinct mechanisms with different scopes, persistence characteristics, and implementation requirements. A system that relies only on message history is limited to what fits in a context window. A system with all four types can recall facts from months ago, maintain persistent user preferences, and surface relevant prior work without reprocessing everything.
+
+## The Four Types
+
+| Type | Scope | Storage | Retrieval |
+|------|-------|---------|-----------|
+| Message History | Current thread | In-memory / checkpointer | Sequential, by position |
+| Working Memory | Per-session, per-agent | Structured store | Direct key access |
+| Semantic Recall | Cross-thread, long-term | Vector database | Embedding similarity |
+| Observational Memory | Background compression | Structured store | Direct key access |
+
+Each type solves a different problem. They are not interchangeable.
+
+## 1. Message History (Short-Term Memory)
+
+Message history is the conversation context the model processes on every generation step. It is the only memory type that is guaranteed to influence the model's output — everything else requires explicit retrieval and injection into the prompt.
+
+### Thread Scope and Checkpointing
+
+Message history is scoped to a thread. Each unique `thread_id` maintains its own independent history. Threads can persist across sessions if a checkpointer backs them to durable storage.
+
+**LangGraph with PostgreSQL checkpointer:**
+
+```python
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.graph import StateGraph, END
+
+checkpointer = PostgresSaver.from_conn_string(os.environ["DATABASE_URL"])
+
+graph = (
+    StateGraph(AgentState)
+    .add_node("agent", agent_node)
+    .add_edge("__start__", "agent")
+    .add_edge("agent", END)
+    .compile(checkpointer=checkpointer)
+)
+
+# Thread 1 — user Alice's session
+config_alice = {"configurable": {"thread_id": "alice-session-2024-01"}}
+graph.invoke({"messages": [("user", "What's my account balance?")]}, config_alice)
+
+# Later — same thread, history is restored from PostgreSQL
+graph.invoke({"messages": [("user", "What about last month?")]}, config_alice)
+
+# Thread 2 — independent history
+config_bob = {"configurable": {"thread_id": "bob-session-2024-01"}}
+graph.invoke({"messages": [("user", "Start a new analysis")]}, config_bob)
+```
+
+### Managing History Length
+
+Message history grows without bound unless truncated. Long histories cause two problems: context window overflow and cost accumulation. Both require explicit management.
+
+**Trim messages to a token budget:**
+
+```python
+from langchain_core.messages import trim_messages
+
+def agent_node(state: AgentState) -> dict:
+    trimmed = trim_messages(
+        state["messages"],
+        max_tokens=4096,
+        token_counter=model,
+        strategy="last",       # keep most recent messages
+        start_on="human",      # always start on a human message
+        include_system=True    # always keep the system message
+    )
+    response = model.invoke(trimmed)
+    return {"messages": [response]}
+```
+
+**Summarize and compress:**
+
+```python
+from langchain_core.messages import SystemMessage
+
+def summarize_node(state: AgentState) -> dict:
+    """Called when message count exceeds threshold."""
+    summary_prompt = f"""Summarize this conversation in 3-5 sentences, 
+    preserving key decisions, facts established, and the user's current goal.
+    
+    Conversation:
+    {format_messages(state['messages'])}"""
+    
+    summary = summarize_model.invoke(summary_prompt)
+    
+    # Replace history with a summary message + last 4 messages
+    compressed = [
+        SystemMessage(content=f"Conversation summary: {summary.content}"),
+        *state["messages"][-4:]
+    ]
+    return {"messages": compressed}
+```
+
+## 2. Working Memory
+
+Working memory is persistent structured state that survives across turns within a session — and optionally across sessions. Unlike message history (which the model processes wholesale), working memory is accessed directly by key and injected selectively into the context.
+
+Use working memory for facts that should remain stable across a session: user preferences, established context, confirmed decisions.
+
+### Mastra Working Memory with Schema
+
+Mastra provides a typed working memory system where you define a Zod schema for the state your agent maintains.
+
+```typescript
+import { Agent } from "@mastra/core/agent"
+import { Memory } from "@mastra/memory"
+import { openai } from "@ai-sdk/openai"
+import { z } from "zod"
+
+const memory = new Memory({
+  options: {
+    workingMemory: {
+      enabled: true,
+      schema: z.object({
+        user_name: z.string().optional(),
+        preferred_output_format: z.enum(["markdown", "plain", "json"]).optional(),
+        current_project: z.string().optional(),
+        established_facts: z.array(z.string()).default([]),
+        decisions_made: z.array(z.object({
+          decision: z.string(),
+          rationale: z.string(),
+          timestamp: z.string()
+        })).default([])
+      })
+    }
+  }
+})
+
+const agent = new Agent({
+  name: "ProjectAssistant",
+  instructions: `You help users with project management tasks.
+  
+  You have working memory that persists across this session.
+  Update it when:
+  - The user tells you their name or preferences
+  - A significant decision is made
+  - An important fact is established
+  
+  Read working memory at the start of each turn to maintain context.`,
+  model: openai("gpt-4o"),
+  memory
+})
+
+// The agent's memory schema is injected into its system prompt automatically.
+// When the agent generates an update to working memory, Mastra persists it
+// and injects the updated values on the next turn.
+const response = await agent.generate("My name is Alice and I prefer JSON output", {
+  threadId: "alice-project-session-1",
+  resourceId: "user-alice"
+})
+```
+
+### Direct Working Memory Access
+
+Working memory can be read and written programmatically, not just through the agent's automatic updates:
+
+```typescript
+import { Memory } from "@mastra/memory"
+
+// Read current working memory
+const currentState = await memory.getWorkingMemory({
+  threadId: "alice-project-session-1",
+  resourceId: "user-alice"
+})
+
+console.log(currentState.user_name)            // "Alice"
+console.log(currentState.preferred_output_format)  // "json"
+
+// Programmatically update working memory (useful for injecting context from external systems)
+await memory.updateWorkingMemory({
+  threadId: "alice-project-session-1",
+  resourceId: "user-alice",
+  update: {
+    current_project: "Q1 Planning",
+    established_facts: ["Budget approved: $50k", "Deadline: March 15"]
+  }
+})
+```
+
+## 3. Semantic Recall
+
+Semantic recall stores messages and other content as vector embeddings. On each new turn, the most semantically similar past content is retrieved and injected into the current context. This enables agents to "remember" relevant conversations from months ago without keeping every message in the active context window.
+
+### Mastra Semantic Memory
+
+```typescript
+import { Memory } from "@mastra/memory"
+import { openai } from "@ai-sdk/openai"
+import { PgVector } from "@mastra/pg"
+
+const pgVector = new PgVector({
+  connectionString: process.env.DATABASE_URL!
+})
+
+const memory = new Memory({
+  embedder: openai.embedding("text-embedding-3-small"),
+  vector: pgVector,
+  options: {
+    semanticRecall: {
+      enabled: true,
+      topK: 5,           // retrieve 5 most similar past messages
+      messageRange: {    // how many messages around each match to include
+        before: 2,
+        after: 1
+      }
+    }
+  }
+})
+
+const agent = new Agent({
+  name: "LongTermAssistant",
+  instructions: `You have access to a semantic memory of past conversations.
+  When the user references something that happened before, check your recalled
+  memories. Cite which prior conversation you are drawing from when relevant.`,
+  model: openai("gpt-4o"),
+  memory
+})
+
+// Turn from 3 months ago in thread "alice-thread-jan"
+await agent.generate("The API key for the staging environment is sk-stg-...", {
+  threadId: "alice-thread-jan",
+  resourceId: "user-alice"
+})
+
+// Today, in a different thread — semantic recall finds the relevant prior message
+const response = await agent.generate("What was the staging API key again?", {
+  threadId: "alice-thread-apr",
+  resourceId: "user-alice"
+})
+// Agent correctly recalls the key from January
+```
+
+### LangGraph Store with Semantic Search
+
+LangGraph's `InMemoryStore` and `AsyncPostgresStore` support both exact-match retrieval and semantic search when initialized with an embedding model:
+
+```python
+from langgraph.store.memory import InMemoryStore
+from langchain_openai import OpenAIEmbeddings
+
+store = InMemoryStore(
+    index={
+        "embed": OpenAIEmbeddings(model="text-embedding-3-small"),
+        "dims": 1536
+    }
+)
+
+# Store a fact about a user
+store.put(
+    namespace=("user_facts", "alice"),
+    key="api_keys",
+    value={"staging_key": "sk-stg-...", "recorded_at": "2024-01-15"}
+)
+
+# Later — semantic search finds relevant stored facts
+memories = store.search(
+    namespace=("user_facts", "alice"),
+    query="API key for staging environment",  # semantic similarity search
+    limit=3
+)
+
+for memory in memories:
+    print(f"Found: {memory.value}")
+```
+
+**Using the store in a LangGraph node:**
+
+```python
+from langgraph.graph import StateGraph
+from langgraph.prebuilt import InjectedStore
+from typing import Annotated
+
+def agent_node(state: AgentState, store: Annotated[BaseStore, InjectedStore]) -> dict:
+    # Retrieve relevant memories before generating
+    user_facts = store.search(
+        namespace=("user_facts", state["user_id"]),
+        query=state["messages"][-1].content,
+        limit=5
+    )
+    
+    memory_context = "\n".join([
+        f"- {m.value}" for m in user_facts
+    ])
+    
+    system_prompt = f"""You are a helpful assistant.
+    
+Relevant context from past conversations:
+{memory_context}
+
+Use this context when relevant, but do not reference it explicitly unless asked."""
+    
+    response = model.invoke([
+        SystemMessage(content=system_prompt),
+        *state["messages"]
+    ])
+    
+    # Store new facts from this turn
+    if new_facts := extract_facts(response.content):
+        for fact in new_facts:
+            store.put(
+                namespace=("user_facts", state["user_id"]),
+                key=fact["key"],
+                value=fact
+            )
+    
+    return {"messages": [response]}
+```
+
+## 4. Observational Memory
+
+Observational memory compresses old message history in the background. As messages age, they are summarized and stored in structured form, freeing context window space while preserving the substance of past interactions.
+
+The process runs asynchronously: the agent continues operating normally while a background process periodically compresses old messages into summaries.
+
+### Mastra Background Memory Compression
+
+```typescript
+import { Memory } from "@mastra/memory"
+import { openai } from "@ai-sdk/openai"
+
+const memory = new Memory({
+  options: {
+    lastMessages: 20,           // keep the 20 most recent messages verbatim
+    semanticRecall: {
+      enabled: true,
+      topK: 3
+    },
+    // Background compression of messages older than lastMessages threshold
+    compressionPolicy: {
+      enabled: true,
+      model: openai("gpt-4o-mini"),
+      prompt: `Summarize the key information from this conversation segment.
+        Preserve: decisions made, facts established, user preferences stated.
+        Discard: pleasantries, repeated requests, unsuccessful attempts.
+        Format as bullet points.`
+    }
+  }
+})
+```
+
+When the thread's message count exceeds `lastMessages`, older messages are compressed into structured summaries and stored separately. On future turns, both the recent messages (verbatim) and the older summaries (compressed) contribute to the agent's context.
+
+## Shared Memory Between Agents
+
+Sharing memory between agents in a multi-agent system requires explicit design. Two approaches:
+
+### Thread-Level Sharing
+
+Multiple agents operating on the same `threadId` share the same message history. This works for supervisor-worker patterns where the entire conversation is one logical thread:
+
+```typescript
+// Supervisor and workers share the same threadId
+const threadId = "task-123-thread"
+
+const supervisorResponse = await supervisorAgent.generate(userMessage, { threadId })
+// Worker invoked with same threadId — sees the full conversation history
+const workerResponse = await workerAgent.generate(delegatedTask, { threadId })
+```
+
+Caveat: workers see the supervisor's internal reasoning in their context. This is usually acceptable but can pollute worker context for tasks where domain focus is important.
+
+### Resource-Level Cross-Thread Recall
+
+Mastra's `resourceId` scopes semantic recall across all threads for the same logical entity (user, organization, project). An agent accessing any thread with `resourceId: "user-alice"` can retrieve semantically similar content from all of Alice's past threads:
+
+```typescript
+// Both threads share the same resourceId — semantic recall works across them
+await agent.generate("Set up the new environment", {
+  threadId: "alice-jan-thread",
+  resourceId: "user-alice"
+})
+
+await agent.generate("What environment variables do we need?", {
+  threadId: "alice-apr-thread",
+  resourceId: "user-alice"  // semantic recall pulls from january thread
+})
+```
+
+### Explicit Store Sharing
+
+For multi-agent systems where agents need to read and write shared structured state, use a shared store with namespaced access:
+
+```python
+# LangGraph: shared store accessible from any node in the graph
+shared_store = AsyncPostgresStore.from_conn_string(DATABASE_URL)
+
+# Agent A writes to shared namespace
+await shared_store.aput(
+    namespace=("project", "task-123", "findings"),
+    key="security_analysis",
+    value={"risk_level": "medium", "issues": [...], "completed_by": "security_agent"}
+)
+
+# Agent B reads from shared namespace
+security_findings = await shared_store.aget(
+    namespace=("project", "task-123", "findings"),
+    key="security_analysis"
+)
+```
+
+## Memory in Multi-Agent Systems: What to Isolate vs. Share
+
+| Memory type | Share between agents? | Rationale |
+|-------------|----------------------|-----------|
+| Message history | Only through shared threadId | Workers do not need full supervisor conversation |
+| Working memory | Per-agent | Agent-specific preferences and state |
+| Semantic recall | Share via resourceId | Cross-thread recall benefits from full history |
+| Task results (store) | Yes, with namespacing | Sub-task outputs must be accessible to supervisor |
+
+<Callout type="info">
+The most common memory mistake in multi-agent systems is assuming all agents share a global memory store. Each agent's working memory and message history should be isolated by default. Share only what needs to be shared, and do so through explicit namespaced keys rather than a shared global state object.
+</Callout>
+
+## Related Pages
+
+- [Supervisor Pattern](./supervisor-pattern) — passing context through agent delegations
+- [Human-in-the-Loop](./human-in-the-loop) — suspending and resuming workflows while preserving memory state
+- [Orchestration Patterns](./orchestration-patterns) — which patterns benefit most from semantic recall

@@ -1,0 +1,64 @@
+# .skill.yaml — Skill Distribution Manifest
+# Format: Best practice for cross-platform skill distribution (April 2026)
+# Not yet standardized, but future-proofs for emerging package managers.
+#
+# Status: This manifest is supplementary. The canonical entry point is
+# skills/agentify/SKILL.md (Claude Code) and AGENTS.md (Codex, generic agents).
+
+name: agentify
+version: 1.0.0
+license: MIT
+
+description: |
+  Audit and transform any codebase for AI agent consumability. Scores across
+  11 dimensions, produces findings reports, and executes transformation plans
+  via specialist sub-agents.
+
+entry-point: ./skills/agentify/SKILL.md
+
+author:
+  name: Daniel Howells
+
+homepage: https://github.com/anthropics/agent-zero
+repository:
+  type: git
+  url: https://github.com/anthropics/agent-zero.git
+
+keywords:
+  - agentic
+  - mcp
+  - api-design
+  - cli-design
+  - agent-dx
+  - audit
+  - transformation
+  - llms-txt
+  - agents-md
+  - aeo
+  - data-retrievability
+  - vectors
+  - rag
+
+compatibility:
+  - claude-code >= 1.0.0
+  - claude-agent-sdk >= 1.0.0
+  - openai-codex >= 0.1.0
+  - agents-md >= 1.0.0
+
+dependencies: []
+
+specialist-agents:
+  - context-writer
+  - discovery-writer
+  - error-designer
+  - api-optimizer
+  - cli-enhancer
+  - auth-upgrader
+  - mcp-builder
+  - test-writer
+
+# Distribution URLs (for future registry lookup)
+distribution:
+  npm: "@anthropic/agentify"  # Not yet on npm, planned
+  github: "https://github.com/anthropics/agent-zero/releases"
+  claude-code-plugin: "agentify"

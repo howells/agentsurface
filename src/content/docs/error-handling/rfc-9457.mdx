@@ -1,0 +1,200 @@
+---
+title: RFC 9457 Problem Details
+description: The current standard for structured HTTP error responses that agents can parse and act on
+---
+
+## Summary
+
+RFC 9457 standardizes error response format with five core fields: type (stable URI), title, status, detail, instance. Agents branch on type, never on title or detail. Extensions like is_retriable, retry_after_seconds, suggestions, trace_id, doc_uri enable autonomous recovery.
+
+```
+{
+  "type": "https://api.example.com/errors/rate-limit-exceeded",
+  "title": "Rate limit exceeded",
+  "status": 429,
+  "is_retriable": true,
+  "retry_after_ms": 5000,
+  "suggestions": ["Wait 5 seconds and retry"]
+}
+```
+
+- type: stable URI agents can branch on (contract-level)
+- is_retriable: explicit boolean, not inferred from status code
+- suggestions: concrete next steps, first is most likely fix
+- trace_id: correlation ID for internal lookup
+- Content-Type: application/problem+json signals RFC 9457 format
+
+RFC 9457 (March 2024) defines a standard JSON format for HTTP error responses. It obsoletes RFC 7807 (April 2015) with improved registration procedures for extension types, explicit internationalization support, and enhanced security guidance. Like its predecessor, it answers a fundamental problem: HTTP status codes alone are insufficient for agents to decide whether to retry, modify the request, or escalate.
+
+The format has become widespread. The `application/problem+json` content type signals that the response body follows the standard, allowing agents and client libraries to handle errors consistently regardless of which service returned them.
+
+## The Standard Fields
+
+```json
+{
+  "type": "https://example.com/errors/insufficient-credit",
+  "title": "Insufficient credit",
+  "status": 422,
+  "detail": "The account has $12.00 remaining but the transaction costs $42.00.",
+  "instance": "/accounts/acme/transactions/txn_01HV3K8MNP"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | Recommended | A URI that uniquely identifies the error type. Should dereference to human-readable documentation. |
+| `title` | Recommended | A short, human-readable summary of the problem type. Does not change between occurrences. |
+| `status` | Optional | The HTTP status code. Mirrors the response's actual status code. |
+| `detail` | Optional | A human-readable explanation specific to this occurrence of the problem. |
+| `instance` | Optional | A URI reference that identifies the specific occurrence of the problem. |
+
+`type` is the most critical field for agents. It is the stable, parseable identifier that agents can branch on:
+
+```typescript
+const response = await fetch("/accounts/acme/charge", {
+  method: "POST",
+  body: JSON.stringify({ amount: 4200 }),
+});
+
+if (!response.ok) {
+  const problem = await response.json();
+
+  switch (problem.type) {
+    case "https://example.com/errors/insufficient-credit":
+      // Specific recovery: check balance, reduce amount, or escalate
+      break;
+    case "https://example.com/errors/account-suspended":
+      // Not recoverable: stop and report to human
+      break;
+    case "https://example.com/errors/validation-error":
+      // Fix the request and retry
+      break;
+    default:
+      // Unknown error type: log and escalate
+  }
+}
+```
+
+Agents should never branch on the `title` or `detail` fields — those are prose for humans and may change between releases. `type` is the stable contract.
+
+## RFC 9457 vs RFC 7807
+
+RFC 9457 retains full backward compatibility with RFC 7807 while adding:
+
+- **Formal extension registration**: The IANA Problem Details extension registry codifies how vendor extensions (like `is_retriable`, `trace_id`) are declared and documented.
+- **Internationalization support**: Extensions may include language tags and localized explanations.
+- **Security clarifications**: Explicit guidance on preventing information disclosure (no stack traces, internal error codes sanitized).
+- **Instance URI semantics**: Clearer definition of when `instance` should be a server-relative URI vs absolute URI.
+
+For practical purposes, both standards share the core five fields and the extension mechanism. Use RFC 9457 as the baseline for new APIs.
+
+## Recommended Extensions for Agent APIs
+
+The RFC explicitly allows extension fields beyond the five core ones. For agent-readable APIs, these extensions carry the structured recovery information agents need.
+
+### `is_retriable`
+
+A boolean that explicitly tells the agent whether retrying the same request might succeed:
+
+```json
+{
+  "type": "https://example.com/errors/service-unavailable",
+  "title": "Service temporarily unavailable",
+  "status": 503,
+  "detail": "The invoices service is undergoing maintenance.",
+  "is_retriable": true,
+  "retry_after_seconds": 30
+}
+```
+
+### `retry_after_seconds`
+
+How long to wait before retrying. Numeric equivalent of the `Retry-After` header, included in the body for clients that process the body but not headers:
+
+```json
+{
+  "type": "https://example.com/errors/rate-limit-exceeded",
+  "title": "Rate limit exceeded",
+  "status": 429,
+  "detail": "You have exceeded the 100 requests per minute limit.",
+  "is_retriable": true,
+  "retry_after_seconds": 47
+}
+```
+
+### `suggestions`
+
+An array of actionable next steps. Short, imperative strings describing what the agent should try:
+
+```json
+{
+  "type": "https://example.com/errors/validation-error",
+  "title": "Validation failed",
+  "status": 422,
+  "detail": "The request body failed schema validation.",
+  "suggestions": [
+    "Provide a value for the required 'amount' field",
+    "The 'currency' field must be a 3-letter ISO 4217 code (e.g., 'USD')"
+  ]
+}
+```
+
+### `doc_uri`
+
+A link to detailed documentation for this error type. Unlike `type`, which is a stable machine identifier, `doc_uri` may point to versioned docs or a troubleshooting guide:
+
+```json
+{
+  "type": "https://example.com/errors/webhook-validation-failed",
+  "title": "Webhook signature validation failed",
+  "status": 401,
+  "detail": "The X-Webhook-Signature header does not match the expected HMAC-SHA256 signature.",
+  "doc_uri": "https://docs.example.com/webhooks/security#signature-validation"
+}
+```
+
+### `trace_id`
+
+A correlation ID linking this error to a specific request in the service's observability stack. When an agent escalates to a human, the human can look up the trace:
+
+```json
+{
+  "type": "https://example.com/errors/internal-error",
+  "title": "Internal server error",
+  "status": 500,
+  "detail": "An unexpected error occurred. The issue has been logged.",
+  "trace_id": "01HV3K8MNP2QRS3TUVWX",
+  "is_retriable": true,
+  "retry_after_seconds": 5
+}
+```
+
+## Content Type
+
+Always include the `Content-Type: application/problem+json` header on error responses. This signals to clients and agents that the body is a parseable problem document:
+
+```typescript
+function problemResponse(
+  res: Response,
+  status: number,
+  problem: ProblemDetails
+): void {
+  res.status(status)
+     .setHeader("Content-Type", "application/problem+json")
+     .json(problem);
+}
+```
+
+## Checklist
+
+- [ ] All error responses use `application/problem+json` content type
+- [ ] Every error has a stable `type` URI that agents can branch on
+- [ ] `is_retriable` is present on every error response
+- [ ] `title` is stable; `detail` is occurrence-specific
+- [ ] Stack traces and internal details never appear in responses
+
+## Related Pages
+
+- [Agent Extensions](/docs/error-handling/agent-extensions) — agent-specific fields beyond RFC 9457
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — structuring error content to enable recovery
+- [Retry Patterns](/docs/error-handling/retry-patterns) — how agents should act on error information

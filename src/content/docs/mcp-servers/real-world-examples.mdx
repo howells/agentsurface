@@ -1,0 +1,290 @@
+---
+title: Real-World MCP Patterns
+description: How GitHub, Stripe, and Vercel structure their production MCP servers
+---
+
+## Summary
+
+GitHub, Stripe, and Vercel reveal consistent patterns: toolset grouping (organize tools by feature, enable/disable at startup), environment-based configuration, error recovery strategies, and logging. GitHub's 60+ tools are managed via toolsets; Stripe uses composable operations; Vercel exposes deployment and analytics. All follow the single-responsibility principle and provide clear error paths.
+
+- Toolset grouping: organize tools into named groups, enable via config
+- Startup configuration: load toolsets/features at server start
+- Environment-based: use env vars for API keys, endpoints, features
+- Error recovery: structured errors guide agents toward retry or alternate paths
+- Logging: use MCP logging facilities, write to stderr
+- GitHub, Stripe, Vercel all use 10-60 tools per server (not 300)
+
+Production MCP servers from major platforms reveal consistent patterns that go beyond what the spec requires. The GitHub MCP server, Stripe's agent toolkit, and Vercel's MCP server each solve the same core challenges — tool explosion, auth flexibility, deployment variety — and their approaches are worth studying directly.
+
+## GitHub MCP Server
+
+The GitHub MCP server (`github/github-mcp-server`) is one of the most referenced open-source MCP implementations. It exposes GitHub operations — repositories, issues, pull requests, code search — to agents. Several of its design decisions are instructive.
+
+### Toolset Grouping
+
+GitHub's server exposes over 60 tools, which would be overwhelming without organization. It solves this through **toolset grouping**: tools are organized into named groups, and operators configure which groups are enabled:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "github-mcp-server",
+      "args": ["stdio"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_...",
+        "GITHUB_TOOLSETS": "repos,issues,pull_requests,code_search"
+      }
+    }
+  }
+}
+```
+
+Tools in disabled toolsets are not registered — they do not appear in the `tools/list` response at all. Agents connected to a GitHub server configured for only `issues` and `pull_requests` see a manageable tool list focused on the work at hand, not a 60-tool catalog.
+
+The toolset configuration is read at startup, not per-request. Toolsets are an operator concern, not a user or agent concern:
+
+```typescript
+// Simplified version of GitHub's toolset pattern
+const TOOLSETS: Record<string, RegisterFn[]> = {
+  repos: [registerGetRepo, registerListRepos, registerCreateRepo, registerForkRepo],
+  issues: [registerGetIssue, registerListIssues, registerCreateIssue, registerUpdateIssue],
+  pull_requests: [registerGetPR, registerListPRs, registerCreatePR, registerMergePR],
+  code_search: [registerSearchCode, registerGetFileContents],
+};
+
+const enabledToolsets = process.env.GITHUB_TOOLSETS?.split(",") ?? Object.keys(TOOLSETS);
+
+for (const toolset of enabledToolsets) {
+  const fns = TOOLSETS[toolset];
+  if (!fns) throw new Error(`Unknown toolset: ${toolset}`);
+  for (const fn of fns) fn(server, config);
+}
+```
+
+### The --read-only Flag
+
+GitHub's server accepts a `--read-only` flag that disables all tools that write, create, or delete:
+
+```bash
+github-mcp-server stdio --read-only
+```
+
+In read-only mode, only tools annotated with `readOnlyHint: true` are registered. This makes it safe to give an agent GitHub access in an automated pipeline without worrying about it opening issues or pushing code.
+
+The implementation checks the flag during registration:
+
+```typescript
+export function registerCreateIssue(
+  server: McpServer,
+  config: Config
+): void {
+  if (config.readOnly) return; // Skip registration entirely
+
+  server.tool(
+    "github_create_issue",
+    "Creates a new issue in a repository...",
+    CreateIssueSchema,
+    { annotations: { readOnlyHint: false, destructiveHint: false } },
+    async (params) => { /* ... */ }
+  );
+}
+```
+
+### Multiple Authentication Strategies
+
+GitHub's server supports three authentication methods, selected by which environment variable is present:
+
+```typescript
+function loadAuth(): Auth {
+  if (process.env.GITHUB_PERSONAL_ACCESS_TOKEN) {
+    return { type: "pat", token: process.env.GITHUB_PERSONAL_ACCESS_TOKEN };
+  }
+
+  if (process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY) {
+    return {
+      type: "app",
+      appId: process.env.GITHUB_APP_ID,
+      privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+      installationId: process.env.GITHUB_APP_INSTALLATION_ID,
+    };
+  }
+
+  if (process.env.GITHUB_OAUTH_TOKEN) {
+    return { type: "oauth", token: process.env.GITHUB_OAUTH_TOKEN };
+  }
+
+  throw new Error(
+    "No GitHub authentication configured. Set GITHUB_PERSONAL_ACCESS_TOKEN, " +
+    "GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY, or GITHUB_OAUTH_TOKEN."
+  );
+}
+```
+
+This env-driven auth selection pattern allows the same server binary to be deployed in different contexts without code changes. A developer uses a PAT; a CI pipeline uses a GitHub App; a user-facing product uses OAuth.
+
+## Stripe MCP Server
+
+Stripe's MCP server approach differs significantly from GitHub's. Rather than a standalone subprocess, Stripe offers:
+
+1. **A hosted remote MCP server** at `https://mcp.stripe.com` — zero deployment required, auth via OAuth
+2. **The `@stripe/agent-toolkit` npm package** — for embedding Stripe tools directly in your own agent
+
+### Hosted Remote Server
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "url": "https://mcp.stripe.com",
+      "auth": {
+        "type": "oauth",
+        "clientId": "your-stripe-client-id"
+      }
+    }
+  }
+}
+```
+
+Stripe handles all deployment, scaling, versioning, and API compatibility. The OAuth flow delegates access — users authorize specific Stripe capabilities without sharing their API keys. This is the pattern the November 2025 MCP spec mandates for public servers.
+
+### Agent Toolkit for Embedded Use
+
+The `@stripe/agent-toolkit` package lets you add Stripe tools to your own MCP server or AI SDK integration without running a separate server:
+
+```typescript
+import { StripeAgentToolkit } from "@stripe/agent-toolkit/modelcontextprotocol";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+const stripeTools = new StripeAgentToolkit({
+  secretKey: process.env.STRIPE_SECRET_KEY!,
+  configuration: {
+    actions: {
+      paymentIntents: { create: true, read: true },
+      customers: { create: true, read: true },
+      invoices: { create: true, send: true },
+    },
+  },
+});
+
+// Register Stripe tools into your existing MCP server
+stripeTools.registerTools(server);
+```
+
+The `configuration.actions` object performs the same role as GitHub's toolset grouping — it limits which Stripe operations are exposed, preventing agents from accessing capabilities they should not have (refunds, subscription cancellations, account settings).
+
+### Selective Tool Exposure
+
+Stripe's pattern of `actions` configuration is worth adopting in your own servers. Rather than exposing all tools to all users, scope tool availability to the requesting user's permissions:
+
+```typescript
+function buildActionsConfig(user: AuthedUser): StripeActions {
+  return {
+    paymentIntents: {
+      create: user.scopes.includes("payments:write"),
+      read: user.scopes.includes("payments:read"),
+    },
+    customers: {
+      create: user.scopes.includes("customers:write"),
+      read: user.scopes.includes("customers:read"),
+    },
+    invoices: {
+      create: user.scopes.includes("invoices:write"),
+      send: user.scopes.includes("invoices:write"),
+    },
+  };
+}
+
+const handler = createMcpHandler((server, req) => {
+  const user = (req as any).mcpAuth;
+  const actions = buildActionsConfig(user);
+
+  // Only register tools the user is authorized to use
+  if (actions.invoices.create) registerCreateInvoice(server, config);
+  if (actions.invoices.read) registerListInvoices(server, config);
+  if (actions.paymentIntents.create) registerCreatePaymentIntent(server, config);
+});
+```
+
+## Vercel MCP Server
+
+Vercel's MCP server is built on `mcp-on-vercel`, a template that demonstrates the full production deployment pattern. The server exposes Vercel API operations and is used as a reference implementation for the `@vercel/mcp-adapter` package.
+
+```typescript
+// Vercel's pattern: domain operations with auth-gated registration
+export function registerDeploymentTools(
+  server: McpServer,
+  config: { token: string; teamId?: string }
+): void {
+  server.tool(
+    "vercel_list_deployments",
+    "Lists recent deployments for a project. Returns deployment URLs, statuses, and git metadata.",
+    {
+      project_id: z.string().describe("The Vercel project ID"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(20)
+        .describe("Number of deployments to return (default 20, max 100)"),
+    },
+    {
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project_id, limit }) => {
+      const res = await fetch(
+        `https://api.vercel.com/v6/deployments?projectId=${project_id}&limit=${limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            ...(config.teamId ? { "x-vercel-team-id": config.teamId } : {}),
+          },
+        }
+      );
+
+      if (!res.ok) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: await res.text() }],
+        };
+      }
+
+      const data = await res.json();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(
+            data.deployments.map((d: any) => ({
+              id: d.uid,
+              url: d.url,
+              state: d.state,
+              created_at: d.created,
+              git_branch: d.meta?.githubCommitRef,
+              git_message: d.meta?.githubCommitMessage,
+            }))
+          ),
+        }],
+      };
+    }
+  );
+}
+```
+
+The lean response pattern is clear here: rather than returning the full Vercel API response (which includes dozens of fields per deployment), only the fields an agent acts on are returned.
+
+## Patterns They All Share
+
+Reviewing GitHub, Stripe, and Vercel's approaches reveals five consistent patterns:
+
+**1. Domain grouping.** Tools are organized by domain entity (repos, issues, deployments) rather than by operation type. This maps to how agents think — "I need to do something with invoices" routes to the invoices group.
+
+**2. Auth flexibility.** All three support multiple authentication strategies, selected at startup via environment variables. No authentication method is hardcoded into the tool implementation.
+
+**3. Selective tool exposure.** None of them expose their full API surface. GitHub has a `--read-only` flag and toolsets. Stripe has `configuration.actions`. Vercel has scope-gated registration. Agents get exactly the tools they need for the task at hand.
+
+**4. Env-driven configuration.** Every behavioral variation — which tools to enable, which permissions to grant, which API endpoint to target — is controlled by environment variables. The server binary is environment-agnostic.
+
+**5. Lean responses.** Tool responses return the minimum fields needed for the agent to proceed. Full API responses are never passed through directly.
+
+These patterns are not incidental. They emerge from operating MCP servers at scale, with real agents, and observing where failures occur. They are worth adopting even for small internal servers.

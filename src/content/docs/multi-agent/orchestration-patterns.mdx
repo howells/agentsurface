@@ -1,0 +1,403 @@
+---
+title: Orchestration Patterns
+description: The five primary patterns for coordinating multiple AI agents, when to use each, and the failure modes to expect
+---
+
+## Summary
+
+Choose the right pattern for your task sequence. Sequential for well-defined stages, concurrent for independent work, handoff for specialist domains, group chat for collaborative refinement, dynamic orchestration for open-ended discovery. Combining patterns is common: deterministic backbone handles routing and validation, AI agents handle judgment.
+
+| Pattern | Control | Best for | Risk |
+|---------|---------|----------|------|
+| Sequential | Forward through stages | Research → draft → edit → review | Context dilution, error propagation |
+| Concurrent | Fan-out/fan-in aggregation | Diverse perspectives, parallel work | Inconsistent schemas, partial failure |
+| Handoff | Transfer to specialist | Distinct non-overlapping domains | Ambiguous boundaries, lost context |
+| Group chat | Shared thread, manager orders | Collaborative refinement | Sycophantic convergence, token growth |
+| Dynamic | Runtime task ledger | Open-ended complex goals | Hallucinated completion, circular planning |
+
+Multi-agent systems are not a single architecture. They are a family of patterns, each with different control flow, failure characteristics, and appropriate use cases. Choosing the wrong pattern is the most common source of multi-agent complexity — a sequential pipeline where concurrent fan-out was needed, or a swarm where a supervisor would have produced coherent output.
+
+This page covers the five primary patterns, how the major frameworks implement them, and the emerging 2026 consensus on when to use each.
+
+## The Five Patterns
+
+### 1. Sequential (Pipeline)
+
+The output of one agent becomes the input for the next. Control flows strictly forward through a defined sequence of stages.
+
+```
+Input → Agent A → Agent B → Agent C → Output
+```
+
+Each agent transforms the artifact in a predictable way: extract, then enrich, then validate, then format. No agent needs to know about the others — only about its own input contract and output contract.
+
+**When to use sequential:**
+- Tasks with a natural stage progression (research → draft → edit → review)
+- When each stage requires specialized context or a different system prompt
+- When intermediate outputs need to be inspectable or auditable
+- When a failure in any stage should halt the pipeline rather than produce partial results
+
+**Failure modes:**
+- **Context dilution:** By stage three, the agent's context window contains the accumulated output of every prior stage. Long pipelines degrade quality as early context competes with recent additions.
+- **Error propagation:** An error in stage two produces garbage for stage three. If stage three succeeds anyway and produces plausible output, the garbage is invisible until output review.
+- **No parallelism:** Sequential pipelines are strictly slower than their most time-consuming stage. There is no way to recover latency.
+
+**Framework implementation (Mastra):**
+
+```typescript
+import { createWorkflow, createStep } from "@mastra/core/workflows"
+import { z } from "zod"
+
+const researchStep = createStep({
+  id: "research",
+  inputSchema: z.object({ topic: z.string() }),
+  outputSchema: z.object({ sources: z.array(z.string()), summary: z.string() }),
+  execute: async ({ inputData }) => {
+    const result = await researchAgent.generate(inputData.topic)
+    return { sources: result.sources, summary: result.text }
+  }
+})
+
+const draftStep = createStep({
+  id: "draft",
+  inputSchema: z.object({ sources: z.array(z.string()), summary: z.string() }),
+  outputSchema: z.object({ draft: z.string() }),
+  execute: async ({ inputData }) => {
+    const result = await writerAgent.generate(
+      `Based on these sources: ${inputData.sources.join(", ")}\n\nSummary: ${inputData.summary}\n\nWrite a draft article.`
+    )
+    return { draft: result.text }
+  }
+})
+
+const editStep = createStep({
+  id: "edit",
+  inputSchema: z.object({ draft: z.string() }),
+  outputSchema: z.object({ article: z.string() }),
+  execute: async ({ inputData }) => {
+    const result = await editorAgent.generate(inputData.draft)
+    return { article: result.text }
+  }
+})
+
+export const contentPipeline = createWorkflow({
+  id: "content-pipeline",
+  inputSchema: z.object({ topic: z.string() }),
+  outputSchema: z.object({ article: z.string() }),
+})
+  .then(researchStep)
+  .then(draftStep)
+  .then(editStep)
+  .commit()
+```
+
+### 2. Concurrent (Fan-Out / Fan-In)
+
+The same input is sent to multiple agents in parallel. Their outputs are collected and merged through an aggregation strategy.
+
+```
+          ┌→ Agent A ─┐
+Input ────┼→ Agent B ─┼→ Aggregator → Output
+          └→ Agent C ─┘
+```
+
+**When to use concurrent:**
+- Independent sub-tasks that do not depend on each other's results
+- Tasks that benefit from multiple perspectives (adversarial review, diverse generation, multi-model voting)
+- When total latency is bounded by the slowest agent rather than the sum of all agents
+
+**Aggregation strategies:**
+
+| Strategy | When to use | Trade-off |
+|----------|------------|-----------|
+| Majority vote | Binary or categorical decisions | Requires odd number of agents; does not handle nuance |
+| Weighted merge | Structured outputs with confidence scores | Requires agents to produce comparable schemas |
+| LLM synthesis | Prose or complex outputs | Adds a synthesis step with its own latency and cost |
+| Best-of-N | When one answer is clearly correct | Requires a scoring function to select the winner |
+
+**LLM synthesis example (LangGraph):**
+
+```python
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated
+import operator
+
+class ReviewState(TypedDict):
+    code: str
+    reviews: Annotated[list[str], operator.add]  # fan-in: accumulate reviews
+    final_verdict: str
+
+def security_review(state: ReviewState) -> dict:
+    review = security_agent.invoke({"code": state["code"]})
+    return {"reviews": [f"Security: {review.content}"]}
+
+def performance_review(state: ReviewState) -> dict:
+    review = performance_agent.invoke({"code": state["code"]})
+    return {"reviews": [f"Performance: {review.content}"]}
+
+def maintainability_review(state: ReviewState) -> dict:
+    review = maintainability_agent.invoke({"code": state["code"]})
+    return {"reviews": [f"Maintainability: {review.content}"]}
+
+def synthesize(state: ReviewState) -> dict:
+    combined = "\n\n".join(state["reviews"])
+    verdict = synthesis_agent.invoke({
+        "message": f"Synthesize these code reviews into a final verdict:\n{combined}"
+    })
+    return {"final_verdict": verdict.content}
+
+builder = StateGraph(ReviewState)
+builder.add_node("security", security_review)
+builder.add_node("performance", performance_review)
+builder.add_node("maintainability", maintainability_review)
+builder.add_node("synthesize", synthesize)
+
+# Fan-out from START
+builder.add_edge("__start__", "security")
+builder.add_edge("__start__", "performance")
+builder.add_edge("__start__", "maintainability")
+
+# Fan-in to synthesize
+builder.add_edge("security", "synthesize")
+builder.add_edge("performance", "synthesize")
+builder.add_edge("maintainability", "synthesize")
+builder.add_edge("synthesize", END)
+
+graph = builder.compile()
+```
+
+**Failure modes:**
+- **Inconsistent schemas:** If parallel agents return different structures, the aggregator cannot merge them reliably. Define shared output schemas before building fan-out.
+- **Partial failure:** If one of three concurrent agents fails, does the aggregator proceed with two results or block waiting for the third? Build explicit timeout and partial-result policies.
+- **Aggregation cost:** LLM synthesis adds a full generation step. For simple decisions, majority vote is faster and cheaper.
+
+### 3. Handoff (Routing)
+
+A routing layer evaluates the input and transfers full control to exactly one specialist agent. The routing layer does not participate further once the handoff occurs.
+
+```
+Input → Router → [Agent A | Agent B | Agent C]
+                       ↓ (only one receives control)
+                     Output
+```
+
+**When to use handoff routing:**
+- Clearly distinct domains that do not overlap (billing vs. technical support vs. onboarding)
+- When the routing decision can be made reliably from the input alone
+- When specialist agents should not know they are part of a routing system
+
+**What distinguishes routing from supervisor:** In a pure handoff, control is transferred, not delegated. The router does not receive a result — the specialist agent's response goes directly to the user or downstream consumer. The router's job ends at the routing decision.
+
+**Framework implementation (OpenAI Agents SDK):**
+
+```python
+from openai.agents import Agent, Runner
+
+billing_agent = Agent(
+    name="BillingSpecialist",
+    instructions="""Handle all billing and payment questions.
+    You have access to the billing database and payment processor.
+    Scope: invoices, charges, refunds, subscription plans.""",
+    tools=[get_invoice, process_refund, update_plan]
+)
+
+support_agent = Agent(
+    name="TechnicalSupport",
+    instructions="""Handle technical troubleshooting and bug reports.
+    You have access to the error log database and deployment system.
+    Scope: error diagnosis, configuration help, feature questions.""",
+    tools=[get_error_logs, search_docs, create_ticket]
+)
+
+triage_agent = Agent(
+    name="Triage",
+    instructions="""Route customer requests to the appropriate specialist.
+    Transfer to BillingSpecialist for payment and invoice questions.
+    Transfer to TechnicalSupport for technical and product questions.
+    Do not attempt to answer questions yourself — route immediately.""",
+    handoffs=[billing_agent, support_agent]
+)
+
+result = await Runner.run(triage_agent, user_message)
+```
+
+**Failure modes:**
+- **Routing boundary ambiguity:** A user message about "why was I charged for a feature that doesn't work" spans both billing and technical support. Routing agents struggle with cross-domain queries. Add an explicit fallback agent for these cases.
+- **Lost context on handoff:** The specialist receives the original user message but not the routing agent's reasoning. Pass routing metadata through context or system prompt injection.
+
+### 4. Group Chat (Maker-Checker)
+
+Multiple agents share a conversation thread. A manager agent controls who speaks next, in what order, and when the conversation terminates. The canonical implementation is a human-like meeting where agents respond to each other's contributions.
+
+```
+Manager ──→ Agent A speaks
+         ←── A's response
+Manager ──→ Agent B responds to A
+         ←── B's response
+Manager ──→ Agent A revises
+         ←── Revised response
+Manager decides: done
+```
+
+**When to use group chat:**
+- Collaborative document creation (one agent drafts, another critiques, the first revises)
+- Iterative refinement with adversarial pressure
+- Tasks where the correct output emerges through dialogue rather than from a single agent
+
+**AutoGen / Magentic-One implementation:**
+
+```python
+from autogen import ConversableAgent, GroupChat, GroupChatManager
+
+writer = ConversableAgent(
+    name="Writer",
+    system_message="You write first drafts based on the brief provided.",
+    llm_config={"model": "gpt-4o"}
+)
+
+critic = ConversableAgent(
+    name="Critic",
+    system_message="You review drafts and provide specific, actionable feedback. "
+                   "Identify gaps, inaccuracies, and structural problems.",
+    llm_config={"model": "gpt-4o"}
+)
+
+editor = ConversableAgent(
+    name="Editor",
+    system_message="You apply the critic's feedback to improve the draft. "
+                   "Preserve the writer's voice while addressing all critique points.",
+    llm_config={"model": "gpt-4o"}
+)
+
+groupchat = GroupChat(
+    agents=[writer, critic, editor],
+    messages=[],
+    max_round=6,
+    speaker_selection_method="round_robin"
+)
+
+manager = GroupChatManager(
+    groupchat=groupchat,
+    llm_config={"model": "gpt-4o"}
+)
+
+# Initiate with the brief
+writer.initiate_chat(manager, message="Write a product announcement for our new API...")
+```
+
+**Failure modes:**
+- **Sycophantic convergence:** Agents agree with each other rather than maintaining their assigned perspective. A critic that agrees with the writer after one revision round has not performed its function. Add explicit role enforcement: "You must find at least one substantive problem or explain why the draft is already complete."
+- **Runaway conversations:** Without a clear termination condition, group chats can oscillate indefinitely. Always set a maximum round count and a termination agent that can declare the conversation complete.
+- **Token accumulation:** Each round appends to the shared message history. By round 8, early context is being truncated in most models. Group chats work best when kept short — 4–6 rounds maximum.
+
+### 5. Dynamic Orchestration (Magentic Style)
+
+A manager agent receives the goal, dynamically decomposes it into tasks, maintains a task ledger, assigns tasks to available agents based on capability, and revises the plan as results arrive. There is no fixed structure — the graph is built at runtime.
+
+```
+Goal → Manager builds task ledger
+         ↓
+     Assign task 1 to Agent A ──→ result 1
+         ↓
+     Assign task 2 to Agent B ──→ result 2
+         ↓
+     Revise ledger based on results
+         ↓
+     Assign task 3 (depends on result 1+2) ──→ result 3
+         ↓
+     Manager decides: goal achieved
+```
+
+**When to use dynamic orchestration:**
+- Complex goals whose subtasks cannot be defined in advance
+- Tasks where intermediate results change what needs to be done next
+- Research and planning workflows where discovery is part of the task
+
+**The Magentic-One task ledger pattern:**
+
+```
+Facts:          What we know for certain (provided + discovered)
+Plan:           Ordered list of steps the manager believes will achieve the goal
+Tasks Active:   Currently executing work
+Tasks Done:     Completed with results
+Blockers:       Dependencies preventing progress
+Goal:           The original objective (never changes)
+```
+
+The manager updates the ledger after each task completes. If a task reveals the original plan was wrong, the manager replans from the current state rather than continuing with the stale plan.
+
+**Failure modes:**
+- **Hallucinated completion:** The manager decides the goal is achieved when it is not. Add a verification step where the manager checks each claim in the final output against the evidence in the task ledger.
+- **Circular planning:** The manager assigns a task, receives a result, re-evaluates the plan, and assigns the same task again. Implement loop detection by tracking which (agent, task, input) triples have already been executed.
+- **Unbounded cost:** Dynamic orchestration can spawn unlimited sub-tasks. Set explicit budgets: maximum task count, maximum total tokens, maximum wall time.
+
+## Choosing a Pattern
+
+| Situation | Recommended pattern |
+|-----------|-------------------|
+| Well-defined sequential stages | Sequential pipeline |
+| Independent parallel work | Concurrent fan-out |
+| Distinct specialist domains | Handoff routing |
+| Iterative collaborative refinement | Group chat |
+| Open-ended complex goals | Dynamic orchestration |
+| Mixed structured + open-ended | Deterministic backbone + AI at decision nodes |
+
+## The 2026 Consensus: Deterministic Backbone + AI at Decision Nodes
+
+The pattern that has proven most reliable in production is a hybrid: a deterministic workflow graph handles control flow, error recovery, and state transitions, while AI agents are invoked only at specific decision points where judgment is required.
+
+The key insight is that most steps in an agentic workflow are not judgment calls — they are mechanical transformations, validations, and routing decisions that should not be delegated to a language model. Reserve LLM invocations for the steps that genuinely require language understanding or generation.
+
+```
+Input
+  ↓
+[Validate schema]              ← deterministic
+  ↓
+[Extract intent]               ← LLM (intent is ambiguous)
+  ↓
+[Route by intent type]         ← deterministic
+  ↓
+[Execute specialist agent]     ← LLM (specialist judgment)
+  ↓
+[Validate output schema]       ← deterministic
+  ↓
+[Check confidence threshold]   ← deterministic
+  ↓ (low confidence)
+[Escalate to human review]     ← deterministic
+  ↓ (high confidence)
+Output
+```
+
+This pattern has lower cost, faster execution, and more predictable failure modes than fully AI-driven orchestration. The AI is doing what it is good at (judgment, generation, understanding) while the infrastructure handles what it is bad at (reliable routing, error recovery, schema validation).
+
+<Callout type="info">
+Fumadocs and other framework docs use a similar pattern: static routing for well-known paths, dynamic generation only where the content cannot be predetermined. The same principle applies to agent orchestration.
+</Callout>
+
+## Combining Patterns
+
+Production systems frequently combine multiple patterns within a single workflow:
+
+```
+User request
+  ↓
+[Handoff routing] ────────────────── routes to billing
+  ↓
+[Sequential pipeline] ─────────────── retrieve → validate → respond
+  ↓ (complex billing dispute)
+[Concurrent fan-out] ──────────────── legal + finance + customer history
+  ↓
+[Group chat: maker-checker] ────────── draft response → legal review → finalize
+  ↓
+Output
+```
+
+The handoff router gets the request to the right domain. The sequential pipeline handles the standard path. The concurrent fan-out gathers evidence when needed. The group chat validates the output for sensitive cases.
+
+There is no rule against nesting patterns. The rule is that each pattern is chosen deliberately for the characteristics of that step, not applied uniformly across the entire system.
+
+## Related Pages
+
+- [Supervisor Pattern](./supervisor-pattern) — detailed implementations of the orchestrator-worker pattern across frameworks
+- [Swarm and Handoff Patterns](./swarm-pattern) — peer-to-peer agent handoffs without a central coordinator
+- [Human-in-the-Loop](./human-in-the-loop) — inserting human approval at checkpoints within any of these patterns

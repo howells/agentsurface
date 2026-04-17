@@ -1,0 +1,247 @@
+---
+title: Naming and Descriptions
+description: Verb-first naming conventions and descriptions written as onboarding prompts
+---
+
+## Summary
+
+Tool names and descriptions are the agent's only interface for deciding whether to call a tool. Use verb_noun pattern in snake_case (search_issues, create_invoice, list_repositories, get_user). Descriptions function as onboarding prompts: include "Use when..." and "Do not use for..." to disambiguate from sibling tools. Avoid vague verbs (process), camelCase, or bare nouns. Name scoping with prefixes (billing_create_invoice) groups related tools. Ambiguity compounds into routing errors and incorrect parameter passing.
+
+```
+Good: search_issues (verb_noun)
+Bad:  createInvoice (camelCase)
+Bad:  invoice (no verb)
+Bad:  process_billing (vague verb)
+```
+
+---
+
+Tool names and descriptions are the agent's primary interface for understanding what a tool does. The agent cannot ask for clarification—it reads the name and description, infers intent, and decides whether to call the tool. Ambiguity compounds into routing errors and incorrect parameter construction.
+
+## Naming Conventions
+
+Tool names must communicate two things instantly: the action being performed and the object being acted on.
+
+### Verb-Noun Pattern
+
+Use **`verb_noun`** or **`service_action`** patterns in snake_case:
+
+```
+search_issues         ✓ clear verb, clear noun
+create_invoice        ✓ mutation intent obvious
+list_repositories     ✓ plural for collections
+get_user              ✓ singular for detail fetch
+update_status         ✓ specific action
+billing_create_invoice    ✓ namespaced when multiple servers
+```
+
+Avoid:
+
+```
+createInvoice        ✗ camelCase—inconsistent with MCP/OpenAI convention
+invoice              ✗ no verb—is this getter, creator, or list?
+process_billing      ✗ vague verb (process could mean anything)
+do_thing             ✗ non-descriptive
+crud_users           ✗ multiple operations bundled
+```
+
+### Namespacing
+
+When an agent connects to multiple servers (Jira, GitHub, Slack, internal APIs), tool names collide without a prefix. Use a service prefix consistently:
+
+- `jira_search_issues`, `jira_create_issue`, `jira_transition_issue`
+- `github_list_pull_requests`, `github_create_pull_request`, `github_approve_pr`
+- `slack_send_message`, `slack_list_channels`, `slack_add_reaction`
+
+The prefix groups related tools visually and reduces agent confusion when deciding which tool to call.
+
+### Tense and Mood
+
+- Use imperative present: `create`, not `creating` or `creation`
+- Avoid past tense: `created` is not a tool name
+- Singular or plural according to semantics: `list_users` (plural—returns multiple), `get_user` (singular—returns one)
+
+## Descriptions as Prompts
+
+The tool description is a prompt fragment executed in the agent's decision-making loop. It answers four questions:
+
+1. **What does this tool do?** (one sentence, the concrete action)
+2. **When should an agent use it?** (triggering conditions)
+3. **When should an agent NOT use it?** (disambiguation from sibling tools)
+4. **What are prerequisites and edge cases?** (what can go wrong, what to do)
+
+### Example: Good Description
+
+```
+Search Jira for issues by text, assignee, status, or custom JQL query.
+Use this when the user wants to find open bugs, search by assignee,
+or pull all "high-priority" tickets. Do not use for creating new issues
+(use `jira_create_issue` instead) or updating existing ones (use
+`jira_update_issue`). Requires JIRA_API_KEY env var. Returns up to 50
+results by default; use `limit` and `offset` for pagination. Returns
+an empty array (not an error) when no issues match the query.
+```
+
+This description:
+- States the concrete action (search Jira)
+- Clarifies when to use it (specific triggering scenarios)
+- Explicitly disambiguates from similar tools
+- Notes prerequisites (env var requirement)
+- Documents pagination behavior
+- Explains edge cases (empty results)
+
+### Example: Weak Description
+
+```
+Searches for Jira issues.
+```
+
+Too terse. The agent cannot reason about when to use this vs other search tools, cannot predict edge cases, and must make guesses about parameter semantics.
+
+### Pattern Library
+
+**For mutation tools, name the side effect explicitly:**
+
+```
+Permanently deletes the invoice. This cannot be undone. The customer
+will not be charged. Use only when the invoice was created in error.
+To pause a legitimate invoice instead, use `billing_pause_invoice`.
+Returns { success: true, invoice_id } or { isError: true, message }
+if the invoice is already paid or has been archived.
+```
+
+**For list/query tools, document pagination:**
+
+```
+Returns up to 50 open issues matching the filters, ordered by
+created_at descending. Use the cursor field from the response
+to fetch the next page. Returns an empty array (not an error)
+when no issues match the query. Each page takes ~200ms to fetch.
+```
+
+**For tools with ordering dependencies:**
+
+```
+Sends the invoice email to the customer. Must be called after
+`billing_create_invoice`—calling on a draft invoice returns
+{ isError: true, message: "Invoice not finalized" }. Idempotent:
+calling twice on the same invoice does not send duplicate emails.
+Subject line and template are configurable in the system settings.
+```
+
+**For tools requiring prior state:**
+
+```
+Transitions an issue to a new status. Requires a valid issue_id
+from `search_issues` or `get_issue`. Not all status transitions are
+valid—for example, cannot transition from "Done" back to "Open".
+Returns { isError: true, message, valid_transitions: [...] }
+if the transition is not allowed. Include a comment via the
+optional `comment` parameter to explain the change.
+```
+
+## Disambiguation Patterns
+
+When two tools are siblings or near-overlapping in purpose, explicitly state the choosing criterion in descriptions:
+
+```
+search_issues:       For querying existing tickets. Use for finding
+                     open bugs, filtering by status, listing assigned work.
+create_issue:        For submitting new work. Use when the user describes
+                     a new bug or feature request.
+update_issue:        For modifying existing tickets. Use to change status,
+                     assignee, or description of a ticket already tracked.
+```
+
+Agents that read these descriptions understand exactly which tool to reach for based on the user's intent. Without disambiguation, agents guess—leading to wrong tool selection and failed operations.
+
+## Common Anti-Patterns
+
+### Terse Descriptions
+
+```
+Creates a thing.          ✗ No context
+Searches for items.       ✗ Vague use case
+Gets data.                ✗ What data? When should I use this?
+```
+
+Takes no effort to write. Compounds agent confusion and accuracy loss.
+
+### Missing "Do Not Use For"
+
+```
+Search documents.
+```
+
+Leaves the agent guessing whether to use this for full-text search, metadata-only search, or to filter an existing result set. Pair with a sibling and disambiguate:
+
+```
+Search documents by full text, title, or metadata. For filtering
+results from a prior search, use `filter_search_results` instead.
+```
+
+### Implicit Ordering Dependencies
+
+```
+Add line items to an order.
+```
+
+Does not say whether the order must exist first. Better:
+
+```
+Add line items to an order. Requires a valid order_id from
+`create_order` or `list_orders`. Returns { isError: true } if
+the order does not exist or is already finalized.
+```
+
+### No Pagination Documentation
+
+```
+Returns invoices matching the filter.
+```
+
+How many? What if there are thousands? Better:
+
+```
+Returns up to 50 invoices matching the filter, ordered by
+created_at descending. Use the `next_cursor` field in the response
+to fetch the next page. Total count available via `total_count`.
+```
+
+### Marketing Copy Instead of Prompting
+
+```
+Harness the power of advanced issue tracking with our
+best-in-class Jira integration, delivering seamless workflow
+automation and enterprise-grade reliability.
+```
+
+Not a prompt. Rewrite:
+
+```
+Search Jira for issues by text, status, or assignee. Use when
+finding tickets for a user request. Do not use for creating new
+issues (use `create_issue`). Returns paginated results.
+```
+
+## Length Guidelines
+
+Good descriptions fall in the 60–200 word range. Shorter is fine if the purpose is obvious; never be terse.
+
+```
+50 words:   Perfect for simple, unambiguous tools (get_user, list_repos)
+100 words:  Typical for mutation tools with edge cases
+200 words:  Complex tools with many preconditions or disambiguation needed
+300+ words: Red flag—consider splitting the tool or linking to deeper docs
+```
+
+## Research Evidence
+
+([Anthropic writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents)) found that even tiny refinements to descriptions yield large accuracy gains. "The first paragraph of the description is the most important." Agents read and act on the first few sentences; later paragraphs provide context but secondary to the opening statement.
+
+## See also
+
+- `/docs/tool-design/schemas` — companion page on schema design
+- `/docs/tool-design/anti-patterns` — common mistakes with fixes
+- ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))

@@ -1,0 +1,317 @@
+---
+title: Content Structure for AI Consumption
+description: Structuring documentation so AI agents retrieve accurate answers with minimal tokens
+---
+
+## Summary
+
+Agents truncate context for efficiency and weight earlier content more heavily. Documentation structured for humans (background, explanation, then answer) fails for AEO. Lead with the answer in the first 200 words. Use answer-first structure: direct answer, then data (tables, details), then explanation. This ensures agents extract accurate answers from early paragraphs.
+
+- Put the direct answer in the first 200 words
+- Use tables for structured data (rate limits, plan comparison)
+- Follow with detailed explanation and edge cases
+- Use clear headings to enable agent section targeting
+- Place code examples right after relevant text
+
+AI agents retrieve and quote your documentation. The structure of that documentation — where the answer appears in the page, how headings are organized, how code examples are placed — determines whether the agent extracts an accurate answer or paraphrases something plausible but wrong.
+
+## Answer-First Structure
+
+Put the conclusion or direct answer in the first 200 words of the page. Agents truncate context for efficiency; they weight earlier content more heavily than later content. If the answer to "what is the rate limit" appears in paragraph seven, some agents will answer from an earlier, less accurate paragraph.
+
+The traditional SEO pattern of "introduce the topic, explain the background, eventually answer" is the wrong structure for AEO. Lead with the answer:
+
+```markdown
+# Rate Limits
+
+The API is rate limited to **1,000 requests per minute** per API key.
+Exceeding this limit returns HTTP 429 with a `Retry-After` header.
+
+## By Plan
+
+| Plan     | Requests/minute | Burst allowance |
+|----------|----------------|-----------------|
+| Free     | 100            | 200 for 10s     |
+| Pro      | 1,000          | 5,000 for 10s   |
+| Enterprise | Custom       | Configurable    |
+
+## Handling Rate Limit Errors
+
+...
+```
+
+Contrast with the wrong structure:
+
+```markdown
+# Rate Limits
+
+Rate limiting is a common technique used by APIs to ensure fair usage
+across all customers and to protect the stability of the platform.
+Our rate limiting system uses a token bucket algorithm...
+
+[four paragraphs later]
+
+The default limit is 1,000 requests per minute.
+```
+
+## Self-Contained Sections
+
+Each H2 section should work as a standalone answer without requiring the reader (or agent) to have read the preceding sections. This is harder to write but dramatically increases retrieval accuracy.
+
+When an agent receives a question about "how to handle webhook signature verification," it may retrieve only the relevant section of your webhooks page — not the full page. If that section refers to "the keys you obtained earlier" without specifying what they are or where to find them, the agent produces an incomplete answer.
+
+Write each H2 as if it were the first thing the reader sees:
+
+```markdown
+## Verifying Webhook Signatures
+
+All webhook requests include an `X-Webhook-Signature` header. Verify
+this header to confirm the request originated from our servers.
+
+The signature is an HMAC-SHA256 of the raw request body, using your
+webhook secret as the key. Find your webhook secret in Settings →
+Webhooks → [your endpoint] → Secret.
+
+```typescript
+import { createHmac } from 'crypto'
+
+function verifySignature(
+  payload: string,       // raw request body as string
+  signature: string,     // value of X-Webhook-Signature header
+  secret: string         // your webhook secret from the dashboard
+): boolean {
+  const expected = createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex')
+
+  return `sha256=${expected}` === signature
+}
+```
+```
+
+This section is complete. An agent can retrieve it and answer "how do I verify webhook signatures" without needing the surrounding page.
+
+## Heading Hierarchy
+
+Never skip heading levels. `H1 → H3` without an `H2` confuses the document outline that agents use for navigation and retrieval.
+
+**H1** — Page title. One per page. Match the `` `<title>` `` tag.
+
+**H2** — Major topics. These are your retrieval units. Write H2 headings as questions or as direct answers to questions:
+
+```markdown
+## How do I rotate an API key?       ← question form (good for FAQPage schema)
+## Rotating API Keys                  ← noun form (fine, clear enough)
+## Important Information About Keys   ← vague (avoid)
+```
+
+**H3** — Subtopics within an H2. Do not use H3 for things that could be list items.
+
+**H4+** — Rarely necessary. If you are reaching H4, consider whether you should restructure as separate pages.
+
+## Code Examples Immediately After Prose
+
+Place code examples directly after the prose that introduces them — not in a "Examples" section at the bottom of the page. Agents frequently retrieve a code example and the sentence immediately before it. If the code and its explanation are separated, the code appears without context.
+
+```markdown
+## Paginating Results
+
+Results are paginated using cursor-based pagination. Each response
+includes a `next_cursor` field. Pass this value as the `cursor`
+parameter in the next request.
+
+```typescript
+async function* getAllProjects(apiKey: string) {
+  let cursor: string | undefined
+
+  do {
+    const response = await fetch(
+      `https://api.example.com/v2/projects${cursor ? `?cursor=${cursor}` : ''}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    )
+
+    const data = await response.json()
+    yield* data.projects
+    cursor = data.next_cursor
+  } while (cursor)
+}
+```
+
+When `next_cursor` is absent or null, you have reached the last page.
+```
+
+Note: closing text after the code block ("When `next_cursor` is absent...") re-anchors the code in the reader's understanding. Include it.
+
+## Tables Over Prose for Parameters
+
+Parameter documentation in prose form is hard for agents to parse into structured data. Tables are unambiguous:
+
+```markdown
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_id` | string | Yes | ID of the project to deploy |
+| `ref` | string | Yes | Git ref (branch name, tag, or commit SHA) |
+| `environment` | string | No | Target environment. Default: `production` |
+| `strategy` | string | No | Deployment strategy: `rolling` or `replace`. Default: `rolling` |
+| `timeout` | integer | No | Maximum deployment duration in seconds. Default: `300` |
+```
+
+Use the same format for response fields, environment variables, and configuration options.
+
+## Token Budgets
+
+Keep page token counts within these limits. Agents working with full context windows of 128K–200K tokens may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded.
+
+| Page type | Target | Hard limit |
+|-----------|--------|------------|
+| Quick start / getting started | < 15K tokens | 20K tokens |
+| Concept explanation | < 10K tokens | 15K tokens |
+| API reference (single endpoint) | < 5K tokens | 8K tokens |
+| API reference (full section) | < 25K tokens | 30K tokens |
+| Changelog / release notes | No limit | No limit |
+
+Pages over 30K tokens should be split. A "REST API Reference" page with every endpoint documented inline should become individual pages per endpoint group.
+
+Estimate token count: `character_count / 4` gives a rough approximation for English prose. Code-heavy content is slightly more token-dense.
+
+## Error Documentation
+
+Error messages are high-value retrieval targets. When a user pastes an error into an AI chat, the AI searches for documentation matching that exact error text. Document errors with the exact message text as a heading or inline code:
+
+```markdown
+## Error Reference
+
+### `DEPLOYMENT_FAILED: timeout exceeded`
+
+The deployment did not complete within the configured timeout.
+
+**Causes:**
+- Health check endpoint did not respond within the timeout period
+- Container startup time exceeded the timeout
+
+**Resolution:**
+Increase the `timeout` parameter to at least 2x your container's typical startup time.
+Check `/health` endpoint availability independently with `curl -f https://your-app.example.com/health`.
+
+### `INVALID_REF: git ref not found`
+
+The `ref` parameter does not exist in the linked repository.
+
+**Causes:**
+- Branch or tag was deleted after the deployment was initiated
+- Typo in the `ref` parameter
+
+**Resolution:**
+Verify the ref exists: `` `git ls-remote origin | grep <ref>` ``.
+```
+
+Quote the exact error message string — including punctuation and capitalization — as it appears in API responses. Agents match against exact strings.
+
+## Meta Tags for Retrieval Accuracy
+
+```html
+<head>
+  <!-- Entity-first: product name before page topic -->
+  <meta property="og:title" content="Acme API — Rate Limits" />
+  <meta property="og:description" content="Rate limit thresholds by plan, handling 429 errors, and configuring retry logic for the Acme REST API." />
+
+  <!-- dateModified is used by agents to assess freshness -->
+  <meta property="article:modified_time" content="2025-03-15T09:00:00Z" />
+  <meta property="article:published_time" content="2024-09-01T00:00:00Z" />
+
+  <!-- Tags help retrieval systems categorize the page -->
+  <meta property="article:tag" content="rate-limiting" />
+  <meta property="article:tag" content="api" />
+  <meta property="article:tag" content="errors" />
+</head>
+```
+
+**`og:title` entity-first** — Put the product or service name first, then the topic. "Acme API — Rate Limits" retrieves more accurately than "Rate Limits" because the product context disambiguates the topic from other APIs' rate limit documentation.
+
+**`article:modified_time`** — Agents and search-augmented systems use modification time to assess whether documentation is current. A page with no modification time is treated as unknown age. Use W3C datetime format: `2025-03-15T09:00:00Z`.
+
+**`article:tag`** — Retrieval systems use tags for categorization and filtering. Keep tags specific and consistent across your documentation.
+
+## Sitemap Optimization
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://docs.example.com/api/authentication</loc>
+    <lastmod>2025-03-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://docs.example.com/api/rate-limits</loc>
+    <lastmod>2025-01-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>
+```
+
+**`lastmod` is critical.** Search engines and AI crawlers use `lastmod` to prioritize recrawling. A sitemap without `lastmod` gives crawlers no signal about what has changed — they recrawl everything with equal priority. Use W3C datetime format: `YYYY-MM-DD` or the full ISO 8601 form.
+
+**Sitemap limits:** maximum 50,000 URLs per sitemap file. For larger sites, use a sitemap index file that references multiple sitemaps.
+
+**Sitemap index:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://docs.example.com/sitemap-api.xml</loc>
+    <lastmod>2025-03-15</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://docs.example.com/sitemap-guides.xml</loc>
+    <lastmod>2025-03-10</lastmod>
+  </sitemap>
+</sitemapindex>
+```
+
+Submit your sitemap in `robots.txt`:
+
+```
+Sitemap: https://docs.example.com/sitemap.xml
+```
+
+## Semantic HTML
+
+Search-augmented agents parse HTML. Semantic structure helps them identify the main content, skip navigation, and understand document hierarchy.
+
+Use:
+
+```html
+<article>  <!-- main content area -->
+  <header>
+    <h1>Rate Limits</h1>
+    <time datetime="2025-03-15">March 15, 2025</time>
+  </header>
+  <section>
+    <h2>Default Limits</h2>
+    <p>...</p>
+  </section>
+</article>
+
+<nav aria-label="Documentation navigation">
+  <!-- navigation links -->
+</nav>
+```
+
+Avoid:
+
+```html
+<div class="content">
+  <div class="heading-1">Rate Limits</div>
+  <div class="section">
+    <div class="heading-2">Default Limits</div>
+    <div class="body-text">...</div>
+  </div>
+</div>
+```
+
+Both render identically in a browser. To a parser or agent reading the HTML structure, the first is unambiguous; the second requires CSS class analysis to infer hierarchy.

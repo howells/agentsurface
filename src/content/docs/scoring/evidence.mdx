@@ -1,0 +1,221 @@
+---
+title: Evidence & Grounding
+description: What counts as evidence and how to avoid optimism bias in scoring
+---
+
+## Summary
+
+Every score must be grounded in concrete evidence; scores without evidence are guesses prone to optimism bias drift. Evidence takes four forms: file paths with line numbers (openapi.yaml:45 — "description is 4 words"), grep results (grep -r "is_retriable" returns 0 matches), glob findings (find **/*.mcp.json returns 0 files), and command output (mytool --help --json returns exit code 2). Cite specific findings, avoid vague summaries. Calibration requires comparing multiple coders against same rubric.
+
+- **File paths**: openapi.yaml:45 — description text, line number
+- **Grep patterns**: Command + result (matches 0, 5, 15 occurrences)
+- **Glob findings**: find pattern, count, example files
+- **Command output**: Tool invocation, exit code, output snippet
+- **Avoid**: "Some operations..." vague patterns
+- **Avoid**: Assuming absence without searching
+
+---
+
+Every agentify score must be grounded in concrete evidence from the codebase. This page defines what evidence looks like and demonstrates how to use it to calibrate scores and avoid score drift.
+
+## What Counts as Evidence
+
+Evidence takes four forms. Each grounds a different aspect of the codebase:
+
+### File Paths with Line Numbers
+
+Cite specific locations where the scoring criterion is or isn't met.
+
+**Good:**
+> openapi.yaml:45 — description is "Returns data" (4 words, no agent context)
+>
+> src/api/users.ts:23 — operationId missing
+
+**Weak:**
+> OpenAPI file has weak descriptions
+>
+> Some operations lack operationIds
+
+### Grep Results
+
+Search for presence/absence of patterns that indicate capability.
+
+**Good:**
+> `` grep -r "isError\|is_retriable" src/ `` — 0 matches. Error responses do not signal retriability to agents.
+>
+> `` grep "toModelOutput" src/tools/ `` — matches in 2 of 8 tool files. Incomplete token optimization.
+
+**Weak:**
+> Error handling is missing retriability hints
+>
+> Some tools are optimized
+
+### Glob Findings
+
+Report how many files match a pattern, revealing scope.
+
+**Good:**
+> `` glob("**/llms.txt") `` — 0 results. No discovery file for agents.
+>
+> `` glob("**/.mcp.json") `` — 1 result (project root). One MCP config, likely basic.
+
+**Weak:**
+> No llms.txt
+>
+> MCP config missing
+
+### Command Output
+
+Run tools and report actual behavior.
+
+**Good:**
+> `` cargo run -- --help --json `` exits with code 2 and no structured output. JSON flag not implemented.
+>
+> `` npm run build `` completes in 2.3s; type checking passes; no agent-related tests in `npm test`.
+
+**Weak:**
+> CLI help is not JSON-formatted
+>
+> Build works fine
+
+## Why Evidence Matters: The Optimism Bias Trap
+
+Scores without evidence drift high. Here's why:
+
+1. **Implicit assumptions**: You assume "we probably have good error handling" without checking.
+2. **Wishful thinking**: You score toward what the team *intended* rather than what exists.
+3. **No calibration**: Without evidence, each rater uses a different mental bar.
+
+When you score a dimension 2 without inspecting the code, you're guessing. The team's guess is usually "we're doing pretty well." Actual audits show the opposite: most codebases score 0–1 because implementations are incomplete.
+
+**Example of drift:**
+
+> **Without evidence**: "We have an OpenAPI spec. I'm going to assume it has decent descriptions. Score: 2."
+>
+> **With evidence**: `` grep "operationId" openapi.yaml | wc -l `` returns 8 out of 40 operations. `` grep -A 3 "description:" openapi.yaml | head -30 `` shows descriptions like "Get user" (2 words). Score: 0 (no operationIds) or 1 (operationIds missing on 80% of operations).
+
+## Worked Example: Raising a Score
+
+Suppose you audit a project and initially score **API Surface at 0** because you found no OpenAPI file.
+
+Then you run: `` find . -name "*.json" -o -name "*.yaml" | xargs grep -l "openapi" ``
+
+You discover `docs/api/openapi.yaml`. You now have evidence that an OpenAPI file exists.
+
+**Re-evaluate with evidence:**
+- `` grep "^  /" docs/api/openapi.yaml `` → 15 endpoints
+- `` grep "operationId:" docs/api/openapi.yaml | wc -l `` → 3 matches (20% coverage)
+- `` grep -A 2 "description:" docs/api/openapi.yaml | head -20 `` → "Get users" (2 words), "Create item" (2 words). No agent context.
+- `` grep "x-agent\|x-action\|Arazzo" docs/api/openapi.yaml `` → 0 matches
+
+**Evidence summary:**
+- OpenAPI spec exists ✓
+- operationId on ~20% of endpoints (not all)
+- Descriptions are terse, no "use when" or disambiguation
+- No Arazzo workflows or semantic extensions
+- No examples on parameters (check: `` grep "example:" docs/api/openapi.yaml ``)
+
+**Updated score: 1** (basic, human-oriented). With this evidence, you can now justify the score and identify the exact gaps to address.
+
+## Worked Example: Lowering a Score
+
+Suppose you score **CLI Design at 2** because you see `--json` flag in the help text.
+
+Then you verify with: `` npm run build && ./dist/cli --json --help ``
+
+Output: `` { version: "1.2.3", description: "My tool" } ``
+
+But when you test an actual command: `` ./dist/cli users --json ``
+
+Output: 
+```
+Failed to load config
+Exit code: 1
+```
+
+No JSON structure. The `--json` flag prints metadata, not command output. You test error handling:
+
+`` ./dist/cli users --json --nonexistent-flag ``
+
+Exit code: 1, output: `Unknown flag`. No semantic exit codes (all errors return 1).
+
+**Evidence:**
+- `--json` exists but only on help/version, not commands
+- Command output is plain text, not JSON
+- All errors exit with code 1 (no semantic distinction)
+- Interactive spinner printed even when stdout is not a TTY
+
+**Revised score: 0 or 1** (basic, inconsistent). The evidence shows `--json` is incomplete.
+
+## Grounding Your Evidence: The Audit Workflow
+
+Follow this pattern to ground every score:
+
+1. **Identify the detection signal** from the rubric
+   - Example: "operationId on all operations"
+
+2. **Run a specific command** to reveal the truth
+   - Example: `` grep -c "operationId:" openapi.yaml | wc -l ``
+
+3. **Record the output verbatim**
+   - Example: "12 operationIds across 40 endpoints (30%)"
+
+4. **Cite the file path or command**
+   - Example: `openapi.yaml` or `` grep -r "operationId" . ``
+
+5. **Map evidence to rubric criterion**
+   - Example: "Rubric says 2+ requires operationId on all operations. Evidence shows 30%. Score: 1."
+
+6. **Document confidence**
+   - Example: "Medium confidence. Examined openapi.yaml (1 file), did not check code generation from spec."
+
+## Evidence Template
+
+When documenting a dimension score, use this template:
+
+```
+**Dimension: [Name]**
+**Score: [0/1/2/3]**
+**Confidence: High / Medium / Low**
+
+**Evidence:**
+- [File path or grep command]: [Result]
+- [File path or grep command]: [Result]
+- [Command output]: [Result]
+
+**Gap:** [What prevents a higher score]
+
+**Next:** [What needs to change to improve]
+```
+
+**Example:**
+
+```
+**Dimension: Error Handling**
+**Score: 1**
+**Confidence: High**
+
+**Evidence:**
+- src/middleware/errors.ts:45–67: Error handler returns `{ status, message }` only
+- grep "is_retriable\|isRetriable" src/ : 0 matches
+- grep "RFC 9457" docs/ : 0 matches
+- grep "Retry-After" src/ : 1 match (rate limit header only, no error context)
+
+**Gap:** No RFC 9457 Problem Details. No is_retriable field. No suggestions array. No doc_uri linking.
+
+**Next:** Refactor error schema to RFC 9457 format. Add is_retriable boolean. Populate suggestions array.
+```
+
+## Best Practices
+
+**Be specific.** "The API is well-documented" is not evidence. "`openapi.yaml` has descriptions on 100% of operations, with examples on 95% of parameters" is.
+
+**Check multiple files.** Don't assume one file represents the whole project. Sample representative surfaces (OpenAPI, CLI, MCP, errors, tests).
+
+**Cite line numbers.** "`src/api/index.ts:234: operationId missing`" is better than "`somewhere in the API code, operationId is missing`".
+
+**Run the commands yourself.** Don't paraphrase. Copy the exact grep/glob/command output into your findings. This makes audits reproducible.
+
+**Document low-confidence scores.** If you haven't examined >30% of relevant code, mark it `Low confidence` and suggest manual re-verification.
+
+**Update scores iteratively.** As you discover new evidence, update both the score and confidence level. Audits are not snapshots—they're living documents.

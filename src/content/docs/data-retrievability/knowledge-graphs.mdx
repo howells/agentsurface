@@ -1,0 +1,243 @@
+---
+title: Knowledge Graphs
+description: Neo4j, KuzuDB, GraphRAG, LightRAG; when graphs beat vectors
+---
+
+Knowledge graphs represent entities and relationships as nodes and edges. They excel at multi-hop reasoning, explicit relationships, and schema-driven queries.
+
+## Summary
+
+**April 2026:** LightRAG (2025) is preferred over GraphRAG for cost efficiency (6,000x cheaper: $0.15 vs $4–7 per document). Use graphs when relationships are explicit and queried often. Neo4j dominates enterprises; KuzuDB archived (Apple acquisition, Oct 2025); Memgraph is open-source alternative.
+
+**Decision:**
+- **Vector-only:** `` `<100K` `` docs, dense semantic matching, cost-sensitive
+- **Hybrid (vector + graph):** Medium complexity, relationship queries matter
+- **Graph-only:** Schema-driven (SQL + relationships), real-time updates
+- **LightRAG:** Token-efficient agentic RAG at scale
+
+## GraphRAG vs. LightRAG
+
+| Aspect | GraphRAG | LightRAG |
+|--------|----------|----------|
+| **Pattern** | Build entity communities, traverse at query | Retrieve entities/relations directly via vectors |
+| **Tokens per query** | 610K+ | `` `<100` `` |
+| **Cost per doc** | $4–7 | $0.15 |
+| **Latency** | 5–10s | `` `<1s` `` |
+| **Complexity** | High (community extraction) | Low (dual-level vectors) |
+| **Multi-hop reasoning** | Excellent | Good |
+| **Real-time updates** | Slow | Fast |
+| **Best for** | Complex domains, global reasoning | Token efficiency, scale |
+
+## GraphRAG with Neo4j
+
+Extract entities → build graph → query with Cypher:
+
+```typescript
+import neo4j from 'neo4j-driver';
+import Anthropic from '@anthropic-sdk/sdk';
+
+const driver = neo4j.driver(
+  'bolt://localhost:7687',
+  neo4j.auth.basic('neo4j', 'password')
+);
+
+const session = driver.session();
+const anthropic = new Anthropic();
+
+async function graphRAGExtract(document: string) {
+  // Use Claude to extract entities and relationships
+  const response = await anthropic.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 2000,
+    messages: [
+      {
+        role: 'user',
+        content: `Extract all entities (people, companies, concepts) and relationships from this document. Output JSON.
+Document: ${document}`,
+      },
+    ],
+  });
+
+  const { entities, relationships } = JSON.parse(
+    response.content[0].type === 'text' ? response.content[0].text : '{}'
+  );
+
+  // Create nodes
+  for (const entity of entities) {
+    await session.run('CREATE (n:Entity {name: $name, type: $type})', {
+      name: entity.name,
+      type: entity.type,
+    });
+  }
+
+  // Create relationships
+  for (const rel of relationships) {
+    await session.run(
+      `MATCH (a:Entity {name: $from}) MATCH (b:Entity {name: $to})
+       CREATE (a)-[r:RELATED {type: $type}]->(b)`,
+      { from: rel.from, to: rel.to, type: rel.type }
+    );
+  }
+}
+
+// Query: multi-hop reasoning
+async function graphRAGQuery(query: string) {
+  const results = await session.run(
+    `MATCH (n:Entity)-[*1..3]-(target) 
+     WHERE n.name = $query
+     RETURN target.name, target.type`,
+    { query }
+  );
+
+  return results.records;
+}
+
+await graphRAGExtract('Acme Corp acquired TechStart Inc in Q3 2025...');
+```
+
+## LightRAG (token-efficient)
+
+LightRAG: embed entities/relations directly, avoid community traversal:
+
+```typescript
+import { LightRAG, QueryParam } from '@lightrag/sdk';
+
+const rag = new LightRAG({
+  workingDir: './lightrag_storage',
+  llmModelFunc: async (prompt) => {
+    // Use Claude
+    return anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+  },
+  embeddingFunc: async (texts) => {
+    // Use OpenAI embeddings
+    const response = await openai.embeddings.create({
+      model: 'text-embedding-3-large',
+      input: texts,
+    });
+    return response.data.map((d) => d.embedding);
+  },
+});
+
+// Insert documents
+await rag.insert('doc1', 'Acme Corp acquired TechStart Inc...');
+
+// Query: direct entity/relation retrieval
+const result = await rag.query(
+  'Who acquired TechStart?',
+  QueryParam.LOCAL_ONLY // Entities/relations only, no traversal
+);
+
+console.log(result); // < 100 tokens
+```
+
+**Cost example:**
+- Traditional GraphRAG: $4–7 per document (community extraction + traversal)
+- LightRAG: $0.15 per document (entity vectors + direct retrieval)
+
+## KuzuDB (embedded graph)
+
+```typescript
+import Kuzu from 'kuzu';
+
+const db = new Kuzu.Database(':memory:');
+const conn = db.connect();
+
+// Create schema
+await conn.execute(`
+  CREATE NODE TABLE Entity(id INT64 PRIMARY KEY, name STRING, type STRING)
+`);
+
+await conn.execute(`
+  CREATE REL TABLE RELATED(FROM Entity TO Entity, relationship_type STRING)
+`);
+
+// Insert
+await conn.execute(`
+  CREATE (n:Entity {id: 1, name: 'Acme', type: 'Company'})
+`);
+
+// Query: Cypher (similar to Neo4j)
+const result = await conn.execute(`
+  MATCH (n:Entity)-[r:RELATED*1..3]-(m:Entity)
+  WHERE n.name = 'Acme'
+  RETURN m.name, r.relationship_type
+`);
+
+console.log(result);
+```
+
+**Note:** KuzuDB archived Oct 2025 (Apple acquisition); use Neo4j or Memgraph instead.
+
+## Hybrid: graph + vector
+
+Combine entity embeddings with graph traversal:
+
+```typescript
+async function hybridGraphQuery(query: string) {
+  // 1. Vector search for relevant entities
+  const queryEmbedding = await openai.embeddings.create({
+    model: 'text-embedding-3-large',
+    input: query,
+  });
+
+  const nearestEntities = await pgvector
+    .query(
+      `SELECT id, name FROM entities 
+       ORDER BY embedding <-> $1 LIMIT 5`,
+      [queryEmbedding.data[0].embedding]
+    );
+
+  // 2. Traverse graph from nearest entities
+  const traversed = await neo4j.run(
+    `MATCH (n:Entity)-[*1..2]-(m:Entity)
+     WHERE n.id IN $ids
+     RETURN DISTINCT m.name, m.type`,
+    { ids: nearestEntities.map((e) => e.id) }
+  );
+
+  return traversed;
+}
+```
+
+## When to use graphs
+
+| Use case | Graph? | Why |
+|----------|--------|-----|
+| Semantic search (synonyms, paraphrasing) | No | Vectors excel |
+| Multi-hop relationships (A→B→C) | **Yes** | Cypher traversal |
+| Exact entity lookup (find by name) | No | Index + SQL |
+| Supply chain (vendor → supplier) | **Yes** | Relationship queries |
+| Recommendation (similar items) | No | Vectors better |
+| Org hierarchy (team → manager → director) | **Yes** | Graph structure |
+| Document Q&A (retrieval + generation) | Maybe | If relationships matter |
+
+## Evaluation: graph query accuracy
+
+```typescript
+async function evaluateGraphQuery(testCases: any[]) {
+  let accuracy = 0;
+
+  for (const { query, expectedResults } of testCases) {
+    const results = await graphRAGQuery(query);
+    const resultNames = results.map((r) => r.get('target.name'));
+
+    const correct = expectedResults.every((e) => resultNames.includes(e));
+    if (correct) accuracy++;
+  }
+
+  console.log(
+    `Graph Query Accuracy: ${((accuracy / testCases.length) * 100).toFixed(2)}%`
+  );
+}
+```
+
+## See also
+
+- [Neo4j docs](https://neo4j.com/docs/)
+- [LightRAG GitHub](https://github.com/hkuds/lightrag)
+- [Memgraph docs](https://memgraph.com/docs)
+- [Microsoft GraphRAG](https://github.com/microsoft/graphrag)

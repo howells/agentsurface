@@ -1,0 +1,388 @@
+---
+title: Semantic Extensions for Agent APIs
+description: OpenAPI extensions, semantic taxonomies, and tooling for enriching your API with agent-specific behavioral hints
+---
+
+## Summary
+
+OpenAPI extensions like x-action and x-category add semantic metadata to operations, allowing agents to reason about risk, sequencing, and reversibility without reading full descriptions. The AgenticAPI ACTION taxonomy classifies operations into six categories: Acquire (read), Compute (transform), Transact (create/modify), Integrate (sync), Orchestrate (multi-step), and Notify (communicate). This enables agents to make safer routing decisions.
+
+```
+┌──────────┬─────────────────────────────────┐
+│ Category │ Description                     │
+├──────────┼─────────────────────────────────┤
+│ Acquire  │ Read data without side effects  │
+│ Compute  │ Transform or analyze data       │
+│ Transact │ Create or modify records        │
+│ Integrate│ Connect with external systems   │
+│ Orchestrate│ Trigger multi-step processes  │
+│ Notify   │ Send communications             │
+└──────────┴─────────────────────────────────┘
+```
+
+Standard OpenAPI covers what your API does. Extensions tell agents how to behave when using it — which operations need confirmation before execution, which are safe to retry, which are destructive, and what category of action each operation represents. This page covers the extension ecosystem and the tooling built on top of it.
+
+## The AgenticAPI ACTION Taxonomy
+
+The AgenticAPI project defines six action categories (the ACTION taxonomy) for classifying API operations by what kind of effect they have. These categories help agents reason about risk, sequencing, and reversibility without reading the full operation description.
+
+| Category | Code | Description | Examples |
+|----------|------|-------------|---------|
+| Acquire | A | Read data without side effects | `get_user`, `list_orders`, `search_products` |
+| Compute | C | Transform or analyze data | `calculate_tax`, `generate_report`, `validate_address` |
+| Transact | T | Create or modify records | `create_order`, `update_profile`, `process_payment` |
+| Integrate | I | Connect or sync with external systems | `sync_contacts`, `import_csv`, `webhook_register` |
+| Orchestrate | O | Trigger multi-step processes | `run_pipeline`, `kick_off_workflow`, `deploy_release` |
+| Notify | N | Send communications | `send_email`, `post_slack_message`, `push_notification` |
+
+### `x-action` and `x-category` Extensions
+
+Apply these extensions at the operation level:
+
+```yaml
+paths:
+  /orders/{id}:
+    get:
+      operationId: get_order
+      x-action: Acquire
+      x-category: orders
+      summary: Get an order by ID
+
+  /orders:
+    post:
+      operationId: create_order
+      x-action: Transact
+      x-category: orders
+      summary: Create a new order
+
+  /reports/generate:
+    post:
+      operationId: generate_sales_report
+      x-action: Compute
+      x-category: reporting
+      summary: Generate a sales report for a date range
+
+  /deployments:
+    post:
+      operationId: trigger_deployment
+      x-action: Orchestrate
+      x-category: infrastructure
+      summary: Trigger a production deployment
+
+  /notifications/send:
+    post:
+      operationId: send_notification
+      x-action: Notify
+      x-category: communications
+      summary: Send a push notification to a user
+```
+
+Agent frameworks that understand the ACTION taxonomy can apply category-level policies: for example, requiring human confirmation for all `Transact` and `Orchestrate` operations, or rate-limiting `Notify` operations to prevent spam.
+
+## Agent Behavioral Extensions
+
+### `x-agent-requires-confirmation`
+
+Marks operations that should pause for human approval before the agent executes them. This is framework-independent — any agent framework that respects this extension will surface a confirmation prompt.
+
+```yaml
+paths:
+  /accounts/{id}:
+    delete:
+      operationId: delete_account
+      x-agent-requires-confirmation: true
+      description: Permanently deletes an account and all associated data
+
+  /billing/charge:
+    post:
+      operationId: process_payment
+      x-agent-requires-confirmation: true
+      description: Charges the customer's payment method
+
+  /users/{id}/password-reset:
+    post:
+      operationId: force_password_reset
+      x-agent-requires-confirmation: true
+      description: Forces a password reset for the specified user
+```
+
+### `x-agent-idempotent`
+
+Signals that the operation can be called multiple times with the same inputs and will produce the same result. Agents use this to decide whether retrying a failed call is safe.
+
+```yaml
+paths:
+  /orders/{id}/confirm:
+    post:
+      operationId: confirm_order
+      x-agent-idempotent: true
+      description: >
+        Confirms an order. Idempotent — calling this multiple times on the same
+        order will not create duplicate confirmations.
+
+  /webhooks/register:
+    put:
+      operationId: register_webhook
+      x-agent-idempotent: true
+      description: >
+        Registers or updates a webhook endpoint. Using PUT semantics makes
+        this safe to call multiple times without creating duplicate registrations.
+```
+
+### `x-agent-destructive`
+
+Marks operations that permanently delete data or make irreversible changes. Agents can surface this to users or require additional confirmation beyond what `x-agent-requires-confirmation` provides.
+
+```yaml
+paths:
+  /projects/{id}:
+    delete:
+      operationId: delete_project
+      x-agent-destructive: true
+      x-agent-requires-confirmation: true
+      description: Permanently deletes a project and all contained resources
+
+  /database/truncate:
+    post:
+      operationId: truncate_table
+      x-agent-destructive: true
+      x-agent-requires-confirmation: true
+      description: Removes all rows from the specified table. Cannot be undone.
+```
+
+## Speakeasy MCP Extension
+
+Speakeasy provides `x-speakeasy-mcp` for customizing how MCP tool generation treats individual operations. This is the most expressive extension currently available for controlling the gap between your raw OpenAPI spec and the MCP tools generated from it.
+
+### Tool Name Override
+
+```yaml
+paths:
+  /v2/users/{user_id}/profile:
+    get:
+      operationId: v2_get_user_profile_by_id
+      x-speakeasy-mcp:
+        tool-name: get_user_profile
+        description: >
+          Get the full profile for a user. Use when you have the user's ID
+          and need their complete profile data including settings and preferences.
+```
+
+### Excluding Operations from MCP Generation
+
+```yaml
+paths:
+  /internal/debug/state:
+    get:
+      operationId: get_debug_state
+      x-speakeasy-mcp:
+        ignored: true   # Do not generate an MCP tool for this endpoint
+```
+
+### Grouping Tools by Scope
+
+```yaml
+paths:
+  /users:
+    get:
+      operationId: list_users
+      x-speakeasy-mcp:
+        scopes: [user-management, admin]
+  /analytics/events:
+    get:
+      operationId: list_events
+      x-speakeasy-mcp:
+        scopes: [analytics, reporting]
+```
+
+Agent frameworks can then load only the tools for the scopes relevant to the current agent session, keeping the active tool count low.
+
+### Overriding Parameter Descriptions
+
+```yaml
+paths:
+  /orders:
+    get:
+      operationId: list_orders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, cancelled]
+          x-speakeasy-mcp:
+            description: >
+              Filter orders by current status. Use "pending" to find orders
+              awaiting processing. Use "completed" for fulfilled orders.
+              Omit to return all orders regardless of status.
+```
+
+## Pattern-Based Scope Mapping
+
+Rather than annotating every operation individually, define scope patterns that apply to operations matching path or method patterns:
+
+```yaml
+x-speakeasy-mcp:
+  scopes:
+    read:
+      operations:
+        - method: GET
+    write:
+      operations:
+        - method: POST
+        - method: PUT
+        - method: PATCH
+    admin:
+      operations:
+        - path-pattern: /admin/*
+        - path-pattern: /internal/*
+```
+
+This lets you partition a large API into read-only, read-write, and admin subsets for different agent permission levels.
+
+## Amazon Bedrock `x-requireConfirmation`
+
+Bedrock Agents uses its own extension for confirmation requirements. Apply it at the operation level in OpenAPI specs used with Bedrock action groups:
+
+```yaml
+paths:
+  /funds/transfer:
+    post:
+      operationId: transfer_funds
+      x-amazon-apigateway-integration:
+        # ... integration config
+      x-requireConfirmation: ENABLED
+      description: >
+        Transfers funds between accounts. Requires human confirmation
+        before execution due to financial impact.
+```
+
+Valid values: `ENABLED` (require confirmation) and `DISABLED` (default, no confirmation required).
+
+## Discovery Endpoint: `DISCOVER /actions`
+
+Publishing a discovery endpoint lets agents find your action catalog without reading the full OpenAPI spec. The convention is a `DISCOVER` HTTP method (or `GET` with an `actions` suffix) at a well-known path:
+
+```yaml
+paths:
+  /actions:
+    get:
+      operationId: discover_actions
+      summary: List available agent-ready actions
+      description: >
+        Returns the catalog of operations available to agents, grouped by
+        category. Agents can call this to understand what capabilities are
+        available before selecting specific tools.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        operationId:
+                          type: string
+                        summary:
+                          type: string
+                        category:
+                          type: string
+                          enum: [Acquire, Compute, Transact, Integrate, Orchestrate, Notify]
+                        requiresConfirmation:
+                          type: boolean
+                        isDestructive:
+                          type: boolean
+              example:
+                actions:
+                  - operationId: get_order
+                    summary: Get an order by ID
+                    category: Acquire
+                    requiresConfirmation: false
+                    isDestructive: false
+                  - operationId: delete_order
+                    summary: Permanently delete an order
+                    category: Transact
+                    requiresConfirmation: true
+                    isDestructive: true
+```
+
+## LAPIS Format
+
+LAPIS (LLM API Processing Instruction Syntax) is a compact representation format for OpenAPI specs optimized for LLM context windows. It reduces token count by approximately 85.5% compared to standard OpenAPI YAML while retaining the information agents need to select and call operations.
+
+A full OpenAPI spec in YAML might be 50,000 tokens. The same spec in LAPIS format is typically under 8,000 tokens. This matters when you are stuffing tool definitions into a model context window.
+
+```
+# LAPIS representation of an operation
+POST /orders create_order "Creates a new order for the authenticated user"
+  body: {product_ids: string[], quantity: integer, shipping_address_id: uuid}
+  req: [product_ids, quantity]
+  200: {id: uuid, status: string, total: number, created_at: date-time}
+  400: "Invalid product ID or insufficient stock"
+  422: "Shipping address not found"
+```
+
+LAPIS is useful for:
+- Injecting API context into agent prompts without exhausting the context window
+- Pre-processing specs before tool generation
+- Building lightweight tool-picker prompts
+
+## Auto-Generating MCP from OpenAPI
+
+Several tools convert OpenAPI specs into MCP servers automatically. None of them produce production-quality results out of the box — understanding what they generate and what to fix is the skill.
+
+### Tool Comparison
+
+| Tool | Approach | Strengths | Limitations |
+|------|----------|-----------|-------------|
+| Stainless | SDK + MCP generation | High-quality, polished output | Requires Stainless account; opinionated structure |
+| Speakeasy | SDK + MCP generation | `x-speakeasy-mcp` extension support; fine-grained control | Commercial; complex config |
+| FastMCP | Python MCP server from OpenAPI | Fast setup; good for Python stacks | Limited description customization |
+| openapi-mcp-generator | Open source, zero config | Free; works with any spec | Naive 1:1 generation; no description rewriting |
+
+### Why Naive Generation Fails
+
+Direct 1:1 generation from OpenAPI to MCP tools produces three classes of problems:
+
+**Tool explosion.** A 200-endpoint API becomes 200 MCP tools. Agents cannot select accurately from 200 tools. Selection accuracy drops sharply above 20 tools in context.
+
+**Structural mismatch.** OpenAPI was designed for REST clients that understand HTTP. MCP tools are for LLMs. The parameter structure, description format, and granularity that works for a REST client is wrong for an LLM.
+
+**Context bloat.** Auto-generated descriptions are either copied from OpenAPI (too HTTP-specific) or absent. Both degrade agent routing.
+
+### The Hybrid Approach
+
+Treat auto-generation as a starting point, not the final output:
+
+1. **Generate** the full tool set from your OpenAPI spec using your chosen tool
+2. **Audit** what was generated — which tools are missing, redundant, or badly described
+3. **Prune** approximately 90% — keep only the tools that are actually needed for the target use case
+4. **Rewrite descriptions** for the surviving tools using the [When / Why / How pattern](./openapi-for-agents#the-whenwhy-how-description-pattern)
+5. **Add composite tools** that combine common multi-step sequences into single tool calls
+
+The goal is not comprehensive coverage of your API surface. The goal is the minimal set of tools that lets an agent accomplish the target use cases reliably.
+
+<Callout type="info">
+Start by identifying the top 5 user-facing tasks your API needs to support. Build tools for those tasks, not for every endpoint. Expand the tool set incrementally as you validate that existing tools work correctly.
+</Callout>
+
+## Checklist
+
+- [ ] Operations are categorized with `x-action` using the ACTION taxonomy
+- [ ] Destructive operations have `x-agent-destructive: true`
+- [ ] Irreversible operations have `x-agent-requires-confirmation: true`
+- [ ] Idempotent operations are marked with `x-agent-idempotent: true`
+- [ ] MCP tool count per agent session is under 20 after pruning
+- [ ] Auto-generated tool descriptions have been rewritten as agent trigger conditions
+- [ ] Composite tools exist for common multi-step sequences
+- [ ] `x-speakeasy-mcp: ignored: true` is set on internal/debug endpoints
+
+## Related Pages
+
+- [OpenAPI for Agents](./openapi-for-agents) — the base spec design that extensions annotate
+- [Tool Definitions](./tool-definitions) — how extensions translate into MCP annotations
+- [Arazzo Workflows](./arazzo-workflows) — composite workflows as an alternative to composite tools

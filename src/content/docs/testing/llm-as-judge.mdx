@@ -1,0 +1,287 @@
+---
+title: LLM-as-Judge Patterns
+description: When and how to use LLM judges; biases, calibration, and hybrid approaches
+---
+
+## Summary
+
+Model-based grading for open-ended outputs with no deterministic ground truth (plan quality, semantic correctness, summary coherence). Critical insight: LLM judges are systematically biased—they prefer outputs from themselves or similar models, exhibit position bias (prefer first/last), and suffer from verbose-text preference. Mitigations: use stronger indifferent judge models, hybrid grading (code + model), and calibration against human-labeled baselines. Use code-based graders for deterministic outputs (tool routing, DB state verification).
+
+- **When to use**: Open-ended outputs, semantic correctness, plan quality
+- **When NOT to use**: Deterministic outputs, tool routing, end-state verification
+- **Key biases**: Self-preference, position bias, verbose-text preference
+- **Mitigation**: Stronger judge models, hybrid grading, calibration, code-based graders for deterministic
+
+---
+
+LLM-as-judge (also called model-based grading) evaluates outputs that have no deterministic ground truth — plan quality, parameter semantics, summary coherence. A judge model reads the task, agent output, and reference (if available), then scores it. The trick is that LLM judges are biased and systematically prefer certain outputs even when they are not actually better. Understanding and mitigating these biases is critical.
+
+## When to use LLM-as-judge
+
+Use when:
+- **Open-ended outputs** — agent was asked to write a summary, design a solution, or generate creative content. No single correct answer exists.
+- **Semantic correctness** — parameter value is well-formed JSON, but is it semantically valid? (e.g., is "next Tuesday" a reasonable due_date for this context?)
+- **Plan quality** — did the agent choose a reasonable sequence of tools, even if not the only correct sequence?
+
+Do NOT use when:
+- **Deterministic outputs** — agent was asked to retrieve a user by ID. Either it retrieved the right user or it did not. Use code-based graders.
+- **Tool routing** — "Did the agent call search or read_file?" This is binary and deterministic. Use code-based graders.
+- **End state verification** — "Is the database record now marked 'complete'?" Code-based graders are faster and more reliable.
+
+## Documented biases
+
+Research from Zheng et al. (MT-Bench) and Anthropic's evaluation posts identifies systematic biases in LLM judges:
+
+### Self-preference bias
+
+A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.4 to judge outputs from Claude Opus 4.7, the judge may systematically overrate outputs that look like GPT-style reasoning.
+
+**Mitigation:** Use a stronger judge model that is indifferent between systems. Opus 4.7 is less biased than Haiku 4.5. Or use a different provider entirely (GPT-5.4 judging Claude outputs, Claude judging GPT outputs).
+
+### Position bias
+
+Judges show strong preference for options presented first or last. In pairwise comparisons, "Is A better than B?" is biased by the order of A and B.
+
+**Mitigation:** Randomize position. Ask the judge to compare A vs B, then ask again with B vs A (on the same execution). Average the results. Or use comparison instructions that explicitly ask the judge to ignore order: "Below are two outputs. Evaluate each independently on quality before comparing."
+
+### Length bias
+
+Longer outputs score higher, even when quality is equivalent. A verbose summary scores higher than a concise one.
+
+**Mitigation:** Normalize output length in the judge prompt: "The reference summary has N tokens. The candidate has M tokens. Account for this length difference when scoring." Or control length in the agent's system prompt.
+
+### Task difficulty collapse
+
+Judges do not distinguish between hard and easy tasks. A judge that achieves 90% accuracy on simple tasks may achieve the same 90% on harder tasks (suggesting it is not actually evaluating difficulty).
+
+**Mitigation:** Stratify evaluations by task difficulty. Measure accuracy separately for easy, medium, and hard tasks. Or use a pilot eval on 20–30 human-labelled examples to ensure the judge distinguishes difficulty.
+
+## Calibration techniques
+
+### Cross-judge agreement
+
+Run the same evaluation with multiple judge models. If all judges agree, confidence is high. If they disagree, the task or output is ambiguous.
+
+```typescript
+interface JudgeScore {
+  modelId: string;
+  score: number; // 0-1
+  reasoning: string;
+}
+
+async function crossJudgeEval(
+  task: string,
+  output: string,
+  judges: string[]
+): Promise<JudgeScore[]> {
+  const scores: JudgeScore[] = [];
+  
+  for (const judge of judges) {
+    const score = await callLLM({
+      model: judge,
+      prompt: `
+Task: ${task}
+Output: ${output}
+
+Score this output on a scale of 0-1. Return JSON: {"score": number, "reasoning": string}
+      `,
+    });
+    
+    scores.push({
+      modelId: judge,
+      score: score.score,
+      reasoning: score.reasoning,
+    });
+  }
+  
+  // High agreement = confident
+  const mean = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
+  const stdDev = Math.sqrt(
+    scores.reduce((sum, s) => sum + Math.pow(s.score - mean, 2), 0) / scores.length
+  );
+  
+  return scores;
+}
+
+// Example: if 3 judges give [0.9, 0.85, 0.88], stdDev ~0.02 — high agreement
+// If they give [0.2, 0.5, 0.9], stdDev ~0.28 — low agreement, task is ambiguous
+```
+
+### Anchor datasets
+
+Calibrate a judge against 20–30 human-labelled examples before running at scale. Compute Cohen's kappa to measure agreement with human labels.
+
+```typescript
+// Simplified Cohen's kappa
+function cohensKappa(humanLabels: number[], judgeLabels: number[]): number {
+  const po = // Observed agreement
+    humanLabels.reduce((sum, h, i) => sum + (h === judgeLabels[i] ? 1 : 0), 0) /
+    humanLabels.length;
+  
+  // Expected agreement (assuming chance)
+  const uniqueLabels = new Set([...humanLabels, ...judgeLabels]);
+  let pe = 0;
+  for (const label of uniqueLabels) {
+    const humanPct = humanLabels.filter(l => l === label).length / humanLabels.length;
+    const judgePct = judgeLabels.filter(l => l === label).length / judgeLabels.length;
+    pe += humanPct * judgePct;
+  }
+  
+  return (po - pe) / (1 - pe);
+}
+
+// Kappa > 0.8 = strong agreement
+// Kappa < 0.6 = weak agreement (retune judge prompt)
+```
+
+### In-context calibration
+
+Include a few human-labelled examples in the judge prompt to set expectations.
+
+```typescript
+async function calibratedJudge(
+  task: string,
+  output: string,
+  examples: Array<{ output: string; score: number; explanation: string }>
+): Promise<number> {
+  const exampleText = examples
+    .map(e => `Example output: "${e.output}"\nScore: ${e.score}\nWhy: ${e.explanation}`)
+    .join("\n\n");
+  
+  const score = await callLLM({
+    model: "claude-opus-4-7",
+    prompt: `
+You are grading agent outputs on a scale of 0-1.
+
+Reference examples (human-graded):
+${exampleText}
+
+---
+
+Now grade this output:
+Task: ${task}
+Output: ${output}
+
+Return JSON: {"score": number, "reasoning": string}
+    `,
+  });
+  
+  return score.score;
+}
+```
+
+## Hybrid approaches
+
+Combine LLM judges with heuristic checks to mitigate hallucinations and systematic bias.
+
+### Heuristic + LLM fallback
+
+Use code-based checks first; only invoke LLM judge if heuristics are inconclusive.
+
+```typescript
+async function hybridGrader(
+  toolCall: ToolCall,
+  schema: ToolSchema
+): Promise<{ score: number; confidence: "high" | "low" }> {
+  // Fast heuristic checks
+  const hasRequiredFields = schema.required.every(f => toolCall.arguments[f] !== undefined);
+  const typesCorrect = Object.entries(toolCall.arguments).every(
+    ([key, value]) => {
+      const spec = schema.properties[key];
+      return spec?.type === typeof value || spec?.type === "number";
+    }
+  );
+  
+  // If heuristics pass, high confidence — no LLM needed
+  if (hasRequiredFields && typesCorrect) {
+    return { score: 1.0, confidence: "high" };
+  }
+  
+  // If heuristics fail, use LLM to determine severity
+  const llmScore = await callLLM({
+    model: "claude-haiku-4-5",
+    prompt: `
+Tool: ${toolCall.name}
+Arguments: ${JSON.stringify(toolCall.arguments)}
+Schema: ${JSON.stringify(schema)}
+
+Is this a fatal error or a minor issue? Score 0-1.
+    `,
+  });
+  
+  return { score: llmScore, confidence: "low" };
+}
+```
+
+### Pairwise ranking
+
+Instead of absolute scores (0-1), ask judges to compare outputs pairwise. "Is A better than B?" is more reliable than "Rate A on a scale of 1–10."
+
+```typescript
+async function pairwiseRank(
+  task: string,
+  outputA: string,
+  outputB: string,
+  numJudges = 3
+): Promise<{ winner: "A" | "B" | "tie"; confidence: number }> {
+  const results: ("A" | "B" | "tie")[] = [];
+  
+  for (let i = 0; i < numJudges; i++) {
+    // Randomize order: sometimes A first, sometimes B first
+    const aFirst = Math.random() > 0.5;
+    const [first, second, firstLabel, secondLabel] = aFirst
+      ? [outputA, outputB, "A", "B"]
+      : [outputB, outputA, "B", "A"];
+    
+    const result = await callLLM({
+      model: "claude-opus-4-7",
+      prompt: `
+Task: ${task}
+
+Output 1: ${first}
+Output 2: ${second}
+
+Which is better? Respond with only "1", "2", or "tie".
+      `,
+    });
+    
+    const winner = result === "1" ? firstLabel : result === "2" ? secondLabel : "tie";
+    results.push(winner);
+  }
+  
+  const aWins = results.filter(r => r === "A").length;
+  const confidence = Math.abs(aWins - (numJudges / 2)) / (numJudges / 2);
+  
+  return {
+    winner: aWins > numJudges / 2 ? "A" : aWins < numJudges / 2 ? "B" : "tie",
+    confidence,
+  };
+}
+```
+
+## Cost optimization
+
+LLM judges are expensive at scale. Strategies to reduce cost:
+
+- **Use cheaper judges for pre-screening.** Haiku 4.5 for initial triage, then Opus 4.7 for borderline cases.
+- **Batch evaluation.** Ask a judge to score 10 outputs in a single prompt instead of 10 separate API calls.
+- **Threshold-based fallback.** If code-based heuristics give a score of 0.95 or 0.05, don't invoke LLM judge.
+- **Sample-based calibration.** Calibrate on 30 examples, then use cheaper model + heuristics for the remaining 1000.
+
+## Red flags
+
+- **Judge refuses to rate outputs.** Judge is overly conservative or task is outside its training. Retune prompt or use human review.
+- **Judge scores all outputs the same.** Judge has not understood the task or scoring rubric. Add in-context examples.
+- **Judge output variance is extremely high.** Task is ambiguous; consider decomposing into more specific sub-tasks, or accept that this task requires human judgment.
+
+## References
+
+- Cite [Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"](https://arxiv.org/abs/2306.05685) for documented biases (MT-Bench)
+- Anthropic's blog posts on evaluation: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+- Eugene Yan's [LLM Evaluators guide](https://eugeneyan.com/writing/llm-evaluators/)
+
+## See also
+
+- `/docs/testing/metrics` — measuring pass@k, hallucination rate
+- `/docs/testing/evaluation-framework` — grader design patterns
+- `/docs/testing/observability` — trace-based debugging for ambiguous grades

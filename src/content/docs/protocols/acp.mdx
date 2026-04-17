@@ -1,0 +1,378 @@
+---
+title: Agentic Commerce Protocol (ACP)
+description: The joint OpenAI and Stripe specification for commerce between AI agents, buyers, and merchants
+---
+
+## Summary
+
+ACP defines how agents complete purchases on behalf of users with explicit payment delegation boundaries. Merchants publish capabilities at `/.well-known/acp.json`; agents and merchants negotiate what is available before attempting any payment. Spec: beta (2025). Joint OpenAI + Stripe specification.
+
+```
+Agent → discovers capabilities → negotiates → pays → receipt
+Buyer    (merchant declares      (what merchant  (from agent)
+          accepted methods)        agent can do)
+```
+
+- Stateless commerce sessions, scoped to single intent
+- Agent declares capabilities, merchant declares what it accepts
+- Protocol negotiates intersection before payment
+- Payment delegation: explicit boundaries, user can revoke
+- Supported methods: card, ACH, crypto_USDC
+- Currently in beta; moving toward production
+
+ACP defines how an AI agent completes a purchase on behalf of a user. It is a joint specification from OpenAI and Stripe, currently in beta, covering discovery, capability negotiation, payment delegation, and completion — from the first discovery request through the final receipt.
+
+The problem ACP solves is not technical — HTTP and JSON are sufficient to call any payment API. The problem is behavioral: an agent acting autonomously on a user's behalf needs a protocol that makes the spending boundary explicit, verifiable, and revocable. ACP formalizes that boundary.
+
+## Core Concepts
+
+ACP treats commerce as a session with a defined beginning and end. There is no persistent cart carried across interactions. Each commerce session is stateless and scoped to a single intent: the agent starts a session, negotiates what it needs, pays if authorized, and the session completes.
+
+Three parties participate in every ACP interaction:
+- **Agent** — the AI acting on the user's behalf
+- **Buyer** — the user (or organization) whose payment method and allowance are used
+- **Merchant** — the service offering goods or services
+
+The agent declares its capabilities, the merchant declares what it accepts, and the protocol negotiates the intersection before any payment is attempted.
+
+## Discovery
+
+Merchants publish their ACP capabilities at a well-known URL:
+
+```
+GET /.well-known/acp.json
+```
+
+```json
+{
+  "version": "0.1.0-beta",
+  "merchant_id": "merchant_acme_software",
+  "display_name": "ACME Software Marketplace",
+  "description": "Software licenses, SaaS subscriptions, and developer tools",
+  "endpoints": {
+    "checkout_sessions": "https://api.acme.com/acp/checkout_sessions"
+  },
+  "supported_capabilities": [
+    "streaming_updates",
+    "cancellation",
+    "intent_tracing",
+    "idempotency"
+  ],
+  "supported_payment_methods": ["card", "ach", "crypto_usdc"],
+  "currencies": ["usd", "eur"],
+  "authentication": {
+    "scheme": "bearer",
+    "token_endpoint": "https://auth.acme.com/token"
+  }
+}
+```
+
+An agent discovering a merchant fetches this document before initiating any session. If the merchant's capabilities do not match what the agent or buyer supports, the agent should not attempt commerce.
+
+## Core Flow
+
+```
+Agent                           Merchant
+  │                               │
+  │── POST /checkout_sessions ───▶│  1. Create session, declare capabilities
+  │◀─ 201 session_id + challenge ─│
+  │                               │
+  │── GET /checkout_sessions/:id ▶│  2. Retrieve negotiated session state
+  │◀─ 200 negotiated capabilities ─│
+  │                               │
+  │  [Agent presents to user,     │
+  │   user grants allowance]      │
+  │                               │
+  │── POST /checkout_sessions/:id ▶│  3. Confirm with payment token
+  │◀─ 200 or SSE stream ──────────│
+  │                               │
+  │── POST /complete ─────────────▶│  4. Finalize
+  │◀─ 200 receipt ────────────────│
+```
+
+### Step 1: Create Session
+
+The agent opens a checkout session by declaring what it intends to buy and what capabilities it supports:
+
+```json
+POST https://api.acme.com/acp/checkout_sessions
+Authorization: Bearer eyJ...
+Content-Type: application/json
+Idempotency-Key: agent-session-a1b2c3d4
+
+{
+  "agent_id": "agent:company/customer-assistant",
+  "buyer_id": "user_01HV3K8MNPQR",
+  "intent": {
+    "type": "purchase",
+    "items": [
+      {
+        "sku": "PRO_ANNUAL",
+        "description": "Pro plan — annual subscription",
+        "quantity": 1
+      }
+    ],
+    "currency": "usd",
+    "budget_ceiling_cents": 50000
+  },
+  "agent_capabilities": [
+    "streaming_updates",
+    "cancellation",
+    "idempotency"
+  ],
+  "metadata": {
+    "conversation_id": "conv_8821",
+    "user_intent_summary": "User asked to upgrade their account to Pro"
+  }
+}
+```
+
+The merchant responds with a session ID and the negotiated capability intersection:
+
+```json
+HTTP/1.1 201 Created
+Location: /acp/checkout_sessions/sess_01HV3K
+
+{
+  "session_id": "sess_01HV3K8MNPQR",
+  "status": "pending_authorization",
+  "negotiated_capabilities": [
+    "streaming_updates",
+    "cancellation",
+    "idempotency"
+  ],
+  "items": [
+    {
+      "sku": "PRO_ANNUAL",
+      "description": "Pro plan — annual subscription",
+      "quantity": 1,
+      "unit_price_cents": 24900,
+      "total_cents": 24900,
+      "currency": "usd"
+    }
+  ],
+  "total_cents": 24900,
+  "currency": "usd",
+  "authorization_challenge": {
+    "type": "payment_delegation",
+    "required_allowance_cents": 24900,
+    "expiry": "2026-04-17T15:30:00Z"
+  }
+}
+```
+
+### Step 2: Capability Negotiation
+
+The `negotiated_capabilities` field in the session response is the intersection of what the agent declared and what the merchant supports. The agent must only rely on capabilities that appear in this list.
+
+| Capability | Meaning |
+|---|---|
+| `streaming_updates` | Merchant sends SSE updates during long-running operations |
+| `cancellation` | Sessions can be canceled after creation |
+| `intent_tracing` | Cancellations include structured reason codes |
+| `idempotency` | Duplicate requests with the same `Idempotency-Key` are safe |
+| `partial_fulfillment` | Merchant can fulfill a subset of requested items |
+
+If a capability the agent requires is not in the negotiated list, the agent should abort the session with a cancel request rather than proceeding without the feature.
+
+### Step 3: Payment Delegation
+
+The agent presents the authorization challenge to the buyer. The buyer grants a spending allowance — a one-time, amount-capped, merchant-scoped payment authorization. This allowance does not give the agent access to the buyer's general payment credentials.
+
+```json
+POST https://api.acme.com/acp/checkout_sessions/sess_01HV3K8MNPQR
+Authorization: Bearer eyJ...
+Content-Type: application/json
+Idempotency-Key: agent-payment-a1b2c3d4
+
+{
+  "action": "confirm",
+  "payment_token": "ptok_01HV3K8MNPQR",
+  "allowance": {
+    "amount_cents": 24900,
+    "currency": "usd",
+    "merchant_id": "merchant_acme_software",
+    "expires_at": "2026-04-17T15:30:00Z"
+  }
+}
+```
+
+The `payment_token` is issued by the payment provider (in this case, Stripe) after the buyer completes their authorization step. The allowance fields constrain the token: it can only be used at this merchant, for at most this amount, until this time.
+
+### Step 4: Completion
+
+For synchronous merchants, the confirm response includes the receipt directly. For merchants with `streaming_updates`, the confirm response opens an SSE stream:
+
+```
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+
+data: {"type":"progress","message":"Processing payment...","session_id":"sess_01HV3K"}
+
+data: {"type":"progress","message":"Activating subscription...","session_id":"sess_01HV3K"}
+
+data: {"type":"completed","session_id":"sess_01HV3K","receipt":{"id":"rcpt_01HV3K","items_fulfilled":[{"sku":"PRO_ANNUAL","status":"activated","subscription_id":"sub_01HV3K"}],"total_charged_cents":24900,"timestamp":"2026-04-17T14:22:00Z"}}
+```
+
+After receiving the `completed` event, the agent calls `/complete` to formally close the session:
+
+```json
+POST https://api.acme.com/acp/checkout_sessions/sess_01HV3K8MNPQR/complete
+Authorization: Bearer eyJ...
+Content-Type: application/json
+
+{
+  "session_id": "sess_01HV3K8MNPQR"
+}
+```
+
+## Cancellation and Intent Tracing
+
+ACP supports structured cancellation with reason codes. When `intent_tracing` is in the negotiated capabilities, cancellation requests include a machine-readable reason:
+
+```json
+POST https://api.acme.com/acp/checkout_sessions/sess_01HV3K8MNPQR/cancel
+Authorization: Bearer eyJ...
+Content-Type: application/json
+
+{
+  "session_id": "sess_01HV3K8MNPQR",
+  "reason": {
+    "code": "user_declined",
+    "detail": "User reviewed the price and chose not to proceed"
+  }
+}
+```
+
+Intent trace reason codes allow merchants to distinguish why sessions were abandoned — useful for pricing analysis, UX improvement, and fraud detection.
+
+| Reason Code | Meaning |
+|---|---|
+| `user_declined` | Buyer explicitly declined after review |
+| `budget_exceeded` | Total exceeded the buyer's declared budget |
+| `capability_mismatch` | Required capability not available after negotiation |
+| `timeout` | Session expired before completion |
+| `agent_error` | Agent encountered an internal error |
+| `merchant_unavailable` | Merchant service returned an error |
+
+## Error Handling
+
+ACP error responses carry structured messages with severity and resolution guidance:
+
+```json
+{
+  "error": {
+    "code": "PAYMENT_DECLINED",
+    "severity": "error",
+    "message": "Payment token was declined by the payment processor.",
+    "resolution": "Ask the buyer to check their payment method and re-authorize, or use an alternative payment method.",
+    "retryable": false,
+    "session_id": "sess_01HV3K8MNPQR"
+  }
+}
+```
+
+| Severity | Meaning | Agent behavior |
+|---|---|---|
+| `info` | Advisory — operation succeeded with notes | Log and continue |
+| `warning` | Partial success or degraded result | Inform user, continue if acceptable |
+| `error` | Operation failed | Stop, report to user, do not retry unless `retryable: true` |
+
+## MCP Binding
+
+ACP can be exposed as an MCP server, making commerce available as tools within an agent's MCP tool set. The MCP binding wraps the ACP HTTP API as five tools:
+
+```json
+[
+  {
+    "name": "acp_discover_merchant",
+    "description": "Fetch a merchant's ACP capabilities document. Call before initiating commerce to verify the merchant supports the features you need.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["merchant_url"],
+      "properties": {
+        "merchant_url": { "type": "string", "format": "uri" }
+      }
+    }
+  },
+  {
+    "name": "acp_create_session",
+    "description": "Open a checkout session with a merchant. Returns session ID and negotiated capabilities. Call after discovery confirms the merchant supports required features.",
+    "inputSchema": { ... }
+  },
+  {
+    "name": "acp_get_session",
+    "description": "Retrieve current state of a checkout session including pricing and authorization requirements.",
+    "inputSchema": { ... }
+  },
+  {
+    "name": "acp_confirm_session",
+    "description": "Confirm a session with a buyer-provided payment token. Triggers payment and fulfillment.",
+    "inputSchema": { ... }
+  },
+  {
+    "name": "acp_cancel_session",
+    "description": "Cancel an open session. Include a reason code if intent_tracing was negotiated.",
+    "inputSchema": { ... }
+  }
+]
+```
+
+The MCP binding uses JSON-RPC 2.0 transport — the same as standard MCP tools — so no additional transport layer is required.
+
+## Security
+
+### Bearer Tokens
+
+All ACP requests require a Bearer token in the `Authorization` header. Tokens are scoped to the agent's identity and the specific buyer session. A token issued for one buyer cannot be used to initiate sessions for another.
+
+### Request Signing
+
+Merchants may require request signing as an additional layer on top of Bearer token authentication. Signed requests include a timestamp and HMAC signature in request headers:
+
+```
+X-ACP-Timestamp: 1745001720
+X-ACP-Signature: hmac-sha256 keyId="agent-key-01",signature="ZmVkY2Jh..."
+```
+
+### Replay Protection
+
+The `X-ACP-Timestamp` header must be within 5 minutes of the merchant's server time. Requests outside this window are rejected as potential replays. Clients must maintain synchronized clocks.
+
+### Idempotency Keys
+
+All mutating requests (`POST /checkout_sessions`, `POST /checkout_sessions/:id`) must include an `Idempotency-Key` header. If the same key is submitted twice, the merchant returns the original response without executing the operation again. This protects against network retry storms creating duplicate purchases.
+
+```
+Idempotency-Key: agent-session-a1b2c3d4e5f6
+```
+
+Generate idempotency keys from the conversation context — for example, a hash of the session ID and operation type — so that the key is deterministic but unique per intent.
+
+## Best Practices
+
+### For Agents
+
+- Always fetch `/.well-known/acp.json` before initiating a session. Do not hardcode merchant capabilities.
+- Check the negotiated capability list before relying on any feature. Fail gracefully if a required capability was not negotiated.
+- Present the authorization challenge to the user before calling confirm. Never call confirm without explicit user approval.
+- Set `budget_ceiling_cents` in every session creation request. This gives the buyer visibility into the maximum possible charge before they authorize.
+- Generate idempotency keys deterministically from the conversation context, not randomly, so retries after network failures produce the same key.
+- Always cancel sessions that are not completed. Do not leave sessions in `pending_authorization` state indefinitely.
+
+### For Merchants
+
+- Return complete pricing in the session creation response, including all taxes and fees. Do not surface additional charges at the confirm step.
+- Implement `streaming_updates` for any operation that takes more than 2 seconds. Agents cannot distinguish a slow response from a hung request.
+- Include machine-readable error codes with every failure. Prose-only error messages cannot be acted on programmatically.
+- Honor `budget_ceiling_cents`. If the total exceeds the declared ceiling, return an error at session creation — do not wait until the confirm step to reject it.
+
+## When to Use ACP
+
+ACP is appropriate for controlled pilots and production deployments where agent-initiated commerce requires explicit payment boundaries and audit trails. It is currently in beta — the spec may evolve. For exploration, use it; for mission-critical payments, evaluate maturity and tooling support carefully.
+
+## Related Pages
+
+- [MCP Protocol](/docs/protocols/mcp) — the tool layer; ACP can be exposed over MCP transport
+- [A2A Protocol](/docs/protocols/a2a) — agent-to-agent delegation
+- [Protocol Comparison](/docs/protocols/comparison) — when to use ACP vs other protocols

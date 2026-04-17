@@ -1,0 +1,289 @@
+---
+title: Serving Markdown to Agents
+description: Content negotiation patterns for returning Markdown instead of HTML to AI agents
+---
+
+## Summary
+
+HTML consumes 5-6x more tokens than Markdown for the same content. Content negotiation via Accept headers lets agents request Markdown, reducing their token budget by ~80%. An agent that reads five Markdown pages reads one HTML page for the same cost. Implementation varies by framework (Next.js middleware, Flask, etc.), but the pattern is consistent: check Accept header and return the best match.
+
+- Markdown: ~3 tokens for "## Authentication", HTML: ~15 tokens
+- HTTP Accept header: "Accept: text/markdown" vs "Accept: text/html"
+- Fallback to HTML if Markdown not available
+- Not all agents send Accept headers yet (optional optimization)
+- Biggest impact on documentation-heavy systems
+
+HTML costs tokens. A heading in HTML is `<h2 class="text-2xl font-bold mt-8 mb-4">Authentication</h2>` — roughly 15 tokens. The same heading in Markdown is `## Authentication` — 3 tokens. Across a full documentation page, the reduction is consistent: serving Markdown instead of HTML cuts token consumption by approximately 80%.
+
+For agents operating within context window budgets, this matters. An agent that can read five pages in Markdown reads one page in HTML for the same cost.
+
+## How Content Negotiation Works
+
+HTTP content negotiation uses the `Accept` header. A browser sends:
+
+```
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+```
+
+An agent that prefers Markdown sends:
+
+```
+Accept: text/markdown, text/plain;q=0.9, */*;q=0.8
+```
+
+Your server reads the `Accept` header and returns the format with the highest priority that it can serve. If no matching format is available, it falls back to HTML.
+
+Not all agents send `Accept: text/markdown` today. Many still accept `*/*` and receive HTML. Content negotiation is an opt-in optimization — pages that serve it benefit agents that request it; all other clients receive HTML as before.
+
+## Next.js App Router Implementation
+
+The cleanest approach in Next.js is a middleware rewrite that intercepts requests with `Accept: text/markdown` and routes them to a dedicated handler.
+
+### Middleware
+
+```typescript
+// middleware.ts
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const accept = request.headers.get('accept') ?? ''
+
+  if (accept.includes('text/markdown')) {
+    const url = request.nextUrl.clone()
+    // Route to a markdown handler at /_md/[path]
+    url.pathname = `/_md${request.nextUrl.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/docs/:path*'],
+}
+```
+
+### Markdown Route Handler
+
+```typescript
+// app/_md/docs/[...slug]/route.ts
+import { source } from '@/lib/source'
+import { notFound } from 'next/navigation'
+
+export async function GET(
+  _request: Request,
+  { params }: { params: { slug: string[] } }
+) {
+  const page = source.getPage(params.slug)
+
+  if (!page) {
+    notFound()
+  }
+
+  // source.getPage returns the MDX source — strip frontmatter for clean Markdown
+  const markdown = stripFrontmatter(page.data._raw.flattenedPath)
+
+  const tokenCount = estimateTokens(markdown)
+
+  return new Response(markdown, {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Vary': 'Accept',
+      'x-markdown-tokens': String(tokenCount),
+      'Cache-Control': 'public, max-age=3600',
+    },
+  })
+}
+
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---[\s\S]*?---\n/, '')
+}
+
+function estimateTokens(text: string): number {
+  // Rough approximation: 1 token ≈ 4 characters for English prose
+  return Math.ceil(text.length / 4)
+}
+```
+
+### Alternative: .md URL Suffix
+
+A simpler approach that avoids middleware complexity: serve Markdown at `.md`-suffixed URLs. This is the convention used by `llms.txt` link lists.
+
+```typescript
+// app/docs/[...slug]/route.ts — handles /docs/authentication.md
+export async function GET(
+  request: Request,
+  { params }: { params: { slug: string[] } }
+) {
+  const lastSegment = params.slug[params.slug.length - 1]
+
+  if (!lastSegment.endsWith('.md')) {
+    return new Response('Not found', { status: 404 })
+  }
+
+  const slug = [
+    ...params.slug.slice(0, -1),
+    lastSegment.slice(0, -3),
+  ]
+
+  const page = source.getPage(slug)
+
+  if (!page) {
+    return new Response('Not found', { status: 404 })
+  }
+
+  return new Response(page.data._raw.sourceFileContent, {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Vary': 'Accept',
+    },
+  })
+}
+```
+
+## Express / Node.js
+
+```typescript
+import express from 'express'
+import { readDocPage } from './docs'
+
+const app = express()
+
+app.get('/docs/:slug', async (req, res) => {
+  const page = await readDocPage(req.params.slug)
+
+  if (!page) {
+    return res.status(404).json({ error: 'Page not found' })
+  }
+
+  const accept = req.headers.accept ?? ''
+
+  if (accept.includes('text/markdown')) {
+    const markdown = page.markdown
+    const tokenCount = Math.ceil(markdown.length / 4)
+
+    return res
+      .status(200)
+      .set({
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Vary': 'Accept',
+        'x-markdown-tokens': String(tokenCount),
+      })
+      .send(markdown)
+  }
+
+  return res.status(200).send(page.html)
+})
+```
+
+## Required Headers
+
+**`Content-Type: text/markdown; charset=utf-8`** — Identifies the response as Markdown. Use the registered MIME type. Do not use `text/plain` for Markdown responses — it loses semantic meaning.
+
+**`Vary: Accept`** — Critical for CDN caching correctness. Without this header, a CDN may cache the Markdown response and serve it to browsers requesting HTML (or vice versa). `Vary: Accept` tells the CDN to cache separate copies for different `Accept` values.
+
+**`x-markdown-tokens`** — An informal header carrying the estimated token count. Not standardized, but useful for agents that want to budget their context window before fetching. Omit if you do not compute it.
+
+```
+HTTP/2 200
+Content-Type: text/markdown; charset=utf-8
+Vary: Accept
+x-markdown-tokens: 1847
+Cache-Control: public, max-age=3600
+```
+
+## Cloudflare Markdown for Agents
+
+Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown conversion at the edge. When enabled, Cloudflare intercepts requests with `Accept: text/markdown`, fetches the HTML origin response, converts it to Markdown, and returns the Markdown to the agent.
+
+This requires no changes to your origin server. Enable it in the Cloudflare dashboard under Speed > Optimization > Markdown for Agents.
+
+The conversion is imperfect — Cloudflare strips navigation, footers, and ads, but complex layouts may not convert cleanly. Origin-served Markdown is preferable when you control the stack. Cloudflare's conversion is a pragmatic option for sites where modifying the origin is impractical.
+
+## HTML Fallback Signals
+
+Even when you do not implement server-side content negotiation, you can signal Markdown availability in the HTML `` `<head>` ``:
+
+```html
+<link
+  rel="alternate"
+  type="text/markdown"
+  href="/docs/authentication.md"
+  title="Authentication (Markdown)"
+/>
+```
+
+This follows the same pattern as RSS feed discovery (`<link rel="alternate" type="application/rss+xml">`). Agents that look for alternate representations find the Markdown URL without having to guess or use Accept headers.
+
+## The "Copy for AI" Pattern
+
+A growing pattern on developer documentation sites is a "Copy for AI" button that copies the page's Markdown source to the clipboard. Users paste it directly into their AI chat or IDE context.
+
+```typescript
+// components/CopyForAI.tsx
+'use client'
+
+import { useState } from 'react'
+
+interface CopyForAIProps {
+  markdownUrl: string
+}
+
+export function CopyForAI({ markdownUrl }: CopyForAIProps) {
+  const [state, setState] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle')
+  const [tokenCount, setTokenCount] = useState<number | null>(null)
+
+  async function handleCopy() {
+    setState('loading')
+
+    const response = await fetch(markdownUrl, {
+      headers: { Accept: 'text/markdown' },
+    })
+
+    if (!response.ok) {
+      setState('error')
+      return
+    }
+
+    const markdown = await response.text()
+    const tokens = response.headers.get('x-markdown-tokens')
+
+    if (tokens) {
+      setTokenCount(Number(tokens))
+    }
+
+    await navigator.clipboard.writeText(markdown)
+    setState('copied')
+    setTimeout(() => setState('idle'), 2000)
+  }
+
+  return (
+    <button onClick={handleCopy} disabled={state === 'loading'}>
+      {state === 'copied'
+        ? `Copied${tokenCount ? ` (~${tokenCount} tokens)` : ''}`
+        : state === 'loading'
+          ? 'Loading...'
+          : 'Copy for AI'}
+    </button>
+  )
+}
+```
+
+Displaying the token count alongside the copy confirmation sets expectations for the user. Someone pasting 25,000 tokens into a model with a 32K context window should know that before pasting.
+
+## What Not to Strip
+
+When generating Markdown for agents, preserve:
+
+- All code blocks with language identifiers
+- Table content — agents parse Markdown tables directly
+- Internal links — relative links are still useful for context
+- Heading hierarchy — agents use this for navigation and summarization
+
+Strip:
+
+- Navigation menus and breadcrumbs
+- Footer content (social links, legal notices)
+- Cookie consent banners and modals
+- Advertisement placeholders
+- HTML-only interactive elements (accordions, tabs — flatten to headings and content)

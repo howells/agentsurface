@@ -1,0 +1,350 @@
+---
+title: Schema Introspection
+description: Enabling agents to discover CLI commands, parameters, and types at runtime without pre-loaded documentation
+---
+
+## Summary
+
+Schema introspection lets agents discover CLI capabilities at runtime without pre-loaded documentation. This solves staleness (docs may not match installed version), context cost (no need to load full docs upfront), and version mismatches (agents query the current version). Implementing --help --json or a --schema flag enables this discovery without breaking human-readable help.
+
+- Runtime discovery solves staleness, context cost, and version mismatches
+- --help --json returns machine-readable command metadata
+- Include parameter types, constraints, and required flags
+- Support --schema subcommands for programmatic introspection
+- Machine-readable help output should list commands and their parameters
+
+An agent operating without pre-loaded documentation must be able to discover what a CLI accepts at runtime. This is schema introspection — the ability to query the CLI itself for a machine-readable description of its commands, parameters, types, and constraints.
+
+Human-readable `--help` text does not satisfy this. It is written for scanning, not parsing. An agent trying to extract parameter types from `--help` text is doing brittle string matching against text that will change without warning.
+
+## Why Runtime Discovery Matters
+
+Pre-stuffing a CLI's documentation into an agent's context window has three problems:
+
+1. **Staleness.** The documentation you loaded last week may not match the CLI version installed today. API-backed CLIs change frequently.
+2. **Context cost.** Full documentation for a complex CLI may be tens of thousands of tokens. Loading it all upfront consumes budget whether or not the agent needs those commands.
+3. **Version mismatches.** The agent may be running in environments with different CLI versions. Hardcoded documentation will silently mismatch.
+
+Runtime schema discovery solves all three. The agent queries the installed CLI for its current schema and uses exactly what it finds.
+
+## `--help --json`
+
+The lowest-barrier starting point is making `--help` output machine-readable when combined with `--json`:
+
+```bash
+# Human-readable help
+$ mytool user create --help
+Create a new user account.
+
+Usage:
+  mytool user create [flags]
+
+Flags:
+  --name string       Display name for the user (required)
+  --email string      Email address (required)
+  --role string       Role: admin, member, viewer (default: member)
+  --no-welcome        Skip the welcome email
+
+# Machine-readable help
+$ mytool user create --help --json
+```
+
+```json
+{
+  "command": "user create",
+  "description": "Create a new user account.",
+  "flags": [
+    {
+      "name": "name",
+      "type": "string",
+      "required": true,
+      "description": "Display name for the user"
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "format": "email",
+      "required": true,
+      "description": "Email address"
+    },
+    {
+      "name": "role",
+      "type": "string",
+      "enum": ["admin", "member", "viewer"],
+      "default": "member",
+      "required": false,
+      "description": "User role"
+    },
+    {
+      "name": "welcome",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "description": "Send welcome email on creation"
+    }
+  ]
+}
+```
+
+This makes the parameter contract machine-readable without requiring a separate `describe` subcommand.
+
+## The `describe` Command
+
+For deeper introspection, provide a dedicated `describe` command (or `schema`, or `inspect`) at the top level and on every subgroup:
+
+```bash
+# Describe the full CLI
+mytool describe
+
+# Describe a command group
+mytool user describe
+
+# Describe a specific command
+mytool user create describe
+```
+
+The describe command returns a structured schema document covering the command tree, all parameters, types, required status, defaults, enums, and relationships between commands.
+
+```bash
+$ mytool describe --json
+```
+
+```json
+{
+  "name": "mytool",
+  "version": "2.4.1",
+  "commands": [
+    {
+      "name": "user",
+      "description": "Manage user accounts",
+      "commands": [
+        {
+          "name": "create",
+          "description": "Create a new user account",
+          "flags": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "description": "Display name for the user"
+            },
+            {
+              "name": "email",
+              "type": "string",
+              "format": "email",
+              "required": true,
+              "description": "Email address"
+            },
+            {
+              "name": "role",
+              "type": "string",
+              "enum": ["admin", "member", "viewer"],
+              "default": "member",
+              "required": false,
+              "description": "User role"
+            }
+          ],
+          "args": [],
+          "returns": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        {
+          "name": "list",
+          "description": "List user accounts with optional filtering",
+          "flags": [
+            {
+              "name": "status",
+              "type": "string",
+              "enum": ["active", "suspended", "pending"],
+              "required": false,
+              "description": "Filter by account status"
+            },
+            {
+              "name": "fields",
+              "type": "string",
+              "required": false,
+              "description": "Comma-separated list of fields to include in the response"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "required": ["id", "name", "email", "role", "status"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "role": {"type": "string", "enum": ["admin", "member", "viewer"]},
+          "status": {"type": "string", "enum": ["active", "suspended", "pending"]},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}
+```
+
+## Live Runtime-Resolved Schemas
+
+Static embedded schemas have the same staleness problem as pre-loaded documentation. The highest-value implementation resolves schemas at runtime from a discovery document — typically the same OpenAPI spec the API itself uses.
+
+```bash
+$ mytool user create --help --json
+# The CLI fetches the current spec from the API's /openapi.json,
+# extracts the schema for POST /users, and returns it as the flag schema.
+# This always reflects the installed API version, not a bundled snapshot.
+```
+
+```typescript
+async function getCommandSchema(command: string): Promise<CommandSchema> {
+  // Fetch live spec from the backing API
+  const spec = await fetchOpenAPISpec(api.baseURL + '/openapi.json');
+
+  // Find the operation matching this command
+  const operation = findOperation(spec, command);
+
+  // Translate OpenAPI operation to CLI flag schema
+  return operationToFlagSchema(operation);
+}
+```
+
+Live schemas surface new fields immediately when the API adds them, without requiring a CLI release. Agents can use new fields in raw payloads (see [Raw Payload Input](./raw-payload-input)) even before the CLI adds convenience flags for them.
+
+## Including Scopes, Enums, and Nested Types
+
+A complete schema exposes everything an agent needs to construct a valid call:
+
+**OAuth scopes required:**
+```json
+{
+  "command": "user delete",
+  "required_scopes": ["users:write", "admin"],
+  "description": "Requires admin scope or users:write scope"
+}
+```
+
+**Exhaustive enums with descriptions:**
+```json
+{
+  "name": "status",
+  "type": "string",
+  "enum": [
+    {"value": "active", "description": "Account is fully operational"},
+    {"value": "suspended", "description": "Temporarily disabled by an administrator"},
+    {"value": "pending", "description": "Awaiting email verification"},
+    {"value": "deleted", "description": "Scheduled for permanent deletion within 30 days"}
+  ]
+}
+```
+
+**Nested type references:**
+```json
+{
+  "name": "address",
+  "type": "object",
+  "$ref": "#/components/schemas/Address",
+  "description": "Mailing address for the user"
+}
+```
+
+## The SKILL.md Format
+
+SKILL.md is a structured capability declaration that pairs with the CLI binary to give agents a concise, versioned description of what the CLI can do and the invariants they must follow when using it.
+
+A SKILL.md file lives in the repository root (or alongside the binary) and follows this structure:
+
+```markdown
+---
+name: mytool
+version: 2.4.1
+schema_command: mytool describe --json
+auth:
+  type: api_key
+  env: MYTOOL_API_KEY
+  docs: https://docs.example.com/auth
+capabilities:
+  - user management
+  - dns records
+  - billing
+---
+
+# mytool
+
+A CLI for managing Example Platform resources.
+
+## Invariants
+
+- Always pass `--dry-run` before any destructive operation (delete, purge, archive)
+- Always pass `--fields id,name,status` unless full records are required
+- Always pass `--json` or rely on auto-detection when piping output
+
+## Authentication
+
+Set `MYTOOL_API_KEY` to your API key. Obtain from: https://app.example.com/settings/api-keys
+
+## Common Workflows
+
+### Create a user and immediately assign a role
+
+```bash
+mytool user create --name "Alice Chen" --email alice@example.com --json | \
+  jq -r '.id' | \
+  xargs -I{} mytool user role assign {} --role admin
+```
+
+### Bulk-export active users as NDJSON
+
+```bash
+mytool user list --status active --all --json
+```
+
+## Safety
+
+- `user delete` is irreversible. Always `--dry-run` first.
+- `dns record delete` propagates within 60 seconds. Verify the record before deletion.
+```
+
+The YAML frontmatter is machine-readable metadata. The Markdown body is prose guidance for the agent's context. The `schema_command` field tells the agent exactly how to fetch the full runtime schema for any command.
+
+Auto-generate SKILL.md from your CLI's describe output as part of your release pipeline:
+
+```bash
+# Generate SKILL.md from live schema
+mytool describe --json | generate-skill-md > SKILL.md
+```
+
+## Scoring Rubric
+
+This axis is part of the [Agent DX CLI Scale](./cli-scale).
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only `--help` text. No machine-readable schema. |
+| 1 | `--help --json` or a `describe` command for some surfaces, but incomplete. |
+| 2 | Full schema introspection for all commands — params, types, required fields — as JSON. |
+| 3 | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
+
+## Checklist
+
+- [ ] `--help --json` is supported on every command and returns structured JSON
+- [ ] `describe` command (or equivalent) available at the top level and every subgroup
+- [ ] Schema output includes: flag names, types, required status, defaults, enums, descriptions
+- [ ] Enum fields list every valid value with a description for each
+- [ ] Schema includes OAuth scopes or permission requirements per command
+- [ ] Nested types are included by reference or inline in the schema
+- [ ] Return schemas describe the shape of every command's output
+- [ ] SKILL.md file ships with the CLI in the repository root
+- [ ] SKILL.md frontmatter includes `schema_command` pointing to the introspection command
+- [ ] Schema generation is part of the release pipeline to prevent drift
+
+## Related Pages
+
+- [Raw Payload Input](./raw-payload-input) — using the schema to construct payloads directly
+- [Agent Knowledge Packaging](./agent-knowledge-packaging) — SKILL.md and context file conventions
+- [The Agent DX CLI Scale](./cli-scale) — full scoring framework

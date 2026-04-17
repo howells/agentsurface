@@ -1,0 +1,343 @@
+---
+title: Vector Databases
+description: Pinecone, Weaviate, Qdrant, pgvector, LanceDB comparison and selection
+---
+
+Vector databases store and search high-dimensional embeddings efficiently via approximate nearest neighbor (ANN) algorithms like HNSW or learned indices.
+
+## Summary
+
+**April 2026 breakthrough:** pgvector + pgvectorscale now rivals Pinecone at 75% lower cost. Choose serverless (Pinecone) for hands-off ops, pgvector for cost-sensitive, Qdrant for fine-grained control, or Weaviate for native hybrid search. **Self-hosted is now cost-competitive for >100K vectors.**
+
+**Key takeaways:**
+- **Pinecone serverless:** Managed, hybrid + rerank, auto-scaling. $16/1M RUs.
+- **pgvector + pgvectorscale:** Self-hosted PostgreSQL, 28x lower latency, 75% cheaper. Requires ops.
+- **Qdrant:** HNSW + quantization, self-host or cloud. $0.20/1M RUs.
+- **Weaviate:** Native BM25 + dense hybrid, GraphQL API. $0.50/1k reads.
+- **LanceDB:** Multi-vector (ColBERT), serverless, TypeScript-native.
+
+## Selection matrix
+
+| DB | Dims | Latency (p95) | Cost/vector | Self-host | Hybrid | Rerank | Best for |
+|----|------|---------------|-------------|-----------|--------|--------|----------|
+| **Pinecone** | Any | 50–100ms | $16/1M RUs | No | Yes | Yes | Managed, variable workloads |
+| **pgvector + pgvectorscale** | Any | 5–15ms | $70/mo (EC2) | Yes | No (use FTS) | No | Cost-sensitive, high-throughput |
+| **Qdrant** | Any | 10–30ms | $0.20/1M RUs | Yes | Sparse+dense | No | Control + quantization |
+| **Weaviate** | Any | 50–100ms | $0.50/1k reads | Yes | Yes (native) | No | Native hybrid |
+| **LanceDB** | Any | 20–50ms | Free (OSS) | Yes | No | No | Multi-vector (ColBERT) |
+| **Milvus** | Any | 50–100ms | Infrastructure | Yes | No | No | Large-scale distributed |
+| **MongoDB Atlas** | Any | 100–300ms | $0.02/1M | No | No | No | MongoDB integration |
+| **Turbopuffer** | Any | 50–100ms | Serverless | No | No | No | Serverless, agentic |
+| **Redis Vector** | Any | `<10ms` | $0.07/GB | No (managed) | No | No | Low-latency sessions |
+
+## Pinecone serverless
+
+```typescript
+import { Pinecone } from '@pinecone-database/pinecone';
+
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
+// Upsert with metadata
+async function indexDocs(docs: any[], embeddings: number[][]) {
+  const index = pinecone.index('main');
+
+  await index.upsert(
+    docs.map((doc, i) => ({
+      id: doc.id,
+      values: embeddings[i],
+      metadata: {
+        text: doc.text,
+        source: doc.source,
+        createdAt: new Date().toISOString(),
+      },
+    }))
+  );
+}
+
+// Query with metadata filter
+async function search(query: string, embedding: number[]) {
+  const index = pinecone.index('main').namespace('tenant-1'); // Multi-tenant
+
+  const results = await index.query({
+    vector: embedding,
+    topK: 10,
+    filter: {
+      source: { $eq: 'legal' }, // Metadata filter
+    },
+    includeMetadata: true,
+  });
+
+  return results.matches.map((m) => ({
+    id: m.id,
+    score: m.score,
+    text: m.metadata?.text,
+  }));
+}
+```
+
+## pgvector + pgvectorscale
+
+**2026 winner for cost-sensitive production:**
+
+```sql
+-- Install extension
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgvectorscale;
+
+-- Table with embedding + HNSW index
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  embedding vector(1536),
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- HNSW index (pgvector)
+CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops);
+
+-- Streaming DiskANN index (pgvectorscale, more efficient)
+CREATE INDEX ON documents USING diskann (embedding);
+
+-- Full-text search for BM25
+CREATE INDEX fts_idx ON documents USING GIN(
+  to_tsvector('english', text)
+);
+```
+
+TypeScript client (Drizzle ORM):
+
+```typescript
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import { pgTable, serial, text, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { vector } from 'pgvector/drizzle';
+import { sql } from 'drizzle-orm';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const db = drizzle(pool);
+
+const documents = pgTable('documents', {
+  id: serial('id').primaryKey(),
+  text: text('text').notNull(),
+  embedding: vector('embedding', { dimensions: 1536 }),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Insert
+async function indexDoc(doc: { text: string; metadata?: any }, emb: number[]) {
+  await db.insert(documents).values({
+    text: doc.text,
+    embedding: emb,
+    metadata: doc.metadata,
+  });
+}
+
+// Vector search
+async function vectorSearch(queryEmbedding: number[], limit: number = 10) {
+  const results = await db
+    .select()
+    .from(documents)
+    .orderBy(sql`embedding <-> ${queryEmbedding}`)
+    .limit(limit);
+
+  return results;
+}
+
+// Hybrid: FTS + vector
+async function hybridSearch(
+  query: string,
+  queryEmbedding: number[],
+  limit: number = 10
+) {
+  const ftsResults = await db
+    .select()
+    .from(documents)
+    .where(sql`to_tsvector('english', text) @@ plainto_tsquery('english', ${query})`)
+    .limit(limit);
+
+  const vectorResults = await vectorSearch(queryEmbedding, limit);
+
+  // Merge and deduplicate
+  const merged = new Map();
+  ftsResults.forEach((r, i) => {
+    merged.set(r.id, { ...r, ftsRank: i });
+  });
+  vectorResults.forEach((r, i) => {
+    if (merged.has(r.id)) {
+      merged.get(r.id).vectorRank = i;
+    } else {
+      merged.set(r.id, { ...r, vectorRank: i });
+    }
+  });
+
+  return Array.from(merged.values()).sort(
+    (a, b) =>
+      ((a.ftsRank ?? 999) + (a.vectorRank ?? 999)) -
+      ((b.ftsRank ?? 999) + (b.vectorRank ?? 999))
+  );
+}
+```
+
+## Qdrant
+
+```typescript
+import { QdrantClient } from '@qdrant/js-client-rest';
+
+const client = new QdrantClient({ url: 'http://localhost:6333' });
+
+// Create collection with binary quantization
+async function setupCollection() {
+  await client.recreateCollection('docs', {
+    vectors: {
+      size: 1536,
+      distance: 'Cosine',
+    },
+    quantization_config: {
+      binary: {
+        always_ram: false, // Use disk for quantized vectors
+      },
+    },
+  });
+}
+
+// Upsert with quantization
+async function indexDocs(docs: any[]) {
+  const points = docs.map((doc) => ({
+    id: parseInt(doc.id),
+    vector: doc.embedding,
+    payload: {
+      text: doc.text,
+      source: doc.source,
+    },
+  }));
+
+  await client.upsert('docs', {
+    wait: true,
+    points,
+  });
+}
+
+// Search with metadata filter
+async function search(query: string, embedding: number[]) {
+  const results = await client.search('docs', {
+    vector: embedding,
+    limit: 10,
+    filter: {
+      must: [
+        {
+          key: 'source',
+          match: {
+            value: 'legal',
+          },
+        },
+      ],
+    },
+  });
+
+  return results.map((r) => ({
+    id: r.id,
+    score: r.score,
+    text: r.payload?.text,
+  }));
+}
+```
+
+## Weaviate: native hybrid
+
+```typescript
+import weaviate from 'weaviate-ts-client';
+
+const client = weaviate.client({
+  scheme: 'http',
+  host: 'localhost:8080',
+});
+
+// Hybrid search (BM25 + dense)
+async function hybridSearch(query: string, embedding: number[]) {
+  const where = {
+    path: ['source'],
+    operator: 'Equal',
+    valueString: 'legal',
+  };
+
+  const result = await client.graphql
+    .get()
+    .withClassName('Document')
+    .withWhere(where)
+    .withHybrid({
+      query: query,
+      vector: embedding,
+      alpha: 0.5, // 50/50 BM25 + dense
+    })
+    .withFields(['text', 'source', '_additional {score, certainty}'])
+    .withLimit(10)
+    .do();
+
+  return result.data.Get.Document;
+}
+```
+
+## LanceDB: multi-vector native
+
+```typescript
+import * as lancedb from '@lancedb/lancedb';
+
+const db = await lancedb.connect(':memory:');
+
+// Multi-vector table (ColBERT)
+async function createMultiVectorTable() {
+  const table = await db.createTable('docs', [
+    {
+      id: 1,
+      text: 'example',
+      token_embeddings: [[0.1, 0.2], [0.3, 0.4]], // Token-level embeddings
+      metadata: { source: 'legal' },
+    },
+  ]);
+
+  return table;
+}
+
+// Search by token-level similarity
+async function tokenSearch(queryTokens: number[][], limit: number = 10) {
+  const table = await db.openTable('docs');
+
+  // MaxSim operator (approximate)
+  const results = await table
+    .search(queryTokens[0]) // Search by first query token
+    .limit(limit)
+    .toList();
+
+  return results;
+}
+```
+
+## Migration checklist: switching vector DBs
+
+- [ ] Identify current index schema (dims, distance metric, quantization)
+- [ ] Export all vectors + metadata to JSON/CSV
+- [ ] Map schema to new DB (add quantization, adjust field types)
+- [ ] Batch import with retry logic (handle rate limits)
+- [ ] Run shadow traffic (route % of queries to new DB, compare results)
+- [ ] Verify latency (p95, p99) on new DB
+- [ ] Cutover with fallback (route traffic, monitor errors, revert if needed)
+- [ ] Evaluate cost (RUs, storage, compute) on new DB
+- [ ] Decommission old DB after cooldown period (1–2 weeks)
+
+## Cost estimation (100K vectors, 1536 dims)
+
+**Pinecone:** 100K × 0.33 cents/vector/month = $330 storage + $16 per 1M RUs ≈ $500/mo  
+**pgvector (AWS EC2 t3.large):** ~$70/mo (reusable for other services)  
+**Qdrant Cloud:** ~$100/mo (similar to pgvector self-host)  
+**Weaviate Cloud:** ~$200/mo
+
+## See also
+
+- [Pinecone docs](https://docs.pinecone.io)
+- [pgvector GitHub](https://github.com/pgvector/pgvector)
+- [pgvectorscale](https://github.com/timescale/pgvectorscale)
+- [Qdrant docs](https://qdrant.tech/documentation/)
+- [Weaviate docs](https://weaviate.io/developers/weaviate)
+- [LanceDB docs](https://lancedb.com/docs)

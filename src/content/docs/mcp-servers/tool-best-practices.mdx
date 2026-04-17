@@ -1,0 +1,340 @@
+---
+title: Tool Definition Best Practices
+description: Writing tool names, descriptions, and schemas that agents can reason about reliably
+---
+
+## Summary
+
+Tool definitions determine agent behavior. Use snake_case verb_noun format (billing_create_invoice, not createInvoice). Descriptions function as prompts that guide agent selection and sequencing. Good descriptions answer four questions: what does this do, when to call it, what triggers it, and what it returns. Namespace tools when multiple servers are connected.
+
+- Naming: snake_case, verb_noun pattern, domain-prefixed when shared context
+- Descriptions: instructions, not marketing; answer four questions
+- Schema: describe every field with .describe(); list required parameters
+- Negative trigger conditions: "don't use this if..."
+- Include output shape and success conditions in descriptions
+
+Tool definitions are the primary interface between your server and the agent using it. An agent cannot ask you to clarify what a tool does — it reads the name and description, infers intent, decides whether to call it, and constructs the arguments. Every ambiguity in your definition becomes a failure mode at runtime.
+
+## Naming Conventions
+
+Tool names must communicate two things instantly: the action being performed and the object being acted on.
+
+**Use snake_case with a verb_noun pattern:**
+
+```
+billing_create_invoice       ✓ clear domain, clear action
+billing_list_invoices        ✓ plural for list operations
+billing_get_invoice          ✓ singular for fetch by ID
+billing_void_invoice         ✓ domain verb (not billing_delete_invoice)
+billing_send_invoice_email   ✓ three-part names are fine for specificity
+```
+
+**Avoid:**
+
+```
+createInvoice        ✗ camelCase — inconsistent with MCP convention
+invoice              ✗ no verb — is this a getter? creator? list?
+do_billing_thing     ✗ vague verb
+create               ✗ no noun — create what?
+billing_crud         ✗ multiple operations in one name
+```
+
+**Namespace everything when multiple servers are in scope.** When an agent is connected to five servers simultaneously, tool names collide without a namespace prefix. The billing server uses `billing_`, the documents server uses `docs_`, the CRM server uses `crm_`. Agents resolve ambiguity by reading names alone — make that resolution trivial.
+
+## Description Writing as Prompt Engineering
+
+The tool description is executed as a prompt fragment. The model reads it to decide whether to call this tool, when to call it, and in what order relative to other tools. Write it as instructions, not marketing copy.
+
+A good description answers four questions:
+
+1. **What does this tool do?** (one sentence, the concrete action)
+2. **When should an agent use it?** (the triggering condition)
+3. **What are the prerequisites?** (what must exist before calling this)
+4. **What are the edge cases?** (what can go wrong, what to do about it)
+
+```typescript
+server.tool(
+  "billing_create_invoice",
+
+  // BAD: marketing copy — tells the agent nothing actionable
+  "Creates invoices for your customers using our powerful billing system.",
+
+  // GOOD: answers all four questions
+  "Creates a new invoice and returns the invoice ID and a hosted payment URL. " +
+  "Use when the user wants to charge a customer or bill for services rendered. " +
+  "Requires a valid customer_id — call billing_list_customers first if you only have a name or email. " +
+  "Returns isError: true if the customer has exceeded their credit limit or if a duplicate invoice " +
+  "exists for the same period; check the error message for the specific reason.",
+
+  schema,
+  handler
+);
+```
+
+The length is appropriate — this is not documentation padding. Each sentence removes an inference the agent would otherwise have to make.
+
+**Common description patterns:**
+
+```typescript
+// For mutation tools, name the side effect explicitly
+"Permanently voids the invoice. This cannot be undone. " +
+"The customer will not be charged. Use only when the invoice was created in error. " +
+"To pause a legitimate invoice instead, use billing_pause_invoice."
+
+// For list tools, document pagination
+"Returns up to 50 invoices matching the filters, ordered by created_at descending. " +
+"Use the cursor field from the response to fetch the next page. " +
+"Returns an empty array (not an error) when no invoices match."
+
+// For tools with important ordering requirements
+"Sends the invoice email to the customer. " +
+"Must be called after billing_create_invoice — calling on a draft invoice returns isError: true. " +
+"Idempotent: calling twice on the same invoice does not send duplicate emails."
+```
+
+## Schema Design with Zod
+
+Every field in your input schema must have a `.describe()` annotation. Without descriptions, the agent has only the field name to work from when constructing arguments.
+
+```typescript
+import { z } from "zod";
+
+const CreateInvoiceSchema = z.object({
+  // UUID format hint prevents the agent from passing a numeric ID
+  customer_id: z
+    .string()
+    .uuid()
+    .describe(
+      "The UUID of the customer to invoice. Get this from billing_list_customers " +
+      "or billing_get_customer — do not pass a customer name or email."
+    ),
+
+  // Integer type with domain context
+  amount_cents: z
+    .number()
+    .int()
+    .positive()
+    .max(100_000_000) // $1M ceiling
+    .describe(
+      "Invoice amount in cents (100 = $1.00). Use integer cents to avoid " +
+      "floating point rounding errors."
+    ),
+
+  // Enum communicates the exact valid set
+  currency: z
+    .enum(["usd", "eur", "gbp", "cad", "aud"])
+    .describe("ISO 4217 currency code. Defaults to the customer's billing currency if omitted."),
+
+  // Regex makes the format machine-verifiable
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
+    .describe(
+      "Payment due date in YYYY-MM-DD format (e.g. '2025-02-28'). " +
+      "Must be today or a future date."
+    ),
+
+  // Optional fields declare their default
+  line_items: z
+    .array(
+      z.object({
+        description: z.string().max(200).describe("Item description shown on the invoice"),
+        quantity: z.number().int().positive().describe("Number of units"),
+        unit_price_cents: z.number().int().positive().describe("Price per unit in cents"),
+      })
+    )
+    .optional()
+    .describe(
+      "Line items to include on the invoice. If omitted, a single line item is created " +
+      "using the amount_cents and any description provided at the top level."
+    ),
+});
+```
+
+**Schema design rules:**
+
+- Use `.uuid()` for ID fields — it rejects numeric IDs that look like strings
+- Use `.enum()` over `z.string()` for fields with a fixed valid set
+- Use `.regex()` to encode format constraints that cannot be expressed with types alone
+- Use `.int()` for counts and monetary amounts — prevents `2.5 items`
+- Use `.max()` on strings and arrays — prevents accidental giant payloads
+- Use `.optional()` with `.describe()` that states the default behavior
+
+## The outputSchema Requirement
+
+When you declare `outputSchema` on a tool, the MCP protocol requires your handler to return a `structuredContent` field alongside (or instead of) the standard `content` array. Declaring an output schema without returning structured content is a protocol violation.
+
+```typescript
+const InvoiceOutputSchema = z.object({
+  invoice_id: z.string().uuid(),
+  status: z.enum(["draft", "open", "paid", "void"]),
+  amount_cents: z.number().int(),
+  payment_url: z.string().url().optional(),
+});
+
+server.tool(
+  "billing_create_invoice",
+  "Creates a new invoice...",
+  CreateInvoiceSchema,
+  { outputSchema: InvoiceOutputSchema },
+  async (params) => {
+    const invoice = await createInvoice(params);
+
+    const structured = {
+      invoice_id: invoice.id,
+      status: invoice.status,
+      amount_cents: invoice.amountCents,
+      payment_url: invoice.hostedUrl ?? undefined,
+    };
+
+    return {
+      // Required when outputSchema is declared
+      structuredContent: structured,
+      // Human-readable content is still useful for agents
+      // that display results to users
+      content: [
+        {
+          type: "text",
+          text: `Invoice ${invoice.id} created for ${formatCents(invoice.amountCents, invoice.currency)}.`,
+        },
+      ],
+    };
+  }
+);
+```
+
+<Callout type="info">
+Declaring `outputSchema` enables downstream agents to receive your tool's output as typed structured data rather than free-form text. Use it for tools whose output will be consumed by other tools or stored in agent state.
+</Callout>
+
+## Response Leanness
+
+Return exactly what the agent needs. Avoid returning full database records when the agent only needs an ID and a status field.
+
+```typescript
+// AVOID: returning the entire record
+return {
+  content: [{
+    type: "text",
+    text: JSON.stringify(invoice), // 40+ fields, most irrelevant
+  }],
+};
+
+// PREFER: returning only the fields agents act on
+return {
+  content: [{
+    type: "text",
+    text: JSON.stringify({
+      invoice_id: invoice.id,
+      status: invoice.status,
+      payment_url: invoice.hostedUrl,
+      amount_cents: invoice.amountCents,
+      currency: invoice.currency,
+      due_date: invoice.dueDate,
+    }),
+  }],
+};
+```
+
+Each extra field in a response consumes tokens in the agent's context window. Over many tool calls in a long session, this adds up. A response that is five times larger than necessary is five times more expensive and may cause context truncation in long-running agents.
+
+## The isError Pattern
+
+MCP distinguishes between two kinds of errors:
+
+- **Protocol errors** — the tool call itself failed (invalid parameters, server crashed, timeout). These throw exceptions and result in MCP error responses. The agent typically cannot recover from these.
+- **Tool execution errors** — the tool ran successfully but the operation failed (customer not found, insufficient balance, duplicate invoice). These return normally with `isError: true` in the content.
+
+Use `isError: true` for all domain errors. The agent can read the error message, understand what happened, and decide to try a different approach.
+
+```typescript
+async (params) => {
+  const customer = await db.customers.findById(params.customer_id);
+
+  if (!customer) {
+    return {
+      isError: true,
+      content: [{
+        type: "text",
+        text: `Customer ${params.customer_id} not found. ` +
+              `Call billing_list_customers to find the correct customer ID.`,
+      }],
+    };
+  }
+
+  if (customer.creditLimitCents < params.amount_cents) {
+    return {
+      isError: true,
+      content: [{
+        type: "text",
+        text: `Invoice amount ${formatCents(params.amount_cents)} exceeds customer credit limit ` +
+              `of ${formatCents(customer.creditLimitCents)}. ` +
+              `Reduce the amount or call billing_increase_credit_limit first.`,
+      }],
+    };
+  }
+
+  const invoice = await createInvoice(customer, params);
+
+  return {
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        invoice_id: invoice.id,
+        status: invoice.status,
+        payment_url: invoice.hostedUrl,
+      }),
+    }],
+  };
+}
+```
+
+## Writing Actionable Error Messages
+
+Every `isError: true` response should tell the agent what to do next. An error message that only states the problem is half complete.
+
+```typescript
+// INCOMPLETE: states the problem, gives no recovery path
+"Customer not found."
+
+// COMPLETE: states the problem and provides recovery steps
+"Customer abc-123 not found. " +
+"If you have the customer's email, call billing_list_customers with filter.email to find their ID. " +
+"If the customer was recently created, there may be a replication delay — retry in 10 seconds."
+
+// INCOMPLETE: vague constraint violation
+"Invalid amount."
+
+// COMPLETE: specifies the constraint and the valid range
+"amount_cents must be between 100 (minimum $1.00) and 100000000 (maximum $1,000,000.00). " +
+`Received: ${params.amount_cents}.`
+```
+
+The pattern is: `[what failed] + [why it failed] + [how to fix it]`. All three parts are required for an agent to recover without human intervention.
+
+<Callout type="warn">
+Never throw uncaught exceptions from tool handlers. Uncaught exceptions produce MCP protocol errors with generic messages. Catch domain errors and return them as `isError: true` responses with actionable messages instead.
+</Callout>
+
+## Tool Granularity
+
+Tools that do too much are ambiguous — the agent cannot tell which variant of the operation will be performed. Tools that do too little require chaining many calls to accomplish a single user intent.
+
+A useful heuristic: each tool should map to a single, coherent user intention.
+
+```typescript
+// TOO BROAD: agent cannot predict the side effects
+"Processes the invoice, which may create, send, void, or archive it based on its current state."
+
+// TOO GRANULAR: three round trips to do one thing
+billing_validate_invoice_params()
+billing_reserve_invoice_number()
+billing_commit_invoice()
+
+// APPROPRIATE: one call, one outcome, predictable side effects
+billing_create_invoice()   // creates draft
+billing_send_invoice()     // transitions to open, sends email
+billing_void_invoice()     // transitions to void, notifies customer
+```
+
+When in doubt, model your tools against the operations in your domain API. One HTTP endpoint, one tool — with the exception of CRUD list/get operations that are often worth splitting.

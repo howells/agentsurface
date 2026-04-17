@@ -1,0 +1,361 @@
+---
+title: Well-Known Discovery Endpoints
+description: Standardized /.well-known/ paths that let agents and protocols discover your capabilities programmatically
+---
+
+## Summary
+
+/.well-known/ is an IETF standard (RFC 5785) for site-wide metadata. Agents use it for capability discovery without prior knowledge. Key files include /.well-known/ai (AI capabilities), /.well-known/mcp (MCP server locations), and /.well-known/openapi.json (API specs). Publishing these enables agents to discover and use your system programmatically.
+
+- /.well-known/ai: JSON describing AI-facing capabilities (64 KB max)
+- /.well-known/mcp: MCP server endpoints and transports
+- /.well-known/openapi.json: Link to OpenAPI specification
+- /.well-known/oauth2-authorization-server: OAuth metadata
+- All responses should be JSON with Content-Type application/json
+
+The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here makes your system participable in agentic protocols without requiring out-of-band configuration.
+
+## /.well-known/ai
+
+The IETF draft "AI Discovery Endpoint" defines `/.well-known/ai` as a JSON file describing a site's AI-facing capabilities. This is the broadest of the well-known files — it covers what AI systems can do with your site, what formats you support, and where to find more specific declarations.
+
+Maximum file size: 64 KB.
+
+```json
+{
+  "version": "1.0",
+  "name": "Acme Platform",
+  "description": "Developer platform for building and deploying applications",
+  "url": "https://example.com",
+  "capabilities": [
+    "api",
+    "mcp",
+    "llms-txt",
+    "openapi",
+    "webhooks"
+  ],
+  "api": {
+    "base_url": "https://api.example.com/v2",
+    "spec": "https://api.example.com/openapi.json",
+    "authentication": {
+      "type": "oauth2",
+      "token_url": "https://auth.example.com/oauth/token",
+      "scopes_url": "https://docs.example.com/api/scopes"
+    }
+  },
+  "mcp": {
+    "endpoint": "https://mcp.example.com",
+    "transports": ["streamable-http", "sse"],
+    "documentation": "https://docs.example.com/mcp"
+  },
+  "llms": {
+    "index": "https://docs.example.com/llms.txt",
+    "full": "https://docs.example.com/llms-full.txt"
+  },
+  "content": {
+    "markdown": true,
+    "vary_accept": true,
+    "formats": ["text/html", "text/markdown", "application/json"]
+  },
+  "contact": {
+    "developer_support": "https://example.com/support",
+    "status": "https://status.example.com"
+  }
+}
+```
+
+Serve with `Content-Type: application/json`. This file is still a draft standard — field names may change before finalization.
+
+## /.well-known/agent-card.json
+
+The Agent-to-Agent (A2A) protocol, developed by Google and now IANA-registered, uses `agent-card.json` for agent-to-agent discovery. When one agent wants to delegate a task to another agent, it fetches the target's agent card to understand capabilities, authentication requirements, and endpoint locations.
+
+```json
+{
+  "name": "Acme Deployment Agent",
+  "description": "Deploys and manages applications on the Acme platform. Can create deployments, roll back, scale, and inspect logs.",
+  "version": "1.2.0",
+  "url": "https://agent.example.com",
+  "documentationUrl": "https://docs.example.com/agents/deployment",
+  "iconUrl": "https://example.com/agent-icon.png",
+  "provider": {
+    "organization": "Acme Inc",
+    "url": "https://example.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": true,
+    "multiTurn": true
+  },
+  "authentication": {
+    "schemes": ["Bearer"],
+    "credentials": "https://auth.example.com/agent/token"
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "deploy",
+      "name": "Deploy Application",
+      "description": "Creates a new deployment from a git ref or artifact URL. Returns a deployment ID for status tracking.",
+      "tags": ["deploy", "ci", "release"],
+      "examples": [
+        "Deploy the main branch to production",
+        "Roll back to the previous deployment",
+        "Deploy version 2.4.1 to staging"
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "logs",
+      "name": "Fetch Logs",
+      "description": "Retrieves logs for a deployment. Supports filtering by time range, severity, and service.",
+      "tags": ["logs", "observability", "debug"],
+      "examples": [
+        "Show me the last 100 error logs",
+        "Get logs from the auth service in the last hour"
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"]
+    }
+  ]
+}
+```
+
+The A2A protocol uses this card for routing — an orchestrating agent looks up the skills array to decide whether to delegate a task here. The `examples` field in each skill is particularly important: these are used for semantic matching when an agent does not know your agent's ID but is searching for a capable agent by task description.
+
+## /.well-known/mcp.json
+
+MCP server discovery is described in a Server-Endpoint Proposal (SEP) in progress. The proposed path is `/.well-known/mcp.json`:
+
+```json
+{
+  "version": "1.0",
+  "servers": [
+    {
+      "name": "Acme MCP Server",
+      "description": "Full API access via MCP. Tools for deployments, projects, and team management.",
+      "url": "https://mcp.example.com",
+      "transport": "streamable-http",
+      "authentication": {
+        "type": "oauth2",
+        "authorization_url": "https://auth.example.com/oauth/authorize",
+        "token_url": "https://auth.example.com/oauth/token",
+        "scopes": {
+          "deployments:read": "Read deployment status and logs",
+          "deployments:write": "Create and modify deployments",
+          "projects:read": "List and inspect projects",
+          "projects:write": "Create and modify projects"
+        }
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": true,
+        "prompts": true,
+        "sampling": false
+      }
+    }
+  ]
+}
+```
+
+This format is still evolving. Check the MCP specification repository for the latest field definitions before implementing.
+
+## /.well-known/acp.json
+
+The Agentic Commerce Protocol (ACP) uses `acp.json` for capability advertisement. ACP focuses on commercial agent interactions — agents that can transact, book, purchase, or negotiate on behalf of users.
+
+```json
+{
+  "version": "1.0",
+  "provider": {
+    "name": "Acme Inc",
+    "url": "https://example.com",
+    "description": "Developer platform and marketplace"
+  },
+  "capabilities": [
+    {
+      "type": "api_access",
+      "description": "Programmatic access to all platform features",
+      "endpoint": "https://api.example.com/v2",
+      "pricing": "per_request",
+      "documentation": "https://docs.example.com/api"
+    },
+    {
+      "type": "subscription_management",
+      "description": "Purchase and manage platform subscriptions",
+      "endpoint": "https://api.example.com/v2/billing",
+      "documentation": "https://docs.example.com/billing"
+    }
+  ],
+  "contact": {
+    "technical": "api@example.com",
+    "commercial": "partnerships@example.com"
+  }
+}
+```
+
+## /openapi.json
+
+While not technically a `/.well-known/` path, `/openapi.json` and `/openapi.yaml` are the de facto standard locations for OpenAPI specifications. Many API clients, agent frameworks, and developer tools check these paths automatically.
+
+Serve your primary OpenAPI spec at one of these conventional paths:
+
+```
+/openapi.json        ← most commonly checked
+/openapi.yaml        ← for teams that prefer YAML
+/api/openapi.json    ← if your API lives under /api
+/api-docs            ← Swagger UI convention
+```
+
+Redirect from all conventional paths to your canonical spec location rather than serving different files at each path. Agents that hit a redirect follow it; the canonical URL stays stable.
+
+## agents.txt
+
+The IETF draft "Agent Capability Declaration" proposes `agents.txt` as a text file (at `/agents.txt`) that declares agent-accessible capabilities in a human- and machine-readable format:
+
+```
+# agents.txt
+# Agent capability declaration for example.com
+
+Name: Acme Platform
+Version: 2.4
+Contact: api@example.com
+
+# API Capabilities
+API: https://api.example.com/v2
+API-Spec: https://api.example.com/openapi.json
+API-Auth: oauth2-client-credentials
+API-Docs: https://docs.example.com/api
+
+# MCP
+MCP: https://mcp.example.com
+MCP-Transport: streamable-http
+
+# LLM Index
+LLM-Index: https://docs.example.com/llms.txt
+LLM-Full: https://docs.example.com/llms-full.txt
+
+# Content
+Markdown: yes
+Vary-Accept: yes
+```
+
+The format is `Key: Value`, one declaration per line. Comments begin with `#`. This draft is early-stage and field names are not finalized.
+
+## agents.json
+
+The Wildcard AI standard uses `agents.json` to describe structured workflows — sequences of actions that agents can perform using your API:
+
+```json
+{
+  "version": "1.0",
+  "name": "Acme Platform",
+  "description": "Developer platform for building and deploying applications",
+  "api": {
+    "base_url": "https://api.example.com/v2",
+    "spec": "https://api.example.com/openapi.json",
+    "auth": {
+      "type": "bearer",
+      "token_url": "https://auth.example.com/oauth/token"
+    }
+  },
+  "flows": [
+    {
+      "id": "deploy_application",
+      "name": "Deploy an Application",
+      "description": "Create a new deployment from a git ref and wait for it to complete",
+      "steps": [
+        {
+          "id": "create_deployment",
+          "action": "POST /deployments",
+          "description": "Create the deployment",
+          "required_params": ["project_id", "ref"],
+          "optional_params": ["environment", "strategy"]
+        },
+        {
+          "id": "poll_status",
+          "action": "GET /deployments/{deployment_id}",
+          "description": "Poll until status is 'complete' or 'failed'",
+          "depends_on": "create_deployment",
+          "poll": {
+            "field": "status",
+            "terminal_values": ["complete", "failed"],
+            "interval_seconds": 5,
+            "timeout_seconds": 300
+          }
+        }
+      ],
+      "success_output": "deployment_id, deployment_url, duration_seconds",
+      "failure_output": "deployment_id, error_message, failed_step"
+    }
+  ]
+}
+```
+
+The `flows` array is the distinguishing feature of `agents.json`. Rather than just listing endpoints, it describes complete workflows — what to call, in what order, with what dependencies. Agents can execute a named flow without needing to reason about sequencing themselves.
+
+## NLWeb /ask
+
+NLWeb, published by Microsoft, adds a `/ask` endpoint that provides a conversational interface to any site's content. An agent sends a natural-language question; the site answers it directly rather than returning a list of links.
+
+NLWeb implementations also expose an MCP server interface, making the endpoint usable both for direct HTTP calls and through MCP-compatible agent frameworks.
+
+```
+GET /ask?q=How+do+I+authenticate+with+the+API
+Accept: application/json
+```
+
+```json
+{
+  "question": "How do I authenticate with the API?",
+  "answer": "Authentication uses OAuth 2.0 Client Credentials. POST to https://auth.example.com/oauth/token with grant_type=client_credentials, client_id, and client_secret. The response contains an access_token valid for 3600 seconds. Include it in all API requests as Authorization: Bearer {token}.",
+  "sources": [
+    {
+      "title": "Authentication Guide",
+      "url": "https://docs.example.com/authentication",
+      "excerpt": "..."
+    }
+  ],
+  "confidence": 0.94
+}
+```
+
+The NLWeb reference implementation is available at `github.com/microsoft/NLWeb`. It connects to your existing content (via `llms.txt` or a vector database) and generates answers using a configured LLM backend.
+
+## Advertising Well-Known Files
+
+Once you have published well-known files, reference them from:
+
+**Your `llms.txt`:**
+```markdown
+## API & Integration
+
+- [OpenAPI Specification](https://api.example.com/openapi.json): Full REST API specification
+- [MCP Server](https://docs.example.com/mcp): Connect via Model Context Protocol
+
+## Discovery
+
+- [AI Capabilities](https://example.com/.well-known/ai): Machine-readable capability declaration
+- [Agent Card](https://example.com/.well-known/agent-card.json): A2A protocol discovery
+```
+
+**Your `robots.txt`:**
+```
+# AI discovery files
+# ai-discovery: https://example.com/.well-known/ai
+# agent-card: https://example.com/.well-known/agent-card.json
+# mcp: https://example.com/.well-known/mcp.json
+```
+
+**Your OpenAPI spec:**
+```yaml
+info:
+  x-mcp-server: https://mcp.example.com
+  x-agent-card: https://example.com/.well-known/agent-card.json
+  x-llms-txt: https://docs.example.com/llms.txt
+```
+
+Cross-referencing your discovery files helps agents that start discovery from any entry point find the full picture.

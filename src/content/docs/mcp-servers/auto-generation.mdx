@@ -1,0 +1,230 @@
+---
+title: Auto-Generating MCP from OpenAPI
+description: Generating MCP tool definitions from OpenAPI specs — and why generation alone is not enough
+---
+
+## Summary
+
+Naive OpenAPI-to-MCP generation produces bad servers: 50-300 tools that overwhelm agents, descriptions written for humans not AI reasoning, and operation-shaped rather than intent-shaped tools. The correct workflow is: generate → prune → rewrite → add composites. Target tool count: 10-30 tools per domain. Generated descriptions need rewriting; fields need .describe(); multi-step operations need composite tools.
+
+- Generation is mechanical starting point, not finished server
+- Prune: remove operations agents never need
+- Rewrite: agent-oriented descriptions, field descriptions
+- Composite tools: combine common operation sequences
+- Target: 10-30 tools per domain (not 50-300)
+- Humans handle intent layer; generation handles mechanical mapping
+
+Every OpenAPI spec is a potential MCP server. The mapping is mechanical: each operation becomes a tool, each parameter becomes a schema field, each response becomes a return type. Tooling exists to perform this transformation automatically. The problem is that a mechanical 1:1 mapping produces a bad MCP server, not just a mediocre one.
+
+## Why Naive Generation Fails
+
+An OpenAPI spec for a real API typically contains 50–300 operations. A 1:1 generated MCP server exposes 50–300 tools. Agents cannot reason over 300 tools effectively — the tool list consumes too much context, selection accuracy degrades, and agents pick wrong tools because the descriptions are generated from terse operation summaries rather than written for agent consumption.
+
+Generated descriptions inherit OpenAPI description text, which is written for human developers reading reference docs, not for AI reasoning about intent. Compare:
+
+```
+# Generated from OpenAPI description
+"Creates an invoice resource in the billing subsystem."
+
+# Written for agent consumption
+"Creates a draft invoice and returns the invoice ID and payment URL. " +
+"Use when the user wants to charge a customer. Call list_customers first " +
+"if you only have a name — this tool requires a customer UUID."
+```
+
+Generated Zod schemas omit `.describe()` on fields because OpenAPI field descriptions do not map directly to Zod's `.describe()`. The agent gets parameter names with no context.
+
+Generated tools are operation-shaped, not intent-shaped. APIs often have five separate operations where an agent wants one: `create draft → add line items → set due date → finalize → send`. Generation produces five tools; agents want one `create_and_send_invoice` composite.
+
+## The Hybrid Approach
+
+The correct workflow is: **generate → prune → rewrite → add composites**.
+
+1. **Generate** a full tool list from the spec as a starting point
+2. **Prune** — remove operations that agents never need (internal admin ops, bulk import endpoints, legacy compatibility routes)
+3. **Rewrite** — replace generated descriptions with agent-oriented descriptions, add `.describe()` to every field
+4. **Add composites** — build multi-step tools that combine common operation sequences
+
+This is not a fully automated process. The pruning and rewriting phases require understanding both the domain and how agents reason. Generation handles the mechanical mapping; humans handle the intent layer.
+
+**Target tool count:** Most domain APIs need between 10 and 30 MCP tools. If you have more than 40, reconsider whether agents genuinely need all of them or whether the excess is residual from generation.
+
+## Tool Comparison
+
+### Stainless
+
+Stainless generates SDKs and MCP servers from OpenAPI specs. Its key insight is the **two-tool architecture**: instead of generating one tool per operation, it generates two tools per major resource:
+
+- `{resource}_get` — fetch a resource by ID, with all its relationships
+- `{resource}_search` — find resources matching a filter
+
+This dramatically reduces tool count and models how agents actually use APIs — they either know what they want (get by ID) or they need to find it (search with filters).
+
+```yaml
+# stainless.yml — configuration for MCP output
+mcp:
+  resources:
+    invoices:
+      tools:
+        - get
+        - search
+        - create
+      descriptions:
+        get: "Fetches a single invoice by ID. Returns the full invoice record including line items and payment status."
+        search: "Searches invoices by customer, status, date range, or amount. Returns up to 50 results with a cursor for pagination."
+        create: "Creates a new draft invoice. Call invoices_send separately to send the payment request."
+```
+
+Stainless generates type-safe, well-described tools when configured correctly. The `descriptions` block in the config is where you replace generated text with agent-oriented descriptions — this is the rewrite phase.
+
+### Speakeasy
+
+Speakeasy generates MCP servers from OpenAPI specs with Zod schema validation and TypeScript types. It respects the `x-speakeasy-mcp` extension for per-operation configuration:
+
+```yaml
+# openapi.yaml
+paths:
+  /invoices:
+    post:
+      operationId: createInvoice
+      x-speakeasy-mcp:
+        name: billing_create_invoice
+        description: >
+          Creates a draft invoice for a customer. Requires a valid customer_id —
+          call billing_list_customers if you only have an email or name.
+          Returns the invoice ID and a hosted payment URL.
+        include: true
+      # standard OpenAPI spec continues...
+```
+
+The `x-speakeasy-mcp` extension overrides the generated tool name and description with your agent-oriented versions. Operations without `include: true` are excluded from the generated MCP server, which handles the pruning phase.
+
+Speakeasy also generates Zod schemas with types from the OpenAPI spec, but you still need to add `.describe()` to the generated schemas — the extension does not currently propagate field descriptions through to Zod annotations.
+
+### FastMCP
+
+FastMCP is a Python-first framework (with a JavaScript port) for building MCP servers. It does not generate from OpenAPI — you define tools in Python or TypeScript directly. For teams using Python or with existing FastAPI applications, FastMCP provides a clean decorator-based syntax:
+
+```python
+# Python example
+from fastmcp import FastMCP
+
+mcp = FastMCP("billing-mcp")
+
+@mcp.tool()
+def billing_create_invoice(
+    customer_id: str,
+    amount_cents: int,
+    currency: str,
+    due_date: str,
+) -> dict:
+    """
+    Creates a draft invoice for a customer.
+    Requires a valid customer_id — call billing_list_customers first.
+    Returns the invoice_id and payment_url.
+    """
+    # implementation
+```
+
+FastMCP is a good choice if you are building the MCP server from scratch rather than deriving it from an existing OpenAPI spec. It is not an auto-generation tool.
+
+### openapi-mcp-generator
+
+`openapi-mcp-generator` is a TypeScript CLI that performs a direct 1:1 generation from OpenAPI to MCP. Use it as the generation step in the hybrid workflow, not as the complete solution:
+
+```bash
+npx openapi-mcp-generator \
+  --spec ./openapi.yaml \
+  --output ./generated \
+  --prefix billing_
+```
+
+The output is a directory of TypeScript files with one tool file per OpenAPI operation. Review the generated files as the starting point for your pruning and rewriting phase. Do not ship the generated output directly.
+
+## The x-speakeasy-mcp Extension
+
+The `x-speakeasy-mcp` extension works with Speakeasy's generator and can be added to any OpenAPI spec as a vendor extension. You can annotate your spec incrementally, adding MCP configuration to the operations you want to expose without modifying the spec's existing structure:
+
+```yaml
+paths:
+  /invoices:
+    post:
+      operationId: createInvoice
+      summary: Create an invoice
+      x-speakeasy-mcp:
+        name: billing_create_invoice
+        include: true
+        description: >
+          Creates a draft invoice. Returns invoice_id and payment_url.
+          Prerequisites: valid customer_id from billing_list_customers.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+
+  /invoices/{id}/void:
+    post:
+      operationId: voidInvoice
+      x-speakeasy-mcp:
+        include: false  # Exclude from MCP — too destructive for agents
+```
+
+Operations marked `include: false` are not generated. Start by setting `include: false` on everything, then enable the operations you want agents to use.
+
+## The Correct Workflow
+
+```
+1. Point generator at your OpenAPI spec
+   npx openapi-mcp-generator --spec ./openapi.yaml --output ./generated
+
+2. Review the generated tool list
+   - How many tools were generated?
+   - Which operations do agents genuinely need?
+   - Which are internal, admin, or legacy?
+
+3. Prune: mark excluded operations in openapi.yaml with x-speakeasy-mcp.include: false
+   Target: 10-30 tools for a focused domain server
+
+4. Rewrite descriptions in openapi.yaml or in the generated files
+   - Replace terse API reference text
+   - Add what/when/prerequisites/edge-cases pattern
+   - Add .describe() to every Zod field
+
+5. Add composite tools manually for common multi-step flows
+   - Identify 2-3 operation sequences agents will commonly chain
+   - Build a single tool that performs the full sequence
+
+6. Test with MCP Inspector
+   - Does the tool list make sense?
+   - Do descriptions convey intent clearly?
+   - Do tools cover the common agent workflows?
+
+7. Maintain: when you add endpoints to the spec, decide explicitly
+   whether they should be added to the MCP server
+```
+
+<Callout type="warn">
+Auto-generation produces a starting point, not a finished MCP server. Shipping generated output without the pruning, rewriting, and composite-tool phases will result in a server that technically works but that agents use poorly — wrong tool selection, missing context, redundant calls. The quality of your MCP server is determined by the rewriting phase, not the generation phase.
+</Callout>
+
+## Keeping Generated and Manual Code in Sync
+
+When your API evolves, the generated base needs to stay in sync with your curated additions. The safest pattern is to separate generated from manual code:
+
+```
+src/
+├── generated/           # Never edit by hand — regenerate when spec changes
+│   ├── tools/
+│   │   ├── create-invoice.generated.ts
+│   │   └── list-invoices.generated.ts
+│   └── schemas/
+│       └── invoice.generated.ts
+├── tools/               # Curated wrappers around generated tools
+│   ├── create-invoice.ts   # Wraps generated, adds descriptions
+│   └── list-invoices.ts
+└── composites/          # Manual multi-step tools
+    └── create-and-send-invoice.ts
+```
+
+The `generated/` directory is fully overwritten on each generation run. The `tools/` and `composites/` directories are manually maintained. The curated tools import types from `generated/` but define their own descriptions, schemas, and handlers.

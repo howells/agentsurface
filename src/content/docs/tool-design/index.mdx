@@ -1,0 +1,84 @@
+---
+title: Tool Design
+description: Principles for defining tools that agents select correctly and execute reliably
+---
+
+## Summary
+
+Covers naming conventions, schema design, idempotency, token budgeting, cross-framework portability, and curation. Well-designed tools reduce hallucination, lower token spend, and enable reliable multi-step reasoning. Dimension spans verb-first naming, agent-oriented descriptions ("when to use"), flat typed schemas, output optimization via toModelOutput, and dynamic tool selection for large registries.
+
+- **Naming**: verb_noun pattern in snake_case
+- **Descriptions**: "Use when..." and "Do not use for..." clarity
+- **Schemas**: flat, typed, enum constraints, field descriptions
+- **Idempotency**: dry-run modes, read vs. write classification
+- **Token budget**: pagination contracts, response shape optimization
+- **Portability**: single definition across MCP, AI SDK, OpenAI, Vercel, LangChain
+
+Tool design is the single highest-leverage investment in agent applications. Anthropic, OpenAI, and Google publish broadly similar guidance: name clearly, describe as if onboarding a teammate, keep schemas flat and typed, return semantic content, and fail informatively. Tools that are well-designed for AI consumption reduce hallucination, lower token spend, and enable reliable multi-step reasoning.
+
+This dimension spans naming conventions, schema design, idempotency, token budgeting, cross-framework portability, tool curation, and anti-patterns.
+
+## Dimensions
+
+### Naming and Descriptions
+
+Verbs before nouns. Descriptions written as onboarding prompts, not documentation. "Use when..." and "Do not use for..." clauses disambiguate from sibling tools. ([Anthropic on tool design](https://www.anthropic.com/engineering/writing-tools-for-agents))
+
+See `/docs/tool-design/naming-and-descriptions`.
+
+### Schemas
+
+Flat structures, typed fields, Zod `.describe()`, strict mode (`additionalProperties: false`), enum constraints. Input *and* output schemas keep agents reasoning over typed data. ([JSON Schema 2020-12](https://json-schema.org/specification.html); [OpenAI strict mode](https://platform.openai.com/docs/guides/function-calling))
+
+See `/docs/tool-design/schemas`.
+
+### Idempotency and Safety
+
+Idempotent tools preferred. Dry-run modes, read vs write classification, dangerous-tool annotations (MCP `destructiveHint`). Links to `/docs/error-handling/idempotency`.
+
+See `/docs/tool-design/idempotency-and-safety`.
+
+### Token Budget
+
+Estimating tool-call cost, pagination contracts, response shape for agents. Small responses compound over many tool calls.
+
+See `/docs/tool-design/token-budget`.
+
+### Cross-Framework Portability
+
+The same tool exported as MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK. Single registry, multiple adapters. Links to `/templates/tools-and-orchestration/tool-definition.ts`.
+
+See `/docs/tool-design/cross-framework-portability`.
+
+### Tool Curation
+
+Tool registries, role-based subsets, read-only vs mutating kits. When >20 tools are needed, use dynamic selection (BM25 search) not all-at-once loading. Links to `/templates/tools-and-orchestration/tool-registry.ts`.
+
+See `/docs/tool-design/tool-curation`.
+
+### Anti-Patterns
+
+Ten common mistakes and short fixes: terse descriptions, opaque IDs, nullable parameters, nested unions (OpenAI strict mode rejects), no disambiguation between similar tools, throwing errors instead of returning, etc.
+
+See `/docs/tool-design/anti-patterns`.
+
+## Scoring Rubric
+
+| Score | Criteria | Detection |
+|-------|----------|-----------|
+| 0 | No formal tool definitions. Functions exist but no schema, no description. | No `tool()` calls, no `@tool` decorators, no `createTool()`, no MCP tool registrations. |
+| 1 | Basic tool schemas exist but descriptions are terse or missing. No examples. | Tool definitions present but descriptions `` `<20` `` words. No `.describe()` on Zod fields. No inputExamples. |
+| 2 | Good tool design. `verb_noun` naming. Agent-oriented descriptions with "when to use" and disambiguation. Typed schemas with field descriptions. | Descriptions include "Use when..." and "Do not use for...". All schema fields have descriptions. enum values on constrained strings. `` `<10` `` tools per agent/context. |
+| 3 | Excellent tool design. `toModelOutput` reducing token usage. Tool annotations (`readOnly`, `destructive`, `idempotent`). Dynamic tool selection support (`activeTools`, `defer_loading`). Cross-framework definitions. | `toModelOutput` defined. annotations object present. `activeTools` or `defer_loading` patterns. Tool definitions portable across frameworks. |
+
+## See also
+
+- **[Cookbook: Tool Annotations](/docs/cookbook/tool-annotations)** — READ_ONLY, WRITE, DESTRUCTIVE taxonomy; system prompt integration
+- **[Cookbook: Semantic Tool Selection](/docs/cookbook/semantic-tool-selection)** — embedding-based tool picking at >20 tool scale
+- `/docs/error-handling/idempotency` — retry semantics and idempotency keys
+- `/docs/api-surface/tool-definitions` — existing tool content from MCP servers
+- `/templates/tools-and-orchestration/tool-definition.ts` — starter template
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+- ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
+- ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))
+- ([12-factor agents](https://github.com/humanlayer/12-factor-agents))

@@ -1,0 +1,307 @@
+---
+title: Vitest Evaluation Harness
+description: In-process evals for fast iteration; retry-on-flake, seed pinning, JUnit output
+---
+
+## Summary
+
+In-process evaluation harness for fast local iteration and deterministic routing tests (no LLM-as-judge, temperature 0). Best for TypeScript projects already using Vitest. Produce JUnit output for CI integration. Allow breakpoints, state inspection, and seed pinning for reproducibility. Fastest feedback for quick iteration; not suitable for large-scale eval (1000+cases) or open-ended grading requiring human review.
+
+- **Fast feedback**: 10-50 cases in seconds, no API latency
+- **Local debugging**: Breakpoints, state inspection, traces
+- **Deterministic routing**: Temperature 0, tool selection tests
+- **JUnit output**: CI integration, regression tracking
+- **Seed pinning**: Reproducible agent behavior
+- **Not suitable for**: Open-ended evals, 1000+ cases, human review needs
+
+---
+
+Vitest evals run agents in-process within your test suite. They are faster for local iteration, produce JUnit output for CI, and allow seed pinning for reproducibility. Best for TypeScript projects already using Vitest.
+
+## When to use Vitest evals
+
+- **Fast feedback loop** — 10-50 test cases in seconds, no API latency to external platforms
+- **Local debugging** — set breakpoints, inspect state during agent execution
+- **Deterministic routing** — test tool selection (set temperature 0) without external eval infrastructure
+- **Regression tests** — catch regressions in CI before deploying
+
+Do NOT use for:
+- **Open-ended evals** — if you need LLM-as-judge on every test case, external platforms are simpler
+- **Large-scale evaluation** — if you have 1000+ test cases, use Braintrust or LangSmith
+- **Human review** — if you need to manually review borderline cases, use a managed platform
+
+## Basic structure
+
+```typescript
+// tests/agent.eval.ts
+import { describe, it, expect, beforeEach } from "vitest";
+import { z } from "zod";
+import { MyAgent } from "../src/agent";
+
+describe("Agent Evals", () => {
+  let agent: MyAgent;
+  
+  beforeEach(() => {
+    agent = new MyAgent({
+      model: "claude-opus-4-7",
+      temperature: 0, // Deterministic for evals
+      maxRetries: 1,
+    });
+  });
+  
+  it("should route to search tool for documentation queries", async () => {
+    const result = await agent.run({
+      prompt: "Find the authentication documentation for MCP",
+    });
+    
+    // Assert tool was selected
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0].name).toBe("docs_search");
+    expect(result.toolCalls[0].arguments.query).toMatch(/auth/i);
+  });
+  
+  it("should construct valid parameters", async () => {
+    const result = await agent.run({
+      prompt: "Send invoice inv_001 to customer@example.com",
+    });
+    
+    const sendCall = result.toolCalls.find(c => c.name === "send_invoice");
+    expect(sendCall).toBeDefined();
+    
+    // Validate schema
+    const schema = z.object({
+      invoice_id: z.string().regex(/^inv_/),
+      recipient_email: z.string().email(),
+    });
+    
+    expect(() => schema.parse(sendCall.arguments)).not.toThrow();
+  });
+});
+```
+
+Run with:
+
+```bash
+npm run test -- agent.eval.ts
+```
+
+## Retry-on-flake pattern
+
+LLMs are stochastic. A single test failure might be noise. Retry a few times; pass if any succeeds:
+
+```typescript
+import { retry } from "vitest";
+
+it(
+  "should handle ambiguous intent",
+  async () => {
+    const result = await agent.run({
+      prompt: "Find files related to auth",
+    });
+    
+    // Could mean user authentication, OAuth, MCP OAuth, etc.
+    // Any reasonable tool selection passes
+    const toolName = result.toolCalls[0].name;
+    expect(
+      ["user_auth_search", "oauth_search", "docs_search"].includes(toolName)
+    ).toBe(true);
+  },
+  { retry: 2 } // Retry up to 2 times; pass if any succeeds
+);
+```
+
+This handles non-determinism while keeping tests fast. Don't use retry for deterministic cases (set temperature 0 instead).
+
+## Seed pinning
+
+For reproducibility, pin the LLM seed. Most providers support `seed` parameter:
+
+```typescript
+const agent = new MyAgent({
+  model: "claude-opus-4-7",
+  seed: 12345, // Fixed seed for reproducible routing
+  temperature: 0,
+});
+
+it("should consistently route the same query", async () => {
+  const runs = [];
+  for (let i = 0; i < 3; i++) {
+    const result = await agent.run({ prompt: "Search for docs" });
+    runs.push(result.toolCalls[0].name);
+  }
+  
+  // All runs use the same tool
+  expect(new Set(runs).size).toBe(1);
+});
+```
+
+Note: even with seed, different model versions or parameter changes can affect routing. Seed is necessary but not sufficient for full reproducibility.
+
+## JUnit output for CI
+
+Export Vitest results to JUnit format for easy CI integration:
+
+```bash
+npm run test -- agent.eval.ts --reporter=junit --outputFile=eval-results.xml
+```
+
+Use in GitHub Actions:
+
+```yaml
+# .github/workflows/evals.yml
+- name: Run agent evals
+  run: npm run test -- agent.eval.ts --reporter=junit --outputFile=eval-results.xml
+
+- name: Publish eval results
+  uses: EnricoMi/publish-unit-test-result-action@v2
+  if: always()
+  with:
+    files: eval-results.xml
+    check_name: Agent Evals
+```
+
+## Parametrized test cases
+
+Generate test cases from a dataset:
+
+```typescript
+const testCases = [
+  {
+    name: "Search for docs",
+    prompt: "Find the authentication documentation",
+    expectedTool: "docs_search",
+  },
+  {
+    name: "Search for code",
+    prompt: "Show me the implementation of login",
+    expectedTool: "code_search",
+  },
+  {
+    name: "Request help",
+    prompt: "How do I debug this error?",
+    expectedTool: "ask_human",
+  },
+];
+
+describe.each(testCases)("Tool routing: $name", ({ prompt, expectedTool }) => {
+  it("should select correct tool", async () => {
+    const result = await agent.run({ prompt });
+    expect(result.toolCalls[0].name).toBe(expectedTool);
+  });
+});
+```
+
+## Measuring pass@k locally
+
+Run each test case multiple times, collect results, compute pass@k:
+
+```typescript
+async function runNTrials(prompt: string, n = 5): Promise<boolean[]> {
+  const results: boolean[] = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      const result = await agent.run({ prompt });
+      results.push(result.toolCalls.length > 0); // Simple success criterion
+    } catch (e) {
+      results.push(false);
+    }
+  }
+  return results;
+}
+
+function passAtK(results: boolean[], k: number): number {
+  return results.slice(0, k).some(r => r) ? 1 : 0;
+}
+
+it("should have high pass@5 on ambiguous prompts", async () => {
+  const results = await runNTrials("Find files related to auth", 5);
+  expect(passAtK(results, 5)).toBe(1);
+  
+  // Also report stats
+  const passRate = results.filter(r => r).length / results.length;
+  console.log(`Pass@1: ${results[0] ? 1 : 0}, pass@5: ${passAtK(results, 5)}, rate: ${passRate}`);
+});
+```
+
+## Snapshot testing for trajectories
+
+Save full execution traces and alert on changes:
+
+```typescript
+import { expect, test } from "vitest";
+
+it("should execute consistent plan", async () => {
+  const result = await agent.run({
+    prompt: "Send invoice inv_001",
+  });
+  
+  const trajectory = result.toolCalls.map(c => ({
+    tool: c.name,
+    args: c.arguments,
+  }));
+  
+  // Snapshot: first run saves trajectory, future runs compare
+  expect(trajectory).toMatchSnapshot();
+});
+```
+
+First run creates a snapshot:
+
+```json
+// tests/__snapshots__/agent.eval.ts.snap
+[
+  { "tool": "get_invoice", "args": { "id": "inv_001" } },
+  { "tool": "send_invoice", "args": { "id": "inv_001" } }
+]
+```
+
+Future runs fail if trajectory changes (e.g., tool order, new intermediate tool). Review the diff, update snapshot if intentional:
+
+```bash
+npm run test -- agent.eval.ts -u
+```
+
+## Memory and cost considerations
+
+In-process evals use real API calls. To reduce cost:
+
+- **Mock tool responses** — don't call actual tools, return fixed responses:
+
+```typescript
+const agent = new MyAgent({
+  tools: [
+    {
+      name: "search_docs",
+      handler: async () => ({ results: ["mock doc 1"] }), // Mocked
+    },
+  ],
+});
+```
+
+- **Use cheaper models for routing tests** — temperature 0 with Haiku instead of Opus:
+
+```typescript
+const agentRouting = new MyAgent({
+  model: "claude-haiku-4-5",
+  temperature: 0,
+});
+
+const agentQuality = new MyAgent({
+  model: "claude-opus-4-7",
+});
+
+// Routing tests: fast + cheap
+// Quality tests: slower but higher accuracy
+```
+
+## Template and links
+
+- Template: `/templates/cli-and-evals/eval-vitest-harness.ts` — full working example
+- Vitest docs: https://vitest.dev/
+- Anthropic SDK: https://code.claude.com/docs/en/agent-sdk/typescript
+
+## See also
+
+- `/docs/testing/metrics` — pass@k calculation
+- `/docs/testing/evaluation-framework` — grader patterns
+- `/docs/testing/ci-integration` — GitHub Actions setup

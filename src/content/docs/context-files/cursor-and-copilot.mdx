@@ -1,0 +1,410 @@
+---
+title: Cursor Rules and GitHub Copilot
+description: Tool-specific overrides with progressive disclosure and sync patterns
+---
+
+## Summary
+
+Tool-specific overrides layered on AGENTS.md. Cursor reads `.cursor/rules/*.mdc` files (can scope by glob patterns per file); GitHub Copilot reads `.github/copilot-instructions.md`. Both should reference AGENTS.md and add tool-only guidance. Cursor rules support file-level frontmatter (globs) and multiple rule files scoped to different directories/languages. Keep minimal, avoid duplication, link to shared conventions in AGENTS.md.
+
+- **Cursor rules**: `.cursor/rules/*.mdc` with globs metadata
+- **Copilot instructions**: `.github/copilot-instructions.md` (single file)
+- **Glob scoping**: Apply rules per file pattern (src/**/*.ts)
+- **Reference AGENTS.md**: "See AGENTS.md for project conventions"
+- **Add tool-only**: Cursor/Copilot-specific guidance
+- **Avoid duplication**: Don't repeat AGENTS.md content
+
+---
+
+Cursor reads `.cursor/rules/*.mdc` files. GitHub Copilot reads `.github/copilot-instructions.md`. Both are tool-specific overrides on top of AGENTS.md. Keep them thin and focused: reference shared conventions from AGENTS.md, add tool-only guidance.
+
+## Cursor Rules (.cursor/rules)
+
+Cursor supports multiple rule files scoped by glob patterns. Each file is a `.mdc` (Markdown Cursor) file that specifies where it applies.
+
+### Structure
+
+```markdown
+---
+globs: src/**/*.ts,src/**/*.tsx
+---
+
+# Cursor Rules for TypeScript
+
+See AGENTS.md for project conventions.
+
+## TypeScript-Specific Rules
+
+Always:
+  - Use strict: true in tsconfig
+  - Define function return types explicitly (no inference)
+  - Use const for all immutable bindings
+  - Avoid any; use unknown and narrow
+
+Never:
+  - Use var
+  - Use null; prefer undefined
+  - Use ! non-null assertion without comment
+```
+
+The `globs` frontmatter tells Cursor when to apply these rules (TypeScript files only).
+
+### Glob Patterns
+
+```markdown
+---
+globs: src/components/**/*.tsx
+---
+# React Component Rules
+
+Applies only to React component files.
+```
+
+```markdown
+---
+globs: "*.test.ts,*.spec.ts"
+---
+# Test Rules
+
+Applies only to test files.
+```
+
+### Multi-File Strategy
+
+```
+.cursor/
+├── rules/
+│   ├── typescript.mdc       # TypeScript rules (src/**/*.ts)
+│   ├── react.mdc            # React-specific (src/**/*.tsx)
+│   ├── tests.mdc            # Test files (*.test.ts)
+│   └── api-routes.mdc       # API routes (src/api/**)
+```
+
+Each file is focused on a specific scope. Cursor applies matching rules in order.
+
+### Example: Complete Cursor Rules
+
+```markdown
+---
+globs: "src/**/*.{ts,tsx}"
+---
+
+# TypeScript Project Rules
+
+See AGENTS.md for commands and boundaries.
+
+## Naming
+
+Variables / functions: camelCase
+Types / interfaces: PascalCase
+Constants: UPPER_SNAKE_CASE (if immutable config)
+Files: kebab-case
+
+## TypeScript
+
+Always:
+  - strict: true (tsconfig.json)
+  - Explicit return types on exported functions
+  - Use const for all bindings
+  - Import types: import type { T } from '...'
+
+Never:
+  - any type; use unknown and narrow
+  - null; use undefined
+  - non-null assertion (!) without comment
+  - Function expressions; use const fn = () => {}
+
+## Imports
+
+Order:
+  1. External packages (react, next, zod, etc.)
+  2. Internal absolute paths (src/...)
+  3. Relative paths (../)
+
+Example:
+  import React from 'react';
+  import { z } from 'zod';
+  import { useAuth } from 'src/hooks/useAuth';
+  import { Button } from './Button';
+
+## Comments
+
+Use JSDoc for:
+  - Public functions and types
+  - Non-obvious logic
+  - Why, not what
+
+Avoid:
+  - Stating the obvious (// increment x)
+  - Stale comments (update on code change)
+
+## Error Handling
+
+Return errors, don't throw (in tools):
+  return {
+    success: false,
+    error: { code: 'INVALID_INPUT', message: '...' }
+  };
+
+## Testing
+
+Test file location: src/components/Button.test.tsx (alongside component)
+Test structure: describe, it, expect
+
+```
+
+## GitHub Copilot Instructions
+
+GitHub Copilot reads `.github/copilot-instructions.md`. Similar to Cursor rules but without glob scoping—applies to all files.
+
+### Structure
+
+```markdown
+# GitHub Copilot Custom Instructions
+
+See AGENTS.md for project conventions and commands.
+
+## Coding Style
+
+- TypeScript with strict mode
+- camelCase for functions/variables, PascalCase for types
+- Explicit return types on exported functions
+- Use const; avoid var and null
+
+## API Design
+
+- RESTful routes: /api/v1/...
+- Status codes: 200 (success), 400 (client error), 500 (server error)
+- Error responses: { error: { code, message, details } }
+
+## Testing
+
+- Unit tests alongside source files (.test.ts)
+- Use Vitest; aim for >80% coverage
+- Test behavior, not implementation
+
+## Performance
+
+- Paginate list endpoints (max 50 items)
+- Use indexes on frequently queried columns
+- Avoid N+1 queries; use batch or joins
+
+## Security
+
+- All API routes require authentication
+- Validate input on all endpoints
+- Use parameterized queries (Prisma handles this)
+- Secrets in .env.local, never in git
+```
+
+### Tone and Length
+
+Keep GitHub Copilot instructions concise. Copilot's token budget is smaller than Claude's or Cursor's. Bullet points beat prose.
+
+```markdown
+# GitHub Copilot Custom Instructions
+
+See AGENTS.md for project conventions.
+
+## Quick Guidelines
+
+- TypeScript strict mode; explicit return types
+- camelCase functions, PascalCase types
+- REST API: /api/v1/..., status codes 200/400/500
+- Test alongside source: Component.test.tsx
+- Use const; avoid var and null
+- Paginate lists (max 50); validate all inputs
+```
+
+This is ~80 words—tight and actionable.
+
+## Keeping Files in Sync
+
+AGENTS.md, CLAUDE.md, Cursor rules, and Copilot instructions can drift. Establish a sync pattern:
+
+### Manual Sync Checklist
+
+When AGENTS.md changes, update:
+
+```
+AGENTS.md           ← source of truth for commands, boundaries, tech stack
+├── CLAUDE.md       (reference AGENTS.md, add Claude-only hooks)
+├── .cursor/rules/  (reference AGENTS.md sections, add Cursor-only rules)
+└── .github/copilot-instructions.md (reference AGENTS.md, add Copilot focus areas)
+```
+
+Before committing:
+
+1. Update AGENTS.md with new commands or boundaries
+2. Add reference links in CLAUDE.md: "See AGENTS.md > Boundaries"
+3. Update Cursor rules for affected code paths
+4. Summarize in Copilot instructions (brief version of AGENTS.md)
+5. Commit all files together
+
+### Automated Validation
+
+Add a pre-commit hook to check consistency:
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Check that Cursor rules reference AGENTS.md
+if grep -r "See AGENTS.md" .cursor/rules/ > /dev/null 2>&1; then
+  echo "✓ Cursor rules reference AGENTS.md"
+else
+  echo "✗ Cursor rules missing AGENTS.md reference"
+  exit 1
+fi
+
+# Check that Copilot instructions exist if AGENTS.md does
+if [ -f "AGENTS.md" ] && [ ! -f ".github/copilot-instructions.md" ]; then
+  echo "✗ AGENTS.md exists but .github/copilot-instructions.md missing"
+  exit 1
+fi
+
+echo "✓ Context files OK"
+```
+
+## Project Layout
+
+```
+.
+├── AGENTS.md                          # Universal baseline
+├── CLAUDE.md                          # Claude Code overrides
+├── CONTRIBUTING.md                    # Detailed contribution guide
+├── .cursor/
+│   └── rules/
+│       ├── typescript.mdc             # TS-specific rules
+│       ├── react.mdc                  # React-specific rules
+│       └── tests.mdc                  # Test file rules
+├── .github/
+│   └── copilot-instructions.md        # GitHub Copilot instructions
+└── docs/
+    ├── ARCHITECTURE.md                # Architecture overview
+    └── runbooks/                      # Deployment, incident response
+```
+
+## Monorepo Sync
+
+In monorepos, Cursor rules can be scoped per-package:
+
+```
+.cursor/rules/
+├── ts-global.mdc           # All .ts files
+├── api-routes.mdc          # packages/api/src/routes/**
+├── web-components.mdc      # packages/web/src/components/**
+└── tests-global.mdc        # All .test.ts files
+```
+
+Top-level `.github/copilot-instructions.md` applies to all packages.
+
+## Example: Full Sync
+
+**AGENTS.md:**
+
+```markdown
+# AGENTS.md
+
+...
+## Testing
+
+Unit: Vitest (pnpm test)
+```
+
+**CLAUDE.md (referencing):**
+
+```markdown
+See AGENTS.md > Testing for test setup and commands.
+```
+
+**.cursor/rules/tests.mdc (referencing):**
+
+```markdown
+---
+globs: "*.test.ts"
+---
+
+See AGENTS.md > Testing for test patterns.
+
+## Cursor-Specific Test Rules
+
+Never:
+  - Use .skip or .only (should not be committed)
+  - Test implementation; test behavior
+```
+
+**.github/copilot-instructions.md (summarizing):**
+
+```markdown
+# GitHub Copilot Custom Instructions
+
+See AGENTS.md for full conventions.
+
+## Testing
+
+- Tests: src/**/*.test.ts (Vitest)
+- Run: pnpm test
+- Structure: describe, it, expect
+- Test behavior, not implementation
+```
+
+All files reference AGENTS.md as source of truth. No duplication.
+
+## Anti-Patterns
+
+### Duplication
+
+```markdown
+# BAD: .cursor/rules/commands.mdc
+
+pnpm dev
+pnpm test
+pnpm build
+```
+
+Already in AGENTS.md. Instead:
+
+```markdown
+# GOOD: .cursor/rules/commands.mdc
+
+See AGENTS.md > Quick Start for commands.
+This file adds Cursor-specific tips.
+```
+
+### Stale Content
+
+```markdown
+# BAD: .github/copilot-instructions.md
+
+Use npm install
+
+(But AGENTS.md says pnpm; npm is old.)
+```
+
+Sync fails. Use pre-commit hook to prevent this.
+
+### Over-Specification
+
+```markdown
+# BAD: Cursor rules
+
+Always:
+  - Use PascalCase for types
+  - Use camelCase for functions
+  - Use const
+  - Use async/await
+  - Use arrow functions
+  - ...30 more rules
+```
+
+Too long. Keep rules focused on non-obvious patterns. AGENTS.md covers the rest.
+
+## See also
+
+- `/docs/context-files/agents-md` — AGENTS.md spec
+- `/docs/context-files/claude-md` — Claude overrides
+- ([Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai))
+- ([GitHub Copilot custom instructions](https://docs.github.com/en/copilot/customizing-copilot/adding-custom-instructions-for-copilot))
+- `/templates/discovery/cursor-rules.mdc` — starter Cursor rules file
+- `/templates/discovery/copilot-instructions.md` — starter Copilot instructions

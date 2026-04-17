@@ -1,0 +1,313 @@
+---
+title: Idempotency and Replay Protection
+description: Nonce stores, DPoP jti uniqueness, preventing double-submission
+---
+
+## Summary
+
+Idempotency and replay protection operate at different layers. DPoP jti uniqueness prevents a stolen proof from being replayed. Idempotency-Key headers prevent double-submission of write operations if retried due to network failure. Together they provide full safety for high-value operations like payments.
+
+- DPoP jti: unique per request, stored with 2-minute TTL, prevents proof replay
+- Idempotency-Key: client-generated, sent on every retry, server deduplicates
+- Idempotency store: cache responses (200s only, not errors) for 24 hours
+- Use Redis for distributed systems; in-memory for single instance
+- Combine both for payments, user provisioning, data deletion
+
+Two distinct security concerns: **idempotency** (the same request can be safely retried without side effects) and **replay protection** (a captured token or proof cannot be used twice). DPoP's `jti` (JWT ID) claim and idempotency keys solve these in different layers.
+
+## Replay Protection via DPoP JTI
+
+RFC 9449 DPoP proofs include a `jti` claim — a unique identifier per request. The server must never see the same `jti` twice. If an attacker captures a DPoP proof and attempts to reuse it, the server rejects the duplicate `jti`.
+
+```json
+{
+  "jti": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "htm": "POST",
+  "htu": "https://api.example.com/payments",
+  "iat": 1700000000,
+  "exp": 1700000120
+}
+```
+
+The server maintains a store of seen JTIs, valid for the lifetime of the proof (typically 2 minutes). On every DPoP proof validation:
+
+```typescript
+const seenJtis = new Map<string, number>();
+const JTI_MAX_AGE = 2 * 60; // 2 minutes
+
+async function validateDPopProof(proof: string): Promise<void> {
+  const { payload } = await jwtVerify(proof, publicKey);
+
+  const jti = payload.jti as string;
+  const now = Math.floor(Date.now() / 1000);
+
+  // Check if this JTI has been seen
+  if (seenJtis.has(jti)) {
+    throw new Error('DPoP JTI has been replayed');
+  }
+
+  // Store the JTI with expiry
+  seenJtis.set(jti, now + JTI_MAX_AGE);
+
+  // Clean up expired JTIs
+  for (const [id, expiry] of seenJtis.entries()) {
+    if (expiry < now) {
+      seenJtis.delete(id);
+    }
+  }
+}
+```
+
+For distributed systems, use Redis or a similar distributed store:
+
+```typescript
+import redis from 'redis';
+
+const redisClient = redis.createClient();
+const JTI_TTL = 2 * 60; // 2 minutes
+
+async function recordDPopJti(jti: string): Promise<boolean> {
+  const result = await redisClient.set(`dpop:jti:${jti}`, '1', {
+    EX: JTI_TTL, // Auto-expire after TTL
+    NX: true,    // Only set if key doesn't exist
+  });
+
+  return result === 'OK';
+}
+
+async function validateDPopProof(proof: string): Promise<void> {
+  const { payload } = await jwtVerify(proof, publicKey);
+  const jti = payload.jti as string;
+
+  const recorded = await recordDPopJti(jti);
+  if (!recorded) {
+    throw new Error('DPoP JTI has been replayed');
+  }
+}
+```
+
+The Redis `NX` flag ensures the JTI is only set once. If the key already exists, the operation fails, signaling a replay.
+
+## Idempotency Keys for Mutation Operations
+
+Idempotency keys are client-generated identifiers that prevent double-submission of write operations. If a request is retried due to network failure, timeout, or connection loss, the server recognizes it as the same logical operation and does not execute it twice.
+
+Clients include an `Idempotency-Key` header:
+
+```bash
+POST /payments HTTP/1.1
+Host: api.example.com
+Authorization: Bearer ...
+Idempotency-Key: idempotency_01HV3K8MNP
+Content-Type: application/json
+
+{
+  "amount": 10000,
+  "currency": "usd",
+  "description": "Invoice payment"
+}
+```
+
+Servers store a mapping of `Idempotency-Key` → response for a limited time (typically 24 hours). On subsequent requests with the same key, the server returns the cached response without re-executing.
+
+```typescript
+import redis from 'redis';
+
+const redisClient = redis.createClient();
+const IDEMPOTENCY_TTL = 24 * 60 * 60; // 24 hours
+
+async function handlePayment(req: Request): Promise<Response> {
+  const idempotencyKey = req.headers.get('Idempotency-Key');
+  if (!idempotencyKey) {
+    return Response.json(
+      { error: 'Idempotency-Key header is required' },
+      { status: 400 }
+    );
+  }
+
+  // Check if this request has been seen before
+  const cacheKey = `idempotency:${idempotencyKey}`;
+  const cachedResponse = await redisClient.get(cacheKey);
+  if (cachedResponse) {
+    return Response.json(JSON.parse(cachedResponse), { status: 200 });
+  }
+
+  // Process the payment
+  const body = await req.json();
+  let result;
+  try {
+    result = await processPayment(body);
+  } catch (err) {
+    // Do NOT cache error responses (allow retry)
+    throw err;
+  }
+
+  // Cache the successful response
+  await redisClient.set(
+    cacheKey,
+    JSON.stringify(result),
+    { EX: IDEMPOTENCY_TTL }
+  );
+
+  return Response.json(result, { status: 200 });
+}
+
+async function processPayment(data: {
+  amount: number;
+  currency: string;
+  description: string;
+}) {
+  // Execute payment logic
+  return {
+    transaction_id: 'txn_01HV3K8MNP',
+    status: 'completed',
+    amount: data.amount,
+  };
+}
+```
+
+Key behaviors:
+
+- Only cache **successful** responses (2xx status). Allow retries on errors so the client can try again.
+- Cache for a long duration (24 hours) to handle delayed retries.
+- Generate idempotency keys as UUIDv7 or similar (include timestamp so old keys eventually expire naturally).
+- Log the key for audit trails.
+
+## Combining DPoP and Idempotency
+
+For high-value operations (payments, user provisioning, data deletion), use both:
+
+1. **DPoP** prevents token replay — a stolen token cannot be used by an attacker
+2. **Idempotency-Key** prevents double-submission — if the agent retries due to network failure, the operation executes only once
+
+```typescript
+async function handlePayment(req: Request): Promise<Response> {
+  const idempotencyKey = req.headers.get('Idempotency-Key');
+  const dpopHeader = req.headers.get('DPoP');
+  const authHeader = req.headers.get('Authorization');
+
+  // Validate DPoP (prevents token replay)
+  if (dpopHeader) {
+    await validateDPopProof(dpopHeader, req.method, req.url);
+  }
+
+  // Validate idempotency (prevents double-submission)
+  if (!idempotencyKey) {
+    return Response.json(
+      { error: 'Idempotency-Key is required' },
+      { status: 400 }
+    );
+  }
+
+  const cached = await redisClient.get(`idempotency:${idempotencyKey}`);
+  if (cached) {
+    return Response.json(JSON.parse(cached), { status: 200 });
+  }
+
+  // Process payment
+  const result = await processPayment(await req.json());
+
+  await redisClient.set(
+    `idempotency:${idempotencyKey}`,
+    JSON.stringify(result),
+    { EX: 24 * 60 * 60 }
+  );
+
+  return Response.json(result, { status: 200 });
+}
+```
+
+## Nonce Stores and TTL Management
+
+For large-scale systems, maintain separate stores:
+
+- **DPoP JTI store** (Redis with 2-minute TTL)
+- **Idempotency key store** (Redis with 24-hour TTL)
+- **Session nonce store** (for CSRF, if using sessions)
+
+```typescript
+// Using Redis with automatic expiration
+const dPopStore = redisClient.createClient({ password: '...', db: 0 });
+const idempotencyStore = redisClient.createClient({ password: '...', db: 1 });
+
+async function recordDPopJti(jti: string): Promise<boolean> {
+  const result = await dPopStore.set(`jti:${jti}`, '1', {
+    EX: 120,      // 2 minutes
+    NX: true,
+  });
+  return result === 'OK';
+}
+
+async function recordIdempotencyKey(key: string, response: string): Promise<void> {
+  await idempotencyStore.set(`key:${key}`, response, {
+    EX: 86400,    // 24 hours
+  });
+}
+```
+
+Monitor store size to prevent unbounded growth. Use Redis eviction policies (e.g., `allkeys-lru`) to automatically clean up expired keys.
+
+## Client Retry Logic with Idempotency
+
+Agents should generate idempotency keys and retry on network failures:
+
+```typescript
+import { randomUUID } from 'crypto';
+
+async function makePaymentWithRetry(amount: number, maxRetries = 3) {
+  const idempotencyKey = randomUUID();
+  const dPopProof = await generateDPopProof('POST', 'https://api.example.com/payments');
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch('https://api.example.com/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'DPoP': dPopProof,
+          'Idempotency-Key': idempotencyKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount }),
+      });
+
+      if (res.ok) {
+        return res.json();
+      }
+
+      if (res.status === 408 || res.status >= 500) {
+        // Retryable error
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+
+      // Non-retryable error
+      throw new Error(`Payment failed: ${res.status}`);
+    } catch (err) {
+      if (attempt === maxRetries - 1) throw err;
+      // Retry on network error
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+}
+```
+
+The same `idempotencyKey` and `dPopProof` are sent on every retry, allowing the server to recognize and deduplicate the request.
+
+## Checklist
+
+- [ ] DPoP `jti` claims are stored and validated for uniqueness
+- [ ] DPoP JTI store auto-expires after 2 minutes
+- [ ] Mutation operations require and validate `Idempotency-Key` header
+- [ ] Idempotency key store caches successful responses for 24 hours
+- [ ] Error responses (4xx, 5xx) are NOT cached; allow retry
+- [ ] Distributed systems use Redis or equivalent for nonce stores
+- [ ] Old JTIs and idempotency keys are automatically cleaned up
+- [ ] Agents generate UUIDv7 idempotency keys
+- [ ] Retries use exponential backoff
+
+## See Also
+
+- [DPoP](/docs/authentication/dpop) — RFC 9449 sender-constrained tokens
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token validation
+- [Error Handling](/docs/error-handling/idempotency) — full idempotency guide

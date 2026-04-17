@@ -1,0 +1,341 @@
+---
+title: Managing Tool Sprawl
+description: The organizational and technical problem of too many agent tools — detection, prevention, and frameworks for sustainable tool ecosystems
+---
+
+## Summary
+
+Tool selection accuracy degrades above 20 tools per context. Name collisions, overlapping descriptions, and token saturation cause agents to select wrong tools, duplicate calls, or omit relevant ones. Prevent sprawl by grouping tools into plugins, namespacing to avoid collision, and removing deprecated tools.
+
+- Degradation begins ~10 tools, severe at 40+ tools
+- Name collision: two tools with similar names cause arbitrary selection
+- Description overlap: conflicting signals about which tool to call
+- Context saturation: tool list alone consumes thousands of tokens
+- Semantic Kernel plugins: group related tools, load by domain
+- Namespacing: billing__get_invoice avoids collision
+- Never keep deprecated tools out of fear of breakage
+
+Tool sprawl is the condition where an agent system accumulates more tools than any agent can use effectively. The tools exist, they are registered, but no one knows which ones are current, which overlap with others, or which are actually being called. According to a 2024 survey, 94% of IT leaders report that tool sprawl is increasing in their organizations, and only 12% have centralized management for their AI tool ecosystems.
+
+The performance consequence is concrete: agents selecting from large unmanaged tool sets show measurably worse routing accuracy. When a tool list contains 40 tools and three of them do roughly the same thing under different names, the agent may call the wrong one, call all three, or fail to call any of them confidently.
+
+## Why Sprawl Happens
+
+Tool sprawl follows a predictable pattern:
+
+1. A new capability is needed — a developer adds a tool
+2. The existing tool set is not checked for overlap
+3. A renamed or slightly different tool is added for a slightly different use case
+4. Tools added during experimentation are never removed
+5. Deprecated API endpoints remain as tools because removing them feels risky
+6. Different teams add tools for their own agents without a shared registry
+
+The result is a tool namespace that grows monotonically and is never pruned.
+
+## The Performance Impact
+
+Tool selection accuracy degrades with set size. This is not a hypothetical concern — it is measurable. OpenAI's function calling documentation notes the degradation begins around 10 tools per context. Research from Anthropic and others places the practical ceiling at 20 before selection errors become significant.
+
+The degradation mechanisms:
+
+- **Name collision:** Two tools with similar names cause the model to pick arbitrarily between them
+- **Description overlap:** When tool descriptions partially cover each other's domain, the model receives conflicting signals about which to call
+- **Context saturation:** Each tool's name and description consumes tokens in the selection window. At 40 tools with 100-word descriptions each, the tool list alone consumes 4,000 tokens before any user message is added
+- **False negatives:** A relevant tool is not called because its description was drowned out by 39 other descriptions
+
+## Framework Solutions
+
+### Semantic Kernel Plugins
+
+Semantic Kernel groups tools into plugins. Each plugin owns a specific domain; functions within a plugin are closely related. This is the tool equivalent of single-responsibility modules.
+
+```python
+from semantic_kernel.functions import kernel_function
+from semantic_kernel.kernel import Kernel
+
+class BillingPlugin:
+    """All billing operations. No non-billing functions belong here."""
+    
+    @kernel_function(
+        name="get_invoice",
+        description="Get a single invoice by ID. Returns full invoice details including line items."
+    )
+    async def get_invoice(self, invoice_id: str) -> str:
+        ...
+    
+    @kernel_function(
+        name="list_invoices",
+        description="List invoices with optional filters. Returns paginated results."
+    )
+    async def list_invoices(self, status: str = None, limit: int = 20) -> str:
+        ...
+    
+    @kernel_function(
+        name="create_invoice",
+        description="Create a new invoice for a customer. Returns the invoice ID and payment link."
+    )
+    async def create_invoice(self, customer_id: str, amount_cents: int, currency: str) -> str:
+        ...
+
+class DocumentPlugin:
+    """All document operations. No billing or other domain functions here."""
+    
+    @kernel_function(name="get_document", description="...")
+    async def get_document(self, doc_id: str) -> str: ...
+
+# Load only the plugins relevant to this agent's purpose
+kernel = Kernel()
+kernel.add_plugin(BillingPlugin(), plugin_name="billing")
+# DocumentPlugin is not added — this is a billing agent
+```
+
+Semantic Kernel's `FunctionChoiceBehavior` can be set to `Required` (must use a specific function), `Auto` (model chooses), or `None` (model cannot use functions) per invocation, giving fine-grained control over which tool subset is active at each step.
+
+### OpenAI Namespaces
+
+The OpenAI Assistants API and function calling both benefit from name namespacing. Namespace tools by domain to prevent collision and make intent unambiguous:
+
+```json
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "billing__get_invoice",
+      "description": "Get invoice details from the billing system..."
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "billing__create_invoice",
+      "description": "Create a new invoice in the billing system..."
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "docs__get_document",
+      "description": "Get a document from the document store..."
+    }
+  }
+]
+```
+
+Double underscore is the conventional separator. The namespace prefix makes it immediately clear which system the tool belongs to, even when the tool name itself is generic.
+
+### Vertex AI API Registry
+
+Google's Vertex AI provides a centralized registry for tools and extensions. Rather than defining tools inline in each agent, teams register tools centrally and agents reference them by ID:
+
+```python
+from vertexai.preview.extensions import Extension
+
+# Tools are registered and versioned in a central registry
+billing_extension = Extension.from_hub("billing-tools@v2")
+document_extension = Extension.from_hub("document-tools@v1")
+
+# Agents declare which extensions they use — not inline tool definitions
+agent = reasoning_engines.LangchainAgent(
+    model="gemini-1.5-pro",
+    extensions=[billing_extension],  # only billing tools available
+    system_instruction="You are a billing specialist..."
+)
+```
+
+The registry approach gives you: versioning (tools can be updated without updating every agent that uses them), ownership (each extension has a registered owner), and audit (usage can be tracked at the registry level).
+
+## Dynamic Tool Selection
+
+When a large tool surface is unavoidable, dynamic selection avoids loading all tools into every context. Only the tools relevant to the current task are activated.
+
+### MCP listChanged Notification
+
+MCP servers can notify clients when their tool list changes. Clients that handle `notifications/tools/list_changed` can refresh their view of available tools reactively rather than statically:
+
+```typescript
+// Client-side: handle dynamic tool list updates
+client.setNotificationHandler(
+  "notifications/tools/list_changed",
+  async () => {
+    const { tools } = await client.listTools()
+    // Re-build the agent's active tool set from the updated list
+    activeTools = tools.filter(t => isRelevantToCurrentTask(t, currentTaskContext))
+  }
+)
+```
+
+Servers use this to expose context-sensitive tool sets: a billing server might expose different tools depending on the authenticated user's permissions, or expose different tools at different points in a workflow.
+
+### Anthropic BM25 Search
+
+Anthropic's recommended pattern for large tool surfaces uses BM25 keyword search to select a relevant subset before each generation step:
+
+```typescript
+import { BM25 } from "orama/components"
+
+// Index all available tools
+const toolIndex = new BM25()
+for (const tool of allAvailableTools) {
+  toolIndex.add({
+    id: tool.name,
+    text: `${tool.name} ${tool.description} ${Object.keys(tool.parameters.properties || {}).join(" ")}`
+  })
+}
+
+// Before each generation: search for relevant tools
+async function selectTools(userMessage: string, allTools: Tool[]): Promise<Tool[]> {
+  const results = toolIndex.search(userMessage, { limit: 8 })
+  const selectedNames = new Set(results.hits.map(h => h.id))
+  return allTools.filter(t => selectedNames.has(t.name))
+}
+
+// Use only selected tools in the generation call
+const { text } = await generateText({
+  model,
+  tools: Object.fromEntries(
+    (await selectTools(userMessage, allTools)).map(t => [t.name, t])
+  ),
+  prompt: userMessage
+})
+```
+
+### Vercel AI SDK activeTools
+
+The AI SDK's `activeTools` parameter enables declaring a large tool surface while activating only a subset per turn:
+
+```typescript
+import { generateText } from "ai"
+
+// All tools are defined — none are active by default
+const allTools = { ...billingTools, ...documentTools, ...crmTools, ...analyticsTools }
+
+// Per-turn selection based on conversation context
+function selectActiveTools(message: string): string[] {
+  const isBillingQuery = /invoice|payment|charge|refund/.test(message.toLowerCase())
+  const isDocQuery = /document|file|report/.test(message.toLowerCase())
+  
+  if (isBillingQuery) return ["billing_get_invoice", "billing_list_invoices", "billing_create_invoice"]
+  if (isDocQuery) return ["docs_get_document", "docs_list_documents", "docs_create_document"]
+  return ["billing_get_invoice", "docs_get_document"] // default minimal set
+}
+
+const { text } = await generateText({
+  model,
+  tools: allTools,
+  activeTools: selectActiveTools(userMessage),  // only these are in the context window
+  prompt: userMessage
+})
+```
+
+The full tool list is defined for type safety and schema validation, but only `activeTools` are injected into the model's context window.
+
+## Organizational Solutions
+
+Technical solutions address the symptom. Organizational solutions address the cause.
+
+### Tool Registry with Ownership
+
+Every tool in the registry should have an explicit owner. The owner is responsible for the tool's description quality, deprecation decisions, and documentation. No ownerless tools.
+
+A minimal registry entry:
+
+```yaml
+# tools/registry.yaml
+- name: billing_create_invoice
+  owner: billing-team
+  version: 2.1.0
+  status: active  # active | deprecated | experimental
+  description: "Creates a new invoice and returns the invoice ID and payment link."
+  replaces: billing_new_invoice  # deprecated predecessor
+  used_by:
+    - billing-agent
+    - finance-workflow
+  last_reviewed: 2025-01-15
+
+- name: billing_new_invoice
+  owner: billing-team
+  version: 1.0.0
+  status: deprecated
+  deprecated_since: 2024-09-01
+  replaced_by: billing_create_invoice
+  removal_planned: 2025-04-01
+```
+
+### Approved Tool Sets by Agent Role
+
+Define the canonical tool set for each agent role, not at the agent level, but at a shared specification level. Any agent that performs the "billing specialist" role uses exactly the billing specialist tool set.
+
+```typescript
+// tools/approved-sets.ts
+export const TOOL_SETS = {
+  "billing-specialist": [
+    "billing_get_invoice",
+    "billing_list_invoices",
+    "billing_create_invoice",
+    "billing_process_refund",
+    "billing_get_customer"
+  ],
+  "technical-support": [
+    "docs_search",
+    "logs_get_recent",
+    "infra_get_service_status",
+    "tickets_create"
+  ],
+  "general-assistant": [
+    "billing_get_invoice",     // read-only billing access
+    "docs_search",
+    "calendar_get_events"
+  ]
+} as const
+
+// Enforce at agent construction time
+function createBillingAgent() {
+  return new Agent({
+    tools: filterTools(allTools, TOOL_SETS["billing-specialist"])
+  })
+}
+```
+
+### Observability Over Tool Usage
+
+Before pruning tools, understand which tools are actually being called. Unused tools are candidates for removal. Heavily called tools need stability guarantees.
+
+```typescript
+// Instrument every tool call
+function withObservability(tool: Tool, toolName: string): Tool {
+  return {
+    ...tool,
+    execute: async (...args) => {
+      const start = Date.now()
+      try {
+        const result = await tool.execute(...args)
+        metrics.increment("tool.call.success", { tool: toolName })
+        metrics.histogram("tool.call.duration_ms", Date.now() - start, { tool: toolName })
+        return result
+      } catch (err) {
+        metrics.increment("tool.call.error", { tool: toolName })
+        throw err
+      }
+    }
+  }
+}
+```
+
+Review tool call metrics monthly. Tools with zero calls in 90 days are candidates for deprecation. Tools with high error rates need description improvements.
+
+## Sprawl Prevention Checklist
+
+Before adding a new tool:
+
+- [ ] Search the registry for an existing tool that covers this capability
+- [ ] If a similar tool exists, is the new tool genuinely different enough to warrant a separate entry?
+- [ ] Does the new tool have an owner assigned?
+- [ ] Is the tool name unique and does it follow the namespace convention?
+- [ ] Will this tool be added to an approved set, or only used experimentally?
+- [ ] Is the existing tool set for the target agent already at or near the 20-tool ceiling?
+
+## Related Pages
+
+- [Agent Cards and Discovery](./agent-cards) — advertising tool capabilities to other agents without exposing full tool lists
+- [Orchestration Patterns](./orchestration-patterns) — patterns that require different tool subsets at different workflow stages
+- [Universal Tool Design Patterns](../api-surface/tool-definitions) — the cross-framework principles for tool definition quality

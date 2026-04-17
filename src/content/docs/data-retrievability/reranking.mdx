@@ -1,0 +1,138 @@
+---
+title: Reranking
+description: Two-stage retrieval, model comparison, cost vs. quality trade-offs
+---
+
+Reranking is a second stage that refines coarse retrieval results. Retrieve broad (top-50), rerank narrow (top-5) for higher precision without recomputing embeddings.
+
+## Summary
+
+Two-stage retrieval is the 2026 standard. Cohere Rerank 3.5/4.0 and Voyage Rerank 2.5 are production-ready. Cost (~$0.01/1M tokens) is negligible vs. generation cost.
+
+| Model | Latency | Cost | Quality | Best for |
+|-------|---------|------|---------|----------|
+| **Cohere Rerank 3.5** | 50–100ms | $0.01/1M | Multilingual, 100+ langs | Enterprise |
+| **Cohere Rerank 4.0** | 50–100ms | $0.01/1M | Latest, most accurate | 2026 choice |
+| **Voyage Rerank 2.5** | 30–80ms | $0.01/1M | 13.89% boost over dense | Fast |
+| **BGE Rerank** | 20–50ms (self-host) | Free | Competitive, open-source | Cost-sensitive |
+
+## TypeScript pipeline
+
+```typescript
+import { Cohere } from 'cohere-ai';
+
+async function twoStageRetrieval(query: string) {
+  // Stage 1: Retrieve broad (hybrid or dense)
+  const retrieved = await hybridSearch(query, 50); // Top-50
+
+  // Stage 2: Rerank to narrow
+  const cohere = new Cohere({ token: process.env.COHERE_API_KEY });
+  
+  const reranked = await cohere.rerank({
+    model: 'rerank-3.5',
+    query,
+    documents: retrieved.map(r => ({ text: r.text })),
+    top_n: 5, // Keep top-5
+  });
+
+  return reranked.results.map(r => ({
+    document: retrieved[r.index],
+    relevanceScore: r.relevance_score,
+  }));
+}
+```
+
+## Cost-benefit analysis
+
+**Cost savings:** Rerank filters irrelevant docs before generation.
+- Retrieve 50 documents: ~500 tokens (negligible)
+- Rerank 50: ~0.01 tokens cost
+- Generate from top-5: -2000 tokens saved vs. top-50
+
+**ROI:** Reranking cost pays for itself by filtering even 1–2 irrelevant docs.
+
+## Voyage Rerank 2.5 example
+
+```typescript
+import Voyage from '@voyageai/voyageai';
+
+async function voyageRerank(query: string, documents: any[]) {
+  const client = new Voyage({ apiKey: process.env.VOYAGE_API_KEY });
+
+  const result = await client.rerank({
+    model: 'rerank-2.5',
+    query,
+    documents: documents.map((d) => d.text),
+    topK: 5,
+  });
+
+  return result.results.map((r) => ({
+    document: documents[r.index],
+    score: r.relevanceScore,
+  }));
+}
+```
+
+## BGE Rerank (self-hosted)
+
+```typescript
+import { pipeline } from '@xenova/transformers';
+
+const reranker = await pipeline('feature-extraction', 'mixedbread-ai/mxbai-rerank-xsmall-v1');
+
+async function bgeRerank(query: string, documents: string[], topK = 5) {
+  // Compute similarity between query and each document
+  const scores = await Promise.all(
+    documents.map(async (doc) => {
+      const queryEmbedding = await reranker(query, { pooling: 'cls' });
+      const docEmbedding = await reranker(doc, { pooling: 'cls' });
+      const similarity = cosineSimilarity(queryEmbedding.data, docEmbedding.data);
+      return similarity;
+    })
+  );
+
+  // Rank by score
+  return documents
+    .map((doc, i) => ({ document: doc, score: scores[i] }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+}
+```
+
+## When NOT to rerank
+
+- Single retrieval result (nothing to rerank)
+- Latency-critical (`<100ms` SLA)
+- Cost-sensitive with `<10K` monthly queries
+
+For these, optimize retrieval quality instead (better embedding model, contextual retrieval).
+
+## Evaluation: ranking metrics
+
+```typescript
+function ndcg(relevances: number[], k: number = 10) {
+  const dcg = relevances
+    .slice(0, k)
+    .reduce((sum, rel, i) => sum + rel / Math.log2(i + 2), 0);
+
+  const idcg = [...relevances].sort((a, b) => b - a).slice(0, k)
+    .reduce((sum, rel, i) => sum + rel / Math.log2(i + 2), 0);
+
+  return dcg / idcg;
+}
+
+function mrr(relevantIndex: number) {
+  return 1 / (relevantIndex + 1);
+}
+
+function recall(retrieved: Set<string>, relevant: Set<string>) {
+  const matches = [...retrieved].filter(id => relevant.has(id));
+  return matches.length / relevant.size;
+}
+```
+
+## See also
+
+- [Cohere Rerank docs](https://docs.cohere.com/docs/rerank)
+- [Voyage Rerank docs](https://docs.voyageai.com/docs/reranker)
+- [BGE Rerank GitHub](https://github.com/FlagOpen/FlagEmbedding)

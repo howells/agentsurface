@@ -1,0 +1,245 @@
+---
+title: Idempotency and the Idempotency-Key Header
+description: Safe retry semantics for agent-driven write operations using request deduplication
+---
+
+## Summary
+
+The Idempotency-Key header enables safe retries on write operations. Client generates a unique key per logical operation and sends it on every retry. Server stores responses keyed by idempotency key with 24-hour TTL and returns the cached result if the same key arrives again.
+
+```
+First request:  Idempotency-Key: abc123 → processes, stores response
+Retry:          Idempotency-Key: abc123 → returns cached response
+                (no duplicate resource created)
+```
+
+- Generate key once per logical operation, not per attempt
+- Send same key on every retry of the same logical operation
+- Server caches only successful responses (2xx), not errors
+- Cache with 24-hour TTL (allow delayed retries)
+- Use Redis for multi-instance deployments
+- Combine with Retry-After header for explicit wait times
+
+An agent retrying a write operation without idempotency guarantees risks creating duplicate resources. An invoice creation that is retried after a network timeout might create two invoices if the first request actually succeeded before the connection dropped.
+
+Idempotency keys prevent this. The client generates a unique key per logical operation and includes it in every retry. The server deduplicates — if a request with a given key has already been processed, it returns the original response without executing the operation again.
+
+## The Idempotency-Key Header
+
+The IETF draft (in progress toward standardization) defines the `Idempotency-Key` header. Generate a unique key per logical operation and send it on every retry:
+
+```http
+POST /api/invoices HTTP/1.1
+Idempotency-Key: my-unique-txn-id-12345
+Content-Type: application/json
+
+{ "amount": 100, "currency": "USD" }
+```
+
+The server deduplicates within a window (24 hours is typical):
+
+- **First request**: Processes the operation, stores the result (status, response body, timestamp).
+- **Duplicate request** (same Idempotency-Key): Returns the cached result without re-executing.
+
+```typescript
+import { randomUUID } from "crypto";
+
+async function createInvoiceIdempotent(
+  data: InvoiceData,
+  key: string = randomUUID()
+): Promise<Invoice> {
+  return withRetry(async () => {
+    const response = await fetch("https://api.example.com/invoices", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,  // Same key on every retry
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new ApiError(error);
+    }
+
+    return response.json();
+  });
+}
+```
+
+## Server-Side Implementation
+
+Store responses keyed by idempotency key with a TTL (24 hours recommended):
+
+```typescript
+interface IdempotencyEntry {
+  status: number;
+  body: unknown;
+  headers: Record<string, string>;
+  expiresAt: number;
+}
+
+const idempotencyStore = new Map<string, IdempotencyEntry>();
+
+async function handleCreateInvoice(req: Request, res: Response) {
+  const idempotencyKey = req.headers.get("idempotency-key");
+
+  if (!idempotencyKey) {
+    return res.status(400).json({
+      type: "https://example.com/errors/missing-idempotency-key",
+      title: "Missing Idempotency-Key",
+      status: 400,
+      detail: "POST/PATCH/DELETE operations require an Idempotency-Key header",
+      is_retriable: false,
+    });
+  }
+
+  // Check cache
+  const cached = idempotencyStore.get(idempotencyKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    res.writeHead(cached.status, {
+      ...cached.headers,
+      "X-Idempotency-Cached": "true",
+    });
+    return res.end(JSON.stringify(cached.body));
+  }
+
+  // Execute operation
+  try {
+    const invoice = await createInvoice(req.body);
+
+    // Store result
+    idempotencyStore.set(idempotencyKey, {
+      status: 201,
+      body: invoice,
+      headers: { "Content-Type": "application/json" },
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    });
+
+    res.writeHead(201);
+    res.end(JSON.stringify(invoice));
+  } catch (err) {
+    const errorResponse = toApiError(err);
+    idempotencyStore.set(idempotencyKey, {
+      status: errorResponse.status,
+      body: errorResponse,
+      headers: { "Content-Type": "application/problem+json" },
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    });
+
+    res.writeHead(errorResponse.status);
+    res.end(JSON.stringify(errorResponse));
+  }
+}
+```
+
+For production, use Redis instead of in-memory storage:
+
+```typescript
+import { createClient } from 'redis';
+
+const redis = createClient();
+
+async function handleCreateInvoice(req: Request, res: Response) {
+  const idempotencyKey = req.headers.get("idempotency-key");
+
+  if (!idempotencyKey) {
+    return res.status(400).json({
+      type: "https://example.com/errors/missing-idempotency-key",
+      status: 400,
+      detail: "Idempotency-Key header required",
+    });
+  }
+
+  // Check cache
+  const cached = await redis.get(`idempotency:${idempotencyKey}`);
+  if (cached) {
+    const entry = JSON.parse(cached);
+    res.writeHead(entry.status, {
+      "Content-Type": "application/json",
+      "X-Idempotency-Cached": "true",
+    });
+    return res.end(JSON.stringify(entry.body));
+  }
+
+  // Execute operation
+  try {
+    const invoice = await createInvoice(req.body);
+
+    // Store with 24-hour TTL
+    await redis.setex(
+      `idempotency:${idempotencyKey}`,
+      24 * 60 * 60,
+      JSON.stringify({ status: 201, body: invoice })
+    );
+
+    res.writeHead(201);
+    res.end(JSON.stringify(invoice));
+  } catch (err) {
+    const errorResponse = toApiError(err);
+    await redis.setex(
+      `idempotency:${idempotencyKey}`,
+      24 * 60 * 60,
+      JSON.stringify({ status: errorResponse.status, body: errorResponse })
+    );
+
+    res.writeHead(errorResponse.status);
+    res.end(JSON.stringify(errorResponse));
+  }
+}
+```
+
+See `/templates/errors-and-auth/idempotency-middleware.ts` for a production Next.js middleware implementation.
+
+## When Idempotency Keys Are Critical
+
+Idempotency is essential for operations that:
+
+- Consume limited resources (API quota, balance, inventory)
+- Trigger external side effects (email, SMS, webhook, payment processing)
+- Create unique records (invoices, orders, accounts)
+- Are expensive or irreversible (financial transactions, deployments)
+
+Optional for read-only operations and operations that are already naturally idempotent.
+
+## Idempotency vs Retry-After
+
+Idempotency keys handle retries safely. `Retry-After` headers tell the agent *when* to retry. Both are needed:
+
+- `Idempotency-Key` ensures the second request doesn't create a duplicate resource
+- `Retry-After` tells the agent how long to wait before sending that safe retry
+
+```typescript
+async function createWithRetry(data: InvoiceData): Promise<Invoice> {
+  const key = randomUUID();
+
+  while (true) {
+    try {
+      return await createInvoiceIdempotent(data, key);
+    } catch (err) {
+      if (err instanceof ApiError && err.problem?.is_retriable) {
+        const waitMs = err.problem.retry_after_ms || 1000;
+        await sleep(waitMs);
+        continue; // Same key ensures deduplication on retry
+      }
+      throw err;
+    }
+  }
+}
+```
+
+## Checklist
+
+- [ ] POST/PATCH/DELETE operations require `Idempotency-Key` header
+- [ ] Idempotency-Key is generated once per logical operation (not per retry attempt)
+- [ ] Server stores responses with a 24-hour TTL
+- [ ] Cached responses include `X-Idempotency-Cached: true` header
+- [ ] Duplicate requests return the original response without re-executing
+- [ ] Failed requests are also cached to prevent infinite retries on permanent errors
+- [ ] Redis or equivalent distributed store is used for multi-instance deployments
+
+## Related Pages
+
+- [Retry Patterns](/docs/error-handling/retry-patterns) — when and how to retry
+- [Agent Extensions](/docs/error-handling/agent-extensions) — `is_retriable` flag

@@ -1,0 +1,26 @@
+---
+title: CLI Design
+description: Building CLIs that AI agents can operate as effectively as human users
+---
+
+## Summary
+
+Well-designed CLIs are agent-operable when they produce structured output, support schema introspection, enforce strict validation, and provide safety mechanisms like dry-run and confirmation bypass. This section covers the gaps that make standard CLIs unsuitable for agents and the patterns to close them: machine-readable output, raw payload input, exit codes, and command structure.
+
+- Structured --json output that agents can parse without heuristics
+- Schema introspection via --schema or --help --json
+- Meaningful exit codes mapping to specific failure categories
+- Strict input validation with actionable error messages
+- Dry-run and --yes flags for safe automation
+
+A well-designed CLI is one of the easiest interfaces for an agent to use — if it produces structured output. Most CLIs fail at agent-readiness because they were designed exclusively for human-readable terminal output.
+
+## What This Section Covers
+
+- **Structured output** — `--json` and `--output json` flags that return machine-parseable responses for every command
+- **Schema introspection** — `--schema` flags or subcommands that let agents discover available commands, arguments, and options programmatically
+- **Exit codes** — consistent, meaningful exit codes that map to specific failure categories
+- **Input hardening** — strict validation with actionable error messages when arguments are malformed
+- **Confirmation bypassing** — `--yes` / `--no-input` flags that let agents skip interactive prompts
+- **Progress and streaming** — structured progress output that agents can parse without regex
+- **Completions and discoverability** — machine-readable help output that goes beyond human-formatted `--help` text

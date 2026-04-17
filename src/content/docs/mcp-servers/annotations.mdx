@@ -1,0 +1,264 @@
+---
+title: Tool Annotations
+description: Communicating tool behavior hints to clients through MCP annotations
+---
+
+## Summary
+
+Tool annotations are metadata hints signaling tool behavior to clients. Four hints: readOnlyHint (does not modify state), destructiveHint (irreversibly deletes), progressIndicators (reports progress), and costWarning (expensive operation). Annotations are hints, not guarantees. Unverified servers' annotations are treated as untrusted. Verified, trusted servers can enable smarter client behavior without human confirmation.
+
+- readOnlyHint: tool does not modify persistent state
+- destructiveHint: tool may permanently delete or irreversibly modify
+- progressIndicators: tool reports incremental progress
+- costWarning: tool is expensive (time, tokens, money)
+- Default destructiveHint: true (assume worst)
+- Hints enable smarter client behavior (auto-run safe tools, warn on destructive)
+
+Tool annotations are metadata hints that tell MCP clients about the behavioral characteristics of a tool — whether it reads or writes, whether the operation can be reversed, whether it might affect systems outside the server's own domain. Clients use these hints to decide whether to show a confirmation dialog, allow automatic retry, or warn the user before proceeding.
+
+Annotations are hints, not guarantees. A tool that declares `readOnlyHint: true` might still write to a log file. Clients that come from unverified servers must treat annotations as untrusted information. For verified, trusted servers, annotations enable smarter client behavior without requiring humans in the loop for every tool call.
+
+## The Four Hints
+
+### readOnlyHint
+
+Signals that the tool does not modify any persistent state. It only reads, observes, or computes.
+
+- **Default:** `false` — if you do not set this, clients assume the tool may write
+- **Client effect:** Clients may allow the tool to run automatically without confirmation in agentic workflows
+
+```typescript
+server.tool(
+  "billing_get_invoice",
+  "Fetches a single invoice by its ID. Returns the full invoice record.",
+  { invoice_id: z.string().uuid().describe("The invoice UUID to fetch") },
+  {
+    annotations: {
+      readOnlyHint: true,
+    },
+  },
+  async (params) => {
+    const invoice = await db.invoices.findById(params.invoice_id);
+    // ...
+  }
+);
+```
+
+### destructiveHint
+
+Signals that the tool may permanently delete or irreversibly modify data.
+
+- **Default:** `true` — clients assume the worst if you do not say otherwise
+- **Client effect:** Clients typically show a confirmation dialog before executing a tool with `destructiveHint: true`
+
+```typescript
+server.tool(
+  "billing_void_invoice",
+  "Permanently voids an invoice. This cannot be undone.",
+  {
+    invoice_id: z.string().uuid().describe("The invoice UUID to void"),
+    reason: z.string().max(200).optional().describe("Optional reason for voiding"),
+  },
+  {
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+    },
+  },
+  async (params) => {
+    // ...
+  }
+);
+```
+
+### idempotentHint
+
+Signals that calling the tool multiple times with the same parameters produces the same result as calling it once. No additional side effects accumulate on repeat calls.
+
+- **Default:** `false` — clients assume repeated calls may compound their effects
+- **Client effect:** Clients can safely retry an idempotent tool on timeout or transient failure without risk of duplicate actions
+
+```typescript
+server.tool(
+  "billing_send_invoice_email",
+  "Sends the invoice payment email to the customer. " +
+  "Idempotent: calling twice for the same invoice does not send duplicate emails.",
+  {
+    invoice_id: z.string().uuid().describe("The invoice UUID to send"),
+  },
+  {
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true, // Safe to retry on failure
+    },
+  },
+  async (params) => {
+    // Implementation uses a deduplication key to prevent double-sends
+    await emailQueue.enqueue({
+      type: "invoice_payment_request",
+      invoiceId: params.invoice_id,
+      idempotencyKey: `invoice-email-${params.invoice_id}`,
+    });
+    // ...
+  }
+);
+```
+
+### openWorldHint
+
+Signals that the tool interacts with systems outside the MCP server — it makes external network requests, reads from external APIs, sends messages to third-party services.
+
+- **Default:** `true` — clients assume tools may reach outside the server unless told otherwise
+- **Client effect:** Clients in sandboxed or offline environments may restrict tools with `openWorldHint: true`
+
+```typescript
+server.tool(
+  "billing_sync_from_stripe",
+  "Pulls the latest invoice data from Stripe into the local database.",
+  {
+    since: z
+      .string()
+      .datetime()
+      .optional()
+      .describe("Only sync invoices updated after this ISO 8601 timestamp"),
+  },
+  {
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: true, // Makes external requests to Stripe API
+    },
+  },
+  async (params) => {
+    // Makes HTTP requests to api.stripe.com
+    // ...
+  }
+);
+
+server.tool(
+  "billing_calculate_tax",
+  "Calculates the applicable tax for an invoice using local tax tables. " +
+  "No external requests are made.",
+  {
+    amount_cents: z.number().int().positive(),
+    jurisdiction: z.string().describe("ISO 3166-1 alpha-2 country code"),
+  },
+  {
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false, // Pure computation, no external calls
+    },
+  },
+  async (params) => {
+    // Uses only local data, no network calls
+    // ...
+  }
+);
+```
+
+## Defaults Assume Worst Case
+
+The default for every annotation is the most conservative possible value:
+
+| Annotation       | Default  | Meaning of default                              |
+| ---------------- | -------- | ----------------------------------------------- |
+| readOnlyHint     | `false`  | Assume the tool may modify state                |
+| destructiveHint  | `true`   | Assume the tool may permanently destroy data    |
+| idempotentHint   | `false`  | Assume repeated calls have compounding effects  |
+| openWorldHint    | `true`   | Assume the tool makes external requests         |
+
+This means that an unannotated tool gets the most restrictive behavior from clients. Annotating your tools is how you opt in to smoother experiences — fewer confirmation dialogs, safer automatic retries, unrestricted use in sandboxed environments.
+
+## Full Annotation Reference
+
+### Read-only list tool
+
+Safe to call in any context, safe to retry, makes no changes:
+
+```typescript
+{
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}
+```
+
+### Create/update tool (safe to retry)
+
+Modifies state but does not destroy data, idempotent via idempotency key:
+
+```typescript
+{
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}
+```
+
+### Create/update tool (not safe to retry)
+
+Creates a new record each time — retry may create duplicates:
+
+```typescript
+{
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}
+```
+
+### Deletion tool
+
+Permanently removes data, not safe to retry blindly:
+
+```typescript
+{
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}
+```
+
+### External action tool
+
+Sends an email, fires a webhook, charges a credit card:
+
+```typescript
+{
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+}
+```
+
+## Annotations Are Hints, Not Contracts
+
+Clients from unverified servers cannot trust annotations. A malicious or buggy server could annotate a data-deletion tool as `readOnlyHint: true` — clients that auto-approve read-only tools would execute it without confirmation.
+
+For this reason:
+
+- Clients in high-stakes environments should require human confirmation for all tools, regardless of annotations
+- Annotations should only influence automatic behavior in contexts where the server's identity is verified (pinned hash, signed manifest, trusted registry)
+- When building a client that consumes annotations, document that unverified server annotations are treated as suggestions, not guarantees
+
+The value of annotations comes from the combination of correct implementation on the server side and appropriate trust calibration on the client side.
+
+<Callout type="info">
+Annotations are part of the tool definition and are returned in the `tools/list` response. Clients read them once during capability negotiation and cache them for the session. If you change an annotation on a running server, connected clients will not see the change until they re-fetch the tool list.
+</Callout>

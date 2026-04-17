@@ -1,0 +1,258 @@
+---
+title: Protected Resource Metadata
+description: RFC 9728 and RFC 8414 extension for resource server discovery
+---
+
+## Summary
+
+Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to validate tokens against the correct JWKS, determine if DPoP is required, and learn which scopes you support.
+
+- `resource_url`: your API's base URI
+- `authorization_servers`: list of trusted identity providers
+- `scopes_supported`: all scopes your API recognizes
+- `jwks_uri`: public key endpoint for JWT validation
+- `proof_types_supported`: DPoP requirements and algorithms
+- Cache with `Cache-Control: max-age=3600`
+
+When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, where to validate JWTs, and whether you require DPoP. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the auth server metadata endpoint. RFC 9728 Protected Resource Metadata (the extension) defines the metadata that a resource server exposes about itself.
+
+Publish this metadata at `/.well-known/oauth-protected-resource` to allow clients (including MCP) to discover your auth requirements and validate tokens correctly.
+
+## Metadata Document Structure
+
+```json
+{
+  "resource_url": "https://api.example.com",
+  "authorization_servers": [
+    "https://auth.example.com/"
+  ],
+  "scopes_supported": [
+    "invoices:read",
+    "invoices:write",
+    "customers:read",
+    "customers:write",
+    "payments:read",
+    "payments:write"
+  ],
+  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+  "response_types_supported": [
+    "token"
+  ],
+  "proof_types_supported": {
+    "dpop": {
+      "alg_values_supported": [
+        "ES256",
+        "RS256"
+      ]
+    }
+  },
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+  ],
+  "grant_types_supported": [
+    "client_credentials",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
+  ],
+  "oauth_protected_resource_version": "1.0"
+}
+```
+
+Key fields:
+
+- `resource_url` — your API's base URI
+- `authorization_servers` — list of auth servers that can issue tokens you accept
+- `scopes_supported` — all scopes your API recognizes
+- `jwks_uri` — where to fetch public keys for JWT validation
+- `response_types_supported` — typically just `["token"]` for agents
+- `proof_types_supported` — if you require DPoP, include this section with supported algorithms
+- `grant_types_supported` — which OAuth grants clients can use (usually `client_credentials` and `token-exchange`)
+- `token_endpoint_auth_methods_supported` — how clients authenticate to the token endpoint
+
+## Next.js Implementation
+
+```typescript
+// pages/api/.well-known/oauth-protected-resource.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const metadata = {
+    resource_url: 'https://api.example.com',
+    authorization_servers: [
+      'https://auth.example.com/',
+    ],
+    scopes_supported: [
+      'invoices:read',
+      'invoices:write',
+      'customers:read',
+      'customers:write',
+      'payments:read',
+      'payments:write',
+    ],
+    jwks_uri: 'https://auth.example.com/.well-known/jwks.json',
+    response_types_supported: ['token'],
+    proof_types_supported: {
+      dpop: {
+        alg_values_supported: ['ES256', 'RS256'],
+      },
+    },
+    grant_types_supported: [
+      'client_credentials',
+      'urn:ietf:params:oauth:grant-type:token-exchange',
+    ],
+    token_endpoint_auth_methods_supported: [
+      'client_secret_basic',
+      'client_secret_post',
+    ],
+    oauth_protected_resource_version: '1.0',
+  };
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.status(200).json(metadata);
+}
+```
+
+Serve it at `https://api.example.com/.well-known/oauth-protected-resource` (standard location) or `https://api.example.com/.well-known/oauth-protected-resource.json` (alternative).
+
+## How MCP Uses This
+
+MCP 2025-11-25 clients fetch this metadata to:
+
+1. Discover which authorization servers can issue tokens
+2. Validate tokens against the correct JWKS endpoint
+3. Determine if DPoP is required
+4. Learn which scopes the API supports
+5. Use the correct token endpoint for token exchange
+
+When an MCP server calls your resource server, it:
+
+1. Fetches `/.well-known/oauth-protected-resource`
+2. Validates the resource URL matches
+3. Fetches the JWKS from the declared `jwks_uri`
+4. On every request, validates the JWT signature against JWKS and verifies `iss` and `aud` claims
+5. If `proof_types_supported.dpop` is present, includes a DPoP proof
+
+```typescript
+// MCP client example (simplified)
+async function callResourceServer(token: string, endpoint: string) {
+  // Fetch metadata
+  const metadata = await fetch('https://api.example.com/.well-known/oauth-protected-resource')
+    .then(r => r.json());
+
+  // Fetch JWKS
+  const jwks = await fetch(metadata.jwks_uri).then(r => r.json());
+
+  // Validate token before sending
+  // (server-side validation happens too)
+
+  // If DPoP is required, generate a proof
+  let dpopProof = null;
+  if (metadata.proof_types_supported?.dpop) {
+    dpopProof = await generateDPopProof('GET', endpoint);
+  }
+
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+  };
+  if (dpopProof) {
+    headers['DPoP'] = dpopProof;
+  }
+
+  const res = await fetch(endpoint, { headers });
+  return res.json();
+}
+```
+
+## Minimal Metadata for Simple APIs
+
+If you're not using DPoP or token exchange yet, a minimal metadata document is acceptable:
+
+```json
+{
+  "resource_url": "https://api.example.com",
+  "authorization_servers": [
+    "https://auth.example.com/"
+  ],
+  "scopes_supported": [
+    "read",
+    "write"
+  ],
+  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+  "response_types_supported": [
+    "token"
+  ],
+  "grant_types_supported": [
+    "client_credentials"
+  ]
+}
+```
+
+## Publishing Metadata in OpenAPI
+
+You can reference protected resource metadata in your OpenAPI spec:
+
+```yaml
+openapi: 3.1.0
+info:
+  title: Example API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.com/token
+          scopes:
+            invoices:read: Read invoices
+            invoices:write: Create and update invoices
+paths:
+  /invoices:
+    get:
+      security:
+        - oauth2: [invoices:read]
+      responses:
+        '200':
+          description: List of invoices
+
+x-oauth-protected-resource: /.well-known/oauth-protected-resource
+```
+
+This allows OpenAPI tools to automatically discover your OAuth requirements.
+
+## Cache and Update Strategy
+
+The metadata document is relatively stable but can change when you:
+- Add new scopes
+- Support DPoP
+- Add token exchange support
+- Change authorization servers
+
+Clients typically cache metadata for 1 hour (specify `Cache-Control: max-age=3600`). When you make changes, the cache expires naturally. For immediate propagation, rotate the URI or notify clients.
+
+## Checklist
+
+- [ ] Endpoint is served at `/.well-known/oauth-protected-resource`
+- [ ] `resource_url` matches your API's base URI
+- [ ] `authorization_servers` includes all trusted identity providers
+- [ ] `scopes_supported` is exhaustive and matches your API's permission model
+- [ ] `jwks_uri` points to a valid JWKS endpoint with current public keys
+- [ ] `proof_types_supported` is included if DPoP is required
+- [ ] `grant_types_supported` includes the flows your API accepts
+- [ ] Response includes `Cache-Control` header with appropriate TTL
+- [ ] Metadata is served with `Content-Type: application/json`
+
+## See Also
+
+- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
+- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 delegation
+- [MCP Authorization](/docs/authentication/mcp-auth-model) — MCP's use of metadata
+- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — base specification
+- ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — resource server extension

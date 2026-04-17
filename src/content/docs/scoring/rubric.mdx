@@ -1,0 +1,200 @@
+---
+title: Scoring Rubric
+description: Detailed 0/1/2/3 criteria for all 11 dimensions with detection patterns
+---
+
+## Summary
+
+Authoritative 0–3 scoring criteria for all 11 dimensions with concrete evidence patterns. For each dimension: 0 = not implemented (blocker), 1 = basic/weak (exists but insufficient), 2 = good/functional (production use), 3 = excellent/optimized (best practices). Each level specifies detection patterns (file globs, grep patterns, command output) for evidence-based auditing. Covers API Surface, CLI Design, MCP Server, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, Data Retrievability.
+
+```
+0: Not implemented (blocker)
+1: Basic/weak (exists, insufficient)
+2: Good/functional (production-ready)
+3: Excellent/optimized (best practices)
+```
+
+---
+
+This is the authoritative rubric for agentify scoring. For each dimension, the 0/1/2/3 scale defines what evidence you're looking for and what concrete signals indicate each level.
+
+---
+
+## Dimension 1: API Surface
+
+**What it measures:** How well the project's HTTP API is described for AI agent tool generation. Includes OpenAPI quality, operationIds, agent-oriented descriptions, parameter structure, examples, and Arazzo workflow support.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No machine-readable API spec. Endpoints exist but no OpenAPI, Swagger, or formal schema. | No files matching `**/openapi.{json,yaml,yml}`, `**/swagger.{json,yaml}`. |
+| **1** | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params. | OpenAPI present but: descriptions `` `<20` `` words or lack "use when" context; operationId missing on >30% of operations; no example values on schema properties; nested parameter structures (objects within objects). |
+| **2** | Agent-oriented descriptions with "use when" and disambiguation. Proper operationIds on all operations (verb_noun style). Enums exhaustive. Examples on all parameters. Flat structures. | Descriptions include "Use this when…" and "Do not use for…"; operationId on 100% of operations; enum values fully enumerated on constrained strings; example property on all schema fields; parameters at root level, not deeply nested. |
+| **3** | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-speakeasy-mcp, x-action, x-agent-*). MCP auto-generated from spec. LAPIS-style token efficiency. | Arazzo file present with workflow definitions; x-speakeasy-mcp or x-action extensions used; MCP server generated from OpenAPI spec; description token efficiency `` `<200` `` tokens per operation. |
+
+**Key files to examine:** `openapi.json`, `openapi.yaml`, `swagger.json`, API route files, Arazzo definitions, MCP generation code.
+
+---
+
+## Dimension 2: CLI Design
+
+**What it measures:** How well the project's CLI tool works with agent automation. Based on Agent DX CLI Scale principles: JSON output, exit codes, schema introspection, input validation.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | Human-only output. Tables, color codes, prose. No structured format. Interactive prompts without bypass. | CLI exists but: no `--json` flag; no `--output json` option; interactive prompts with no `--yes` or `--force` bypass; no machine-readable output to stdout. |
+| **1** | JSON output exists but inconsistent across commands. Some support `--json`, others don't. Errors may be unstructured. | `--json` or `--output json` on some commands but not others; JSON shape differs between commands; non-zero exit code but no semantic distinction (all failures are exit 1); spinner output not suppressed when piped. |
+| **2** | Consistent JSON across all commands. Structured error responses. Semantic exit codes (0–5). Dry-run on mutations. TTY detection. | All commands produce consistent JSON schema; exit codes differentiate: 0=success, 1=usage error, 2=validation error, 3=not found, 4=permission, 5=conflict; `--dry-run` on all write operations; isatty() detection disables spinners when piped. |
+| **3** | NDJSON streaming for pagination. Schema introspection (--schema dumps params/types/required). Input hardening (path traversal, control chars). SKILL.md shipped. Agent knowledge packaging. | `--schema` or `--describe` command returns full machine-readable schema (params, types, required fields); NDJSON streaming for large result sets; input validation rejects `../`, `%2e`, control chars; SKILL.md or AGENTS.md ships with CLI package. |
+
+**Key files to examine:** CLI entry point, command definitions, middleware, error handlers, package.json `bin` field, SKILL.md.
+
+**N/A when:** Project has no CLI tool and is not primarily a CLI tool.
+
+---
+
+## Dimension 3: MCP Server
+
+**What it measures:** Whether and how well the project exposes an MCP server. Includes tool definitions, annotations, resources, error handling, auth, and testing.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No MCP server. No .mcp.json. No MCP SDK imports. | No files importing `@modelcontextprotocol/sdk`, `mcp-handler`, `@mastra/mcp`, or similar MCP libraries. |
+| **1** | Basic MCP server exists but minimal. Few tools (`` `<5` ``). Weak descriptions. No annotations. No resources. Unstructured errors. | MCP server present but: `` `<5` `` tools defined; descriptions `` `<20` `` words or lack agent context; no annotations object or all empty; no resources or prompts exposed; errors not wrapped in `{ isError: true }` structure. |
+| **2** | Well-structured MCP with proper annotations. Agent-oriented descriptions. Structured error handling. outputSchema declared. Resources for static data. | Tools have annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`); descriptions include "use when" context; `isError: true` pattern on tool errors; `outputSchema` declared on tools returning structured data; resources expose configuration or reference data. |
+| **3** | Production MCP. OAuth 2.1 authentication for remote servers. Pagination on list operations. Progress notifications. Multiple transports. Tested with InMemoryTransport. | OAuth 2.1 implementation present (client credentials, token exchange); pagination implemented on tools returning arrays; progress notifications sent for long operations; both stdio and HTTP transports configured; test files using `InMemoryTransport.createLinkedPair()`. |
+
+**Key files to examine:** `.mcp.json`, MCP server implementation, tool definitions, test files, auth middleware.
+
+---
+
+## Dimension 4: Discovery & AEO
+
+**What it measures:** How discoverable and consumable the project is by AI agents. Covers llms.txt, AGENTS.md, JSON-LD schema, content negotiation, robots.txt configuration.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots. | No `llms.txt` at web root; no `AGENTS.md` in repo root; no JSON-LD markup in HTML; robots.txt contains `Disallow: /` for `GPTBot`, `ClaudeBot`, or `User-agent: *`. |
+| **1** | Basic discovery. AGENTS.md or llms.txt exists but minimal. No structured data. | AGENTS.md present but `` `<50` `` lines or auto-generated (shows no curation); OR llms.txt present but `` `<10` `` links, no descriptions; no JSON-LD on any pages. |
+| **2** | Good discovery. llms.txt with categorized sections. AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows AI bots. Sitemap with lastmod. | llms.txt with H2 sections and link descriptions; AGENTS.md with commands section (exact invocations), conventions, and boundaries; at least `FAQPage` or `TechArticle` JSON-LD on pages; robots.txt explicitly allows `GPTBot`, `ClaudeBot`, `Google-Extended`; sitemap.xml with accurate `lastmod`. |
+| **3** | Full AEO. llms-full.txt. Content negotiation. Markdown-mode. Well-known endpoints. Stripe-style instructions. "Copy for AI" buttons. | `llms-full.txt` present (concatenated docs in markdown); server returns markdown for `Accept: text/markdown` (content negotiation); `Vary: Accept` header; `x-markdown-tokens` response header; `/.well-known/agent.json` or `/.well-known/ai` endpoints; instructions section for agents in nav/footer; token budgets visible on pages; NLWeb `/ask` endpoint. |
+
+**Key files to examine:** `llms.txt`, `llms-full.txt`, `AGENTS.md`, `robots.txt`, `sitemap.xml`, HTML layout/templates, server middleware, `.well-known/` files.
+
+**N/A when:** Project is a pure library or tool with no web presence and no documentation site.
+
+---
+
+## Dimension 5: Authentication
+
+**What it measures:** Whether agents can authenticate without human browser interaction. Includes API keys, OAuth 2.1 M2M, scoped tokens, token exchange (RFC 8693), and agent identity.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | Browser-only auth. OAuth authorization code flow as only option. CAPTCHAs. Session cookies. | Auth requires redirect to `login` or OAuth provider. No `client_credentials` grant. CAPTCHA in auth flow. Cookie-based sessions only. |
+| **1** | API keys exist but no M2M OAuth. Keys may be long-lived or overly broad. | API key auth available and documented. No OAuth `client_credentials` grant type. Keys lack scope limitation (e.g., bearer token grants access to all operations). No expiration policy. |
+| **2** | OAuth 2.1 Client Credentials grant. Scoped, short-lived tokens. Env var injection. JWT validation (iss, aud, exp). | OAuth server implements `grant_type=client_credentials`; token endpoint returns scoped tokens (e.g., `scope: "read:api write:config"`); tokens expire in hours or minutes; JWT validation checks signature, `iss`, `aud`, `exp` claims; example code shows env var injection (`OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`). |
+| **3** | Token Exchange (RFC 8693) for ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance. | Token exchange endpoint (`/token?grant_type=urn:ietf:params:oauth:grant-type:token-exchange`) present; audience-restricted tokens (agent-scoped); agent identity tracked in audit logs; `.well-known/oauth-protected-resource` published; MCP OAuth 2.1 implementation for remote servers. |
+
+**Key files to examine:** Auth config, OAuth endpoints, middleware, JWT validation, `.well-known/oauth-*` files.
+
+---
+
+## Dimension 6: Error Handling
+
+**What it measures:** Whether errors give agents enough information to recover. Covers RFC 9457 Problem Details, retriability hints, suggestions, and debugging context.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail. | Error responses return plain text or empty bodies. No consistent error schema. Errors lack operational context. |
+| **1** | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't. | Partial error schema: some endpoints return `{ type, message }`, others return raw strings. No `is_retriable` field. Error shapes differ across endpoints. |
+| **2** | RFC 9457 Problem Details everywhere. type, title, status, detail, instance. is_retriable boolean. suggestions array. trace_id for debugging. | All error responses conform to RFC 9457 schema: `type` (URI), `title`, `status`, `detail`, `instance`. `is_retriable` boolean on all errors. `suggestions` array with recovery steps (e.g., "retry after 5s", "increase timeout"). `trace_id` header for request tracking. Rate limit 429 includes `Retry-After` header. |
+| **3** | Full agent error design. doc_uri linking to docs. Intent trace on cancellation. Domain-specific codes. X-RateLimit headers on all responses. CLI semantic exit codes. | `doc_uri` in error responses (link to relevant docs); intent trace structure on cancel/abort operations; domain-specific error codes alongside HTTP (e.g., `code: "RATE_LIMITED_BY_UPSTREAM"`); `X-RateLimit-*` headers on all responses, not just 429; CLI errors use semantic exit codes + JSON output. |
+
+**Key files to examine:** Error middleware, HTTP error handlers, API responses, CLI error output.
+
+---
+
+## Dimension 7: Tool Design
+
+**What it measures:** Quality of tool definitions for AI agent consumption, across any framework (MCP, AI SDK, LangChain).
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No formal tool definitions. Functions exist but no schema, no description. | No `tool()` calls, no `@tool` decorators, no `createTool()`, no MCP tool registrations anywhere in codebase. |
+| **1** | Basic tool schemas exist but descriptions are terse or missing. No examples. | Tool definitions present but: descriptions `` `<20` `` words or lack context; no `.describe()` on Zod fields; no `inputExamples`; parameter names are single letters (`u`, `q`) or generic (`data`, `obj`). |
+| **2** | Good tool design. verb_noun naming. Agent-oriented descriptions. Typed schemas with field descriptions. | Tool names follow `verb_noun` pattern (e.g., `search_users`, `create_document`); descriptions include "Use when…" and "Do not use for…"; all schema fields have `.describe()` docstrings; enum values fully specified; `` `<10` `` tools per agent context. |
+| **3** | Excellent tool design. toModelOutput reducing tokens. Annotations. Dynamic selection. Cross-framework. | `toModelOutput` defined to reduce token usage for responses; annotations object present (`readOnly`, `destructive`, `idempotent`); activeTools or `defer_loading` patterns for dynamic selection; tool definitions portable (same schema works in MCP, Claude SDK, OpenAI Agents SDK). |
+
+**Key files to examine:** Tool definitions, agent setup, MCP tool registrations, schema decorators.
+
+---
+
+## Dimension 8: Context Files
+
+**What it measures:** Quality of agent context files for AI coding assistants (AGENTS.md, CLAUDE.md, .cursor/rules, etc.).
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No AGENTS.md, CLAUDE.md, or equivalent context files. | No agent context files found in repo root or standard locations. |
+| **1** | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands. | AGENTS.md or CLAUDE.md present but: >500 lines of prose; auto-generated (shows no curation, mentions "generated by agentify" or similar); lacks command section; architecture narrative without boundaries. |
+| **2** | Hand-curated context files. Commands with exact flags first. Permission boundaries. Testing expectations. | Commands section at top with exact invocations (e.g., `npm run build`, `npm test -- --watch`); permission boundaries defined (always/ask-first/never); `` `<370` `` lines; non-obvious conventions documented with code examples; updated iteratively (git history shows refinements). |
+| **3** | Multi-tool context. AGENTS.md (universal) + CLAUDE.md (Claude-specific) + .cursor/rules (Cursor-specific). Progressive disclosure. Updated from friction. | Multiple context file formats present and maintained; progressive disclosure via file references (e.g., AGENTS.md links to CLAUDE.md for Claude-specific setup); permission boundaries enforced in text; files clearly evolved from usage friction (not auto-generated). |
+
+**Key files to examine:** `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/*.mdc`, `.github/copilot-instructions.md`, `.windsurf/rules/`.
+
+---
+
+## Dimension 9: Data Retrievability
+
+**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via vector embeddings, hybrid search, reranking, knowledge graphs, agentic RAG patterns, and evaluation frameworks.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No data retrieval infrastructure. Documents not indexed, searchable, or retrievable. No embeddings, vector DB, or search. | No `.embed()` calls, no vector DB client (Pinecone/Qdrant/pgvector), no BM25 index, no retriever/RAG patterns. Files static or database-only. |
+| **1** | Basic single-stage dense retrieval. Embeddings computed but no reranking, hybrid, or chunking strategy. No evaluation. | Vector DB exists but: no hybrid layer (BM25+dense), no chunking strategy documented, no RAGAS/MTEB evals, generic embedding model. |
+| **2** | Good retrieval infrastructure. Hybrid search (BM25+dense) with RRF fusion. Reranking (Cohere/Voyage) present. Chunking with >10% overlap. Basic eval metrics. | Hybrid pipeline: BM25+dense+RRF or Weaviate native. Reranking before generation. Chunk size/overlap documented >10%. RAGAS or MTEB eval present. Mid-tier embedding (Voyage 3, Cohere v4, BGE-M3). |
+| **3** | Excellent system. Query planning agents + reflection. Metadata filtering + namespaces. Contextual Retrieval (Anthropic) or ColBERT. Knowledge graphs or agentic RAG. Drift detection. Comprehensive CI/CD evals. | Agentic retriever: query decomposition, multi-hop, reflection loops. Contextual embeddings or prepended summaries. ColBERT/ColPali or graph+vector hybrid. Metadata filters enforced. Embedding drift monitoring. RAGAS+custom metrics in CI/CD. LightRAG for complex domains. |
+
+**Key files to examine:** Embedding pipelines, vector DB clients, chunking logic, reranking setup, RAG frameworks (LangGraph, LlamaIndex), knowledge graph code (Neo4j, KuzuDB), eval scripts (RAGAS, MTEB).
+
+---
+
+## Dimension 11: Multi-Agent Support
+
+**What it measures:** How well the project supports multi-agent orchestration, delegation, state management, and discovery.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No multi-agent patterns. Single-agent or no agent support. | No agent orchestration code. No sub-agent definitions. No delegation logic. |
+| **1** | Basic sub-agent support. Can spawn agents but no structured delegation. | Agent definitions exist but: no state management between agents; no delegation patterns or heuristics; memory not shared; no handoff mechanism. |
+| **2** | Supervisor pattern. Structured delegation with clear roles. State management. HITL at critical points. | Supervisor/orchestrator agent routes to specialist agents; state explicitly passed between agents; approval gates on destructive actions; agent roles clearly separated in code. |
+| **3** | Advanced multi-agent. A2A agent cards published. Workflow composition. Memory patterns. Dynamic selection. Cross-framework interop. | `/.well-known/agent-card.json` (A2A format) published and discoverable; multiple orchestration patterns (supervisor, swarm, sequential); memory system with persistence (working, semantic, episodic); agents dynamically selected based on task; agent definitions portable across frameworks. |
+
+**Key files to examine:** Agent definitions (`.claude/agents/*.md`), orchestration code, `.well-known/agent-card.json`, workflow files.
+
+**N/A when:** Project is not an agent system and does not orchestrate or coordinate agents.
+
+---
+
+## Dimension 12: Testing & Evaluation
+
+**What it measures:** Whether agent interactions are tested and evaluated. Includes tool routing accuracy, error recovery, multi-step flows, and statistical metrics.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No agent-specific tests. Standard unit/integration tests only. | No test files targeting tool selection, agent behavior, or MCP server testing. |
+| **1** | Basic tool routing tests. Some verification that tools are called correctly. | Test files verify tool selection or MCP tool responses. But: no error recovery testing; no multi-step flow verification; MCP tests don't use `InMemoryTransport`. |
+| **2** | Comprehensive tool testing. Selection accuracy, parameter correctness, error recovery. Multi-step flows. MCP tested with InMemoryTransport. | Tests cover: correct tool selection on various inputs, valid parameters, error → recovery flow, multi-step sequences. MCP tests use `InMemoryTransport.createLinkedPair()`. Test cases document failure scenarios. |
+| **3** | Full eval suite. pass@k and pass^k metrics. Non-determinism handling. Regression detection. CI integration. Eval-driven development. | Statistical metrics (pass@k: any of k runs succeed; pass^k: all k runs succeed); multiple runs per test case to handle non-determinism; baseline comparison for regression detection; eval suite runs in CI; test cases derived from real production failures. |
+
+**Key files to examine:** Test directories, eval suites, CI configuration (`.github/workflows/`, `package.json` test scripts).
+
+---
+
+## Scoring Notes
+
+- Score based on **current state**, not intent or roadmap
+- Evidence must be **specific**: cite file paths and line numbers, quote grep results, specify glob patterns
+- When uncertain between two levels, score conservatively (lower)
+- Confidence levels: **High** (examined `` `>80%` ``), **Medium** (key files examined), **Low** (`` `<30%` `` coverage)
+- Mark N/A **only** when dimension is genuinely inapplicable to the project

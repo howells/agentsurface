@@ -1,0 +1,121 @@
+# robots.txt — AI crawler policy
+#
+# Spec: https://agents.md (Robots.txt for AI section)
+# AI crawler documentation:
+#   - GPTBot: https://openai.com/gptbot
+#   - ClaudeBot: https://www.anthropic.com/claude/bot
+#   - PerplexityBot: https://www.perplexity.ai/bot
+#   - Google-Extended: https://support.google.com/webmasters/answer/1061943
+#   - CCBot (Common Crawl): https://commoncrawl.org/the-common-crawl-crawl-archive/
+#   - Bytespider (ByteDance): https://www.bytedance.com
+#
+# This template allows major AI training and search crawlers while blocking sensitive paths.
+# Customize USER-AGENT lines and DISALLOW/ALLOW rules for your project.
+
+# Training bots (model training data collection)
+User-agent: GPTBot
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: ClaudeBot
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Google-Extended
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Meta-ExternalAgent
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: CCBot
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Bytespider
+Disallow: /admin
+Disallow: /private
+Disallow: /.env*
+Disallow: /secrets
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+# Search bots (real-time search indexing)
+User-agent: OAI-SearchBot
+Disallow: /admin
+Disallow: /private
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Claude-SearchBot
+Disallow: /admin
+Disallow: /private
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: PerplexityBot
+Disallow: /admin
+Disallow: /private
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+# User-agent bots (AI browsing on behalf of users; usually honors user auth)
+User-agent: ChatGPT-User
+User-agent: Claude-User
+# No restrictive rules; these obey user authentication
+
+# Default policy for all other bots
+User-agent: *
+Disallow: /admin/
+Disallow: /private/
+Disallow: /.env*
+Disallow: /secrets/
+Disallow: /*.json$
+Disallow: /*.sql$
+Disallow: *.pem
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /robots.txt
+Allow: /sitemap.xml
+Allow: /AGENTS.md
+
+# Crawl delay (optional: slow down if expensive)
+# Crawl-delay: 1
+
+# Sitemap for all bots (helps with freshness)
+Sitemap: https://example.com/sitemap.xml
+Sitemap: https://example.com/sitemap-agents.xml
+
+#
+# CUSTOMISATION CHECKLIST:
+#
+# [ ] Replace example.com with your domain
+# [ ] Add paths specific to your project that should be private (/api-internal, /billing, etc.)
+# [ ] Remove any DISALLOW rules if your project has no private areas
+# [ ] Add ALLOW exceptions if needed (e.g., Allow: /api/public/*)
+# [ ] Set Crawl-delay if your server struggles under crawler load
+# [ ] Update Sitemap URLs to match your sitemap locations
+# [ ] If you want to completely block AI training bots, change DISALLOW to / for those user-agents
+# [ ] Test with: curl -I https://example.com/robots.txt
+#

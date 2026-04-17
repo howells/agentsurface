@@ -1,0 +1,258 @@
+---
+title: API Versioning for Agents
+description: Versioning strategies that protect agents from silent breaking changes across schema, behavior, and descriptions
+---
+
+## Summary
+
+Agent versioning must protect against three independent types of breaking changes: schema breaks (immediate runtime errors), behavior breaks (silent failures), and description breaks (routing failures). Agents do not read changelogs, so description changes that alter when a tool is called are breaking changes. This section covers what counts as breaking and strategies to prevent silent failures.
+
+- Schema breaks: removing/renaming parameters, changing types, removing endpoints
+- Behavior breaks: same request/response shape but different semantics
+- Description breaks: changes that shift agent routing decisions
+- operationId is immutable once an endpoint ships
+- Monitor CUJ pass rates before and after description changes
+
+API versioning for human developers is primarily about backward compatibility of request and response shapes. API versioning for agents is more demanding: the schema, the behavior, and the description all need to stay stable. A description change that regresses a user journey is a breaking change, even if the request and response schema are identical.
+
+## Why Versioning Is Different for Agents
+
+Human developers read changelogs. When a field is renamed, a developer sees the migration guide and updates their code. Agents do not read changelogs. They have a tool definition, and that tool definition must continue to work correctly until the agent is explicitly re-tooled.
+
+Three independent layers can break independently:
+
+**Schema breaks** — removing parameters, changing types, renaming fields. These produce immediate runtime errors.
+
+**Behavior breaks** — the request/response shape stays the same but the semantics change. A `status` field that previously meant "user-visible status" now includes internal states. An operation that was synchronous becomes asynchronous. These produce silent failures — the agent gets a 200 response but the outcome is wrong.
+
+**Description breaks** — the description changes in a way that shifts when agents call this operation. A description that previously said "use this for all user lookups" is rewritten to say "use this only for admin lookups." Existing agents routing on the old description will misroute. If the change causes a user-facing workflow to fail, it is a breaking change.
+
+## What Counts as Breaking
+
+The conservative list of breaking changes for agent APIs:
+
+| Change Type | Breaking? | Notes |
+|-------------|-----------|-------|
+| Removing a required parameter | Yes | Hard schema break |
+| Removing an optional parameter | Yes | Agents may be passing it |
+| Renaming a parameter | Yes | Old name no longer accepted |
+| Changing a parameter type | Yes | e.g., string → integer |
+| Removing a response field | Yes | Agents may depend on it |
+| Renaming a response field | Yes | Old name returns undefined |
+| Changing `operationId` | Yes | Breaks all generated tool definitions |
+| Removing an enum value | Yes | Agents may pass the old value |
+| Adding a required parameter | Yes | Existing calls missing the new field fail |
+| Changing sync → async | Yes | Behavior break; agents expect synchronous result |
+| Removing an endpoint | Yes | Tool no longer callable |
+| Changing description (CUJ regresses) | Yes | Behavior break via routing failure |
+| Adding an optional parameter | No | Additive |
+| Adding a response field | No | Additive |
+| Adding a new enum value | No | Additive, unless agents enumerate exhaustively |
+| Adding a new endpoint | No | Additive |
+| Fixing a description that was factually wrong | Yes, evaluate | Monitor CUJ pass rates before and after |
+
+<Callout type="warn">
+Changing an `operationId` is the most impactful breaking change. All generated SDKs, MCP servers, and tool definitions use the `operationId` as the function name. Treat `operationId` as immutable once an endpoint ships.
+</Callout>
+
+## Versioning Strategies
+
+### URL Versioning
+
+Embed the major version in the path. This is the most common approach and the easiest for agents to work with because the version is explicit in every request.
+
+```
+GET /v1/orders
+GET /v2/orders
+```
+
+URL versioning makes the active version visible in logs, traceable in agent call histories, and unambiguous when multiple versions coexist. The downside is that migrating clients requires a code change to the base URL.
+
+```yaml
+# OpenAPI spec with URL versioning
+openapi: "3.1.0"
+info:
+  title: Orders API
+  version: "2.0.0"
+servers:
+  - url: https://api.example.com/v2
+    description: Production v2
+  - url: https://api.example.com/v1
+    description: Production v1 (deprecated, sunset 2026-01-01)
+```
+
+### Date-Based Header Versioning
+
+Use a request header to select the API version by date. Stripe and Anthropic use this pattern. The agent sends a `Stripe-Version: 2024-06-20` header; the server responds with the API shape that was stable on that date.
+
+```
+GET /orders
+Stripe-Version: 2024-06-20
+```
+
+Date-based versioning has a softer rollout path — you can ship a change and let clients opt in by bumping their version date, while existing clients remain on the older behavior until they explicitly migrate. The downside is that the version is invisible in URLs and harder to introspect from agent call logs.
+
+```yaml
+parameters:
+  - name: API-Version
+    in: header
+    required: false
+    schema:
+      type: string
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+      example: "2024-03-15"
+    description: >
+      API version date in YYYY-MM-DD format. Defaults to the latest stable version.
+      Pin to a specific date to ensure your integration does not break when new
+      versions are released.
+```
+
+### Additive-Only Policy
+
+The safest versioning policy for agents is an explicit commitment to never make breaking changes — only additive changes. New fields, new operations, new enum values, but never removals or renames.
+
+This is achievable in practice if you plan for it from the start:
+
+- Name fields precisely the first time — renames are the most common reason to break backward compatibility
+- Use enums conservatively — every enum value is a commitment
+- Design response shapes for minimal, stable fields
+
+The tradeoff: your API accumulates legacy fields and operations over time, and the payload size grows. For most agent APIs, this is an acceptable cost.
+
+## The `deprecated` Flag
+
+Mark deprecated operations and parameters with the `deprecated: true` field in OpenAPI. Agents and frameworks that respect this flag can surface deprecation warnings.
+
+```yaml
+paths:
+  /users/{id}/profile:
+    get:
+      operationId: get_user_profile_v1
+      deprecated: true
+      summary: Get user profile (deprecated — use get_user instead)
+      description: >
+        DEPRECATED: This endpoint will be removed on 2026-01-01.
+        Use get_user (/users/{id}) instead, which returns the same data
+        with a more consistent response format. Existing integrations
+        will continue to work until the sunset date.
+      x-deprecation-sunset: "2026-01-01"
+      x-deprecation-replacement: get_user
+```
+
+Deprecation at the parameter level:
+
+```yaml
+parameters:
+  - name: include_deleted
+    in: query
+    deprecated: true
+    description: >
+      DEPRECATED: Use status=deleted query parameter instead.
+      This parameter will be removed in v3. Example migration:
+      Old: GET /users?include_deleted=true
+      New: GET /users?status=deleted
+    schema:
+      type: boolean
+```
+
+## Deprecation Timeline
+
+Agent integrations require longer deprecation windows than human developer integrations because agents cannot update themselves. A human developer reads the deprecation notice and ships a fix within weeks. An agent is only re-tooled when someone on the team decides to do it.
+
+**Minimum deprecation window:** 12 months from announcement to removal
+
+**Recommended window:** 18 months for any operation used by production agent workflows
+
+**Sunset headers:** Include `Sunset` and `Deprecation` HTTP headers in responses from deprecated endpoints so agent frameworks can surface warnings automatically:
+
+```http
+HTTP/1.1 200 OK
+Deprecation: Tue, 15 Mar 2025 00:00:00 GMT
+Sunset: Thu, 01 Jan 2026 00:00:00 GMT
+Link: <https://docs.example.com/migration/v2-v3>; rel="deprecation"
+```
+
+The `Sunset` header value is the date after which the endpoint will stop returning valid responses. The `Link` header points to migration documentation.
+
+## Testing CUJs Against Description Changes
+
+A critical user journey (CUJ) is a workflow that agents should be able to complete end-to-end. Before changing an operation description, test whether the change regresses existing CUJs.
+
+The test approach:
+
+1. Record which operations agents call for each CUJ in your current system (baseline)
+2. Apply the description change in a staging environment
+3. Re-run the CUJ eval suite
+4. Compare operation routing before and after — any change in which operations are called is a potential regression
+5. If a CUJ now calls a different operation or fails to complete, treat the description change as a breaking change
+
+```typescript
+// Conceptual CUJ test structure
+const cujTests = [
+  {
+    name: "User looks up their recent orders",
+    userMessage: "Show me my last 5 orders",
+    expectedTools: ["list_orders"],
+    expectedOutcome: (result) => result.orders.length <= 5
+  },
+  {
+    name: "User gets details on a specific order",
+    userMessage: "What's the status of order #ABC123?",
+    expectedTools: ["get_order"],
+    expectedOutcome: (result) => result.order.id === "ABC123"
+  }
+]
+```
+
+Run these tests before and after any description change, and before any version release. See the [Testing](/docs/testing) section for agent evaluation patterns.
+
+## Version Negotiation in Tool Definitions
+
+When you maintain multiple API versions, your tool definitions should be version-explicit so agents do not silently use the wrong version.
+
+```typescript
+// Version pinned in MCP tool
+{
+  name: "list_orders_v2",
+  description: `Lists orders using the v2 API. Returns cursor-based pagination
+    and includes the shipping_address field. For the legacy v1 format, use
+    list_orders_v1 (deprecated, scheduled for removal 2026-01-01).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      cursor: { type: "string" },
+      limit: { type: "integer", default: 20 }
+    }
+  }
+}
+```
+
+Alternatively, pin the version in the tool execution layer rather than the name, and update the description to reflect the active version:
+
+```typescript
+const listOrders = tool({
+  name: "list_orders",
+  description: "Lists orders. Returns cursor-based pagination. (API v2)",
+  parameters: z.object({ cursor: z.string().optional(), limit: z.number().default(20) }),
+  execute: async (params) => {
+    return fetch("https://api.example.com/v2/orders", { ... })
+  }
+})
+```
+
+## Checklist
+
+- [ ] Every breaking change triggers a new major version (URL versioning) or new version date (date-based versioning)
+- [ ] Deprecated endpoints have `deprecated: true` in the OpenAPI spec
+- [ ] Deprecated endpoints include `Sunset` and `Deprecation` HTTP response headers
+- [ ] Sunset dates are at least 12 months from deprecation announcement
+- [ ] `operationId` values are treated as immutable after initial release
+- [ ] CUJ eval suite is run before and after any description change
+- [ ] Description changes that regress CUJ routing are treated as breaking changes
+- [ ] Version is explicit in tool definitions (either via versioned name or description)
+
+## Related Pages
+
+- [OpenAPI for Agents](./openapi-for-agents) — writing stable `operationId` values and descriptions
+- [Testing](/docs/testing) — CUJ evaluation frameworks and pass@k metrics
+- [OpenAPI Extensions](./openapi-extensions) — `x-deprecation-*` extension conventions

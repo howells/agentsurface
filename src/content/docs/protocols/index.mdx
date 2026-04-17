@@ -1,0 +1,79 @@
+---
+title: Protocols & Standards
+description: The protocol landscape for agent-to-service and agent-to-agent communication
+---
+
+## Summary
+
+Three protocols dominate: MCP (agent-to-tools/data, vertical), A2A (agent-to-agent, horizontal), ACP (agent commerce). Most production systems layer them: agents use MCP to access their tools, A2A to delegate to peers, and optionally ACP for purchases. Supporting standards (OpenTelemetry, llms.txt) add observability and API discovery.
+
+```
+Orchestrator (uses A2A)
+  ├── MCP → tools
+  ├── MCP → data
+  ├── A2A → Specialist 1
+  │    └── MCP → Specialist's tools
+  └── A2A → Specialist 2
+       └── MCP → Specialist's tools
+```
+
+- MCP 2025-11-25: tools, resources, prompts, async tasks
+- A2A v1.0 RC: task delegation across organizational boundaries
+- ACP beta: agent-initiated commerce with payment delegation
+- Publish: /.well-known/agent.json, /.well-known/acp.json, /AGENTS.md, /llms.txt
+- Transport: stdio (local), Streamable HTTP (remote)
+
+Three mature protocols and several complementary standards define how agents discover capabilities, execute work, and integrate across organizational boundaries.
+
+## Quick Start
+
+**Does your agent need tools?** → Use [MCP](/docs/protocols/mcp) (spec 2025-11-25). This is the baseline.
+
+**Multiple agents delegating work?** → Add [A2A](/docs/protocols/a2a) (v1.0 RC) for peer-to-peer task delegation.
+
+**Agent initiating purchases?** → Add [ACP](/docs/protocols/acp) (beta) for commerce with payment boundaries.
+
+**Complex multi-step workflows?** → Use [Arazzo](/docs/protocols/comparison#arazzo--here-is-the-workflow-sequence) to choreograph API sequences.
+
+**Need observability?** → Instrument with [OpenTelemetry GenAI semconv](/docs/protocols/emerging-standards#opentelemetry-genai-semantic-conventions-stable) — stable and widely adopted.
+
+## The Protocols
+
+| Protocol | Purpose | Learn More |
+|----------|---------|-----------|
+| **MCP 2025-11-25** | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp) |
+| **A2A v1.0 RC** | Agent-to-agent delegation (horizontal) | [A2A docs](/docs/protocols/a2a) |
+| **ACP beta** | Agent-initiated commerce | [ACP docs](/docs/protocols/acp) |
+| **Arazzo 1.0.1** | Multi-step API workflow sequences | [Comparison page](/docs/protocols/comparison) |
+| **OpenTelemetry GenAI** | Observability & tracing | [Emerging standards](/docs/protocols/emerging-standards) |
+| **AGENTS.md** | Agent context documentation | [Emerging standards](/docs/protocols/emerging-standards) |
+| **llms.txt** | LLM-friendly API docs | [Emerging standards](/docs/protocols/emerging-standards) |
+
+## Architecture Pattern
+
+Most production systems use MCP + A2A + supporting standards:
+
+```
+Orchestrator Agent (uses A2A)
+  ├── MCP → Internal tools
+  ├── MCP → Data sources
+  ├── A2A → Specialist Agent 1
+  │    └── MCP → Specialist's tools
+  └── A2A → Specialist Agent 2
+       └── MCP → Specialist's tools
+```
+
+## Discovery Checklist
+
+Publish these endpoints for agents to find you:
+- `/.well-known/agent.json` — A2A AgentCard (for multi-agent scenarios)
+- `/.well-known/acp.json` — ACP capabilities (if you accept agent-initiated payments)
+- `/AGENTS.md` — Agent context & MCP servers (always useful)
+- `/llms.txt` or `/llms-full.txt` — LLM-friendly docs
+- Structured data as JSON-LD (schema.org markup) for auto-discovery
+
+## Full Comparison & Decision Guide
+
+See [Protocol Comparison](/docs/protocols/comparison) for maturity, transport details, auth models, and when to use each.
+
+See [Emerging Standards](/docs/protocols/emerging-standards) for Arazzo workflows, observability, semantic metadata, and draft specs to monitor.

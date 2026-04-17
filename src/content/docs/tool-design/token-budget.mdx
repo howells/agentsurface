@@ -1,0 +1,306 @@
+---
+title: Token Budget
+description: Estimating tool-call token cost and designing lean responses
+---
+
+## Summary
+
+Every tool definition, parameter, and response consumes context tokens. Over many calls in a long session, cost compounds exponentially. Minimize tool-definition tokens: descriptions `` `<100` `` tokens first paragraph (link detailed docs for edge cases), parameter descriptions `` `<5` `` tokens, avoid redundancy. Minimize response tokens: use toModelOutput to strip noise, paginate results (return top-5 not top-1000), avoid embedding full nested objects. A response 5x larger than necessary is 5x more expensive and may cause context truncation.
+
+- **Description cost**: First paragraph `` `<100` `` tokens, link docs for details
+- **Parameter descriptions**: `` `<5` `` tokens each, no redundancy with tool description
+- **Response design**: toModelOutput for token efficiency
+- **Pagination**: Return top-k, use cursor for continuation
+- **Nested objects**: Strip unused fields, return IDs not full objects
+- **Test early**: Calculate tokens per tool + response, per call
+
+---
+
+Every tool parameter, description, and response consumes tokens in the agent's context window. Over many tool calls in a long session, token cost compounds. A response that is five times larger than necessary is five times more expensive and may cause context truncation.
+
+## Tool Definition Token Cost
+
+Tool definitions are included in every agent request. Minimize this cost:
+
+### Description Length
+
+```typescript
+// 15 tokens — concise
+'Search for issues by text or assignee.',
+
+// 50 tokens — good
+'Search for open issues by text, assignee, or status. Use for finding bugs or feature requests. Do not use for creating new issues (use create_issue instead). Returns paginated results.',
+
+// 200+ tokens — bloated
+'This advanced search tool provides comprehensive filtering capabilities across multiple dimensions including text matching, assignee filtering, status transitions, priority levels, custom fields, date ranges, and many other powerful options that let you slice and dice your issue data in countless ways...'
+```
+
+Keep first paragraph under 100 tokens. Link to detailed docs for edge cases rather than inlining.
+
+### Parameter Descriptions
+
+```typescript
+// 5 tokens
+query: z.string().describe('Search query'),
+
+// 12 tokens — better
+query: z.string().describe('Free text search. Examples: "bug fix", "status:open"'),
+
+// 40+ tokens — excessive
+query: z.string().describe('The query string that will be used to search across all issue titles, descriptions, labels, assignee names, and custom fields, supporting boolean operators like AND, OR, and NOT, with wildcard support via asterisks for prefix matching, regex patterns enclosed in slashes, and special syntax for advanced queries'),
+```
+
+### Schema Size
+
+```typescript
+// Bad — bloated
+const schema = z.object({
+  query: z.string(),
+  limit: z.number(),
+  offset: z.number(),
+  sort_by: z.enum(['created', 'updated', 'priority']),
+  sort_order: z.enum(['asc', 'desc']),
+  filter_status: z.enum(['open', 'closed', 'in_progress']),
+  filter_priority: z.enum(['low', 'medium', 'high', 'critical']),
+  filter_assignee: z.string(),
+  filter_labels: z.array(z.string()),
+  include_closed: z.boolean(),
+  include_archived: z.boolean(),
+  group_by: z.enum(['status', 'priority', 'assignee']),
+  // ... 15+ more fields
+}).strict();
+
+// Good — split into two tools
+search_issues_simple({ query, limit, offset })
+search_issues_advanced({ ...all_filters_above })
+```
+
+One lean, high-frequency tool beats one bloated tool that does everything.
+
+## Response Token Cost
+
+Tool responses are inserted into the conversation for the agent to reason over. Each byte costs tokens.
+
+### Lean Response Example
+
+```typescript
+// Bad — return entire record
+async (params) => {
+  const issue = await db.issues.findById(params.id);
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(issue),  // 50+ fields: created_at, updated_at, creator_id, metadata, tags, etc.
+    }],
+  };
+}
+
+// Good — return only what agents act on
+async (params) => {
+  const issue = await db.issues.findById(params.id);
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        id: issue.id,
+        title: issue.title,
+        status: issue.status,
+        assignee: issue.assignee,
+        priority: issue.priority,
+      }),
+    }],
+  };
+}
+```
+
+The lean response is 10x smaller and contains all information the agent needs to decide next steps.
+
+### Pagination and Truncation
+
+Always return paginated results with a next cursor:
+
+```typescript
+async (params) => {
+  const results = await db.issues
+    .where(params.filters)
+    .limit(params.limit)
+    .offset(params.offset)
+    .select(['id', 'title', 'status']);
+  
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        results: results.map(r => ({
+          id: r.id,
+          title: r.title,
+          status: r.status,
+        })),
+        has_more: results.length === params.limit,
+        next_offset: params.offset + params.limit,
+        total_count: results.total,  // Allows agent to know scale
+      }),
+    }],
+  };
+}
+```
+
+Never return all 1000 results at once. Cap at 50, return `has_more: true`, and include `next_offset` for the agent to fetch more.
+
+## Anthropic toModelOutput
+
+For large payloads, Anthropic supports `toModelOutput` to compress responses before feeding to the model:
+
+```typescript
+// Instead of returning 50 full objects:
+{
+  results: [
+    { id: '123', name: 'foo', description: '...', metadata: {...} },
+    // ... 50 objects × 500 tokens each = 25k tokens
+  ]
+}
+
+// Return summary + structured refs:
+{
+  summary: 'Found 50 repositories matching "claude-agent". Top 3: anthropic/anthropic-sdk-python (5.2k stars), anthropic-sdk-js (3.1k stars), anthropic-sdk-go (1.8k stars). Use repositories[].id to fetch details.',
+  repositories: [
+    { id: 'repo-123', name: 'anthropic-sdk-python', stars: 5200 },
+    // ... top results only
+  ],
+  pagination: { next_cursor: 'xyz', total: 1240 }
+}
+```
+
+This compresses the response from ~25k tokens to ~500 tokens while preserving actionability. The agent can see the summary and decide whether to fetch full details via `get_repository(id)`.
+
+## Rate Limit Communication
+
+Include rate limit info in responses so agents adjust pacing:
+
+```typescript
+{
+  results: [...],
+  rate_limit: {
+    limit: 100,
+    remaining: 87,
+    reset_after_seconds: 3600,
+  }
+}
+```
+
+Agents that see `remaining: 2` can stop calling the tool before hitting hard limits.
+
+## Response Shaping Per Agent Model
+
+Different models have different context budgets. Shape responses accordingly:
+
+```typescript
+const responseShape = params.model === 'claude-haiku' 
+  ? 'concise'  // Ultra-lean: IDs + names only
+  : 'detailed'; // Full: include all metadata
+
+if (responseShape === 'concise') {
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(results.map(r => ({ id: r.id, name: r.name }))),
+    }],
+  };
+} else {
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(results),
+    }],
+  };
+}
+```
+
+Or expose a `response_format` parameter:
+
+```typescript
+const searchSchema = z.object({
+  query: z.string(),
+  response_format: z.enum(['concise', 'detailed']).optional().default('concise')
+    .describe('concise: IDs + names only. detailed: full metadata (slower, higher tokens).'),
+});
+```
+
+## Dynamic Tool Loading
+
+When a server has >20 tools, use MCP lazy loading or dynamic selection to avoid loading all definitions upfront:
+
+**MCP lazy loading:**
+
+```typescript
+// Define tool metadata once
+const tools = [
+  { name: 'search_issues', description: '...', schema: {...} },
+  { name: 'create_issue', description: '...', schema: {...} },
+  // ... 50 more tools
+];
+
+// Load only when client requests
+server.setRequestHandler(ListToolsRequestHandler, async () => {
+  return {
+    tools: tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      // Schema loaded on-demand via GetToolDefinitionHandler
+    })),
+  };
+});
+```
+
+**Dynamic selection (BM25 search):**
+
+Before each agent request, search the tool registry by relevance:
+
+```typescript
+async function selectToolsForQuery(userQuery: string, allTools: Tool[]) {
+  const ranked = bm25Search(userQuery, allTools, { topK: 5 });
+  return ranked;  // Only inject top 5 tools into context
+}
+```
+
+This keeps tool definitions in context proportional to task relevance, not total tool count.
+
+## Session-Level Token Budgeting
+
+For long-running agents, track cumulative tool cost:
+
+```typescript
+let cumulativeTokens = 0;
+const maxBudget = 100_000;  // Adjust per model and use case
+
+async function callTool(toolName: string, params: object) {
+  const estimate = estimateTokens(toolName, params);
+  cumulativeTokens += estimate;
+  
+  if (cumulativeTokens > maxBudget * 0.9) {
+    console.warn(`Token budget 90% consumed (${cumulativeTokens} / ${maxBudget}). Consider stopping or switching to cheaper model.`);
+  }
+  
+  if (cumulativeTokens > maxBudget) {
+    throw new Error(`Token budget exceeded. Stop and summarize.`);
+  }
+  
+  return await executeTool(toolName, params);
+}
+```
+
+## Guidelines
+
+| Aspect | Target | Red Flag |
+|--------|--------|----------|
+| Tool description | `` `<100` `` tokens per tool | `` `>200` `` tokens (link to deeper docs) |
+| Parameter descriptions | `` `<30` `` tokens combined | Paragraphs (condense or split schema) |
+| Response size | `` `<500` `` tokens per result | `` `>2000` `` tokens (paginate, compress, or split) |
+| Tool count | `` `<15` `` per agent session | `` `>25` `` tools without dynamic selection |
+| Single response | `` `<1000` `` tokens | `` `>5000` `` tokens (use pagination or toModelOutput) |
+
+## See also
+
+- `/docs/api-surface/openapi` — pagination patterns in specs
+- ([Anthropic toModelOutput](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([Prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching))

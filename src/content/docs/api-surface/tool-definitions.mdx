@@ -1,0 +1,534 @@
+---
+title: Universal Tool Design Patterns
+description: Cross-framework principles for defining tools that agents select correctly and use reliably
+---
+
+## Summary
+
+Tool definitions consist of three universal fields across all frameworks: name, description, and schema. The description acts as a prompt that guides agent selection and behavior. This section covers the three-field minimum, how descriptions function as prompts (not documentation), and common pitfalls in tool design that lead to agents selecting wrong tools or constructing invalid inputs.
+
+- name: machine identifier used as function name in generated code
+- description: prompt instructing agents when and why to call the tool
+- schema: JSON Schema defining input parameters and constraints
+- Include positive and negative trigger conditions in descriptions
+- Document prerequisites and output shape to aid agent reasoning
+
+Every major agent framework — MCP, Vercel AI SDK, Mastra, LangChain, OpenAI, CrewAI, Semantic Kernel, Amazon Bedrock — uses a different syntax for tool definitions. The underlying design principles are identical across all of them. This page covers those universal principles, then shows how each framework implements them.
+
+## The Three-Field Minimum
+
+Every tool in every framework requires exactly three things:
+
+| Field | Purpose |
+|-------|---------|
+| `name` | Machine identifier; the function name in generated code |
+| `description` | Natural language instructions telling the agent when to call this tool |
+| `schema` | JSON Schema or equivalent defining the input parameters |
+
+Some frameworks add optional fields (output schema, annotations, execution handler), but these three are universal. Get them right before adding anything else.
+
+## Descriptions Are Prompts, Not Documentation
+
+This is the most commonly misunderstood aspect of tool design. The `description` field is not human documentation — it is a prompt that the LLM reads when deciding which tool to invoke.
+
+Effective descriptions include:
+
+- **Positive trigger conditions:** "Call this when the user wants to..."
+- **Negative trigger conditions:** "Do not use this if... use X instead"
+- **Input prerequisites:** "Requires a valid order ID from a previous list_orders call"
+- **Output summary:** "Returns the complete order including line items and shipping status"
+
+```typescript
+// Bad — describes implementation, not agent behavior
+{
+  name: "get_order",
+  description: "Fetches an order from the database by order ID.",
+  schema: { ... }
+}
+
+// Good — tells the agent when and why to call this tool
+{
+  name: "get_order",
+  description: `Retrieves full details for a single order including line items,
+    payment status, and shipping information. Use this when the user asks about
+    a specific order and you have the order ID. For searching orders by customer
+    or date range, use search_orders instead. Returns 404 if the order does not
+    exist or belongs to a different account.`,
+  schema: { ... }
+}
+```
+
+## Fewer Tools, Better Selection
+
+Agent frameworks route tool calls by semantic similarity between the user's request and tool descriptions. Adding more tools increases the chance of routing to the wrong one.
+
+- **OpenAI recommendation:** fewer than 10 tools per agent session
+- **Hard ceiling:** 20 tools before selection accuracy degrades significantly
+- **Best practice:** expose a curated subset of your full API surface per use case
+
+If your API has 100 endpoints, do not generate 100 tools. Group, filter, and compose. The agent that does one job well is more reliable than the one that can do everything.
+
+<Callout type="info">
+When you need to expose a large API surface, use dynamic tool selection rather than loading all tools at once. See the [Dynamic Tool Selection](#dynamic-tool-selection) section below.
+</Callout>
+
+## Separation of Interface from Execution
+
+Tool definitions should separate what the agent sees from what the server runs. The agent sees the name, description, and schema. The execution layer handles authentication, database access, HTTP calls, and side effects.
+
+This separation matters for two reasons:
+
+1. **Context parameters must not be tool parameters.** The agent should never be asked to supply authentication tokens, user IDs derived from the session, or internal system identifiers. These flow through the execution layer, not through the tool call.
+2. **Tool interfaces are stable; implementations change.** An agent that hard-codes specific parameter patterns to a tool definition will break when you change the underlying implementation.
+
+```typescript
+// Bad — agent is responsible for auth context it should never handle
+{
+  name: "create_document",
+  schema: {
+    properties: {
+      auth_token: { type: "string" },     // Wrong — execution layer concern
+      user_id: { type: "string" },        // Wrong — comes from session
+      organization_id: { type: "string" }, // Wrong — comes from session
+      title: { type: "string" },
+      content: { type: "string" }
+    }
+  }
+}
+
+// Good — only domain inputs; auth/session context injected at runtime
+{
+  name: "create_document",
+  schema: {
+    properties: {
+      title: { type: "string" },
+      content: { type: "string" },
+      folder_id: { type: "string", description: "Optional folder to place the document in" }
+    },
+    required: ["title"]
+  }
+}
+```
+
+## Tool Composition Patterns
+
+### Read-Then-Write
+
+When a write operation requires information that is not in the agent's current context, expose a paired read tool. The agent calls the read tool first to gather the required IDs or state, then calls the write tool.
+
+```
+list_projects → create_task (requires project_id)
+get_user → update_user (requires current values to avoid overwriting)
+list_team_members → assign_task (requires assignee_id)
+```
+
+### List-Before-Get
+
+For detail operations that require an ID, ensure the corresponding list operation exists and returns the ID field. Agents that cannot list cannot get.
+
+### Dry-Run-Before-Execute
+
+For destructive or irreversible operations, consider exposing a preview tool:
+
+```
+preview_invoice → send_invoice
+validate_migration → run_migration
+estimate_charges → execute_charge
+```
+
+The dry-run tool describes what would happen without doing it, giving the agent (and the human overseeing it) a chance to review before committing.
+
+### Idempotent by Design
+
+Tools that agents may retry should be idempotent. If calling `create_invoice` twice with the same inputs creates two invoices, a retrying agent will cause billing duplicates. Design write tools to accept an idempotency key, or use upsert semantics where appropriate.
+
+## Dynamic Tool Selection
+
+When your full tool surface exceeds 20 tools, do not load all tools into the context at once. Use dynamic selection to load only the relevant tools for the current task.
+
+### Anthropic BM25 Search
+
+Anthropic's recommended pattern searches a tool registry using BM25 ranking before each tool selection step:
+
+```typescript
+// Conceptual pattern — search tool registry before injecting tools
+async function selectTools(userQuery: string, allTools: Tool[]): Promise<Tool[]> {
+  const ranked = bm25Search(userQuery, allTools, { topK: 5 })
+  return ranked
+}
+```
+
+### Vercel AI SDK `activeTools`
+
+Pass a subset of tools per conversation turn:
+
+```typescript
+const result = await generateText({
+  model,
+  tools: allTools,
+  activeTools: ["get_order", "list_orders", "cancel_order"], // only these are active
+  prompt: userMessage
+})
+```
+
+### OpenAI `defer_loading`
+
+Mark tools as deferred so the model can request loading them on demand rather than having them all in context from the start.
+
+## Parallel vs Sequential Tool Use
+
+Agents can call multiple tools in a single response (parallel tool use) or call tools one at a time (sequential). Design tool interfaces to support both.
+
+**Parallel-safe tools** are independent read operations with no shared state:
+
+```
+get_user + get_order + get_invoice  →  can run simultaneously
+```
+
+**Sequential-required tools** have data dependencies:
+
+```
+create_order → add_line_items → calculate_totals → submit_order
+```
+
+Make dependencies explicit in tool descriptions rather than relying on agents to infer them from schema structure. "Requires an order_id from a prior create_order call" is clear. A schema that just has `order_id: string` is not.
+
+## Framework Implementations
+
+### MCP
+
+MCP tool definitions include `name`, `description`, `inputSchema`, an optional `outputSchema`, and `annotations` for behavioral hints.
+
+```json
+{
+  "name": "get_order",
+  "description": "Retrieves full details for a single order. Use when you have an order ID and need complete order information including line items and shipping status. For searching orders, use search_orders.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["order_id"],
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "The order identifier returned by list_orders or create_order"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+      "total": { "type": "number" },
+      "line_items": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/LineItem" }
+      }
+    }
+  },
+  "annotations": {
+    "readOnlyHint": true,
+    "idempotentHint": true
+  }
+}
+```
+
+MCP `annotations` signal behavioral properties to the client:
+
+| Annotation | Meaning |
+|------------|---------|
+| `readOnlyHint: true` | Tool does not modify server state |
+| `idempotentHint: true` | Calling multiple times with same inputs has same effect |
+| `destructiveHint: true` | Tool may delete or irreversibly modify data |
+| `openWorldHint: true` | Tool interacts with external systems beyond the server |
+
+### Vercel AI SDK
+
+The AI SDK `tool()` function takes a description, a Zod input schema, and an execute function. The `toModelOutput` field shapes what the model sees after execution.
+
+```typescript
+import { tool } from "ai"
+import { z } from "zod"
+
+const getOrder = tool({
+  description: `Retrieves full details for a single order including line items,
+    payment status, and shipping information. Use when you have a specific order ID.
+    For searching orders by customer or date, use searchOrders instead.`,
+  parameters: z.object({
+    orderId: z.string().describe("The order ID returned by listOrders or createOrder")
+  }),
+  execute: async ({ orderId }) => {
+    const order = await db.orders.findUnique({ where: { id: orderId } })
+    if (!order) throw new Error(`Order ${orderId} not found`)
+    return order
+  }
+})
+```
+
+For human-in-the-loop patterns, set `needsApproval` to pause execution before the tool runs:
+
+```typescript
+const deleteOrder = tool({
+  description: "Permanently deletes an order. This cannot be undone.",
+  parameters: z.object({
+    orderId: z.string()
+  }),
+  needsApproval: async ({ orderId }) => {
+    // Return true to require human approval before execution
+    const order = await db.orders.findUnique({ where: { id: orderId } })
+    return order?.status === "completed" // Require approval for completed orders
+  },
+  execute: async ({ orderId }) => {
+    await db.orders.delete({ where: { id: orderId } })
+    return { deleted: true, orderId }
+  }
+})
+```
+
+### Mastra
+
+Mastra tools use `createTool` with Zod schemas and a typed execute context. The `toModelOutput` field lets you transform tool results before they re-enter the model context.
+
+```typescript
+import { createTool } from "@mastra/core/tools"
+import { z } from "zod"
+
+export const getOrderTool = createTool({
+  id: "get-order",
+  description: `Retrieves full details for a single order. Use when you have a
+    specific order ID and need complete information including line items and status.
+    For searching or listing orders, use the search-orders tool instead.`,
+  inputSchema: z.object({
+    orderId: z.string().describe("Order ID from a prior list-orders or create-order call")
+  }),
+  outputSchema: z.object({
+    id: z.string(),
+    status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"]),
+    total: z.number(),
+    lineItems: z.array(z.object({
+      productId: z.string(),
+      quantity: z.number(),
+      unitPrice: z.number()
+    }))
+  }),
+  execute: async ({ context }) => {
+    const order = await fetchOrder(context.orderId)
+    return order
+  }
+})
+```
+
+Mastra also supports MCP annotations via `mcp.annotations`:
+
+```typescript
+export const deleteOrderTool = createTool({
+  id: "delete-order",
+  description: "Permanently deletes an order. Cannot be undone.",
+  inputSchema: z.object({ orderId: z.string() }),
+  mcp: {
+    annotations: {
+      destructiveHint: true,
+      idempotentHint: false
+    }
+  },
+  execute: async ({ context }) => { ... }
+})
+```
+
+### LangChain
+
+LangChain uses the `@tool` decorator with Pydantic models for schema definition. Context parameters (auth, session state) flow through `ToolRuntime`, not through tool parameters.
+
+```python
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field
+
+class GetOrderInput(BaseModel):
+    order_id: str = Field(
+        description="The order ID returned by list_orders or create_order"
+    )
+
+@tool("get_order", args_schema=GetOrderInput)
+def get_order(order_id: str) -> dict:
+    """Retrieves full details for a single order including line items and status.
+    
+    Use when you have a specific order ID. For searching orders by customer
+    or date range, use search_orders instead. Returns 404 error if the order
+    does not exist or belongs to a different account.
+    """
+    order = db.orders.get(order_id)
+    if not order:
+        raise ToolException(f"Order {order_id} not found")
+    return order.to_dict()
+```
+
+For injecting runtime context (database session, authenticated user):
+
+```python
+from langchain_core.tools import InjectedToolArg
+from typing import Annotated
+
+@tool
+def create_order(
+    product_ids: list[str],
+    # Injected at runtime — never passed by the agent
+    db_session: Annotated[Session, InjectedToolArg],
+    current_user: Annotated[User, InjectedToolArg]
+) -> dict:
+    """Creates a new order for the current user."""
+    ...
+```
+
+### OpenAI
+
+OpenAI function tools use `function_tool` with strict mode and `additionalProperties: false` to prevent agents from passing unexpected parameters.
+
+```python
+from openai import OpenAI
+from openai.lib._tools import function_tool
+
+@function_tool
+def get_order(order_id: str) -> dict:
+    """Retrieves full details for a single order.
+    
+    Use when you have a specific order ID and need complete order information
+    including line items, payment status, and shipping details. For searching
+    orders by customer or date, use search_orders instead.
+    
+    Args:
+        order_id: The order identifier returned by list_orders or create_order
+    """
+    ...
+```
+
+In the JSON representation, strict mode requires `additionalProperties: false` at every object level:
+
+```json
+{
+  "type": "function",
+  "function": {
+    "name": "get_order",
+    "description": "Retrieves full details for a single order...",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": ["order_id"],
+      "additionalProperties": false,
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "description": "The order identifier"
+        }
+      }
+    }
+  }
+}
+```
+
+### CrewAI
+
+CrewAI assigns tools to agents through the `agent.tools` list rather than a central tool registry. Each agent's `role`, `goal`, and `backstory` define its operational context.
+
+```python
+from crewai import Agent, Task, Crew
+from crewai_tools import BaseTool
+
+class GetOrderTool(BaseTool):
+    name: str = "get_order"
+    description: str = """Retrieves full details for a single order including
+        line items and shipping status. Use when you have an order ID and need
+        complete order information."""
+
+    def _run(self, order_id: str) -> str:
+        order = fetch_order(order_id)
+        return order.to_json()
+
+order_agent = Agent(
+    role="Order Manager",
+    goal="Help customers track and manage their orders accurately",
+    backstory="An expert in order fulfillment with access to the order management system",
+    tools=[GetOrderTool()],
+    verbose=True
+)
+```
+
+### Semantic Kernel
+
+Semantic Kernel uses `KernelFunction` annotations on class methods. Tools are grouped into plugins and injected through dependency injection.
+
+```python
+from semantic_kernel.functions import kernel_function
+from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
+
+class OrderPlugin:
+    def __init__(self, order_service: OrderService):
+        self._order_service = order_service
+
+    @kernel_function(
+        name="get_order",
+        description="""Retrieves full details for a single order. Use when you have
+            a specific order ID and need complete information including line items
+            and shipping status. For searching orders, use search_orders instead."""
+    )
+    async def get_order(
+        self,
+        order_id: Annotated[str, "The order ID from list_orders or create_order"]
+    ) -> str:
+        order = await self._order_service.get(order_id)
+        return json.dumps(order.to_dict())
+```
+
+### Amazon Bedrock
+
+Bedrock supports tools via either an OpenAPI schema (for Bedrock Agents action groups) or a direct function detail schema (for inline tool use).
+
+**OpenAPI schema approach** — the entire API is described in OpenAPI 3.0 and uploaded as an action group. See the [OpenAPI for Agents](./openapi-for-agents) page for spec design guidance.
+
+**Function detail schema** — for direct tool use in the Converse API:
+
+```python
+tool_config = {
+    "tools": [
+        {
+            "toolSpec": {
+                "name": "get_order",
+                "description": """Retrieves full details for a single order including
+                    line items, payment status, and shipping information. Use when you
+                    have a specific order ID. For searching orders, use search_orders.""",
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "required": ["order_id"],
+                        "properties": {
+                            "order_id": {
+                                "type": "string",
+                                "description": "The order identifier"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
+```
+
+Bedrock also supports `x-requireConfirmation` for operations that need human approval before execution. See [OpenAPI Extensions](./openapi-extensions) for details.
+
+## Checklist
+
+Before shipping tool definitions to production:
+
+- [ ] Every tool has a description that includes positive and negative trigger conditions
+- [ ] No tool has more than 10 parameters
+- [ ] Context parameters (auth, session IDs) are injected at runtime, not passed through tool arguments
+- [ ] Tool names are unique, unambiguous, and use verb\_noun format
+- [ ] Destructive or irreversible tools are annotated appropriately
+- [ ] Paired read/write tools exist where write operations require prior state
+- [ ] Idempotency behavior is documented in the description
+- [ ] The number of tools exposed per agent session is under 20
+
+## Related Pages
+
+- [OpenAPI for Agents](./openapi-for-agents) — writing the OpenAPI spec that generates these tool definitions
+- [Arazzo Workflows](./arazzo-workflows) — composing tools into multi-step workflows
+- [OpenAPI Extensions](./openapi-extensions) — `x-agent-*` hints for confirmations, idempotency, and destructive actions

@@ -1,0 +1,326 @@
+---
+title: Swarm and Handoff Patterns
+description: Peer-to-peer agent coordination without a central coordinator — LangGraph swarm, OpenAI handoffs, and when decentralized control outperforms supervisor architectures
+---
+
+## Summary
+
+A swarm eliminates the supervisor bottleneck by letting agents hand off directly to each other. Each agent knows when it is out of its depth and which peer is better suited. Context stays local instead of accumulating at a central manager. The trade-off: emergent behavior is harder to predict and debug.
+
+```
+Agent A ← → Agent B
+  ↓         ↓
+Agent C ← → Agent D
+(decentralized, peer-to-peer)
+```
+
+- Use swarm for long-running tasks where supervisor context accumulation is costly
+- Handoff conditions stated in each agent's instructions
+- No single point of failure, but cycles are the risk
+- LangGraph: create_handoff_tool gives agents ability to transfer control
+- Use supervisor when task sequence is predictable and well-defined
+
+A swarm is a multi-agent system where there is no permanent central coordinator. Any agent in the swarm can hand off to any other agent. Control flows laterally between peers rather than up to a supervisor and back down.
+
+The term is borrowed from robotics, where decentralized coordination emerges from local rules rather than global instructions. In agent systems, the equivalent is: each agent knows when it is out of its depth, knows which other agents are better suited, and can transfer control directly without routing through a manager.
+
+## When Swarm Outperforms Supervisor
+
+The supervisor pattern has a scaling problem: every delegation is a round-trip through the supervisor. As the number of sub-agents grows, the supervisor's context accumulates the results of every prior delegation, and its prompt grows proportionally. At scale, this degrades both quality and cost.
+
+Swarm addresses this by eliminating the supervisor bottleneck. Agents hand off directly based on local decisions, not global routing logic. The trade-off is that emergent behavior is harder to predict and debug.
+
+| | Supervisor | Swarm |
+|---|-----------|-------|
+| Control flow | Centralized through manager | Decentralized, peer-to-peer |
+| Routing logic | Supervisor's system prompt | Each agent's handoff conditions |
+| Context growth | Accumulates at supervisor | Stays local to current agent |
+| Predictability | High (supervisor controls sequence) | Lower (emergent from handoff rules) |
+| Best for | Well-defined task sequences | Open-ended multi-step tasks |
+| Failure surface | Supervisor is single point of failure | No single point of failure; cycles are the risk |
+
+Use swarm when:
+- Tasks are long-running enough that supervisor context accumulation is a real cost
+- The handoff conditions can be stated clearly within each agent's instructions
+- You are comfortable with emergent routing behavior and have tracing in place
+- The task domain is relatively contained (swarms with 10+ agents become hard to reason about)
+
+Use supervisor when:
+- The task sequence is predictable and well-defined
+- You need guaranteed execution order
+- You need the supervisor to synthesize results from multiple agents before responding
+
+## LangGraph Swarm
+
+LangGraph's swarm implementation uses `create_handoff_tool` to give each agent the ability to transfer control to specific other agents. There is no central coordinator node — the graph allows any agent to be the next active node.
+
+### Basic Swarm Setup
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langgraph_swarm import create_handoff_tool, create_swarm
+from langchain_openai import ChatOpenAI
+
+gpt4o = ChatOpenAI(model="gpt-4o")
+gpt4o_mini = ChatOpenAI(model="gpt-4o-mini")
+
+# --- Agents with handoff tools ---
+
+billing_agent = create_react_agent(
+    model=gpt4o,
+    tools=[
+        get_invoice,
+        process_refund,
+        create_handoff_tool(
+            agent_name="support_agent",
+            description="Transfer to technical support when the question is about "
+                        "product functionality rather than billing."
+        ),
+    ],
+    name="billing_agent",
+    prompt="""You handle billing and payment questions: invoices, charges, refunds,
+    subscription plans. When a question is technical rather than financial,
+    transfer to support_agent."""
+)
+
+support_agent = create_react_agent(
+    model=gpt4o,
+    tools=[
+        search_docs,
+        get_error_logs,
+        create_handoff_tool(
+            agent_name="billing_agent",
+            description="Transfer to billing when the question involves charges, "
+                        "invoices, or payment processing."
+        ),
+        create_handoff_tool(
+            agent_name="escalation_agent",
+            description="Transfer to escalation when the issue cannot be resolved "
+                        "with documentation or standard troubleshooting."
+        ),
+    ],
+    name="support_agent",
+    prompt="""You handle technical support: troubleshooting, documentation, error diagnosis.
+    Transfer to billing_agent for financial questions.
+    Transfer to escalation_agent for unresolvable issues."""
+)
+
+escalation_agent = create_react_agent(
+    model=gpt4o,
+    tools=[
+        create_ticket,
+        notify_engineer,
+    ],
+    name="escalation_agent",
+    prompt="""You handle escalations that other agents cannot resolve.
+    Create tickets and notify the on-call engineer. Do not transfer back."""
+)
+
+# --- Assemble the swarm ---
+
+swarm = create_swarm(
+    agents=[billing_agent, support_agent, escalation_agent],
+    default_active_agent="billing_agent"  # entry point
+)
+
+app = swarm.compile()
+
+# Usage
+result = app.invoke({
+    "messages": [{"role": "user", "content": "I'm getting a 500 error on the API and I was charged twice this month"}]
+})
+```
+
+The `default_active_agent` is the entry point. The first agent to receive the message decides whether to handle it or hand off to a peer. In this example, billing handles the charge concern and then hands off to support for the technical issue — or vice versa, depending on which concern the user's message foregrounds.
+
+### Message History Passing
+
+When an agent hands off, the receiving agent sees the full conversation history including all prior agent turns. This is a critical feature of LangGraph swarms — context is not lost at handoff boundaries.
+
+```python
+# The handoff tool uses LangGraph's Command primitive internally:
+# Command(goto="target_agent", update={"active_agent": "target_agent"})
+# The state is updated but messages are preserved in full.
+
+# You can verify handoff history in the state:
+for msg in result["messages"]:
+    if hasattr(msg, "name"):  # tool message from handoff tool
+        print(f"Handoff: {msg.name}")
+    else:
+        print(f"{msg.type}: {msg.content[:100]}")
+```
+
+### Stateful Swarm with Checkpointer
+
+For long-running swarm interactions where a user might pause and resume:
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+checkpointer = MemorySaver()
+app = swarm.compile(checkpointer=checkpointer)
+
+config = {"configurable": {"thread_id": "user-session-42"}}
+
+# First turn
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "I need help with my invoice"}]},
+    config=config
+)
+
+# User returns hours later — full state is restored from checkpoint
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "The issue is still not resolved"}]},
+    config=config
+)
+```
+
+## OpenAI Agents SDK Handoffs
+
+OpenAI's handoff implementation uses the `handoffs` array on each agent. When an agent's language model decides to hand off, it calls the `transfer_to_<agent_name>` tool, which transitions execution to the target agent.
+
+```python
+from openai.agents import Agent, Runner
+
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="""You handle billing questions: invoices, charges, refunds, subscriptions.
+    
+    Hand off to TechSupportAgent when:
+    - The question is about product functionality, not payment
+    - The user reports a technical error unrelated to billing
+    
+    Do not attempt to diagnose technical issues yourself.""",
+    tools=[get_invoice, process_refund, list_subscriptions],
+    handoffs=["TechSupportAgent"]  # declared by name, resolved at runtime
+)
+
+support_agent = Agent(
+    name="TechSupportAgent",
+    instructions="""You handle technical support: troubleshooting, documentation, error logs.
+    
+    Hand off to BillingAgent when:
+    - The question involves a charge, invoice, or payment
+    
+    Hand off to EscalationAgent when:
+    - The issue requires engineering intervention
+    - Standard troubleshooting has not resolved the problem""",
+    tools=[search_docs, get_error_logs, run_diagnostic],
+    handoffs=["BillingAgent", "EscalationAgent"]
+)
+
+escalation_agent = Agent(
+    name="EscalationAgent",
+    instructions="""You handle escalations. Create a ticket and notify on-call.
+    Do not hand off further — you are the final escalation point.""",
+    tools=[create_incident_ticket, page_on_call],
+    handoffs=[]  # terminal agent
+)
+
+# Entry point for the swarm
+result = await Runner.run(
+    billing_agent,
+    "I've been charged three times and now the API is returning 500 errors"
+)
+print(result.final_output)
+```
+
+### Handoff Callbacks
+
+The OpenAI SDK supports `on_handoff` callbacks for logging and control:
+
+```python
+from openai.agents import Agent, handoff, RunContextWrapper
+
+def log_handoff(ctx: RunContextWrapper, input_data: str | None):
+    print(f"Handoff initiated. Input: {input_data}")
+
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="...",
+    handoffs=[
+        handoff(
+            agent=support_agent,
+            on_handoff=log_handoff,
+            input_type=str  # typed input passed during handoff
+        )
+    ]
+)
+```
+
+### Input Filters
+
+When an agent hands off, you can filter or transform the conversation history before the receiving agent sees it. This allows the sending agent to summarize prior context rather than passing the full raw history:
+
+```python
+from openai.agents import Agent, handoff
+from openai.agents.extensions import remove_all_tools
+
+escalation_agent = Agent(
+    name="EscalationAgent",
+    instructions="...",
+)
+
+support_agent = Agent(
+    name="TechSupportAgent",
+    instructions="...",
+    handoffs=[
+        handoff(
+            agent=escalation_agent,
+            # Remove tool calls from history — escalation agent sees only messages
+            input_filter=remove_all_tools
+        )
+    ]
+)
+```
+
+## Preventing Cycles
+
+Swarms can cycle. Agent A hands off to Agent B, which determines the issue is billing-related and hands back to Agent A, which hands back to Agent B. Without cycle prevention, this loops indefinitely.
+
+**Detection strategies:**
+
+1. **Seen-agents set:** Track which agents have already been active in this conversation. Prevent re-activation of agents that already ran and handed off.
+
+```python
+# In LangGraph, track via state
+class SwarmState(TypedDict):
+    messages: list
+    active_agent: str
+    visited_agents: list[str]  # agents that have already executed
+
+# In each agent node, check before accepting a handoff
+def check_cycle(state: SwarmState, target: str) -> bool:
+    if target in state["visited_agents"]:
+        # Hand off to escalation instead of cycling
+        return False
+    return True
+```
+
+2. **Handoff depth limit:** Add a handoff counter to state. If the counter exceeds a threshold, route to a fallback that explains the situation to the user rather than continuing to hand off.
+
+3. **Terminal agents:** Designate one or more agents as terminal — they cannot hand off. Escalation agents, fallback agents, and catch-all agents should be terminal.
+
+<Callout type="warn">
+Swarms without cycle prevention will loop indefinitely when handoff conditions overlap between agents. Always identify terminal agents before deploying a swarm.
+</Callout>
+
+## Swarm vs. Supervisor: Decision Guide
+
+**Choose swarm when the task is:**
+- Multi-domain and the domain boundaries are clear
+- Long enough that supervisor context accumulation is a real cost
+- Designed to handle novel inputs that do not fit a predetermined sequence
+
+**Choose supervisor when the task is:**
+- A known sequence of steps (research → analyze → write)
+- Producing a synthesized output that requires one agent to combine results from many
+- Sensitive enough that you need a single point of accountability in the execution trace
+
+**Combine them** when your system has both structured pipelines (use supervisor with explicit step order) and open-ended routing (use swarm for the routing layer). Many production systems use a swarm at the top level for routing to domain specialists, with each specialist implemented as a supervisor-over-workers pipeline for their own complex tasks.
+
+## Related Pages
+
+- [Orchestration Patterns](./orchestration-patterns) — the full taxonomy of multi-agent coordination patterns
+- [Supervisor Pattern](./supervisor-pattern) — centralized orchestration across all major frameworks
+- [Human-in-the-Loop](./human-in-the-loop) — adding human checkpoints within swarm handoff chains

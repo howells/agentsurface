@@ -1,0 +1,205 @@
+---
+title: Auth Anti-Patterns
+description: Silent failures and late-stage breakage in agent auth workflows
+---
+
+## Summary
+
+Nine patterns that break agent auth silently: authorization code flow, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silent or fail late.
+
+| Pattern | Fix |
+|---------|-----|
+| Authorization Code only | Support Client Credentials |
+| CAPTCHA on token endpoint | Use rate limiting instead |
+| Session cookies | Use Bearer tokens with explicit `exp` |
+| Long-lived broad-scope keys | Short-lived, minimum-scope |
+| Overly broad scopes | Request only required scopes |
+| Hardcoded secrets | Environment variables only |
+| Per-request token calls | Cache for lifetime, refresh proactively |
+| No `aud` claim | Always set `aud`; use Token Exchange |
+| No DPoP binding | Add DPoP for sensitive resources |
+
+Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silent or fail late.
+
+## Authorization Code (Browser-Only)
+
+Authorization Code flow requires a browser. It redirects to a login page, the user clicks "Allow," the server redirects back with a code. Agents cannot render login pages or click buttons.
+
+```
+1. Agent navigates to https://auth.example.com/authorize?response_type=code&...
+2. Server returns HTTP 302 redirect to login page
+3. Agent cannot follow redirect or render HTML
+4. Flow stops; agent receives HTML where it expected JSON
+```
+
+If your service only supports Authorization Code, agents fail at step one.
+
+Fix: Support Client Credentials for machine-to-machine. Single POST to token endpoint, no redirect, no interaction.
+
+```bash
+POST /oauth/token
+grant_type=client_credentials
+&client_id=...&client_secret=...&scope=...
+```
+
+See [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents).
+
+## CAPTCHA on Token Endpoint
+
+If the token endpoint (`/oauth/token`) presents a CAPTCHA, agents fail silently. CAPTCHAs are designed to block automated requests — they succeed perfectly at blocking agents.
+
+This includes reCAPTCHA on login, hCaptcha on signup, or rate-limit fallback to CAPTCHA. The machine-to-machine token endpoint is an API endpoint, not a human-facing form. Use rate limiting and IP-based controls, not CAPTCHA.
+
+## Session Cookies as Primary Auth
+
+Session cookies are browser state. Agents do not maintain a cookie jar unless explicitly configured, and even then, sessions require a login flow that presupposes a human.
+
+```
+1. Agent POSTs /login with username/password
+2. Server returns Set-Cookie: session_id=...
+3. Agent must store and resend cookie on every request
+4. Session expires; agent receives HTML redirect, not a structured error
+```
+
+The failure is insidious: the agent succeeds for a time, then receives HTML where it expected JSON and has no mechanism to recognize it needs re-authentication.
+
+Fix: Use Bearer tokens with explicit `exp` claims. If sessions are needed for the web UI, issue separate API keys or OAuth tokens for programmatic access.
+
+## Long-Lived Broad-Scope Credentials
+
+A static API key with `admin` scope that never expires is maximum-blast-radius. If leaked via commit, log, or misconfigured environment, every resource is compromised indefinitely.
+
+```bash
+ADMIN_API_KEY=sk_live_...  # scope: admin, expires: never
+```
+
+Worse: the damage scales with scope. A leaked `invoices:read` key exposes invoices. An `admin` key exposes billing, users, configuration, everything.
+
+Fix: Issue short-lived keys with minimum scope. See [API Keys](/docs/authentication/api-keys) for rotation patterns.
+
+## Overly Broad Scopes
+
+Requesting all scopes upfront because "the agent might need it" is a widespread mistake. An invoice-summarization agent does not need `invoices:write` or `customers:write`. Every unused scope is a free amplification of damage if the token leaks.
+
+```typescript
+// Wrong: all scopes requested blindly
+const token = await getToken({
+  scopes: ['invoices:read', 'invoices:write', 'customers:read', 'customers:write', 'admin'],
+});
+
+// Right: only what this task needs
+const token = await getToken({
+  scopes: ['invoices:read'],
+});
+```
+
+Request exactly the scopes for the current operation. Use Token Exchange (RFC 8693) to derive narrow tokens for sub-agents and downstream services.
+
+## Hardcoded Secrets
+
+Hardcoded credentials committed to source control are permanently compromised. `git log` retains them forever. Repository forks, CI systems, and code review tools all see the full history.
+
+```typescript
+// Never do this
+headers: { 'Authorization': 'Bearer sk_live_aB3cD4eF5gH6iJ7kL8...' }
+```
+
+Fix: Environment variables or secrets managers only.
+
+```typescript
+const key = process.env.API_KEY;
+if (!key) throw new Error('API_KEY is required');
+```
+
+If you find a hardcoded credential: rotate it immediately (before cleaning history — the secret is already compromised), remove it from code, then clean `git history`.
+
+## Per-Request Token Calls
+
+Calling the token endpoint on every outbound request multiplies auth load by request volume and adds latency to every operation.
+
+```typescript
+// Wrong: token endpoint hit per request
+async function callApi(path: string) {
+  const tokenResponse = await fetch('https://auth.example.com/oauth/token', {...});
+  const { access_token } = await tokenResponse.json();
+  return fetch(`https://api.example.com${path}`, {
+    headers: { 'Authorization': `Bearer ${access_token}` },
+  });
+}
+```
+
+Fix: Cache tokens for their lifetime, refresh proactively before expiry.
+
+```typescript
+const token = await getAccessToken(config);  // cached, refreshed if needed
+const res = await fetch(`https://api.example.com${path}`, {
+  headers: { 'Authorization': `Bearer ${token}` },
+});
+```
+
+See [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) for caching implementation.
+
+## Tokens Without Audience Restriction
+
+A JWT without an `aud` claim is valid against any service that trusts the issuer. If an agent passes such a token to a third-party tool, that tool can use it against unintended services.
+
+```json
+{
+  "sub": "agent_01HV3K8MNP",
+  "scope": "invoices:read",
+  "iss": "https://auth.example.com/",
+  "exp": 1750000000
+  // No aud — valid everywhere
+}
+```
+
+Always include `aud` with the specific service identifier:
+
+```json
+{
+  "sub": "agent_01HV3K8MNP",
+  "scope": "invoices:read",
+  "aud": "https://invoices-service.example.com/",
+  "iss": "https://auth.example.com/",
+  "exp": 1750000000
+}
+```
+
+The receiving service must validate `aud` matches its own identifier. When passing tokens downstream, use Token Exchange to derive new tokens with correct audience, do not forward the original token.
+
+## Tokens Without DPoP
+
+A stolen token can be replayed against the resource server indefinitely until expiry. DPoP (RFC 9449) binds a token to the client's public key. If stolen, the token cannot be replayed because the attacker lacks the private key.
+
+```typescript
+// Without DPoP: token can be replayed anywhere
+Authorization: Bearer eyJhbGciOiJSUzI1NiI...
+
+// With DPoP: token is bound to client keypair
+Authorization: Bearer eyJhbGciOiJSUzI1NiI...
+DPoP: eyJhbGciOiJSUzI1NiIsInR5cCI6ImRwb3Arand0IiwianRpIjoiMTIzIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuZXhhbXBsZS5jb20vZGF0YSJ9...
+```
+
+For high-value resources and sensitive agent-to-agent communication, require DPoP. See [DPoP](/docs/authentication/dpop).
+
+## Summary
+
+| Anti-pattern | Why it breaks | Fix |
+|---|---|---|
+| Authorization Code only | Requires browser | Support Client Credentials |
+| CAPTCHA on token endpoint | Blocks automated requests | Remove; use rate limiting |
+| Session cookies | Expire without structured signal | Use Bearer tokens + explicit `exp` |
+| Long-lived broad-scope keys | Maximum blast radius on leak | Short-lived, minimum-scope |
+| Overly broad scopes | Excess perms on every token | Request only required scopes |
+| Hardcoded secrets | Permanent compromise on commit | Environment variables |
+| Per-request token calls | Multiplies auth load | Cache tokens for lifetime |
+| No `aud` claim | Token valid everywhere | Always set `aud`; use Token Exchange |
+| No DPoP binding | Token can be replayed if stolen | Add DPoP for sensitive resources |
+
+## See Also
+
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — Client Credentials implementation
+- [API Keys](/docs/authentication/api-keys) — correct key lifecycle
+- [Agent Identity](/docs/authentication/agent-identity) — establishing verifiable principals
+- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
+- [Token Exchange](/docs/authentication/token-exchange) — narrowing scope for delegation

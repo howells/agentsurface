@@ -1,0 +1,711 @@
+# OpenAPI 3.1 Skeleton for Agent Consumers
+#
+# Canonical spec: https://spec.openapis.org/oas/v3.1.0
+# Aligned with: JSON Schema 2020-12, RFC 9457 (Problem Details)
+# Error format: application/problem+json per RFC 9457
+# Authentication: OAuth 2.1 Bearer + DPoP (RFC 9449)
+# Pagination: cursor-based (token), not offset
+#
+# When to use this:
+# - New REST APIs targeting agent consumers
+# - APIs that must be discoverable by AI agents
+# - Multi-tenant services with per-client rate limits
+#
+# Customization checklist:
+# ✓ Update info.title, info.version, info.contact
+# ✓ Set servers[] to actual endpoint URLs
+# ✓ Replace Agent resource with your domain entity
+# ✓ Add per-operation examples in x-agent-examples
+# ✓ Implement error responses (400, 401, 403, 404, 409, 429, 500)
+# ✓ Add x-rate-limit vendor extension with actual limits
+# ✓ Validate YAML with Redocly linter: redocly lint openapi.yaml
+
+openapi: 3.1.0
+info:
+  title: Example Agent API
+  version: 1.0.0
+  description: |
+    Agent-first REST API for managing agents and executions.
+
+    Designed for AI agent consumption (Claude, ChatGPT, Gemini) with explicit
+    operational descriptions, error handling per RFC 9457, and pagination.
+
+    See https://spec.openapis.org/oas/v3.1.0 for spec details.
+  contact:
+    name: API Support
+    email: support@example.com
+    url: https://example.com/support
+  license:
+    name: Apache 2.0
+    url: https://opensource.org/licenses/Apache-2.0
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production API
+    variables:
+      region:
+        default: us-east-1
+        enum: [us-east-1, us-west-2, eu-west-1]
+  - url: https://staging-api.example.com/v1
+    description: Staging (for testing)
+
+tags:
+  - name: Agents
+    description: Create, list, update, delete, and run agents
+  - name: Executions
+    description: Monitor and cancel agent executions
+  - name: Health
+    description: Service health and status
+
+paths:
+  /agents:
+    get:
+      operationId: list_agents
+      summary: List agents
+      description: |
+        Retrieve a paginated list of agents accessible to the authenticated user.
+
+        **Use when:** you need to find agents by name, status, or created date.
+        **Do not use for:** retrieving a single agent by ID (use `get_agent_by_id` instead).
+        **Prerequisites:** Bearer token with `agents:read` scope.
+        **Pagination:** Use `page_token` from response to fetch next page. Default limit is 20.
+        **Rate limit:** 100 requests per minute.
+      tags:
+        - Agents
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+          description: Number of results per page
+        - name: page_token
+          in: query
+          schema:
+            type: string
+          example: "cursor_abc123"
+          description: Opaque cursor for pagination; from previous response
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, archived]
+          example: active
+          description: Filter by agent status
+      responses:
+        "200":
+          description: Successfully retrieved agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Agent"
+                  total:
+                    type: integer
+                    example: 42
+                    description: Total number of agents matching filters
+                  page_token:
+                    type: string
+                    nullable: true
+                    example: "cursor_def456"
+                    description: Opaque token for next page, null if no more results
+                  has_more:
+                    type: boolean
+                    example: true
+                    description: True if more results available
+                required: [data, total, has_more]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+      x-agent-examples:
+        - prompt: "List all active agents"
+          operationId: list_agents
+          parameters:
+            status: active
+            limit: 50
+        - prompt: "Get the first 10 agents created by me"
+          operationId: list_agents
+          parameters:
+            limit: 10
+      x-rate-limit:
+        requests: 100
+        window: 60
+        headers: true
+
+    post:
+      operationId: create_agent
+      summary: Create agent
+      description: |
+        Create a new agent with the provided configuration.
+
+        **Use when:** you need to create a new agent to handle a specific task or workflow.
+        **Do not use for:** updating an existing agent (use `update_agent` instead).
+        **Prerequisites:** Bearer token with `agents:write` scope.
+        **Idempotency:** Idempotent for 24 hours using `idempotency_key` header.
+        **Returns:** 201 Created with full agent object.
+      tags:
+        - Agents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentRequest"
+      responses:
+        "201":
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+      x-agent-examples:
+        - prompt: "Create an agent that analyzes support tickets"
+          operationId: create_agent
+          request:
+            name: "Support Analyzer"
+            description: "Analyzes support tickets for sentiment and urgency"
+            model: "claude-opus-4-7"
+      x-openai-isConsequential: false
+
+  /agents/{agent_id}:
+    get:
+      operationId: get_agent_by_id
+      summary: Get agent by ID
+      description: |
+        Retrieve a single agent by its unique identifier.
+
+        **Use when:** you have a specific agent ID and need full details.
+        **Do not use for:** listing multiple agents (use `list_agents` instead).
+        **Prerequisites:** Bearer token with `agents:read` scope. Must have access to the agent.
+        **Caching:** Safe to cache for up to 5 minutes.
+      tags:
+        - Agents
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          description: The unique agent identifier
+      responses:
+        "200":
+          description: Agent retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+      x-agent-examples:
+        - prompt: "Get details about agent abc123"
+          operationId: get_agent_by_id
+          parameters:
+            agent_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    patch:
+      operationId: update_agent
+      summary: Update agent
+      description: |
+        Update an existing agent's configuration (partial update).
+
+        **Use when:** you need to modify an agent's name, description, or settings.
+        **Do not use for:** replacing the entire agent (use DELETE + POST instead).
+        **Prerequisites:** Bearer token with `agents:write` scope and ownership of agent.
+        **Idempotency:** Idempotent for 24 hours using `idempotency_key` header.
+      tags:
+        - Agents
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentRequest"
+      responses:
+        "200":
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+      x-openai-isConsequential: false
+
+    delete:
+      operationId: delete_agent
+      summary: Delete agent
+      description: |
+        Delete an agent (soft delete; can be restored within 30 days).
+
+        **Use when:** an agent is no longer needed.
+        **Prerequisites:** Bearer token with `agents:delete` scope and ownership.
+        **Caution:** Deleted agents cannot be recovered after 30 days.
+        **Idempotent:** Subsequent deletes of already-deleted agents return 404.
+      tags:
+        - Agents
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Agent deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+      x-openai-isConsequential: true
+
+  /agents/{agent_id}/run:
+    post:
+      operationId: run_agent
+      summary: Run agent
+      description: |
+        Trigger execution of an agent with optional input parameters.
+
+        **Use when:** you need to execute an agent and get results.
+        **Prerequisites:** Bearer token with `agents:execute` scope. Agent must be in 'active' status.
+        **Execution model:** Asynchronous. Returns immediately with execution ID; poll status with `get_execution`.
+        **Timeout:** Executions timeout after 1 hour.
+      tags:
+        - Agents
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  description: Input variables for the agent
+                  example:
+                    ticket_id: "SUP-12345"
+                    analysis_type: "sentiment"
+                timeout_seconds:
+                  type: integer
+                  minimum: 10
+                  maximum: 3600
+                  default: 600
+                  description: Max execution time
+              required: [input]
+      responses:
+        "202":
+          description: Execution started (asynchronous)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id:
+                    type: string
+                    format: uuid
+                    example: "660e8500-e29b-41d4-a716-446655440001"
+                  status:
+                    type: string
+                    enum: [pending, running, completed, failed, cancelled]
+                    example: pending
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2026-04-17T10:30:00Z"
+                required: [execution_id, status, created_at]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+      x-agent-examples:
+        - prompt: "Run the support analyzer on ticket SUP-12345"
+          operationId: run_agent
+          parameters:
+            agent_id: "550e8400-e29b-41d4-a716-446655440000"
+          request:
+            input:
+              ticket_id: "SUP-12345"
+            timeout_seconds: 300
+      x-openai-isConsequential: true
+      x-rate-limit:
+        requests: 10
+        window: 60
+
+  /executions/{execution_id}:
+    get:
+      operationId: get_execution
+      summary: Get execution status
+      description: |
+        Retrieve the status and results of an agent execution.
+
+        **Use when:** you need to check if an execution has completed or view its results.
+        **Prerequisites:** Bearer token with `agents:read` scope.
+        **Polling:** Recommended interval is 1-5 seconds. Max 100 polls per execution.
+        **Results retention:** Results available for 7 days after completion.
+      tags:
+        - Executions
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Execution status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending, running, completed, failed, cancelled]
+                  result:
+                    type: object
+                    nullable: true
+                    description: Output from the agent (null if not completed)
+                  error:
+                    type: object
+                    nullable: true
+                    $ref: "#/components/schemas/ErrorResponse"
+                  started_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  completed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                required:
+                  [execution_id, status, started_at, completed_at]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  schemas:
+    Agent:
+      type: object
+      description: An agent definition with configuration and metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          example: "Support Analyzer"
+        description:
+          type: string
+          example: "Analyzes support tickets for sentiment and priority"
+        model:
+          type: string
+          enum: [claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001]
+          example: "claude-opus-4-7"
+        status:
+          type: string
+          enum: [draft, active, archived]
+          example: active
+        tools:
+          type: array
+          items:
+            type: string
+          example: [ticket_search, ticket_create, email_send]
+          description: MCP tool names available to this agent
+        max_steps:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-04-17T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-04-17T11:00:00Z"
+        owner_id:
+          type: string
+          format: uuid
+      required:
+        [id, name, model, status, created_at, updated_at, owner_id]
+
+    CreateAgentRequest:
+      type: object
+      description: Request body to create a new agent
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Support Analyzer"
+        description:
+          type: string
+          maxLength: 500
+          example: "Analyzes support tickets"
+        model:
+          type: string
+          enum: [claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001]
+          example: "claude-opus-4-7"
+        tools:
+          type: array
+          items:
+            type: string
+          example: [ticket_search, ticket_create]
+        max_steps:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      required: [name, model]
+      additionalProperties: false
+
+    UpdateAgentRequest:
+      type: object
+      description: Request body to update an agent (partial)
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [draft, active, archived]
+        tools:
+          type: array
+          items:
+            type: string
+        max_steps:
+          type: integer
+          minimum: 1
+          maximum: 100
+      additionalProperties: false
+
+    ErrorResponse:
+      type: object
+      description: RFC 9457 Problem Details for HTTP APIs
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://api.example.com/errors/validation-failed"
+          description: Machine-readable error type URI
+        title:
+          type: string
+          example: "Validation Failed"
+        status:
+          type: integer
+          enum: [400, 401, 403, 404, 409, 429, 500, 503]
+          example: 400
+        detail:
+          type: string
+          example: "The 'name' field is required and must be 1-100 characters"
+        instance:
+          type: string
+          example: "req-abc123"
+          description: Request or occurrence identifier for debugging
+        suggestions:
+          type: array
+          items:
+            type: string
+          example:
+            - "Ensure the agent name is provided"
+            - "Try again in 60 seconds"
+          description: Actionable suggestions for recovery
+      required: [type, title, status, detail]
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters or body
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/validation-failed"
+            title: "Validation Failed"
+            status: 400
+            detail: "Parameter 'limit' must be between 1 and 100"
+            instance: "req-123"
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "Bearer token missing or expired"
+            instance: "req-456"
+
+    Forbidden:
+      description: Authenticated but lacks permission for this resource
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "You do not have permission to modify this agent"
+            instance: "req-789"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "Agent with ID 550e8400-e29b-41d4-a716-446655440000 not found"
+            instance: "req-999"
+
+    Conflict:
+      description: Resource already exists or version conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/conflict"
+            title: "Conflict"
+            status: 409
+            detail: "Agent with name 'Support Analyzer' already exists"
+            instance: "req-111"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests per minute
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Requests remaining in this minute
+        X-RateLimit-Reset:
+          schema:
+            type: string
+            format: date-time
+          description: When the rate limit resets
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/rate-limit"
+            title: "Too Many Requests"
+            status: 429
+            detail: "Rate limit exceeded: 100 requests per minute"
+            instance: "req-222"
+            suggestions:
+              - "Wait at least 30 seconds before retrying"
+              - "Consider batching requests"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth 2.1 Bearer token.
+
+        Obtain via Client Credentials flow:
+        ```
+        POST /oauth/token
+        grant_type=client_credentials&client_id=...&client_secret=...
+        ```
+
+        Include in request:
+        ```
+        Authorization: Bearer <access_token>
+        ```
+
+    DPoP:
+      type: http
+      scheme: DPoP
+      description: |
+        RFC 9449 Demonstrating Proof-of-Possession (DPoP) for token binding.
+
+        Create DPoP proof header:
+        ```
+        DPoP: <signed JWT with public key proof>
+        ```
+
+security:
+  - BearerAuth: []
+  - DPoP: []

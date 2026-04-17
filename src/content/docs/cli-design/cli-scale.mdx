@@ -1,0 +1,214 @@
+---
+title: The Agent DX CLI Scale
+description: A seven-axis scoring framework for evaluating how well a CLI supports AI agent operation
+---
+
+## Summary
+
+The Agent DX CLI Scale scores CLIs on seven axes (0-3 each, 0-21 total): machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, and command structure. The score maps to readiness tiers from Human-only (0-6) to Agent-first (18-21). This framework quantifies gaps and helps prioritize work.
+
+```
+Axis 1: Machine-Readable Output    (0-3)
+Axis 2: Raw Payload Input           (0-3)
+Axis 3: Schema Introspection        (0-3)
+Axis 4: Context Window Discipline   (0-3)
+Axis 5: Input Hardening            (0-3)
+Axis 6: Safety Rails               (0-3)
+Axis 7: Command Structure           (0-3)
+────────────────────────────────
+Total Score: 0-21
+```
+
+The Agent DX CLI Scale is a systematic rubric for evaluating any CLI's agent-readiness. It scores seven axes on a 0–3 scale, producing a total between 0 and 21. The score maps to four readiness tiers, from Human-only to Agent-first.
+
+> Human DX optimizes for discoverability and forgiveness. Agent DX optimizes for predictability and defense-in-depth.
+
+The scale exists because "does it have `--json`?" is not a useful question. A CLI can have `--json` on three commands out of thirty and score a 1 on the machine-readable output axis. The scale quantifies the gaps precisely enough to prioritize work.
+
+## The Seven Axes
+
+### 1. Machine-Readable Output
+
+Can an agent parse the CLI's output without heuristics?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Human-only output (tables, color codes, prose). No structured format available. |
+| 1 | `--output json` or equivalent exists but is incomplete or inconsistent across commands. |
+| 2 | Consistent JSON output across all commands. Errors also return structured JSON. |
+| 3 | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
+
+See [Machine-Readable Output](./machine-readable-output) for implementation guidance.
+
+### 2. Raw Payload Input
+
+Can an agent send the full API payload without translation through bespoke flags?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only bespoke flags. No way to pass structured input. |
+| 1 | Accepts `--json` or stdin JSON for some commands, but most require flags. |
+| 2 | All mutating commands accept a raw JSON payload that maps directly to the underlying API schema. |
+| 3 | Raw payload is first-class alongside convenience flags. The agent can use the API schema as documentation with zero translation loss. |
+
+See [Raw Payload Input](./raw-payload-input) for implementation guidance.
+
+### 3. Schema Introspection
+
+Can an agent discover what the CLI accepts at runtime without pre-stuffed documentation?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only `--help` text. No machine-readable schema. |
+| 1 | `--help --json` or a `describe` command for some surfaces, but incomplete. |
+| 2 | Full schema introspection for all commands — params, types, required fields — as JSON. |
+| 3 | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
+
+See [Schema Introspection](./schema-introspection) for implementation guidance.
+
+### 4. Context Window Discipline
+
+Does the CLI help agents control response size to protect their context window?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Returns full API responses with no way to limit fields or paginate. |
+| 1 | Supports `--fields` or field masks on some commands. |
+| 2 | Field masks on all read commands. Pagination with `--page-all` or equivalent. |
+| 3 | Streaming pagination (NDJSON per page). Explicit guidance in context/skill files on field mask usage. The CLI actively protects the agent from token waste. |
+
+See [Context Window Discipline](./context-window-discipline) for implementation guidance.
+
+### 5. Input Hardening
+
+Does the CLI defend against the specific ways agents fail (hallucinations, not typos)?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | No input validation beyond basic type checks. |
+| 1 | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding). |
+| 2 | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs. |
+| 3 | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
+
+See [Input Hardening](./input-hardening) for implementation guidance.
+
+### 6. Safety Rails
+
+Can agents validate before acting, and are responses sanitized against prompt injection?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | No dry-run mode. No response sanitization. |
+| 1 | `--dry-run` exists for some mutating commands. |
+| 2 | `--dry-run` for all mutating commands. Agent can validate requests without side effects. |
+| 3 | Dry-run plus response sanitization (e.g., via Model Armor) to defend against prompt injection embedded in API data. The full request→response loop is defended. |
+
+See [Safety Rails](./safety-rails) for implementation guidance.
+
+### 7. Agent Knowledge Packaging
+
+Does the CLI ship knowledge in formats agents can consume at conversation start?
+
+| Score | Criteria |
+|-------|----------|
+| 0 | Only `--help` and a docs site. No agent-specific context files. |
+| 1 | A `CONTEXT.md` or `AGENTS.md` with basic usage guidance. |
+| 2 | Structured skill files (YAML frontmatter + Markdown) covering per-command or per-API-surface workflows and invariants. |
+| 3 | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow a standard like OpenClaw. |
+
+See [Agent Knowledge Packaging](./agent-knowledge-packaging) for implementation guidance.
+
+## Total Score Interpretation
+
+| Range | Rating | Description |
+|-------|--------|-------------|
+| 0–5 | **Human-only** | Built for humans. Agents will struggle with parsing, hallucinate inputs, and lack safety rails. |
+| 6–10 | **Agent-tolerant** | Agents can use it, but they will waste tokens, make avoidable errors, and require heavy prompt engineering to compensate. |
+| 11–15 | **Agent-ready** | Solid agent support. Structured I/O, input validation, and some introspection. A few gaps remain. |
+| 16–21 | **Agent-first** | Purpose-built for agents. Full schema introspection, comprehensive input hardening, safety rails, and packaged agent knowledge. |
+
+## Bonus: Multi-Surface Readiness
+
+Not scored, but note whether the CLI exposes multiple agent surfaces from the same binary:
+
+- **MCP (stdio JSON-RPC)** — typed tool invocation without shell escaping; agents treat the CLI as a native tool rather than a subprocess
+- **Extension / plugin install** — the agent can install the CLI as a capability within its tool ecosystem, rather than shelling out to it
+- **Headless auth** — environment variables for all credentials, with no browser redirect or interactive setup required
+
+A CLI that scores 18/21 but requires browser-based OAuth for authentication is still unusable in headless agent environments. Multi-surface readiness is the difference between "can be used by agents with careful setup" and "works in any agent deployment context."
+
+## How to Evaluate Your Own CLI
+
+Work through each axis methodically. For each one:
+
+1. **Test the zero case.** Does the feature exist at all? If not, score 0.
+2. **Test coverage.** If it exists, is it consistent across all commands or only some?
+3. **Test the edge cases.** Does JSON output work for errors, not just successes? Does `--dry-run` exist for delete, not just create?
+
+A useful shortcut: run the CLI in a pipe and observe its behavior.
+
+```bash
+# TTY detection check — does it auto-detect non-interactive context?
+mytool users list | cat
+
+# Error structured output check
+mytool user get nonexistent_id --json; echo "Exit: $?"
+
+# Schema introspection check
+mytool user create --help --json
+
+# Raw payload check
+echo '{"name":"test","email":"test@example.com"}' | mytool user create
+
+# Dry-run check
+mytool users delete --status suspended --dry-run --json
+
+# Field mask check
+mytool users list --fields id,name --json
+```
+
+Score what you observe, not what the documentation claims.
+
+## Example Evaluation: Stripe CLI
+
+The Stripe CLI (`stripe`) is a widely-used API CLI that scores well on several axes and illustrates the tradeoffs.
+
+| Axis | Score | Notes |
+|------|-------|-------|
+| Machine-Readable Output | 2 | Consistent JSON output with `--` flags; no automatic TTY detection that defaults to JSON when piped |
+| Raw Payload Input | 3 | `stripe post /v1/customers -d 'param=value'` maps directly to API params; raw flag-based API access with full API schema parity |
+| Schema Introspection | 1 | `stripe completion` for shell completions; no `--help --json` or structured describe output |
+| Context Window Discipline | 1 | No `--fields` flag; returns full API objects; some pagination support |
+| Input Hardening | 1 | Basic type validation; no explicit control-character or path-traversal defense documented |
+| Safety Rails | 1 | No `--dry-run` on mutations; `--confirm` on some destructive operations |
+| Agent Knowledge Packaging | 1 | No SKILL.md or AGENTS.md; documentation is human-oriented |
+| **Total** | **10** | **Agent-tolerant** |
+
+Score of 10 means: an agent can use the Stripe CLI, but will waste tokens on full API responses, cannot do runtime schema discovery, and has no dry-run protection for mutations. It needs heavy prompt engineering to compensate.
+
+Reaching Agent-ready (11–15) would require: automatic JSON output in piped contexts, `--fields` on read commands, and `--dry-run` on mutations. Reaching Agent-first (16+) would additionally require: runtime schema resolution, comprehensive input hardening, response sanitization, and a SKILL.md.
+
+## Using the Scale to Prioritize Work
+
+Not all axes have equal leverage. The ordering below reflects which improvements deliver the most agent-reliability per unit of implementation effort:
+
+1. **Machine-Readable Output (Axis 1)** — without this, nothing else works. Implement first.
+2. **Safety Rails (Axis 6)** — `--dry-run` prevents irreversible errors. High impact, relatively simple.
+3. **Schema Introspection (Axis 3)** — enables agents to self-discover without pre-loaded docs. Medium effort, high leverage.
+4. **Context Window Discipline (Axis 4)** — `--fields` is low effort; streaming takes more work.
+5. **Raw Payload Input (Axis 2)** — high leverage for API-backed CLIs; relatively simple to add.
+6. **Agent Knowledge Packaging (Axis 7)** — AGENTS.md is fast; full SKILL.md takes more writing.
+7. **Input Hardening (Axis 5)** — comprehensive hardening takes the most careful implementation.
+
+Start with Axes 1 and 6. A CLI that always outputs structured JSON and supports `--dry-run` on every mutation is already much safer and more useful for agents than one that does neither, even if everything else scores 0.
+
+## Related Pages
+
+- [Machine-Readable Output](./machine-readable-output)
+- [Raw Payload Input](./raw-payload-input)
+- [Schema Introspection](./schema-introspection)
+- [Context Window Discipline](./context-window-discipline)
+- [Input Hardening](./input-hardening)
+- [Safety Rails](./safety-rails)
+- [Agent Knowledge Packaging](./agent-knowledge-packaging)
+- [Command Structure](./command-structure)

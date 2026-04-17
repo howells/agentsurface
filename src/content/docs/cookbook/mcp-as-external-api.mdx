@@ -1,0 +1,422 @@
+---
+title: MCP as External API
+description: Ship your MCP server publicly. Users connect Claude, ChatGPT, Cursor. "Use us where you already work."
+---
+
+## Summary
+
+Your MCP server that powers your in-app agent can become a distribution channel. Publish it with OAuth 2.1 + DPoP authentication so external AI clients (Claude Desktop, ChatGPT, Cursor) can connect and use your agent's tools. Turns your agent into a service.
+
+- **MCP 0.6+ compatible**: Standard protocol; any client can implement.
+- **OAuth 2.1 + DPoP**: User-initiated auth; tokens tied to device (Demonstration of Proof-of-Possession prevents token theft).
+- **No API keys**: Users authorize once; client stores refresh token.
+- **Same tools**: Your in-app agent and external clients use identical tool definitions.
+- **Distribution**: Users find you in Claude's model directory, ChatGPT's app store, Cursor's integrations.
+
+---
+
+## Why Ship MCP Publicly?
+
+1. **Distribution**: Users discover you without visiting your website.
+2. **Usage in flow**: Users don't leave their editor or AI client to manage your product.
+3. **Network effect**: Each AI client's user base becomes your potential customers.
+4. **Low friction**: "Add MCP server" is 3 clicks; "create account" is 5 steps.
+
+---
+
+## Server Setup
+
+Your MCP server already exists (powers your in-app agent). Make it available on a stable URL:
+
+```typescript
+// mcp/server.ts — your existing server
+import { Server } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new Server({
+  name: "my-agent-server",
+  version: "1.0.0",
+});
+
+// Register all tools (same as in-app)
+registerCustomerTools(server, ctx);
+registerOrderTools(server, ctx);
+registerInvoiceTools(server, ctx);
+// ...
+
+// Expose both stdio (for local development) and HTTP (for external clients)
+export async function startMcpServer() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+export async function getMcpServer() {
+  return server;
+}
+```
+
+---
+
+## HTTP Transport
+
+Wrap your server in an HTTP server so external clients can reach it:
+
+```typescript
+// mcp/http-transport.ts
+import express from "express";
+import { getMcpServer } from "./server";
+import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/shared/jsonrpc.js";
+
+const app = express();
+app.use(express.json());
+
+const mcpServer = await getMcpServer();
+
+// POST /mcp/jsonrpc — accepts JSON-RPC 2.0 requests
+app.post("/mcp/jsonrpc", async (req, res) => {
+  const message: JSONRPCMessage = req.body;
+
+  try {
+    const result = await mcpServer.handleMessage(message);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32603,
+        message: err instanceof Error ? err.message : "Internal error",
+      },
+      id: message.id,
+    });
+  }
+});
+
+// GET /.well-known/mcp — MCP discovery (OAuth/info endpoint)
+app.get("/.well-known/mcp", (req, res) => {
+  res.json({
+    name: "my-agent-server",
+    description: "Access my SaaS tools from Claude, ChatGPT, Cursor",
+    version: "1.0.0",
+    auth: {
+      type: "oauth2",
+      authorizationUrl: "https://api.example.com/oauth/authorize",
+      tokenUrl: "https://api.example.com/oauth/token",
+      scopes: ["api:all"],
+    },
+  });
+});
+
+app.listen(3000, () => console.log("MCP HTTP server listening on port 3000"));
+```
+
+---
+
+## OAuth 2.1 + DPoP
+
+Implement OAuth 2.1 with DPoP for secure external auth:
+
+```typescript
+// auth/oauth.ts
+import { generateCodeChallenge, generateState } from "oauth-pkce";
+import jwt from "jsonwebtoken";
+import { createDPoPProof } from "oauth-dop";
+
+// Step 1: Generate authorization URL (user clicks "Connect")
+export function getAuthorizationUrl(clientId: string, redirectUri: string): string {
+  const state = generateState();
+  const challenge = generateCodeChallenge();
+
+  // Store challenge in session (server-side)
+  sessionStore.set(`pkce:${state}`, challenge);
+
+  return new URL("https://api.example.com/oauth/authorize", {
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "api:all",
+    state,
+    code_challenge: challenge.challenge,
+    code_challenge_method: "S256",
+  }).toString();
+}
+
+// Step 2: Exchange code for token (OAuth callback)
+app.get("/oauth/callback", async (req, res) => {
+  const { code, state } = req.query as Record<string, string>;
+
+  // Verify state
+  const storedChallenge = sessionStore.get(`pkce:${state}`);
+  if (!storedChallenge) {
+    return res.status(400).json({ error: "Invalid state" });
+  }
+
+  // Exchange code for access token (server-side; safe)
+  const token = await exchangeCode(code, {
+    clientId: process.env.OAUTH_CLIENT_ID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+    codeVerifier: storedChallenge.verifier,
+  });
+
+  // Return token to client (user stores in their MCP config)
+  res.json({
+    access_token: token.access_token,
+    refresh_token: token.refresh_token,
+    expires_in: token.expires_in,
+  });
+});
+
+// Step 3: MCP client uses token with DPoP proof
+// Client does this automatically when calling MCP methods
+export function createDPoPHeader(method: string, url: string, accessToken: string): string {
+  const proof = createDPoPProof({
+    method,
+    url,
+    nonce: generateNonce(), // Server sends in 401 DPoP-Nonce header
+  });
+
+  return `DPoP ${accessToken}`;
+}
+
+// Step 4: Verify token + DPoP proof on MCP requests
+app.post("/mcp/jsonrpc", async (req, res, next) => {
+  const authHeader = req.header("Authorization");
+  const dPoPProof = req.header("DPoP");
+
+  if (!authHeader || !dPoPProof) {
+    return res.status(401).json({ error: "Missing auth headers" });
+  }
+
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme !== "DPoP") {
+    return res.status(401).json({ error: "Invalid auth scheme" });
+  }
+
+  try {
+    // Verify token
+    const payload = jwt.verify(token, process.env.JWT_PUBLIC_KEY);
+
+    // Verify DPoP proof
+    const proof = jwt.verify(dPoPProof, process.env.DPOP_PUBLIC_KEY);
+    if (proof.htm !== req.method || !proof.htu.startsWith(req.url)) {
+      throw new Error("DPoP proof invalid");
+    }
+
+    // Attach user context
+    req.userId = payload.sub;
+    req.teamId = payload.team_id;
+
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+});
+```
+
+---
+
+## Tool Filtering by User
+
+Each user's access to tools may differ based on their subscription or permissions:
+
+```typescript
+// mcp/server.ts — modified to support external clients
+export async function getMcpServer(userId?: string, teamId?: string) {
+  const server = new Server({ name: "my-agent-server" });
+
+  // Load user's scopes/permissions
+  const scopes = userId && teamId 
+    ? await getUserScopes(userId, teamId)
+    : ["api:read"]; // Anonymous clients get read-only access
+
+  // Register only tools they have access to
+  if (scopes.includes("customers:read") || scopes.includes("api:all")) {
+    registerCustomerTools(server, { userId, teamId, scopes });
+  }
+
+  if (scopes.includes("orders:write") || scopes.includes("api:all")) {
+    registerOrderTools(server, { userId, teamId, scopes });
+  }
+
+  // ...
+
+  return server;
+}
+
+// Modify the HTTP handler to pass user context
+app.post("/mcp/jsonrpc", async (req, res) => {
+  const userId = (req as any).userId; // From OAuth middleware
+  const teamId = (req as any).teamId;
+  const message = req.body;
+
+  const mcpServer = await getMcpServer(userId, teamId);
+  const result = await mcpServer.handleMessage(message);
+  res.json(result);
+});
+```
+
+---
+
+## Client Configuration
+
+Users add your MCP server to their Claude Desktop or ChatGPT configuration:
+
+### Claude Desktop (claude_desktop_config.json)
+
+```json
+{
+  "mcpServers": {
+    "my-agent": {
+      "command": "npx",
+      "args": ["@my-org/mcp-server"],
+      "env": {
+        "MCP_SERVER_URL": "https://api.example.com/mcp",
+        "OAUTH_CLIENT_ID": "your-client-id",
+        "OAUTH_REDIRECT_URI": "http://localhost:3000/oauth/callback"
+      }
+    }
+  }
+}
+```
+
+### ChatGPT Custom GPT
+
+1. User creates a Custom GPT.
+2. Adds "Actions" → "Authentication" → OAuth 2.1.
+3. Provides authorization URL, token URL, scopes.
+4. Adds action schema (points to your `/mcp/openapi` endpoint).
+
+---
+
+## OpenAPI Bridge (Optional)
+
+For ChatGPT compatibility, expose tool descriptions in OpenAPI format:
+
+```typescript
+// mcp/openapi.ts
+app.get("/mcp/openapi.json", async (req, res) => {
+  const userId = (req as any).userId;
+  const teamId = (req as any).teamId;
+  const mcpServer = await getMcpServer(userId, teamId);
+
+  const tools = mcpServer.listTools();
+
+  const spec = {
+    openapi: "3.1.0",
+    info: {
+      title: "My Agent API",
+      description: "Access your SaaS tools from Claude, ChatGPT, Cursor",
+      version: "1.0.0",
+    },
+    servers: [{ url: "https://api.example.com/mcp" }],
+    paths: tools.reduce((acc, tool) => {
+      acc[`/tools/${tool.name}`] = {
+        post: {
+          summary: tool.title,
+          description: tool.description,
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: tool.inputSchema,
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: tool.outputSchema,
+                },
+              },
+            },
+          },
+        },
+      };
+      return acc;
+    }, {} as Record<string, any>),
+  };
+
+  res.json(spec);
+});
+```
+
+---
+
+## Publishing & Discovery
+
+1. **Claude Desktop**: List in the Anthropic plugin marketplace (coming soon).
+2. **ChatGPT**: List as a Custom Action in the GPT Store.
+3. **Cursor**: Contact Cursor team for integration.
+4. **Website**: Add "Use with Claude" / "Use with ChatGPT" buttons on your docs.
+
+---
+
+## Monitoring & Rate Limiting
+
+Track external usage separately from in-app usage:
+
+```typescript
+// middleware/rate-limit.ts
+import { RateLimiter } from "rate-limiter";
+
+const limiter = new RateLimiter({
+  redis,
+  keyPrefix: "mcp:",
+});
+
+app.post("/mcp/jsonrpc", async (req, res, next) => {
+  const userId = (req as any).userId;
+  
+  const limit = await limiter.check(userId, {
+    max: 1000, // Requests per day
+    window: 24 * 60 * 60, // 24 hours
+  });
+
+  if (!limit.ok) {
+    return res.status(429).json({
+      error: "Rate limit exceeded",
+      retryAfter: limit.resetAt,
+    });
+  }
+
+  next();
+});
+
+// Log all external MCP calls
+app.post("/mcp/jsonrpc", (req, res, next) => {
+  const userId = (req as any).userId;
+  const message = req.body;
+
+  logger.info("[MCP External] Tool call", {
+    userId,
+    method: message.method,
+    tool: message.params?.name,
+    source: "external",
+  });
+
+  next();
+});
+```
+
+---
+
+## Checklist
+
+- [ ] Expose your MCP server on a public HTTPS URL.
+- [ ] Implement OAuth 2.1 + DPoP for secure external auth.
+- [ ] Add `/.well-known/mcp` discovery endpoint.
+- [ ] Modify tool registration to respect user scopes.
+- [ ] Document setup for Claude Desktop, ChatGPT, Cursor.
+- [ ] Add rate limiting for external requests.
+- [ ] Monitor external tool calls separately from in-app.
+- [ ] Create "Use with Claude" / "Use with ChatGPT" buttons on docs.
+- [ ] Test with actual Claude Desktop, ChatGPT client.
+
+---
+
+## See Also
+
+- [Tool Design](/docs/tool-design) — tool schema and descriptions.
+- [Tool Annotations](/docs/cookbook/tool-annotations) — declaring tool intent.
+- [MCP Servers](/docs/mcp-servers) — deploying and managing MCP servers.
+

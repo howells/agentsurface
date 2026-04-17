@@ -1,0 +1,4 @@
+{
+  "title": "Error Handling",
+  "pages": ["index", "rfc-7807", "errors-for-agents", "cli-errors", "retry-patterns"]
+}

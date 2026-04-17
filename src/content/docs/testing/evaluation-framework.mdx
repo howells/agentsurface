@@ -1,0 +1,367 @@
+---
+title: Agent Evaluation Framework
+description: A three-layer framework for measuring agent reasoning, action accuracy, and task completion
+---
+
+## Summary
+
+Measure multi-step system performance, not single-turn model accuracy. Three-layer framework: (1) Reasoning – plan quality and adherence (correct tools, order, deviations), (2) Action – tool selection accuracy (F1 score) and parameter correctness (all args valid), (3) Outcome – final artifact matches success criteria (code correct, summary faithful). Each layer can fail independently; binary success/fail metric hides which layer broke. Critical insight: LLM reasoning 90% ≠ agent task completion 40%.
+
+```
+Layer 1: Reasoning (Plan)
+├── Quality: correct tools, order?
+└── Adherence: follows own plan?
+
+Layer 2: Action (Tool Use)
+├── Selection F1: right tool?
+└── Parameters: correct args?
+
+Layer 3: Outcome (Result)
+└── Artifact: meets criteria?
+```
+
+---
+
+LLM evaluations measure a model. Agent evaluations measure a system. That distinction matters because agent failures are rarely pure model failures — they are failures of tool selection, parameter construction, state management, and multi-step coordination. An LLM that scores 90% on a reasoning benchmark might produce an agent that completes only 40% of real tasks correctly, because the gap between "can reason" and "can reliably select the right tool and pass the right arguments" is substantial.
+
+Agent evaluations need different metrics, different grading approaches, and a different dataset construction philosophy.
+
+## Why Agent Evals Differ from LLM Evals
+
+LLM evals typically measure a single turn: given this input, does the model produce an output that matches a reference? MMLU, HumanEval, and HellaSwag all follow this pattern. The metric is accuracy against a fixed answer.
+
+Agent evals measure multi-step execution: given this task, does the agent reach a correct end state by making correct decisions at each step? Two agents might both fail to complete a task — one because it chose the wrong tool, one because it chose the right tool but passed wrong arguments. These failures require different fixes. A single binary success/failure metric obscures which layer broke.
+
+The three-layer framework separates agent evaluation into the three components that can fail independently.
+
+## The Three-Layer Framework
+
+### Layer 1: Reasoning
+
+Reasoning evals measure the quality of the agent's plan before it acts.
+
+| Metric | Definition |
+|---|---|
+| Plan quality | Does the plan correctly identify the required tools and order? |
+| Plan adherence | Does the agent execute the plan it produced, or does it deviate? |
+
+Plan quality requires a grader that understands what a correct plan looks like. For well-defined tasks, this can be rule-based: the correct plan for "send invoice inv_01 to the customer" always includes `get_invoice` followed by `send_invoice`. For open-ended tasks, model-based grading is required.
+
+```python
+def grade_plan_quality(
+    task: str,
+    plan: list[str],
+    expected_tools: list[str]
+) -> float:
+    """Score plan quality as fraction of expected tools present in correct order."""
+    plan_tools = [step["tool"] for step in plan if "tool" in step]
+    
+    matched = 0
+    plan_idx = 0
+    
+    for expected_tool in expected_tools:
+        while plan_idx < len(plan_tools):
+            if plan_tools[plan_idx] == expected_tool:
+                matched += 1
+                plan_idx += 1
+                break
+            plan_idx += 1
+    
+    return matched / len(expected_tools) if expected_tools else 1.0
+```
+
+### Layer 2: Action
+
+Action evals measure the correctness of individual tool calls.
+
+| Metric | Definition |
+|---|---|
+| Tool routing accuracy | Did the agent call the correct tool for this step? |
+| Parameter correctness | Are all required parameters present, correctly typed, and semantically valid? |
+
+Tool routing accuracy is the fraction of tool calls where the agent selected the right tool. This can be measured precisely for tasks with a single correct tool per step:
+
+```python
+def tool_routing_accuracy(
+    calls: list[ToolCall],
+    expected: list[str]
+) -> float:
+    correct = sum(
+        1 for call, exp in zip(calls, expected)
+        if call.tool_name == exp
+    )
+    return correct / len(expected) if expected else 1.0
+```
+
+Parameter correctness requires both schema validation (are required fields present, are types correct?) and semantic validation (is the value actually meaningful for this call?):
+
+```python
+def grade_parameters(
+    call: ToolCall,
+    schema: dict,
+    reference_args: dict | None = None
+) -> dict:
+    errors = []
+    
+    # Schema validation — required fields and types
+    for field, spec in schema.get("properties", {}).items():
+        if field in schema.get("required", []):
+            if field not in call.arguments:
+                errors.append(f"Missing required field: {field}")
+            elif spec["type"] == "string" and not isinstance(call.arguments[field], str):
+                errors.append(f"Wrong type for {field}: expected string")
+    
+    # Semantic validation — compare to reference
+    semantic_score = 1.0
+    if reference_args:
+        matches = sum(
+            1 for k, v in reference_args.items()
+            if call.arguments.get(k) == v
+        )
+        semantic_score = matches / len(reference_args)
+    
+    return {
+        "schema_valid": len(errors) == 0,
+        "schema_errors": errors,
+        "semantic_score": semantic_score,
+    }
+```
+
+### Layer 3: Execution
+
+Execution evals measure whether the agent completed the task and how efficiently.
+
+| Metric | Definition |
+|---|---|
+| Task completion | Did the agent reach the correct end state? |
+| Step efficiency | How many steps did the agent take, relative to the minimum required? |
+
+Task completion is graded on outcomes, not on the path taken. If the task is "send invoice inv_01," the correct outcome is that the invoice's status is `sent`. The agent might have taken a different path to reach that outcome — that is fine, as long as the end state is correct.
+
+```python
+async def grade_task_completion(
+    task_id: str,
+    expected_state: dict,
+    actual_state: dict
+) -> bool:
+    """Compare expected vs actual end state. Returns True if task is complete."""
+    for field, expected_value in expected_state.items():
+        actual_value = actual_state.get(field)
+        if actual_value != expected_value:
+            return False
+    return True
+```
+
+Step efficiency is the ratio of minimum required steps to actual steps taken:
+
+```python
+def step_efficiency(actual_steps: int, minimum_steps: int) -> float:
+    return minimum_steps / actual_steps if actual_steps > 0 else 0.0
+```
+
+An efficiency score of 1.0 means the agent took exactly the minimum number of steps. Scores below 0.5 indicate the agent is taking more than twice the necessary steps — a signal of confused planning or excessive redundant tool calls.
+
+## Grader Types
+
+### Code-Based Graders
+
+Code-based graders are deterministic functions that compare tool calls or end states to expected values. They are fast, reproducible, and do not require an LLM at grading time.
+
+Use code-based graders for:
+- Tool routing accuracy (did agent call the correct tool?)
+- Schema validation (are required parameters present?)
+- End state verification (did the database record change as expected?)
+- Exit code and output format checks for CLI tools
+
+```python
+def grade_invoice_task(execution: AgentExecution) -> EvalResult:
+    invoice_id = execution.task_inputs["invoice_id"]
+    
+    # Verify the correct tool was called
+    send_calls = [c for c in execution.tool_calls if c.tool == "send_invoice"]
+    if not send_calls:
+        return EvalResult(passed=False, reason="send_invoice was never called")
+    
+    # Verify the correct invoice was passed
+    call = send_calls[0]
+    if call.arguments.get("invoice_id") != invoice_id:
+        return EvalResult(
+            passed=False,
+            reason=f"send_invoice called with wrong ID: {call.arguments.get('invoice_id')}"
+        )
+    
+    # Verify the end state
+    final_invoice = execution.final_state.get("invoice")
+    if final_invoice["status"] != "sent":
+        return EvalResult(passed=False, reason=f"Invoice status is '{final_invoice['status']}', expected 'sent'")
+    
+    return EvalResult(passed=True)
+```
+
+### Model-Based Graders (LLM-as-Judge)
+
+Model-based graders use an LLM to evaluate outputs that cannot be graded by rule. They are appropriate for:
+- Plan quality (is this a reasonable plan?)
+- Parameter semantics (is this a sensible date for a due_date?)
+- Open-ended task completion (did the agent produce a good summary?)
+
+```python
+async def model_grade_plan(
+    task: str,
+    plan: list[str],
+    grader_model: str = "claude-sonnet-4-6"
+) -> GradeResult:
+    prompt = f"""
+You are grading whether an agent produced a correct plan for a task.
+
+Task: {task}
+
+Agent's plan:
+{json.dumps(plan, indent=2)}
+
+Grade the plan on two dimensions:
+1. Correctness: Does the plan include the necessary tools in the right order?
+2. Completeness: Does the plan handle the full scope of the task?
+
+Respond with JSON: {{"score": 0-1, "reasoning": "brief explanation"}}
+"""
+    response = await llm.complete(prompt, model=grader_model)
+    return json.loads(response)
+```
+
+The grader model should be different from (and ideally stronger than) the model being evaluated. Using the same model to grade itself introduces systematic bias.
+
+### Human Graders
+
+Human graders are the gold standard. Use them for:
+- Calibrating model-based graders (do LLM-as-judge scores align with human judgment?)
+- Evaluating novel task types with no established rubric
+- Reviewing edge cases that automated graders flag as ambiguous
+
+Human grading is expensive. Reserve it for initial dataset construction and periodic recalibration of automated graders.
+
+## Non-Determinism Metrics
+
+Agent outputs are not deterministic. The same task, run ten times, may produce different paths and sometimes different outcomes. Two metrics capture different aspects of this non-determinism.
+
+**pass@k** (capability ceiling) measures whether the agent can complete the task within k attempts:
+
+```
+pass@k = P(at least one of k attempts succeeds)
+```
+
+A high pass@1 but low pass@k means the agent is consistently capable. A low pass@1 but high pass@5 means the agent can succeed but is unreliable — it gets lucky on some attempts.
+
+**pass^k** (consistency floor) measures whether the agent succeeds on all k attempts:
+
+```
+pass^k = P(all k attempts succeed)
+```
+
+For production deployments, pass^1 (a single run) and pass^k together bracket the reliability range. A production agent should aim for pass^1 close to pass@k — consistent success, not lucky success.
+
+```python
+def passat_k(results: list[bool]) -> float:
+    """Fraction of runs that pass: estimate of pass@1 / success rate."""
+    return sum(results) / len(results) if results else 0.0
+
+def passcaret_k(results: list[bool]) -> float:
+    """1 if all runs pass, 0 if any run fails."""
+    return 1.0 if all(results) else 0.0
+```
+
+## Capability Evals vs Regression Evals
+
+Capability evals measure what the agent can do. Regression evals detect when it stops doing something it did before.
+
+| Type | Dataset composition | Grading | Run frequency |
+|---|---|---|---|
+| Capability | Challenging tasks at the frontier of agent ability | Model-based + human | Weekly or on new model versions |
+| Regression | Real failures from production — the 20-50 most impactful bugs | Code-based | On every code change |
+
+Regression evals are the higher-priority investment for production systems. Capability evals tell you how good the system is. Regression evals tell you when you've broken something that was working.
+
+## Building the First Eval Set
+
+Start with real failures. The most valuable eval cases are the ones that have already broken the system.
+
+1. Pull the last 20-50 task failures from production logs
+2. Reproduce each failure with the exact inputs that triggered it
+3. Write a code-based grader for each failure that detects the specific breakage
+4. Add these as your regression suite
+
+This approach ensures the eval set covers the failure modes that actually occur in production rather than hypothetical failures. An eval that catches real production bugs is more valuable than an eval that tests theoretically important scenarios that have never actually failed.
+
+```python
+# Eval case structure derived from a real failure
+EVAL_CASES = [
+    {
+        "id": "regression_2025_04_001",
+        "description": "Agent failed to finalize before sending invoice",
+        "source": "production_incident_2025-04-12",
+        "inputs": {
+            "task": "Send invoice inv_01HV3K8MNP to the customer",
+            "invoice_status": "draft",  # The pre-condition that caused the failure
+        },
+        "expected_outcome": {
+            "tools_called": ["finalize_invoice", "send_invoice"],
+            "invoice_status": "sent",
+        },
+        "grader": "grade_invoice_send_task",
+    },
+    # ...
+]
+```
+
+## Grade Outcomes, Not Paths
+
+The same correct outcome can be reached by different valid paths. Graders that require a specific sequence of tool calls will incorrectly fail tasks where the agent chose an equally valid path.
+
+```python
+# Wrong — brittle path check
+def grade_task(execution):
+    expected_sequence = ["get_customer", "get_invoice", "send_invoice"]
+    actual_sequence = [c.tool for c in execution.tool_calls]
+    return actual_sequence == expected_sequence  # Fails on valid variations
+
+# Right — outcome check
+async def grade_task(execution, db):
+    invoice = await db.get_invoice(execution.task_inputs["invoice_id"])
+    return invoice.status == "sent"  # Pass if end state is correct
+```
+
+There are exceptions — for tasks where the path is part of the contract (e.g., "confirm before sending"), the path must be verified. But these should be explicit requirements in the eval case, not a general assumption.
+
+## Eval-Driven Development
+
+Write evals before writing the agent. When a new capability is required:
+
+1. Write the eval cases first — what does success look like?
+2. Build a code-based grader for the expected outcomes
+3. Run the eval against the current system — establish the baseline (likely 0%)
+4. Implement the capability
+5. Run the eval again — measure the improvement
+6. Promote the eval to the regression suite
+
+This discipline prevents the common pattern where evals are written after the system is built to confirm it works, rather than to specify what it should do.
+
+## Checklist
+
+- [ ] Evaluations are organized into three layers: reasoning, action, execution
+- [ ] Tool routing accuracy and parameter correctness are measured separately
+- [ ] End state is verified for task completion, not just the final tool call
+- [ ] Grader type matches the output type (code-based for deterministic outputs, model-based for open-ended)
+- [ ] pass@k and pass^k are both measured — not just success rate
+- [ ] Regression eval set starts with at least 20 real production failures
+- [ ] Graders check outcomes, not paths (unless path is a requirement)
+- [ ] Evals are written before the capability is implemented
+
+## See also
+
+- `/docs/testing/metrics` — pass@k, pass^k, tool F1, schema conformance
+- `/docs/testing/llm-as-judge` — calibrating judge models and biases
+- `/docs/testing/braintrust` — managed eval platform with dataset versioning
+- `/docs/testing/promptfoo` — YAML-driven evals with red-teaming
+- `/docs/testing/vitest-harness` — in-process evals with Vitest
+- `/docs/testing/observability` — OpenTelemetry traces for debugging
+- `/docs/testing/ci-integration` — regression testing and statistical significance

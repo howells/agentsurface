@@ -1,0 +1,314 @@
+---
+title: CLAUDE.md
+description: Claude Code-specific overrides and hooks
+---
+
+## Summary
+
+Thin overlay on AGENTS.md for Claude Code-specific behavior only: model selection, skill triggers, extended thinking enablement, memory patterns, session-level context hints, tool allowlisting/denylisting. If Claude should behave differently than Cursor or Copilot, document here. Never repeat AGENTS.md content; reference instead. Minimal file (keep tight) referencing AGENTS.md first, then adding Claude-only hooks.
+
+- **Model selection**: Which Claude model for this codebase
+- **Skill triggers**: Which skills to auto-invoke
+- **Extended thinking**: Enable for certain task types
+- **Memory patterns**: Session management hints
+- **Tool allow/deny**: Claude-specific tool restrictions
+- **Avoid**: Repeating AGENTS.md, general conventions, project overview
+
+---
+
+CLAUDE.md is a thin overlay on top of AGENTS.md. It defines Claude Code-specific behavior only: model selection, skill triggers, memory patterns, context engineering hints. If Claude Code should behave differently from Cursor or Copilot, document it here.
+
+## When to Use CLAUDE.md
+
+- Claude Code should use a different model than the default
+- Specific Claude skills should be triggered for this codebase
+- Claude-specific tools (like `/review`) should be allowed or forbidden
+- Memory patterns or session-level hints apply to this codebase
+- Extended thinking should be enabled for certain tasks
+- Permission mode differs from AGENTS.md
+
+## When NOT to Use CLAUDE.md
+
+- Documenting general project conventions (use AGENTS.md instead)
+- Repeating commands already in AGENTS.md (reference instead)
+- Listing coding standards or tech stack (link to AGENTS.md)
+
+## Structure
+
+### 1. Open with "See AGENTS.md"
+
+Make the relationship explicit:
+
+```markdown
+# CLAUDE.md
+
+See AGENTS.md for core conventions, commands, and boundaries.
+This file adds Claude Code-specific guidance only.
+```
+
+### 2. Model Selection (if different)
+
+```markdown
+## Model
+
+Default: claude-opus-4-7 (best for complex analysis and coding)
+
+Use claude-sonnet-4-6 for:
+  - Fast iteration (cheaper, faster)
+  - Simple refactoring or formatting
+  - Large file reads (smaller context, faster processing)
+
+Use claude-haiku-4-5 for:
+  - Code search or file summarization
+  - One-off tool invocations
+```
+
+If no override, omit this section (Claude Code will use its default).
+
+### 3. Allowed Tools
+
+```markdown
+## Tools
+
+Always allowed:
+  - Read, Bash, Git
+  - File creation and editing
+  - Tool use (any MCP server in mcp-servers/)
+
+Ask first:
+  - Database migrations (pnpm db:migrate)
+  - External API calls (e.g., curl to production)
+
+Never allowed:
+  - Production deployments
+  - Credential rotation
+  - Branch/tag deletion
+```
+
+If AGENTS.md boundaries suffice, omit this section.
+
+### 4. Claude Skills
+
+Reference skills that should be auto-triggered for this codebase:
+
+```markdown
+## Skills
+
+Auto-trigger these skills when relevant:
+  - /review — for pull request analysis
+  - /init — for new CLAUDE.md scaffolding
+  - /security-review — for auth/crypto changes
+
+Disable:
+  - /schedule — not useful for this codebase
+```
+
+See https://code.claude.com/docs/en/skills for the skill reference.
+
+### 5. Memory Patterns
+
+Claude Code's memory tool (beta `context-management-2025-06-27`) persists `/memories` across sessions. Use this for learned constraints that came from friction:
+
+```markdown
+## Memory Hints
+
+Store in memories/:
+  - pnpm install quirks (Node version, lockfile idiosyncrasies)
+  - Frequent build errors and their fixes
+  - Test flakiness and workarounds
+  - CI gate failures and how to resolve them
+  - Performance gotchas (slow tests, large bundles)
+
+Example entry (memories/build-quirks.md):
+  - Turbo cache can get stale; run --force-all if build fails mysteriously
+  - Tailwind JIT fails if class names are not literal strings
+  - Next.js ISR requires revalidate export; no default export = error
+```
+
+### 6. Extended Thinking
+
+If extended thinking should be enabled for specific tasks:
+
+```markdown
+## Extended Thinking
+
+Enable for:
+  - Architecture decisions (ARCHITECTURE.md changes)
+  - Complex refactorings affecting multiple packages
+  - Bug triage on production issues
+  - Security reviews
+
+Disable for:
+  - Simple file edits or formatting
+  - Routine feature development
+```
+
+### 7. Permission Mode
+
+Claude Code supports permission modes. If different from default:
+
+```markdown
+## Permissions
+
+Default: plan (ask for approval on uncertain actions)
+
+Use bypassPermissions for:
+  - Automated refactoring tasks
+  - Lint fixes and formatting
+
+Use dontAsk for:
+  - Code exploration (reading, grepping)
+  - Draft PR creation
+```
+
+See https://code.claude.com/docs/en/agent-sdk for permission mode details.
+
+### 8. Session Hints
+
+Long-running sessions need context engineering:
+
+```markdown
+## Session Hints
+
+- Start with `/read AGENTS.md` to cache project conventions
+- Break complex tasks into multiple sessions to avoid context bloat
+- Use `/summary` at task end to compact conversation history
+- For monorepo work, load per-package AGENTS.md via `/read packages/*/AGENTS.md`
+```
+
+## Example: Simple Override
+
+```markdown
+# CLAUDE.md
+
+See AGENTS.md for core conventions, commands, and boundaries.
+
+## Model
+
+Default: claude-opus-4-7
+
+Use claude-sonnet-4-6 for fast iteration on simple tasks.
+
+## Skills
+
+Auto-trigger:
+  - /review for PR analysis
+  - /security-review for auth changes
+
+## Permissions
+
+Default: plan
+
+Use dontAsk for: reading files, running tests, git operations.
+```
+
+This is minimal—0 duplication with AGENTS.md.
+
+## Example: Complex Override
+
+```markdown
+# CLAUDE.md
+
+See AGENTS.md for core conventions, commands, and boundaries.
+
+## Model
+
+Default: claude-opus-4-7 (complex analysis)
+Use claude-sonnet-4-6 for: fast iteration, simple refactoring
+Use claude-haiku-4-5 for: code search, summarization
+
+## Tools
+
+Always allowed:
+  - Read, Bash, Git
+  - File creation/editing
+  - MCP servers in mcp-servers/
+  - Database: pnpm db:migrate (non-prod only)
+
+Ask first:
+  - Staging deployments
+  - External API calls to production
+
+Never:
+  - Production deployments
+  - Credential rotation
+
+## Skills
+
+Auto-trigger:
+  - /review for pull requests
+  - /security-review for auth/crypto
+  - /init for new CLAUDE.md scaffolding
+
+Disable:
+  - /schedule (N/A for this codebase)
+
+## Memory
+
+Store learned patterns:
+  - Node version quirks (from .nvmrc)
+  - Monorepo build oddities
+  - Test flakiness and workarounds
+  - CI gate failures
+
+Example memory entries:
+  - Turbo cache stales; use --force-all if mysterious failures
+  - Prisma migrations are append-only; rollback only in dev
+  - Tailwind JIT requires literal class names
+  - pnpm install requires Node 18.12+; use .nvmrc
+
+## Extended Thinking
+
+Enable for:
+  - Architecture decisions
+  - Complex refactorings
+  - Security reviews
+
+## Session Hints
+
+- Load AGENTS.md first: /read AGENTS.md
+- Break complex tasks across sessions
+- Use /summary to compact history
+- For monorepo: /read packages/*/AGENTS.md
+
+## Gotchas (Claude-Specific)
+
+- Extended thinking increases token cost 2–3×; use sparingly
+- Memory tool requires explicit `/read memories/` at session start
+- Skill auto-trigger only for *directly* matching files (new tests → auto /review doesn't fire on library changes)
+```
+
+## Do's and Don'ts
+
+**Do:**
+- Reference AGENTS.md instead of repeating
+- Document Claude-specific decisions (model, permissions, skills)
+- Use for learned friction patterns (memory hints)
+- Keep it concise (`` `<100` `` lines)
+
+**Don't:**
+- Duplicate AGENTS.md content
+- Explain general project conventions here (AGENTS.md)
+- Over-specify behavior (let Claude Code use its judgment)
+- Make it longer than AGENTS.md itself (sign it's too detailed)
+
+## File Placement
+
+CLAUDE.md lives at project root, same level as AGENTS.md:
+
+```
+.
+├── AGENTS.md
+├── CLAUDE.md
+├── CONTRIBUTING.md
+└── src/
+```
+
+For monorepos, optional CLAUDE.md at package level (packages/api/CLAUDE.md) for package-specific Claude hints.
+
+## See also
+
+- `/docs/context-files/agents-md` — AGENTS.md spec
+- `/docs/context-files/cursor-and-copilot` — Cursor/Copilot variants
+- ([Claude Code docs](https://code.claude.com/docs/en/claude-code))
+- `/templates/discovery/CLAUDE.md` — starter template
