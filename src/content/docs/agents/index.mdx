@@ -1,0 +1,82 @@
+---
+title: Agents Skill
+description: How the agents skill scaffolds and updates production agent systems.
+---
+
+The `agents` skill creates and updates agent infrastructure. Use it when you need an agent, tool, workflow, memory layer, model router, browser tool, sandbox tool, or framework-specific agent wiring.
+
+It is not a generic code generator. It reads the project first, detects the existing runtime, then follows the conventions already present.
+
+## What It Creates
+
+| Mode | Output | Use When |
+|---|---|---|
+| `/agents init` | Agent directory structure, central registry, exports | A project has no agent infrastructure yet. |
+| `/agents agent <name>` | Agent definition, instructions, registration, tool stubs | You need a new agent with clear purpose and tools. |
+| `/agents tool <name>` | Typed tool with Zod schemas, safety hints, exports | An agent needs a new capability. |
+| `/agents workflow <name>` | Workflow steps, state schemas, trigger function | Work is multi-step, async, resumable, or stateful. |
+| `/agents memory` | Memory configuration and usage pattern | Agents need conversation, entity, or semantic recall. |
+| `/agents model` | Provider and gateway routing | You need model choice behind a stable app API. |
+| `/agents browser` | Browser-access tool wrapper | Agents need web browsing, extraction, screenshots, or GUI access. |
+| `/agents sandbox` | Isolated execution tool wrapper | Agents need to run generated or untrusted code. |
+
+## Runtime Decision Tree
+
+Start with the project shape:
+
+| Project Shape | Default Choice | Reason |
+|---|---|---|
+| `@mastra/core`, `src/mastra`, or `packages/agents` | Mastra | Best fit for local TypeScript agents, tools, workflows, memory, and MCP exposure. |
+| `ai` or `@ai-sdk/*` with app routes | Vercel AI SDK patterns | Best fit for chat routes, streaming, structured output, and app-local tools. |
+| `@modelcontextprotocol/sdk` with no app agent runtime | MCP-first | The product is exposing tools or resources to external agents more than running its own agent. |
+| `wrangler.toml`, Workers bindings, Durable Objects, or `agents` package | Cloudflare Agents | Best fit for edge-hosted, stateful, Workers-native agents. |
+| No agent packages | Mastra-first recommendation | Gives a coherent TypeScript default without inventing local conventions. |
+
+## Updating Existing Agents
+
+When updating an existing agent, preserve the local shape:
+
+- follow existing file layout before creating a new one
+- register new agents/tools in the same barrel files and central registry
+- keep instructions in Markdown when the project already uses prompt files
+- inject user/team/session context server-side, not through model-controlled tool arguments
+- keep tool names, schemas, and output shape consistent with neighboring tools
+- run type checks after wiring
+
+Do not switch frameworks just because a newer tool exists. Add a new framework only when it reduces complexity or matches the deployment target.
+
+## Memory Choices
+
+Use the simplest memory that satisfies the product need:
+
+| Need | Good Default |
+|---|---|
+| Last few conversation turns | Framework memory or database thread history |
+| Cross-session semantic recall | Mastra Memory + pgvector, or existing vector store |
+| Per-user or per-entity state in Workers | Durable Objects |
+| Workers-native long-term memory | Agent Memory if available, otherwise Vectorize/AI Search/AutoRAG |
+| Product/docs corpus retrieval | Existing search index, hybrid search, or RAG stack |
+
+Memory resource IDs must come from authenticated server context. Never let the model choose the user, tenant, project, or entity key.
+
+## Browser And Sandbox Tools
+
+Browser and sandbox capabilities are high-risk. The skill should scaffold them with:
+
+- domain/runtime allowlists
+- timeouts and budgets
+- audit logs
+- output truncation
+- structured errors
+- confirmation gates for writes, purchases, and destructive actions
+- no production secrets inside sandbox sessions
+
+Use Browser Run for Workers-native browser sessions. Use Browserbase, Stagehand, or Playwright where they match the existing runtime. Use Cloudflare Sandbox, Vercel Sandbox, Daytona, or Modal when code must execute away from the app server.
+
+## Related
+
+- [Cloudflare-Native Agent Stack](/docs/cookbook/cloudflare-agent-stack)
+- [Agentic Loop as Commodity](/docs/cookbook/agentic-loop)
+- [Tool Design](/docs/tool-design)
+- [MCP Servers](/docs/mcp-servers)
+- [Multi-Agent Patterns](/docs/multi-agent)

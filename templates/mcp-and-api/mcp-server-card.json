@@ -1,0 +1,34 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+  "version": "1.0",
+  "serverInfo": {
+    "name": "example-mcp-server",
+    "title": "Example MCP Server",
+    "version": "1.0.0"
+  },
+  "description": "Replace with the server's tool surface and when agents should use it.",
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://example.com/mcp"
+  },
+  "authentication": {
+    "required": false
+  },
+  "tools": [
+    {
+      "name": "search",
+      "title": "Search",
+      "description": "Search canonical public documentation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Natural-language question or keyword query."
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}

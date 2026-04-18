@@ -673,7 +673,7 @@ The agentify plugin includes these template files under `/templates`:
 
 ## See also
 
-- `/docs/api-surface` in the Agent Zero Fumadocs site
+- `/docs/api-surface` in the Agent Surface Fumadocs site
 - `/templates/openapi-skeleton.yaml` — starting template for OpenAPI 3.1 specs
 - `/templates/arazzo-workflow.yaml` — workflow example for multi-step operations
 - `/references/tool-design.md` — shared concerns with tool naming and descriptions

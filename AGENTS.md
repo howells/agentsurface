@@ -1,8 +1,8 @@
-# agent-zero
+# Agent Surface
 
 ## Purpose
 
-`agent-zero` is a monorepo for auditing and improving how well a codebase works with AI agents, and for scaffolding production-grade AI agent systems.
+Agent Surface is a monorepo for auditing and improving how well a codebase works with AI agents, and for scaffolding production-grade AI agent systems.
 
 The repository provides two main capabilities: `agentify` for auditing and transforming codebases for agent consumption, and `agents` for scaffolding AI agent infrastructure (agents, tools, workflows, memory, model routing).
 

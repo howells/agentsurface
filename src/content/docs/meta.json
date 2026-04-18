@@ -1,18 +1,25 @@
 {
-  "title": "Docs",
+  "title": "Agent Surface",
   "pages": [
     "index",
     "getting-started",
+    "reference-links",
+    "tooling-catalog",
+    "agents",
     "---",
     "api-surface",
+    "tool-design",
     "cli-design",
     "mcp-servers",
     "discovery",
+    "context-files",
+    "data-retrievability",
     "protocols",
     "authentication",
     "error-handling",
     "testing",
     "multi-agent",
+    "cookbook",
     "scoring"
   ]
 }

@@ -7,9 +7,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={source.pageTree}
       nav={{
-        title: "Agentify",
+        title: "Agent Surface",
       }}
-      githubUrl="https://github.com/howells/agentify"
+      githubUrl="https://github.com/howells/agentsurface"
     >
       {children}
     </DocsLayout>

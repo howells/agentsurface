@@ -5,15 +5,41 @@ description: Standardized /.well-known/ paths that let agents and protocols disc
 
 ## Summary
 
-/.well-known/ is an IETF standard (RFC 5785) for site-wide metadata. Agents use it for capability discovery without prior knowledge. Key files include /.well-known/ai (AI capabilities), /.well-known/mcp (MCP server locations), and /.well-known/openapi.json (API specs). Publishing these enables agents to discover and use your system programmatically.
+/.well-known/ is an IETF standard (RFC 5785) for site-wide metadata. Agents use it for capability discovery without prior knowledge. Key files include API Catalog, MCP Server Cards, Agent Skills indexes, OAuth protected-resource metadata, Web Bot Auth key directories, and agent cards. Publishing these enables agents to discover and use your system programmatically.
 
-- /.well-known/ai: JSON describing AI-facing capabilities (64 KB max)
-- /.well-known/mcp: MCP server endpoints and transports
-- /.well-known/openapi.json: Link to OpenAPI specification
-- /.well-known/oauth2-authorization-server: OAuth metadata
+- /.well-known/api-catalog: RFC 9727 API catalog for API specs, docs, and status
+- /.well-known/mcp/server-card.json: MCP server metadata before connection
+- /.well-known/agent-skills/index.json: domain skills agents can load
+- /.well-known/oauth-protected-resource: OAuth resource metadata
+- /.well-known/http-message-signatures-directory: Web Bot Auth public keys
 - All responses should be JSON with Content-Type application/json
 
 The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here makes your system participable in agentic protocols without requiring out-of-band configuration.
+
+## /.well-known/api-catalog
+
+API Catalog (RFC 9727) gives agents one place to discover public APIs, their specs, docs, status pages, and related metadata. Use it when a product exposes APIs that should be callable or wrapped as tools.
+
+```json
+{
+  "apis": [
+    {
+      "id": "public-rest-api",
+      "title": "Public REST API",
+      "description": "Create, read, and manage resources.",
+      "specification": "https://api.example.com/openapi.json",
+      "documentation": "https://example.com/docs/api",
+      "status": "https://status.example.com"
+    }
+  ]
+}
+```
+
+Reference the catalog with an HTTP `Link` header where practical:
+
+```http
+Link: </.well-known/api-catalog>; rel="api-catalog"
+```
 
 ## /.well-known/ai
 
@@ -126,9 +152,33 @@ The Agent-to-Agent (A2A) protocol, developed by Google and now IANA-registered, 
 
 The A2A protocol uses this card for routing — an orchestrating agent looks up the skills array to decide whether to delegate a task here. The `examples` field in each skill is particularly important: these are used for semantic matching when an agent does not know your agent's ID but is searching for a capable agent by task description.
 
+## /.well-known/mcp/server-card.json
+
+An MCP Server Card describes a remote MCP server before an agent connects: what it does, which transport it uses, how to authenticate, and which tools are available. Prefer this over hiding the endpoint in prose.
+
+```json
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+  "version": "1.0",
+  "serverInfo": {
+    "name": "docs-search",
+    "title": "Documentation Search",
+    "version": "1.0.0"
+  },
+  "description": "Search public documentation and retrieve canonical pages.",
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://example.com/mcp"
+  },
+  "authentication": {
+    "required": false
+  }
+}
+```
+
 ## /.well-known/mcp.json
 
-MCP server discovery is described in a Server-Endpoint Proposal (SEP) in progress. The proposed path is `/.well-known/mcp.json`:
+Some clients and proposals use `/.well-known/mcp.json` as a compatibility pointer. Prefer `/.well-known/mcp/server-card.json` for rich server metadata, and keep `mcp.json` only as a redirect or pointer when needed:
 
 ```json
 {
@@ -161,7 +211,39 @@ MCP server discovery is described in a Server-Endpoint Proposal (SEP) in progres
 }
 ```
 
-This format is still evolving. Check the MCP specification repository for the latest field definitions before implementing.
+This format is still evolving. If you publish it, use it as a compatibility pointer or redirect to the MCP Server Card rather than the only advertised metadata.
+
+## /.well-known/agent-skills/index.json
+
+Publish an Agent Skills index when your site can teach agents how to complete domain-specific tasks. The index should point to separate skill documents rather than inline long procedures.
+
+Each linked skill should follow the public Agent Skills format: a folder with a `SKILL.md` file, required `name` and `description` frontmatter, and optional `scripts/`, `references/`, and `assets/` directories. Keep skill descriptions specific because compatible agents load only the catalog first, then activate the full skill through progressive disclosure.
+
+```json
+{
+  "skills": [
+    {
+      "id": "create-api-token",
+      "name": "Create API Token",
+      "description": "How to create a scoped API token for automation.",
+      "format": "agent-skill",
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+    }
+  ]
+}
+```
+
+## /.well-known/oauth-protected-resource
+
+Protected Resource Metadata (RFC 9728) lets agents discover which authorization server, scopes, and token validation rules apply before calling a protected API.
+
+Use the full guide in [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) for schema details.
+
+## /.well-known/http-message-signatures-directory
+
+Web Bot Auth uses signed HTTP requests so a site can identify friendly bots and agents. The signatures directory publishes public keys that receiving sites use to verify requests.
+
+Implement this when your service sends outbound bot or agent requests and wants other sites to distinguish it from anonymous automation.
 
 ## /.well-known/acp.json
 
@@ -335,11 +417,13 @@ Once you have published well-known files, reference them from:
 
 - [OpenAPI Specification](https://api.example.com/openapi.json): Full REST API specification
 - [MCP Server](https://docs.example.com/mcp): Connect via Model Context Protocol
+- [API Catalog](https://example.com/.well-known/api-catalog): Machine-readable API discovery
 
 ## Discovery
 
 - [AI Capabilities](https://example.com/.well-known/ai): Machine-readable capability declaration
 - [Agent Card](https://example.com/.well-known/agent-card.json): A2A protocol discovery
+- [Agent Skills](https://example.com/.well-known/agent-skills/index.json): Reusable task guides for agents
 ```
 
 **Your `robots.txt`:**
@@ -347,7 +431,7 @@ Once you have published well-known files, reference them from:
 # AI discovery files
 # ai-discovery: https://example.com/.well-known/ai
 # agent-card: https://example.com/.well-known/agent-card.json
-# mcp: https://example.com/.well-known/mcp.json
+# mcp: https://example.com/.well-known/mcp/server-card.json
 ```
 
 **Your OpenAPI spec:**

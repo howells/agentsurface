@@ -7,7 +7,7 @@ description: Ship your MCP server publicly. Users connect Claude, ChatGPT, Curso
 
 Your MCP server that powers your in-app agent can become a distribution channel. Publish it with OAuth 2.1 + DPoP authentication so external AI clients (Claude Desktop, ChatGPT, Cursor) can connect and use your agent's tools. Turns your agent into a service.
 
-- **MCP 0.6+ compatible**: Standard protocol; any client can implement.
+- **MCP-compatible**: Standard protocol; any capable client can implement.
 - **OAuth 2.1 + DPoP**: User-initiated auth; tokens tied to device (Demonstration of Proof-of-Possession prevents token theft).
 - **No API keys**: Users authorize once; client stores refresh token.
 - **Same tools**: Your in-app agent and external clients use identical tool definitions.
@@ -91,12 +91,16 @@ app.post("/mcp/jsonrpc", async (req, res) => {
   }
 });
 
-// GET /.well-known/mcp — MCP discovery (OAuth/info endpoint)
-app.get("/.well-known/mcp", (req, res) => {
+// GET /.well-known/mcp/server-card.json — MCP server metadata
+app.get("/.well-known/mcp/server-card.json", (req, res) => {
   res.json({
     name: "my-agent-server",
     description: "Access my SaaS tools from Claude, ChatGPT, Cursor",
     version: "1.0.0",
+    transport: {
+      type: "streamable-http",
+      url: "https://api.example.com/mcp"
+    },
     auth: {
       type: "oauth2",
       authorizationUrl: "https://api.example.com/oauth/authorize",
@@ -344,10 +348,10 @@ app.get("/mcp/openapi.json", async (req, res) => {
 
 ## Publishing & Discovery
 
-1. **Claude Desktop**: List in the Anthropic plugin marketplace (coming soon).
-2. **ChatGPT**: List as a Custom Action in the GPT Store.
-3. **Cursor**: Contact Cursor team for integration.
-4. **Website**: Add "Use with Claude" / "Use with ChatGPT" buttons on your docs.
+1. **MCP Registry**: Publish a registry entry when your server is public and stable.
+2. **App directories**: Use host-specific app or integration directories where they exist.
+3. **Docs**: Add connection instructions for Claude, ChatGPT, Cursor, and other MCP clients.
+4. **Website**: Add "Connect with MCP" buttons that point to the server card and setup docs.
 
 ---
 
@@ -404,7 +408,7 @@ app.post("/mcp/jsonrpc", (req, res, next) => {
 
 - [ ] Expose your MCP server on a public HTTPS URL.
 - [ ] Implement OAuth 2.1 + DPoP for secure external auth.
-- [ ] Add `/.well-known/mcp` discovery endpoint.
+- [ ] Add `/.well-known/mcp/server-card.json` discovery metadata.
 - [ ] Modify tool registration to respect user scopes.
 - [ ] Document setup for Claude Desktop, ChatGPT, Cursor.
 - [ ] Add rate limiting for external requests.
@@ -419,4 +423,3 @@ app.post("/mcp/jsonrpc", (req, res, next) => {
 - [Tool Design](/docs/tool-design) — tool schema and descriptions.
 - [Tool Annotations](/docs/cookbook/tool-annotations) — declaring tool intent.
 - [MCP Servers](/docs/mcp-servers) — deploying and managing MCP servers.
-

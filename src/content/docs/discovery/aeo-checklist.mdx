@@ -5,12 +5,12 @@ description: Complete tiered checklist for making your site and API discoverable
 
 ## Summary
 
-This tiered checklist organizes AEO implementation from essential foundation items (Tier 1) through comprehensive support (Tier 4). Tier 1 includes robots.txt, llms.txt, and OpenGraph tags — low effort, high impact. Later tiers add JSON-LD, content negotiation, OpenAPI links, and well-known endpoints. Each item links to detailed implementation guidance.
+This tiered checklist organizes AEO implementation from essential foundation items through comprehensive support. Tier 1 includes robots.txt, llms.txt, and OpenGraph tags — low effort, high impact. Later tiers add JSON-LD, Markdown content negotiation, Content Signals, OpenAPI links, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and commerce protocols where relevant.
 
 - Tier 1: robots.txt, llms.txt, OpenGraph meta tags
 - Tier 2: OpenAPI discovery, JSON-LD markup
 - Tier 3: Content negotiation, content structure, AGENTS.md
-- Tier 4: Well-known endpoints, advanced discovery, monitoring
+- Tier 4: Well-known endpoints, API Catalog, MCP Server Cards, Agent Skills, auth discovery
 - Start with Tier 1 before advancing
 
 This checklist covers the full AEO implementation surface organized by tier. Tier 1 items are the minimum viable foundation — ship these first. Later tiers add depth and capability for teams investing seriously in agent discoverability.
@@ -173,6 +173,13 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 - [ ] Every response has a `description` and schema
 - [ ] Spec is kept in sync with actual API behavior (tested in CI)
 
+### API Catalog
+
+- [ ] `/.well-known/api-catalog` exists if you expose public APIs
+- [ ] Catalog links to canonical OpenAPI specs, documentation, status pages, and auth docs
+- [ ] HTTP `Link: </.well-known/api-catalog>; rel="api-catalog"` header present where practical
+- [ ] Catalog omits internal-only APIs that agents should not discover
+
 ### /.well-known/agent-card.json
 
 - [ ] `agent-card.json` published if your service can be delegated to by other agents
@@ -180,11 +187,33 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 - [ ] `authentication` specifies how to obtain credentials
 - [ ] `capabilities.streaming` accurately reflects whether you support streaming
 
-### /.well-known/mcp.json
+### MCP Server Card
 
-- [ ] `mcp.json` published if you run an MCP server (draft standard — check current spec)
+- [ ] `/.well-known/mcp/server-card.json` published if you run an HTTP MCP server
 - [ ] `transport` correctly specifies `streamable-http`, `sse`, or `stdio`
 - [ ] `authentication` section accurate and complete
+- [ ] Card describes the server before connection: name, purpose, tools, transport, and auth
+- [ ] `/.well-known/mcp.json` redirects or points to the server card if used for compatibility
+
+### Agent Skills Index
+
+- [ ] `/.well-known/agent-skills/index.json` exists when your site teaches task-specific agent workflows
+- [ ] Each skill is narrow, procedural, and linked as a separate `SKILL.md`
+- [ ] Linked skills follow the Agent Skills format: required `name` and `description`, optional `scripts/`, `references/`, and `assets/`
+- [ ] Skill descriptions explain when to use the skill, not only what topic it covers
+- [ ] Skills are generated from canonical docs or reviewed with the same rigor as public docs
+
+### OAuth Protected Resource Metadata
+
+- [ ] `/.well-known/oauth-protected-resource` exists for OAuth-protected APIs
+- [ ] Metadata points to the correct authorization server, JWKS, supported scopes, and DPoP requirement
+- [ ] Protected resource metadata is linked from API docs and MCP metadata where applicable
+
+### Web Bot Auth
+
+- [ ] `/.well-known/http-message-signatures-directory` exists if your service sends signed bot or agent requests
+- [ ] Published keys are rotated and documented
+- [ ] Receiving services can verify signed requests before granting high-trust access
 
 ---
 
@@ -250,15 +279,15 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 - [ ] MCP server running and accessible to agents
 - [ ] All API operations exposed as MCP tools with accurate descriptions
 - [ ] Resource endpoints serve documentation and configuration data
-- [ ] Authentication works with OAuth 2.0 Device Authorization or Client Credentials
+- [ ] Authentication works with the flow documented for your agent clients, usually OAuth 2.1 Client Credentials, token exchange, or host-managed delegated auth
 - [ ] Tool definitions tested with MCP inspector
 - [ ] Health check endpoint for uptime monitoring
 
 See the [MCP Servers](/docs/mcp-servers) section.
 
-### Cloudflare Content Signals
+### Content Signals
 
-- [ ] `Content-Signals-Policy: search=yes, ai-input=yes, ai-train=no` header deployed
+- [ ] `Content-Signal: search=yes, ai-input=yes, ai-train=no` declared in `robots.txt` or response headers
 - [ ] Policy header overridden appropriately for gated content
 - [ ] `robots.txt` and Content Signals policy are consistent with each other
 
@@ -282,6 +311,12 @@ See [llms.txt](./llms-txt).
 - [ ] Flows tested with an agent to verify they execute correctly
 
 See [Well-Known Discovery Endpoints](./well-known-endpoints).
+
+### Agentic Commerce
+
+- [ ] x402 implemented for machine-payable resources if agents must pay for access
+- [ ] Universal Commerce Protocol or Agentic Commerce Protocol manifests exist only if agent-mediated commerce is a real product surface
+- [ ] Commerce manifests link to canonical product, price, refund, and support policies
 
 ---
 

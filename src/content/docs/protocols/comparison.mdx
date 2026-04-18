@@ -34,7 +34,7 @@ Six protocols have emerged to address different coordination problems in multi-a
 
 ### MCP — Give This Agent a Hammer
 
-MCP (spec 2025-11-25) answers the question: what can this agent do? It connects an agent to tools (functions it can call), resources (data it can read), prompts (structured workflows), and async tasks (long-running background jobs). The connection is vertical — the agent reaches down into tools and data sources.
+MCP (spec 2025-11-25) answers the question: what can this agent do? It connects an agent to tools (functions it can call), resources (data it can read), prompts (structured workflows), and experimental tasks for long-running work. The connection is vertical — the agent reaches down into tools and data sources.
 
 Use MCP when:
 - An agent needs to call an API, run a function, or read a document
@@ -42,11 +42,11 @@ Use MCP when:
 - You want agents to be able to discover your tools at runtime
 - You have long-running operations that need progress tracking
 
-Every agent framework that matters supports MCP as of mid-2025. It is the baseline capability for any AI-enabled service. Streamable HTTP is now the preferred transport for remote (non-stdio) servers.
+Most serious agent frameworks now support MCP. It is the baseline capability for AI-enabled services that need external tools or data. Streamable HTTP is the standard transport for remote non-stdio servers.
 
 ### A2A v1.0 RC — Send This Task to the Specialist
 
-A2A answers the question: which agent should handle this? It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back — including across organizational boundaries. Governed by the Linux Foundation alongside MCP.
+A2A answers the question: which agent should handle this? It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back — including across organizational boundaries.
 
 Use A2A when:
 - The work requires a specialist that runs separately (different codebase, different organization)
@@ -54,7 +54,7 @@ Use A2A when:
 - You want agents to discover each other at runtime via AgentCard (`/.well-known/agent.json`)
 - Tasks are long-running and need streaming or callback-based progress
 
-A2A and MCP cover different directions. An orchestrator agent might use A2A to delegate to a specialist, while that specialist uses MCP to call the actual APIs. Tasks are the async primitive in A2A (mirroring MCP's task support).
+A2A and MCP cover different directions. An orchestrator agent might use A2A to delegate to a specialist, while that specialist uses MCP to call the actual APIs. Both protocols include patterns for long-running work, but they solve different coordination problems.
 
 ### ACP — Buy This Thing on Behalf of the User
 
@@ -144,7 +144,7 @@ No single protocol replaces the others. Each addresses a distinct coordination p
 
 | Protocol | Use in production? | Notes |
 |---|---|---|
-| MCP `2025-11-25` | Yes | Stable spec, broad SDK support, 10,000+ servers |
+| MCP `2025-11-25` | Yes | Stable spec, broad SDK support, and an official registry |
 | A2A | Yes | Stable spec, Google and Linux Foundation backing |
 | ACP | Pilots only | Beta, spec may change, limited tooling |
 | Arazzo `1.0` | Yes, with caveats | Spec stable, tooling still maturing |
@@ -164,7 +164,7 @@ When evaluating a protocol for production use, the spec stability matters less t
 
 ## Spec References
 
-- [MCP 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/)
+- [MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/)
 - [A2A v1.0 RC](https://a2a-protocol.org/latest/specification/)
 - [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0)
 - [Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)

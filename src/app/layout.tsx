@@ -5,9 +5,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Agentify — Make Any Codebase Agent-Ready",
+  title: "Agent Surface — Make Software Legible to Agents",
   description:
-    "The comprehensive reference for making codebases, APIs, and CLIs optimally consumable by AI agents.",
+    "A practical resource for designing codebases, APIs, CLIs, docs, tools, and skills that AI agents can understand and use.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

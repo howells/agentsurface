@@ -5,7 +5,7 @@ description: Implementing Model Context Protocol servers that expose your capabi
 
 ## Summary
 
-MCP is the standard protocol for agents to discover and invoke external tools. This section covers server architecture, tool design, resource and prompt templates, transport selection, authentication, testing patterns, and real-world examples from GitHub, Stripe, and Vercel. MCP enables agents to use your APIs safely with proper error handling and granular control.
+MCP is the standard protocol for agents to discover and invoke external tools. This section covers server architecture, tool design, resource and prompt templates, transport selection, authentication, testing patterns, MCP Apps, Agent Skills, and real-world examples from GitHub, Stripe, and Vercel. MCP enables agents to use your APIs safely with proper error handling and granular control.
 
 - Architecture: single-responsibility servers, testable factories
 - Tool design: clear names, descriptions as prompts, JSON Schema
@@ -13,6 +13,7 @@ MCP is the standard protocol for agents to discover and invoke external tools. T
 - Transports: stdio (simplest), SSE, HTTP with proper lifecycle
 - Authentication: bearer tokens, OAuth 2.1 for public servers
 - Testing: unit tests, in-memory integration, MCP Inspector
+- Distribution: registry entries, server cards, app surfaces, and skill packages
 
 The Model Context Protocol (MCP) is becoming the standard way for AI agents to discover and invoke external tools. An MCP server wraps your existing API or functionality into a protocol that agents can connect to natively.
 
@@ -25,6 +26,7 @@ The Model Context Protocol (MCP) is becoming the standard way for AI agents to d
 - **Server lifecycle** — initialization, capability declaration, graceful shutdown, and connection management
 - **Error semantics** — returning structured errors through MCP that give agents enough information to recover or report clearly
 - **Testing MCP servers** — validating tool definitions, input handling, and response shapes with automated tests
+- **Distribution and packaging** — publishing MCP endpoints, advertising metadata, and pairing servers with Agent Skills where procedural guidance matters
 
 ## See also
 

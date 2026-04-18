@@ -5,11 +5,11 @@ description: Shipping CLI documentation in formats agents consume at conversatio
 
 ## Summary
 
-Agents starting fresh will hallucinate without guidance. Agent knowledge packaging bundles CLI documentation in formats agents load automatically at conversation start: CONTEXT.md (general orientation), AGENTS.md (Linux Foundation standard for repo context), and SKILL.md (structured tool definitions). This eliminates discovery cost and prevents common failure modes.
+Agents starting fresh will hallucinate without guidance. Agent knowledge packaging bundles CLI documentation in formats agents load automatically at conversation start: CONTEXT.md (general orientation), AGENTS.md (repo context), and Agent Skills (`SKILL.md` plus optional supporting files). This eliminates discovery cost and prevents common failure modes.
 
 - CONTEXT.md: high-level orientation, credentials, invariants
 - AGENTS.md: commands, build/test steps, boundaries, exclusions
-- SKILL.md: structured tool definitions with JSON Schema
+- SKILL.md: portable task guidance, with optional CLI metadata extensions
 - Most agent frameworks auto-load these files from project root
 - Lead with commands in AGENTS.md — this is the most valuable content
 
@@ -23,7 +23,7 @@ Agent knowledge packaging is the practice of bundling the right information in t
 
 A general-purpose context file that most agent frameworks will load automatically when it appears in the project root or the directory from which the CLI is run. It provides high-level orientation: what the tool does, what credentials are needed, and the most important invariants.
 
-```markdown
+````markdown
 # mytool Context
 
 mytool is the CLI for the Example Platform API. It manages users, DNS records,
@@ -46,13 +46,13 @@ Obtain an API key at: https://app.example.com/settings/api-keys
 ## Getting the Schema
 
 Run `mytool describe --json` to get the full command schema for any command group.
-```
+````
 
 CONTEXT.md is intentionally lightweight. It orients the agent without overwhelming it. Deep workflow guidance goes in SKILL.md.
 
 ### AGENTS.md
 
-AGENTS.md follows a convention popularized by several agent frameworks (including the Claude Code convention of loading `CLAUDE.md`). It is the primary context file agents look for in a repository.
+AGENTS.md is the open repo-instruction format used by coding agents. It is the primary context file agents look for in a repository.
 
 Structure AGENTS.md around three concerns:
 
@@ -60,7 +60,7 @@ Structure AGENTS.md around three concerns:
 2. **Capabilities** — what the CLI can do, organized by domain
 3. **Guardrails** — what the agent must never do without specific safety steps
 
-```markdown
+````markdown
 # mytool Agent Guide
 
 ## Setup
@@ -114,44 +114,27 @@ mytool describe --json
 # Schema for a specific command
 mytool user create --help --json
 ```
-```
+````
 
 ### SKILL.md
 
-SKILL.md is a structured capability declaration with machine-readable YAML frontmatter and human-readable Markdown guidance. It is designed to be loaded by agent frameworks that support typed skill files — allowing the agent framework to index capabilities, check version compatibility, and route tasks to the right skill.
+An Agent Skill is a folder with a `SKILL.md` entrypoint. The portable minimum is simple: `name`, `description`, and Markdown instructions. Supporting files live in `scripts/`, `references/`, and `assets/` when the task needs them.
 
-```markdown
+For CLIs, treat fields like `schema_command`, `auth`, `capabilities`, and `invariants` as useful metadata extensions. They help agents use your CLI, but they should not replace the portable Agent Skills shape.
+
+````markdown
 ---
 name: mytool
-version: 2.4.1
-description: CLI for the Example Platform — users, DNS, billing, deployments
-schema_command: mytool describe --json
-auth:
-  type: api_key
-  env: MYTOOL_API_KEY
-  status_command: mytool auth status --json
-capabilities:
-  - id: user_management
-    description: Create, update, suspend, delete users and manage roles
-    commands: [user create, user update, user delete, user role assign]
-  - id: dns_management
-    description: Manage DNS records across zones
-    commands: [dns record create, dns record update, dns record delete]
-  - id: deployments
-    description: Trigger and monitor deployments, manage rollbacks
-    commands: [deploy trigger, deploy rollback, deploy status]
-invariants:
-  - always_dry_run_before_delete: true
-  - always_use_fields: true
-  - confirmation_flag: --yes
-compatibility:
-  min_version: 2.0.0
-  breaking_changes:
-    - version: 2.0.0
-      change: "user create --email is now required (was optional)"
+description: Use when managing Example Platform users, DNS, billing, or deployments from the CLI.
 ---
 
 # mytool Skill
+
+## Discovery
+
+- Runtime schema: `mytool describe --json`
+- Auth check: `mytool auth status --json`
+- Required env: `MYTOOL_API_KEY`
 
 ## Authentication
 
@@ -230,7 +213,26 @@ Use `--fields` to limit response size. Common useful field sets:
 | Billing check | `id,name,billing.plan,billing.status` |
 
 Avoid fetching `notification_preferences`, `feature_flags`, or `audit_log` unless specifically needed.
+````
+
+## CLI Metadata Extension
+
+If your client supports custom skill metadata, expose CLI-specific fields in frontmatter or in a referenced schema document:
+
+```yaml
+schema_command: mytool describe --json
+auth:
+  type: api_key
+  env: MYTOOL_API_KEY
+  status_command: mytool auth status --json
+capabilities:
+  - id: user_management
+    commands: [user create, user update, user delete, user role assign]
+  - id: dns_management
+    commands: [dns record create, dns record update, dns record delete]
 ```
+
+Keep the basic `name` and `description` valid for agents that only understand the public Agent Skills format.
 
 ## Per-Command Skill Files
 
@@ -248,7 +250,7 @@ mytool/
 
 Per-command files can go deeper without bloating the top-level skill:
 
-```markdown
+````markdown
 ---
 skill: mytool/dns-records
 version: 2.4.1
@@ -293,7 +295,7 @@ The `proxied` field routes traffic through the CDN. When true:
   "comment": "Production API server"
 }
 ```
-```
+````
 
 ## Versioning and Discoverability
 
@@ -345,15 +347,15 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 |-------|----------|
 | 0 | Only `--help` and a docs site. No agent-specific context files. |
 | 1 | A `CONTEXT.md` or `AGENTS.md` with basic usage guidance. |
-| 2 | Structured skill files (YAML frontmatter + Markdown) covering per-command or per-API-surface workflows and invariants. |
-| 3 | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow a standard like OpenClaw. |
+| 2 | Agent Skills covering per-command or per-API-surface workflows and invariants. |
+| 3 | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow the public Agent Skills format. |
 
 ## Checklist
 
 - [ ] `AGENTS.md` in the repository root with setup instructions, capabilities, and guardrails
 - [ ] `CONTEXT.md` in the repository root for agent frameworks that load it automatically
-- [ ] `SKILL.md` with YAML frontmatter including `name`, `version`, `schema_command`, `auth`, `capabilities`, and `invariants`
-- [ ] `schema_command` in SKILL.md frontmatter points to the live introspection command
+- [ ] `SKILL.md` with at least `name` and `description` frontmatter
+- [ ] CLI metadata extension points to the live introspection command (`schema_command` or equivalent)
 - [ ] Per-command or per-domain skill files in a `skills/` directory for complex CLIs
 - [ ] Skill files include versioning and are referenced from the CLI's schema output
 - [ ] "Always use" invariants are encoded explicitly — `--dry-run`, `--fields`, `--json`
@@ -362,7 +364,8 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
 ## Related Pages
 
-- [Schema Introspection](./schema-introspection) — SKILL.md format and the `schema_command` field
+- [Schema Introspection](./schema-introspection) — CLI schema commands and optional skill metadata
+- [Agent Skills](/docs/discovery/agent-skills) — portable skill folder format
 - [Context Window Discipline](./context-window-discipline) — why `--fields` invariants matter
 - [Safety Rails](./safety-rails) — dry-run and confirmation patterns to encode as invariants
 - [The Agent DX CLI Scale](./cli-scale) — full scoring framework

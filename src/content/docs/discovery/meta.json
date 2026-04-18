@@ -4,6 +4,7 @@
     "index",
     "llms-txt",
     "agents-md",
+    "agent-skills",
     "structured-data",
     "content-negotiation",
     "well-known-endpoints",

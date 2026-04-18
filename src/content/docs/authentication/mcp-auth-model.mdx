@@ -1,270 +1,166 @@
 ---
 title: MCP Authorization
-description: Client ID Metadata Documents, Enterprise-Managed Authorization, MCP 2025-11-25
+description: OAuth protected-resource metadata, client registration, and token handling for HTTP MCP servers
 ---
 
 ## Summary
 
-MCP 2025-11-25 uses Client ID Metadata Documents (CIMD) where clients publish their identity and public key at `/.well-known/mcp-client.json`. Servers fetch the metadata, validate JWT signatures using the client's public key, and issue tokens without requiring shared secrets. Enterprise-Managed Authorization (EMA) centralizes this in an IdP for multi-tenant deployments.
+MCP authorization applies to HTTP-based transports. A protected MCP server acts as an OAuth 2.1 resource server; the MCP client acts as an OAuth client; an authorization server issues access tokens for the MCP server.
+
+Authorization is optional for MCP implementations, but when an HTTP MCP server is protected it should follow the MCP authorization specification. Stdio servers should not use this flow; they should get credentials from the local environment.
 
 ```
-Client publishes CIMD     Server discovers & verifies     Tokens issued
-   at well-known          against public JWKS             with audit trail
+MCP client → protected MCP server → protected-resource metadata
+     │                    │
+     └──── authorization server discovery ──── token issuance
 ```
 
-- Client publishes CIMD: client_id, public_jwks_uri, requested_capabilities
-- No shared secrets; clients authenticate via signed JWTs
-- Short-lived access tokens (15 min–1 hour)
-- EMA: optional, for enterprises with centralized IdP
-- JWT-Bearer grant: client signs assertions with its private key
+Key pieces:
 
-MCP's authorization model evolved from bearer tokens to dynamic registration to a standards-based metadata approach. MCP 2025-11-25 introduced Client ID Metadata Documents (CIMD) and Enterprise-Managed Authorization (EMA), solving the core problem: how do remote MCP servers securely authenticate clients without pre-shared secrets or complex dynamic registration?
+- Protected-resource metadata advertises which authorization server protects the MCP endpoint.
+- MCP clients must use protected-resource metadata for authorization-server discovery.
+- Authorization servers and MCP clients should support OAuth Client ID Metadata Documents.
+- Dynamic client registration remains a fallback option.
+- Access tokens must be sent in the `Authorization: Bearer <token>` header and must not be placed in URLs.
+- Tokens must be audience-bound to the MCP server resource.
 
-The answer: clients publish metadata at a well-known location, servers discover and verify that metadata, tokens flow securely with full audit trails.
+## Transport Scope
 
-## Evolution of MCP Auth
+MCP authorization is defined for HTTP-based transports.
 
-**Early (2024):** Bearer tokens only. Clients passed a static token; servers accepted it without verifying client identity. High friction: every client-server pair needed out-of-band coordination.
+Use this page for:
 
-**2025-06-18:** OAuth 2.0 dynamic client registration. Clients would register themselves at runtime, receive a `client_id` and `client_secret`, and use Client Credentials grant. Better, but required servers to expose a registration endpoint and trust clients to protect secrets.
+- Streamable HTTP MCP servers exposed over HTTPS
+- remote MCP servers that need per-user or per-tenant access control
+- agent clients that need to discover the right authorization server
 
-**2025-11-25:** Client ID Metadata Documents + Enterprise-Managed Authorization. Clients publish their identity and capabilities at `/.well-known/mcp-client.json`. Servers fetch and verify this metadata, then issue tokens without requiring secrets to be shared. This is the current standard and recommended approach.
+Do not use this page as the primary model for stdio MCP servers. Stdio servers normally receive credentials from environment variables, local config, keychains, or the host application.
 
-## Client ID Metadata Document (CIMD)
+## Protected Resource Metadata
 
-A client (the MCP server you're integrating with) publishes metadata at a well-known URL:
+A protected MCP server must advertise how clients can discover its authorization server.
+
+The server can do this in two ways:
+
+- Return a `WWW-Authenticate` header with a `resource_metadata` URL on `401 Unauthorized`.
+- Serve OAuth protected-resource metadata from a well-known URI.
+
+Common well-known locations include:
+
+```text
+https://example.com/.well-known/oauth-protected-resource
+https://example.com/.well-known/oauth-protected-resource/public/mcp
+```
+
+The protected-resource metadata should include an `authorization_servers` field. The MCP client uses that metadata to discover the authorization server and then follows the normal OAuth flow.
+
+## Authorization Server Discovery
+
+MCP authorization servers must support at least one discovery mechanism:
+
+- OAuth 2.0 Authorization Server Metadata
+- OpenID Connect Discovery 1.0
+
+MCP clients must support both discovery mechanisms. This matters because different issuers publish metadata at different well-known paths.
+
+For an issuer such as `https://auth.example.com/tenant1`, clients may need to try path-insertion and path-appending forms:
+
+```text
+https://auth.example.com/.well-known/oauth-authorization-server/tenant1
+https://auth.example.com/.well-known/openid-configuration/tenant1
+https://auth.example.com/tenant1/.well-known/openid-configuration
+```
+
+## Client Registration
+
+MCP supports three client registration approaches:
+
+| Approach | Use when |
+|---|---|
+| Pre-registration | The client and authorization server already have a relationship. |
+| OAuth Client ID Metadata Documents | The client and authorization server do not have a prior relationship, and the authorization server supports URL-formatted client IDs. |
+| Dynamic client registration | The authorization server supports RFC 7591 and dynamic registration is appropriate. |
+
+When several options exist, clients should prefer pre-registered client details, then Client ID Metadata Documents when supported, then dynamic client registration as a fallback.
+
+## Client ID Metadata Documents
+
+Client ID Metadata Documents are an OAuth client registration mechanism, not an MCP-specific `/.well-known/mcp-client.json` file.
+
+The client uses an HTTPS URL as its `client_id`. That URL points to a JSON document containing OAuth client metadata. The document must include at least:
+
+- `client_id`
+- `client_name`
+- `redirect_uris`
+
+Example:
 
 ```json
 {
-  "name": "InvoiceSummaryAgent",
-  "version": "1.0.0",
-  "description": "Summarizes invoices for a given period",
-  "client_id": "agent_01HV3K8MNP",
-  "client_uri": "https://agents.example.com/invoice-summary",
-  "public_jwks_uri": "https://agents.example.com/.well-known/jwks.json",
-  "requested_capabilities": [
-    "read:invoices",
-    "read:customers"
+  "client_id": "https://app.example.com/oauth/client-metadata.json",
+  "client_name": "Example MCP Client",
+  "client_uri": "https://app.example.com",
+  "redirect_uris": [
+    "http://127.0.0.1:3000/callback",
+    "http://localhost:3000/callback"
   ],
-  "redirect_uris": [],
-  "contacts": [
-    "admin@agents.example.com"
-  ],
-  "policy_uri": "https://agents.example.com/privacy",
-  "tos_uri": "https://agents.example.com/tos"
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
 }
 ```
 
-Key fields:
+Authorization servers advertise support with:
 
-- `client_id` — unique identifier for this client (UUIDv7 or ulid)
-- `client_uri` — where the client is hosted or documented
-- `public_jwks_uri` — where to fetch the client's public key for JWT verification
-- `requested_capabilities` — which MCP server capabilities the client wants
-- `redirect_uris` — empty for M2M (no browser redirect needed)
-
-This metadata is static and serves as the client's "identity card." It is not secret and can be published in code repositories or documentation.
-
-## Server-Side Metadata Fetch
-
-When an MCP server receives a request from a client, it:
-
-1. Extracts the client ID from the JWT
-2. Fetches the client's metadata from `/.well-known/mcp-client.json` (or configured location)
-3. Verifies the signature on the JWT using the public key from `public_jwks_uri`
-4. Validates that the client is requesting only capabilities it declared
-5. Issues appropriate permissions
-
-```typescript
-import { jwtVerify, createRemoteJWKSet } from 'jose';
-
-async function authenticateClient(token: string): Promise<string> {
-  // Decode token to get client_id (without verifying yet)
-  const header = JSON.parse(
-    Buffer.from(token.split('.')[0], 'base64').toString()
-  );
-  const payload = JSON.parse(
-    Buffer.from(token.split('.')[1], 'base64').toString()
-  );
-
-  const clientId = payload.sub || payload.client_id;
-
-  // Fetch client's metadata
-  const metadata = await fetch(`https://client-domain.example.com/.well-known/mcp-client.json`)
-    .then(r => r.json());
-
-  if (metadata.client_id !== clientId) {
-    throw new Error('Client metadata does not match token');
-  }
-
-  // Fetch client's public key
-  const jwks = createRemoteJWKSet(new URL(metadata.public_jwks_uri));
-
-  // Verify token signature
-  const { payload: verified } = await jwtVerify(token, jwks, {
-    audience: 'https://resource-server.example.com',
-  });
-
-  return verified.sub as string;
+```json
+{
+  "client_id_metadata_document_supported": true
 }
 ```
 
-## Enterprise-Managed Authorization (EMA)
+The authorization server should fetch the metadata document, validate that the document's `client_id` exactly matches the URL, validate redirect URIs, and cache the document according to HTTP cache headers.
 
-EMA is an optional extension where an organization's identity provider (IdP) manages authorization on behalf of all MCP servers and clients within that organization. Instead of individual servers fetching and verifying client metadata, the IdP issues tokens and servers trust the IdP.
+Clients may use `private_key_jwt` for token endpoint authentication when the metadata document provides the required JWKS configuration.
 
-In an EMA deployment:
+## Token Use
 
-1. Client authenticates to the organization's IdP
-2. IdP issues a JWT with client identity and requested scopes
-3. Client includes this JWT in requests to MCP servers
-4. Servers validate the JWT against the IdP's JWKS
-5. Servers check that the client is authorized for the requested operation
+MCP clients must send access tokens in the authorization header:
 
-```typescript
-// IdP issues a token
-const token = await new SignJWT({
-  sub: 'client_01HV3K8MNP',
-  client_name: 'InvoiceSummaryAgent',
-  aud: 'https://resource-server.example.com',
-  scope: 'mcp:read mcp:invoke',
-  org_id: 'org_acme',
-  iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor(Date.now() / 1000) + 3600,
-})
-  .setProtectedHeader({ alg: 'RS256' })
-  .sign(idpPrivateKey);
-
-// Resource server validates
-const { payload } = await jwtVerify(token, idpJwks, {
-  issuer: 'https://idp.acme.org/',
-  audience: 'https://resource-server.example.com',
-});
-
-// Resource server allows access based on org_id and scope
-if (payload.org_id !== userOrgId) {
-  throw new Error('Token org does not match resource org');
-}
+```http
+Authorization: Bearer <access-token>
 ```
 
-EMA is ideal for enterprises where multiple MCP servers operate within a single identity namespace and compliance requires centralized audit and authorization policies.
+Access tokens must not be placed in URI query strings.
 
-## Token Issuance with CIMD
+The MCP client must include the OAuth Resource Indicators `resource` parameter during authorization and token requests. The resource must identify the MCP server the token is intended for.
 
-When a client (MCP server) calls a resource server for the first time:
+MCP servers must validate that incoming access tokens were issued for their own resource. They must not accept tokens issued for another resource, and they must not pass through tokens they received from an MCP client.
 
-1. Client generates or loads a keypair
-2. Client signs a JWT with its identity (using `sub` = client_id)
-3. Client includes this JWT in the `Authorization` header
-4. Resource server fetches the client's CIMD
-5. Resource server validates the JWT signature using the client's public key
-6. Resource server issues a short-lived access token
+## Scope Challenges
 
-```typescript
-// Client signs a JWT using its private key
-const clientJwt = await new SignJWT({
-  sub: 'agent_01HV3K8MNP',
-  iss: 'https://agents.example.com',
-  aud: 'https://resource-server.example.com',
-  scope: 'read:invoices',
-  iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor(Date.now() / 1000) + 60,
-})
-  .setProtectedHeader({ alg: 'ES256', kid: 'key_01HV3K8MNP' })
-  .sign(clientPrivateKey);
+When a request lacks sufficient scope, the server should use normal OAuth error handling:
 
-// Client requests token
-const tokenRes = await fetch('https://resource-server.example.com/oauth/token', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    assertion: clientJwt,
-  }).toString(),
-});
+- `401 Unauthorized` when authorization is required or the token is invalid
+- `403 Forbidden` when the token is valid but lacks required scope
+- `WWW-Authenticate` with `scope` and `resource_metadata` when the client needs to request additional scope
 
-const { access_token } = await tokenRes.json();
-```
-
-The resource server validates the client JWT and issues a short-lived access token.
-
-## MCP Server Endpoint for Authorization
-
-An MCP server that implements CIMD should expose:
-
-- `/.well-known/mcp-client.json` — the client's metadata (if the server is also a client calling other servers)
-- `/.well-known/oauth-protected-resource` — if this server is a resource server
-- `/oauth/token` — endpoint that exchanges client JWTs for access tokens (if this server is also an authorization server)
-
-```typescript
-// MCP server exposing its own metadata
-server.setRequestHandler(
-  {
-    schema: {
-      method: 'GET',
-      path: '/.well-known/mcp-client.json',
-    },
-  },
-  async () => {
-    return {
-      name: 'InvoiceSummaryAgent',
-      version: '1.0.0',
-      client_id: 'agent_01HV3K8MNP',
-      client_uri: 'https://agents.example.com/invoice-summary',
-      public_jwks_uri: 'https://agents.example.com/.well-known/jwks.json',
-      requested_capabilities: ['read:invoices', 'read:customers'],
-      contacts: ['admin@agents.example.com'],
-    };
-  }
-);
-```
-
-## MCP 2025-11-25 Auth Specification
-
-The MCP spec (https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/) defines:
-
-- **Client Metadata Discovery:** Clients publish CIMD at well-known locations
-- **JWT-Bearer Grant:** Clients authenticate using signed JWTs (no shared secrets)
-- **Scope and Capability Binding:** Requested scopes map to MCP server capabilities
-- **Protected Resource Metadata:** Servers advertise auth requirements at `/.well-known/oauth-protected-resource`
-- **Token Validation:** Servers validate JWTs and enforce scope checks per capability
-
-MCP clients (like Claude Code's integrated servers) automatically:
-- Load and expose their CIMD
-- Sign JWTs for authentication
-- Refresh access tokens before expiry
-- Validate server metadata to determine auth requirements
-
-## When to Use CIMD vs EMA
-
-**Use CIMD when:**
-- Clients and servers are independent organizations
-- No centralized identity infrastructure exists
-- You want clients to be self-describing and discoverable
-- Tokens can be short-lived (15 min–1 hour)
-
-**Use EMA when:**
-- You operate a multi-tenant platform with a central IdP
-- Compliance requires centralized audit and authorization
-- You have many MCP servers under one identity namespace
-- You need to revoke all client access centrally
+Clients should treat a challenged scope as authoritative for satisfying that request. They should not assume it is always identical to the full `scopes_supported` list.
 
 ## Checklist
 
-- [ ] Client publishes CIMD at `/.well-known/mcp-client.json` (if acting as a client)
-- [ ] CIMD includes `client_id`, `public_jwks_uri`, and `requested_capabilities`
-- [ ] Client signs requests using JWT-Bearer grant (no shared secrets)
-- [ ] Server fetches and validates client metadata before issuing tokens
-- [ ] Server validates JWT signatures using the client's public key
-- [ ] Server enforces that requested operations match declared capabilities
-- [ ] Tokens are short-lived (15 min–1 hour)
-- [ ] Server publishes `/.well-known/oauth-protected-resource` (if acting as a resource server)
-- [ ] All auth interactions are logged with client_id and user_id for audit
+- [ ] HTTP MCP endpoint uses HTTPS.
+- [ ] Protected server publishes OAuth protected-resource metadata.
+- [ ] Protected-resource metadata includes `authorization_servers`.
+- [ ] MCP client discovers authorization server metadata through OAuth or OIDC discovery.
+- [ ] Client supports pre-registration and Client ID Metadata Documents where relevant.
+- [ ] Dynamic client registration is only used where the authorization server supports it.
+- [ ] Access tokens are sent with `Authorization: Bearer`.
+- [ ] Access tokens are audience-bound with the OAuth `resource` parameter.
+- [ ] Server rejects tokens issued for a different resource.
+- [ ] Scope challenges include actionable `WWW-Authenticate` metadata.
 
-## See Also
+## Related
 
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — resource server metadata
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance and validation
-- [Agent Identity](/docs/authentication/agent-identity) — audit logging for delegated access
-- ([MCP Specification 2025-11-25 Authorization](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/)) — official specification
-- ([RFC 7523: SAML 2.0 Bearer Assertion Grant](https://datatracker.ietf.org/doc/html/rfc7523)) — JWT-Bearer grant basis
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata)
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents)
+- [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)

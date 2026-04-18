@@ -116,12 +116,20 @@ Disallow: /pricing
 Disallow: /private
 ```
 
-## Cloudflare Content Signals Policy
+## Content Signals
 
-Cloudflare introduced Content Signals, a structured way to declare AI usage permissions that sits alongside `robots.txt`. It is configured at the Cloudflare dashboard level and injects a policy header into responses:
+Content Signals are a structured way to declare AI usage permissions alongside `robots.txt`. They can be emitted through managed platform settings or written directly into `robots.txt`:
 
 ```
-Content-Signals-Policy: search=yes, ai-input=yes, ai-train=no
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+Some platforms can also emit the same signal as a response header:
+
+```
+Content-Signal: search=yes, ai-input=yes, ai-train=no
 ```
 
 The three signal types:
@@ -132,7 +140,7 @@ The three signal types:
 
 **`ai-train`** — Whether AI systems may use this content to train or fine-tune models. `ai-train=no` is the typical setting for commercial content you want to protect.
 
-This header approach has an advantage over `robots.txt`: it applies per-response rather than per-path, which means you can vary the policy based on the request (authenticated users versus public content, for example).
+The header approach has an advantage over `robots.txt`: it applies per-response rather than per-path, which means you can vary the policy based on the request (authenticated users versus public content, for example).
 
 Content Signals does not replace `robots.txt`. Well-behaved crawlers respect both, with `robots.txt` as the baseline and Content Signals as an override or supplement. Bots that do not support Content Signals still see `robots.txt`.
 

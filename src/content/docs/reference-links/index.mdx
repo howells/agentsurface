@@ -1,0 +1,72 @@
+---
+title: Reference Links
+description: Canonical standards, docs, specs, and source links for agent-readable software surfaces.
+---
+
+This is the single source index for standards, specs, and official docs that Agent Surface tracks. Use it when you want the primary source rather than the curated tooling view.
+
+## Agent-Readable Web
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [Cloudflare Agent Readiness](https://blog.cloudflare.com/agent-readiness/) | Discoverability, content accessibility, bot access control, and capabilities | Understanding what agent-readiness scanners currently check. |
+| [Agent Readiness Checker](https://isitagentready.com/) | Public site scanner for agent readiness | Spot-checking whether a URL exposes agent-readable signals. |
+| [Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) | `Accept: text/markdown`, `x-markdown-tokens`, `Content-Signal`, and edge HTML-to-Markdown conversion | Serving readable pages to agents without wasting context on HTML. |
+| [llms.txt](https://llmstxt.org/) | LLM-readable site indexes | Publishing a concise map of docs, APIs, and key resources. |
+| [Content Signals](https://contentsignals.org/) | Search, AI input, and AI training policy signals | Declaring how accessed content may be used. |
+| [Web Bot Auth](https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth/) | Signed HTTP requests for bot identity | Letting sites distinguish accountable agents from anonymous automation. |
+| [API Catalog RFC 9727](https://www.rfc-editor.org/rfc/rfc9727.html) | `/.well-known/api-catalog` | Advertising API specs, docs, status pages, and related API metadata. |
+
+## Agent Skills And Context
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [Agent Skills](https://agentskills.io/home) | Open format for reusable folders of instructions, scripts, references, and assets | Packaging repeatable agent capabilities without bloating the base prompt. |
+| [Agent Skills Specification](https://agentskills.io/specification) | `SKILL.md` frontmatter, directories, validation, and progressive disclosure | Authoring skills that portable agents can discover and load. |
+| [Adding Skills Support](https://agentskills.io/client-implementation/adding-skills-support) | Skill discovery, catalogs, activation, and context management | Implementing a skills-compatible agent runtime or client. |
+| [Agent Skills Reference Library](https://github.com/agentskills/agentskills/tree/main/skills-ref) | Validation and prompt XML generation tooling | Validating local or published skills. |
+| [AGENTS.md](https://agents.md/) | Repository instructions for coding agents | Giving agents repo-level commands, boundaries, conventions, and navigation. |
+
+## MCP
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [MCP Introduction](https://modelcontextprotocol.io/docs/getting-started/intro) | MCP as the standard connector between AI apps and external systems | Grounding protocol decisions. |
+| [MCP Architecture](https://modelcontextprotocol.io/docs/concepts/architecture) | Clients, servers, hosts, and capability flow | Designing where MCP belongs in an agent system. |
+| [Build an MCP Server](https://modelcontextprotocol.io/docs/develop/build-server) | Server implementation basics | Exposing tools, resources, and prompts to agents. |
+| [Connect to Remote MCP Servers](https://modelcontextprotocol.io/docs/develop/connect-remote-servers) | Remote server connection model | Publishing MCP over network transport. |
+| [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) | Interactive server inspection and debugging | Testing tool definitions, schemas, prompts, and resources. |
+| [MCP Registry](https://registry.modelcontextprotocol.io/) | Public MCP server discovery | Finding and distributing MCP servers. |
+
+## Auth And Identity
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [OAuth Protected Resource Metadata RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html) | `/.well-known/oauth-protected-resource` | Letting agents discover authorization servers and resource metadata. |
+| [OAuth 2.1 Draft](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/) | Modern OAuth profile | Designing delegated machine-to-machine auth. |
+| [DPoP RFC 9449](https://www.rfc-editor.org/rfc/rfc9449.html) | Proof-of-possession access tokens | Reducing bearer-token replay risk for sensitive tools. |
+
+## Agent Runtimes And Tooling Docs
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [Mastra Docs](https://mastra.ai/docs) | TypeScript agents, tools, workflows, memory, RAG, MCP, evals, and voice | Default local TypeScript agent scaffolding. |
+| [Vercel AI SDK](https://ai-sdk.dev/docs) | Model calls, tools, structured output, streaming, and UI | TypeScript AI app foundations. |
+| [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk) | Agents, tools, handoffs, guardrails, tracing, and evals | OpenAI-native agent systems. |
+| [OpenRouter Docs](https://openrouter.ai/docs) | Model routing, structured outputs, plugins, and hosted tools | Provider optionality and first-party model-call tools. |
+| [Cloudflare Agents](https://developers.cloudflare.com/agents/) | Durable Object-backed agents, state, scheduling, tools, MCP, and browser access | Workers-native agent systems. |
+| [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) | Gateway observability, caching, rate limits, guardrails, retries, and routing | Governed model access across providers. |
+| [Cloudflare Browser Run](https://developers.cloudflare.com/browser-run/) | Managed browser automation, screenshots, PDFs, Markdown extraction, crawling, Playwright, and MCP | Browser access for agents. |
+| [Cloudflare Sandbox](https://developers.cloudflare.com/sandbox/) | Isolated code execution for agents and applications | Running untrusted or generated code outside the app process. |
+
+## Commerce And Payments
+
+| Reference | What It Covers | Use It For |
+|---|---|---|
+| [x402](https://www.x402.org/) | HTTP-native machine payments | Pay-to-access resources and APIs. |
+| [Universal Commerce Protocol](https://ucp.dev/) | Commerce discovery and transaction protocol | Agent-driven ecommerce surfaces. |
+| [Agentic Commerce Protocol](https://www.agenticcommerce.dev/) | Agent-mediated purchasing flows | Agent-initiated buying with explicit payment boundaries. |
+
+## How This Page Relates To The Catalog
+
+Use this page for canonical sources and specs. Use the [Tooling Catalog](/docs/tooling-catalog) for curated recommendations, tiers, and judgement calls.

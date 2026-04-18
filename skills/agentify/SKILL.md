@@ -12,7 +12,7 @@ license: MIT
 metadata:
   version: 1.0.1
   author: Daniel Howells
-  repository: https://github.com/howells/agentify
+  repository: https://github.com/howells/agentsurface
   keywords:
     - agentic
     - mcp
@@ -77,8 +77,8 @@ For Codex and non-Claude tools, reference this skill in your project's `AGENTS.m
 
 **Git clone** (for personal or team use):
 ```bash
-git clone https://github.com/howells/agentify /path/to/agentify
-cp -r /path/to/agentify/skills/agentify ~/.claude/skills/
+git clone https://github.com/howells/agentsurface /path/to/agentsurface
+cp -r /path/to/agentsurface/skills/agentify ~/.claude/skills/
 ```
 
 **Project-specific** (commit to version control):
@@ -131,7 +131,8 @@ Gather context in parallel using Glob and Grep:
    | OpenAPI specs | `**/openapi.{json,yaml,yml}`, `**/swagger.{json,yaml}` |
    | MCP servers | `**/.mcp.json`, grep for `@modelcontextprotocol/sdk`, `mcp-handler`, `@mastra/mcp` |
    | Context files | `**/AGENTS.md`, `**/CLAUDE.md`, `**/.cursor/rules/*.mdc`, `**/.github/copilot-instructions.md` |
-   | Discovery | `**/llms.txt`, `**/llms-full.txt`, `**/robots.txt`, `**/sitemap.xml` |
+   | Discovery | `**/llms.txt`, `**/llms-full.txt`, `**/robots.txt`, `**/sitemap.xml`, `**/.well-known/**`, `**/api-catalog*` |
+   | Agent web readiness | grep for `Accept: text/markdown`, `Content-Signal`, `http-message-signatures-directory`, `agent-skills`, `mcp/server-card`, `oauth-protected-resource`, `api-catalog`, `x402`, `ucp`, `acp` |
    | CLI tools | `**/bin/*`, CLI entry points in package.json `bin` field |
    | API routes | `**/app/api/**`, `**/pages/api/**`, `**/routes/**` |
    | Structured data | grep for `schema.org`, `application/ld+json` in layout/template files |
@@ -177,7 +178,7 @@ Score each applicable dimension 0-3. For each:
 | 1 | **API Surface** | OpenAPI quality, agent-oriented descriptions, operationIds, Arazzo workflows |
 | 2 | **CLI Design** | JSON output, exit codes, schema introspection, input hardening, SKILL.md |
 | 3 | **MCP Server** | Tool definitions, annotations, resources, auth, testing |
-| 4 | **Discovery & AEO** | llms.txt, AGENTS.md, JSON-LD, content negotiation, robots.txt |
+| 4 | **Discovery & AEO** | llms.txt, AGENTS.md, JSON-LD, content negotiation, robots.txt, agent-readiness standards |
 | 5 | **Authentication** | M2M auth, OAuth 2.1, scoped tokens, agent identity |
 | 6 | **Error Handling** | RFC 7807, is_retriable, suggestions, recovery hints |
 | 7 | **Tool Design** | Descriptions as prompts, schemas, toModelOutput, cross-framework |
@@ -349,7 +350,7 @@ Present the plan summary and ask: "Ready to execute? I'll start with [cluster na
 | Agent | Purpose | Model |
 |-------|---------|-------|
 | `context-writer` | AGENTS.md, CLAUDE.md, .cursor/rules | Sonnet |
-| `discovery-writer` | llms.txt, llms-full.txt, robots.txt, JSON-LD | Sonnet |
+| `discovery-writer` | llms.txt, llms-full.txt, robots.txt, Content Signals, Markdown content negotiation, JSON-LD, `.well-known` discovery | Sonnet |
 | `error-designer` | RFC 7807 structured errors | Sonnet |
 | `api-optimizer` | OpenAPI descriptions, extensions | Sonnet |
 | `cli-enhancer` | --json output, exit codes, introspection | Sonnet |

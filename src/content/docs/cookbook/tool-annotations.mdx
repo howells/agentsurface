@@ -16,7 +16,7 @@ Every MCP tool declares intent via annotations: `readOnlyHint`, `destructiveHint
 
 ## MCP Annotation Spec
 
-Each tool in MCP 0.6+ accepts an `annotations` object:
+MCP tool definitions support an `annotations` object:
 
 ```typescript
 interface ToolAnnotations {
@@ -562,4 +562,3 @@ test("system prompt includes safety rules for destructive tools", () => {
 - [Tool Design](/docs/tool-design) — MCP tool schema and transport.
 - [Agentic Loop](/docs/cookbook/agentic-loop) — how frameworks consume annotations.
 - [Two-Step Confirmation](/docs/cookbook/two-step-confirmation) — enforcing confirmation workflows.
-

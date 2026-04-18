@@ -69,16 +69,16 @@ This is the authoritative rubric for agentify scoring. For each dimension, the 0
 
 ## Dimension 4: Discovery & AEO
 
-**What it measures:** How discoverable and consumable the project is by AI agents. Covers llms.txt, AGENTS.md, JSON-LD schema, content negotiation, robots.txt configuration.
+**What it measures:** How discoverable, readable, governable, and callable the project is by AI agents. Covers llms.txt, AGENTS.md, JSON-LD schema, Markdown content negotiation, robots.txt, Content Signals, `.well-known` capability metadata, auth discovery, MCP discovery, and agent-commerce checks when relevant.
 
 | Score | Criteria | Evidence Patterns |
 |-------|----------|-------------------|
-| **0** | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots. | No `llms.txt` at web root; no `AGENTS.md` in repo root; no JSON-LD markup in HTML; robots.txt contains `Disallow: /` for `GPTBot`, `ClaudeBot`, or `User-agent: *`. |
-| **1** | Basic discovery. AGENTS.md or llms.txt exists but minimal. No structured data. | AGENTS.md present but `` `<50` `` lines or auto-generated (shows no curation); OR llms.txt present but `` `<10` `` links, no descriptions; no JSON-LD on any pages. |
-| **2** | Good discovery. llms.txt with categorized sections. AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows AI bots. Sitemap with lastmod. | llms.txt with H2 sections and link descriptions; AGENTS.md with commands section (exact invocations), conventions, and boundaries; at least `FAQPage` or `TechArticle` JSON-LD on pages; robots.txt explicitly allows `GPTBot`, `ClaudeBot`, `Google-Extended`; sitemap.xml with accurate `lastmod`. |
-| **3** | Full AEO. llms-full.txt. Content negotiation. Markdown-mode. Well-known endpoints. Stripe-style instructions. "Copy for AI" buttons. | `llms-full.txt` present (concatenated docs in markdown); server returns markdown for `Accept: text/markdown` (content negotiation); `Vary: Accept` header; `x-markdown-tokens` response header; `/.well-known/agent.json` or `/.well-known/ai` endpoints; instructions section for agents in nav/footer; token budgets visible on pages; NLWeb `/ask` endpoint. |
+| **0** | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or hides public docs from retrieval. | No `llms.txt` at web root; no `AGENTS.md` in repo root; no JSON-LD markup in HTML; robots.txt contains `Disallow: /` for retrieval/search bots or `User-agent: *`. |
+| **1** | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but `` `<50` `` lines or auto-generated; OR llms.txt present but `` `<10` `` links, no descriptions; basic sitemap only; no JSON-LD; no Markdown response path. |
+| **2** | Good discovery. llms.txt with categorized sections. AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended retrieval/search bots. Sitemap with lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and link descriptions; AGENTS.md with exact commands, conventions, and boundaries; `FAQPage`, `TechArticle`, or `WebAPI` JSON-LD; robots.txt explicitly allows retrieval bots and references sitemap; OpenAPI discoverable at a stable URL. |
+| **3** | Full agent-readable web surface. llms-full.txt. Markdown content negotiation or `.md` URL fallback. Content Signals. Well-known capability discovery. Auth metadata. MCP metadata. Optional commerce protocols checked when relevant. | `llms-full.txt` present; server returns Markdown for `Accept: text/markdown` or serves `.md` routes; `Vary: Accept` and `x-markdown-tokens`; `Content-Signal` in robots/headers; `/.well-known/api-catalog`, `/.well-known/mcp/server-card.json` or `/.well-known/mcp.json`, `/.well-known/agent-skills/index.json`, `/.well-known/oauth-protected-resource` where applicable; `http-message-signatures-directory` when bot identity is implemented. |
 
-**Key files to examine:** `llms.txt`, `llms-full.txt`, `AGENTS.md`, `robots.txt`, `sitemap.xml`, HTML layout/templates, server middleware, `.well-known/` files.
+**Key files to examine:** `llms.txt`, `llms-full.txt`, `AGENTS.md`, `robots.txt`, `sitemap.xml`, HTML layout/templates, server middleware, `.well-known/` files, OpenAPI/API Catalog files, MCP metadata, Agent Skills indexes.
 
 **N/A when:** Project is a pure library or tool with no web presence and no documentation site.
 

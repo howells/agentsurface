@@ -474,3 +474,10 @@ export async function runPersonaTurn(
 
 **When to apply:** Personas, project-specific assistants, customer support threads,
 long-running research sessions. Any use case where "the agent knows this entity."
+
+**Cloudflare-native mapping:** Cloudflare Agents and Durable Objects are a strong
+fit for this pattern. Use the Durable Object ID as the entity key, keep the
+agent's short-term state in the object, and attach long-term recall through
+Agent Memory, Vectorize, AI Search, AutoRAG, or an external vector store. This
+is especially useful for agents that need WebSocket continuity, scheduled work,
+or edge-local state without introducing a separate Node service.

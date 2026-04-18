@@ -1,10 +1,20 @@
-# agent-zero
+# Agent Surface
 
-`agent-zero` is a monorepo for auditing and improving how well software works with AI agents.
+Agent Surface is a practical resource for making software legible, callable, and useful to AI agents.
 
-Its main deliverable is `agentify`: a skill for scoring a codebase across 11 agent-readiness dimensions, generating findings and transformation plans, and optionally executing targeted improvements through specialist sub-agents.
+It combines documentation, implementation approaches, reusable templates, and two skills: `agentify` for auditing agent readiness, and `agents` for creating or updating agent systems correctly.
 
-The repository also includes templates, command definitions, specialist agents, and a Next.js documentation site that explains the underlying patterns.
+The premise is simple: agents do not consume software through one interface. They read docs, inspect repositories, call APIs, run CLIs, use MCP tools, parse errors, retrieve context, and execute workflows. Agent Surface treats all of those as one design problem.
+
+## What This Repo Contains
+
+- **Documentation** — a Fumadocs site covering API surface, CLI design, MCP servers, discovery, authentication, errors, testing, multi-agent patterns, scoring, protocols, and tool design
+- **Approaches** — opinionated patterns for making software agent-ready without turning every product into an agent framework
+- **`agentify` skill** — an audit and transformation workflow that scores a codebase across 11 dimensions
+- **`agents` skill** — a scaffolding workflow for agents, tools, workflows, memory, model routing, browser access, and sandboxes
+- **Specialist agents** — focused workers for context files, discovery, errors, API shape, CLI ergonomics, auth, MCP, testing, retrievability, and agentic patterns
+- **Templates** — reusable examples for discovery, auth, MCP, errors, evals, orchestration, and agent-facing contracts
+- **Tooling catalog** — a curated list of well-regarded AI and agent tooling grouped by purpose
 
 ## What `agentify` Does
 
@@ -33,15 +43,38 @@ The 11 dimensions are:
 6. Error Handling
 7. Tool Design
 8. Context Files
-9. Multi-Agent Support
-10. Testing
-11. Data Retrievability
+9. Data Retrievability
+10. Multi-Agent and Orchestration
+11. Testing and Evaluation
+
+## What `agents` Does
+
+`agents` is designed for requests such as:
+
+- create an agent
+- add a tool
+- build a workflow
+- add memory
+- set up model routing
+- update an existing agent correctly
+
+It is Mastra-first for local TypeScript agent infrastructure, while respecting existing AI SDK, MCP, LangGraph, and Cloudflare Workers projects. It detects project shape before scaffolding and chooses conservative defaults for the runtime already in front of it.
+
+Core outputs:
+
+- agent definitions with clear instructions and tool registration
+- typed tools with Zod schemas and MCP annotations
+- workflow scaffolds with state, triggers, and safety patterns
+- memory setup for Mastra, Postgres/pgvector, or Workers-native alternatives
+- model routing across providers and gateways
+- browser and sandbox tool wrappers with safety boundaries
 
 ## Repository Contents
 
 High-signal parts of the repo:
 
 - [`skills/agentify/`](./skills/agentify/) - main skill entrypoint, scoring references, and specialist agents
+- [`skills/agents/`](./skills/agents/) - agent system scaffolding skill and production references
 - [`disciplines/`](./disciplines/) - longer-form guidance on agent design topics
 - [`templates/`](./templates/) - reusable templates for discovery, auth, MCP, errors, evals, and orchestration
 - [`src/app/`](./src/app/) - Next.js application for the docs site
@@ -53,20 +86,20 @@ High-signal parts of the repo:
 Prerequisites:
 
 - Node.js 20+
-- `pnpm`
+- npm
 
 Install and run the docs site:
 
 ```bash
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 Other useful commands:
 
 ```bash
-pnpm build
-pnpm start
+npm run build
+npm start
 ```
 
 Notes:
@@ -75,9 +108,9 @@ Notes:
 - the current `package.json` does not define dedicated `test` or `lint` scripts
 - Biome configuration lives in [`biome.json`](./biome.json)
 
-## Using `/agentify`
+## Using The Skills
 
-The command surface in this repository supports the following modes:
+`agentify` supports the following modes:
 
 - `/agentify` - full audit with scorecard and findings
 - `/agentify score` - scorecard only
@@ -86,11 +119,25 @@ The command surface in this repository supports the following modes:
 - `/agentify --dimension=X` - focus on a single dimension
 - `/agentify --format=json` - structured output
 
-See [`commands/agentify.md`](./commands/agentify.md) and [`skills/agentify/SKILL.md`](./skills/agentify/SKILL.md) for the operative workflow.
+See [`skills/agentify/SKILL.md`](./skills/agentify/SKILL.md) for the operative workflow.
+
+`agents` supports the following modes:
+
+- `/agents` - detect project and ask what to create or update
+- `/agents init` - initialize agent infrastructure
+- `/agents agent <name>` - scaffold an agent
+- `/agents tool <name>` - scaffold a typed tool
+- `/agents workflow <name>` - scaffold a workflow
+- `/agents memory` - add memory
+- `/agents model` - configure model routing
+- `/agents browser` - add browser/web access tooling
+- `/agents sandbox` - add isolated code execution tooling
+
+See [`skills/agents/SKILL.md`](./skills/agents/SKILL.md) for the operative workflow.
 
 ## Specialist Agents
 
-`agentify` can delegate work to specialist agents in [`./agents`](./agents):
+`agentify` can delegate work to specialist agents in [`skills/agentify/agents`](./skills/agentify/agents):
 
 - `context-writer`
 - `discovery-writer`
@@ -121,6 +168,7 @@ Current documentation areas include:
 - testing
 - tool design
 - data retrievability
+- agent system scaffolding
 - scoring and calibration
 - protocols
 - cookbook patterns
@@ -130,11 +178,12 @@ Current documentation areas include:
 This repository is structured to be readable by multiple agent runtimes.
 
 - `AGENTS.md` provides repo-level guidance
-- `SKILL.md` provides execution instructions for `agentify`
+- `skills/agentify/SKILL.md` provides execution instructions for audits and transformations
+- `skills/agents/SKILL.md` provides execution instructions for agent system scaffolding
 - Claude Code can consume the plugin and skill layout directly
 - Codex and other generic runtimes can use `AGENTS.md` plus linked skill files
 
-No standalone MCP server is bundled in this repository today. The repo mainly distributes the audit skill, related templates, and supporting documentation.
+No standalone MCP server is bundled in this repository today. The repo mainly distributes the audit/scaffolding skills, related templates, and supporting documentation.
 
 ## Current Stack
 
@@ -150,7 +199,7 @@ Visible in the checked-in code:
 
 - [`AGENTS.md`](./AGENTS.md)
 - [`skills/agentify/SKILL.md`](./skills/agentify/SKILL.md)
-- [`commands/agentify.md`](./commands/agentify.md)
+- [`skills/agents/SKILL.md`](./skills/agents/SKILL.md)
 - [`docs/arc/specs/agentify-spec.md`](./docs/arc/specs/agentify-spec.md)
 - [`INSTALL.md`](./INSTALL.md)
 - [`CHANGELOG.md`](./CHANGELOG.md)

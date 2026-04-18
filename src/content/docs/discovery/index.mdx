@@ -5,14 +5,14 @@ description: Making your capabilities findable by AI agents through structured d
 
 ## Summary
 
-Agent Engine Optimization (AEO) makes capabilities discoverable to AI systems. This section covers llms.txt (token-efficient site index), AGENTS.md (repo context), structured data (JSON-LD), content negotiation (Markdown over HTML), well-known endpoints, robots.txt rules, and content structure best practices. Together these patterns ensure agents find, understand, and accurately cite your documentation.
+Agent Engine Optimization (AEO) makes capabilities discoverable to AI systems. This section covers llms.txt (token-efficient site index), AGENTS.md (repo context), structured data (JSON-LD), Markdown content negotiation, well-known capability metadata, robots.txt, Content Signals, Web Bot Auth, and content structure best practices. Together these patterns ensure agents find, understand, accurately cite, and safely use your documentation and APIs.
 
 - llms.txt: curated index at /llms.txt for token efficiency
 - AGENTS.md: repository context standard for AI coding agents
 - Structured data (JSON-LD): enables AI Overview inclusion
 - Content negotiation: serve Markdown to agents, HTML to browsers
-- Well-known endpoints: /.well-known/ai for capability discovery
-- robots.txt: control training vs. retrieval crawler access
+- Well-known endpoints: API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth keys
+- robots.txt and Content Signals: control training, retrieval, and search access
 
 Before an agent can use your API, it has to find it. Agent Engine Optimization (AEO) is the practice of making your capabilities discoverable by AI systems — the agent equivalent of SEO.
 
@@ -22,6 +22,6 @@ Before an agent can use your API, it has to find it. Agent Engine Optimization (
 - **AGENTS.md** — a structured file that describes your repository's agent-facing capabilities, tool locations, and integration patterns
 - **Structured data** — JSON-LD, Schema.org markup, and OpenAPI links that search-augmented agents can parse
 - **Content negotiation** — serving different response formats (HTML for browsers, JSON for agents) based on Accept headers
-- **robots.txt for agents** — controlling which parts of your site agents can access and index
-- **Well-known URIs** — using `/.well-known/` endpoints to advertise capabilities like MCP server locations and OAuth metadata
+- **robots.txt for agents** — controlling which parts of your site agents can access and index, with Content Signals when you need more granular AI policy
+- **Well-known URIs** — using `/.well-known/` endpoints to advertise API catalogs, MCP server cards, Agent Skills indexes, OAuth protected-resource metadata, Web Bot Auth keys, and commerce manifests
 - **SEO as AEO** — how traditional SEO practices (clean URLs, semantic HTML, meta descriptions) directly improve agent discoverability

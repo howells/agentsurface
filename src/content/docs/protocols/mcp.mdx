@@ -5,10 +5,10 @@ description: The dominant standard for connecting AI agents to external tools, d
 
 ## Summary
 
-MCP defines how agents discover and use tools, read resources, invoke prompts, and run long-lived async tasks over a stateful connection. It is the baseline protocol: every major AI lab supports it as of 2025. Current spec: 2025-11-25. Transport options: stdio (local), Streamable HTTP (remote). Authentication: OAuth 2.1 + optional DPoP.
+MCP defines how agents discover and use tools, read resources, invoke prompts, and run long-lived async tasks over a stateful connection. It is the baseline protocol for connecting AI applications to external systems. Current spec: 2025-11-25. Transport options: stdio (local), Streamable HTTP (remote). Protected HTTP servers use OAuth-based authorization discovery.
 
 ```
-Agent → connects via stdlib/HTTP → MCP Server
+Agent → connects via stdio/HTTP → MCP Server
   ├─ discovers tools
   ├─ reads resources (documents, data)
   ├─ invokes prompts (structured workflows)
@@ -17,19 +17,18 @@ Agent → connects via stdlib/HTTP → MCP Server
 
 - Four primitives: tools (model-controlled), resources (agent-read), prompts (structured workflows), tasks (async, long-lived)
 - Stateful JSON-RPC over stdio or HTTP
-- Authorization via OAuth 2.1 Client Credentials or MCP 2025-11-25 CIMD
+- Authorization for protected HTTP servers via OAuth protected-resource metadata and authorization-server discovery
 - Server advertises capabilities; agent selects which to use
-- MCP registry: 10,000+ public servers, 97M+ SDK downloads/month
+- MCP Apps add interactive UI surfaces inside compatible AI clients
+- Agent Skills complement MCP by packaging reusable instructions, scripts, references, and assets
 
-MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and execute long-running async tasks — all over a single stateful connection. As of 2025, it is the de-facto standard across every major AI lab and the protocol you should implement first.
+MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and execute long-running async tasks — all over a single stateful connection. Implement MCP first when you are exposing tools, data, or workflows to external agents.
 
 ## Origin and Governance
 
-Anthropic published the initial MCP specification in November 2024. In December 2025, Anthropic donated the specification to the Linux Foundation's AI & Data Foundation (AAIF), making it a vendor-neutral open standard governed by a technical steering committee with representation from across the industry.
+Anthropic published the initial MCP specification in November 2024. Since then it has become the main cross-vendor protocol surface for connecting agents to tools, resources, prompts, and workflow primitives.
 
-All major AI labs have adopted MCP as of mid-2025: OpenAI, Google DeepMind, Microsoft, AWS, and Anthropic all ship MCP support in their agent runtimes. The ecosystem around it reflects this adoption: the MCP SDK packages exceed 97 million monthly downloads, and the public MCP server registry lists over 10,000 servers.
-
-The current specification version is [`2025-11-25`](https://spec.modelcontextprotocol.io/specification/2025-11-25/). This page covers that version.
+The current specification version is [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/). This page covers that version.
 
 ## Four Primitives
 
@@ -125,7 +124,7 @@ Prompts are reusable message templates that users select to start or guide inter
 
 ### Tasks (Async Execution)
 
-Tasks allow long-running, asynchronous operations with explicit state management and progress notifications. New in `2025-11-25`, tasks progress through a state machine: `working → input_required → completed` (or `failed`, `cancelled`). The server initiates callbacks or poll patterns for result delivery.
+Tasks allow long-running, asynchronous operations with explicit state management and progress notifications. New in `2025-11-25` and currently experimental, tasks are durable state machines for polling and deferred result retrieval. Requestors poll with `tasks/get`, retrieve completed results with `tasks/result`, and continue until a terminal state such as `completed`, `failed`, or `cancelled`.
 
 ```json
 {
@@ -141,7 +140,7 @@ Tasks allow long-running, asynchronous operations with explicit state management
 }
 ```
 
-Use tasks when an operation cannot complete in a single RPC roundtrip — report generation, data exports, compliance audits, or any work taking >5 seconds. Clients can poll the task state or register webhooks for push notifications.
+Use tasks when an operation cannot complete in a single RPC roundtrip — report generation, data exports, compliance audits, or expensive batch work. Clients can poll task state and receivers may send optional task status notifications.
 
 ## Wire Format
 
@@ -280,7 +279,7 @@ Do not return JSON-RPC error objects for business logic failures. Use `isError: 
 
 ## Tool Annotations
 
-The `2025-11-25` specification adds an `annotations` field to tool definitions. Annotations communicate behavioral characteristics to clients without embedding them in the description text.
+Tool definitions support an `annotations` field. Annotations communicate behavioral characteristics to clients without embedding them in the description text.
 
 ```json
 {
@@ -307,17 +306,17 @@ Annotations are hints, not enforcement. Clients may use them to require user con
 
 ## New in 2025-11-25
 
-The November 2025 revision introduces four significant features:
+The November 2025 revision adds several important capabilities:
 
-**Tasks & Async Primitives** — Long-running operations with poll + push notification support for background jobs.
+**Tasks** — Experimental durable requests with polling and deferred result retrieval.
 
-**Client ID Metadata Documents (CIMD)** — Servers declare which client integrations (Claude Desktop, ChatGPT, Gemini) are supported and version requirements for compatibility checking.
+**Client ID Metadata Documents** — Recommended OAuth client registration mechanism for clients and authorization servers that do not have a prior relationship.
 
-**Enterprise-Managed Authorization (EMA)** — Identity providers can centrally manage MCP client credentials, useful for multi-tenant and compliance-heavy deployments.
+**Authorization-server discovery** — HTTP authorization now leans on OAuth protected-resource metadata and supports OAuth or OpenID Connect discovery for authorization servers.
 
-**URL Mode Elicitation** — Clients can provide missing arguments as URL query parameters for browser-based workflow support, expanding MCP beyond JSON-RPC.
+**URL Mode Elicitation** — Servers can direct users to external URLs for sensitive out-of-band interactions that should not pass through the MCP client.
 
-Additionally, the spec formalizes an Extensions Framework via SEPs (Server Enhancement Proposals) for vendor extensions without breaking compatibility.
+**Tool-call support in sampling** — Sampling can include `tools` and `toolChoice` parameters.
 
 ## Advanced Capabilities
 
@@ -488,20 +487,20 @@ Streamable HTTP replaced the earlier `http+sse` transport. The legacy SSE transp
 
 ### OAuth 2.1 for HTTP Transport
 
-OAuth 2.1 is mandatory for MCP servers deployed over HTTP. The spec does not permit unauthenticated HTTP MCP servers in production. The authorization flow uses standard OAuth 2.1 with PKCE:
+Authorization is optional in MCP, but protected HTTP MCP servers should follow the MCP authorization specification. The server acts as an OAuth resource server, advertises protected-resource metadata, and points clients to one or more authorization servers:
 
 ```
-1. Client discovers authorization server via MCP server metadata
-2. Client initiates OAuth 2.1 authorization code flow with PKCE
-3. User grants consent
-4. Client exchanges code for access token
-5. Client includes Bearer token in all MCP HTTP requests
+1. Client receives `401 Unauthorized` with a `WWW-Authenticate` `resource_metadata` URL, or discovers protected-resource metadata at a well-known URI.
+2. Client reads the `authorization_servers` value from protected-resource metadata.
+3. Client discovers authorization server metadata using OAuth Authorization Server Metadata or OpenID Connect Discovery.
+4. Client completes the supported OAuth flow and obtains an access token for the MCP server resource.
+5. Client includes the bearer token in every protected MCP HTTP request.
 ```
 
-The MCP server exposes its authorization server metadata at:
+The MCP server exposes protected-resource metadata, not necessarily authorization-server metadata:
 
 ```
-GET /.well-known/oauth-authorization-server
+GET /.well-known/oauth-protected-resource
 ```
 
 Tokens must be validated on every request — not cached across sessions. Validate the audience (`aud`) claim to ensure tokens issued for other services are rejected.
@@ -564,7 +563,7 @@ Declaring `resources.subscribe: true` without implementing `resources/subscribe`
 
 ## Spec & References
 
-- [MCP Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/) — canonical spec with all wire format details
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) — canonical spec with all wire format details
 - [modelcontextprotocol.io](https://modelcontextprotocol.io) — official docs and server registry
 
 ## Related Pages

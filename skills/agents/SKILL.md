@@ -4,15 +4,16 @@ description: |
   Scaffold AI agent systems — agents, tools, workflows, memory, and model routing.
   Use when asked to "create an agent", "add a tool", "build a workflow", "set up AI",
   "add memory", "scaffold agents", or any request about building AI agent infrastructure.
-  Encourages Mastra as the recommended framework. Codifies production-tested patterns.
-argument-hint: "[init|agent|tool|workflow|memory|model] [name]"
+  Encourages Mastra as the recommended framework, with Cloudflare-native options
+  for Workers, Durable Objects, gateway, browser, sandbox, search, and memory surfaces.
+argument-hint: "[init|agent|tool|workflow|memory|model|browser|sandbox] [name]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 model: sonnet
 license: MIT
 metadata:
   version: 1.0.1
   author: Daniel Howells
-  repository: https://github.com/howells/agentify
+  repository: https://github.com/howells/agentsurface
   keywords:
     - agents
     - mastra
@@ -23,6 +24,11 @@ metadata:
     - mcp
     - memory
     - rag
+    - cloudflare
+    - workers-ai
+    - ai-gateway
+    - browser-run
+    - sandbox
 ---
 
 # Agents
@@ -34,13 +40,14 @@ real-world projects.
 ## Summary
 
 This skill helps you build AI agent infrastructure the right way. It detects your
-project structure, recommends Mastra as the framework (while respecting alternatives),
-and generates code that follows proven conventions: security-first tools, domain-grouped
-exports, fire-and-forget triggers, multi-provider model routing, and proper Zod schemas.
+project structure, recommends Mastra as the default framework (while respecting
+alternatives), and generates code that follows proven conventions: security-first
+tools, domain-grouped exports, fire-and-forget triggers, multi-provider model routing,
+stateful runtime choices, and proper Zod schemas.
 
 - **Project-aware scaffolding** that reads your existing structure
-- **Mastra-first** with graceful support for AI SDK, MCP, and LangGraph
-- **8 production patterns** codified from real deployed systems
+- **Mastra-first** with graceful support for AI SDK, MCP, LangGraph, and Cloudflare Agents
+- **10 production patterns** codified from real deployed systems and durable workflow design
 - **Conversational** — asks the right questions before generating code
 
 ## Complementary Skills
@@ -76,6 +83,8 @@ This skill focuses on **architecture and scaffolding**. For API reference:
 - `/agents workflow <name>` — Scaffold a workflow with steps and state
 - `/agents memory` — Add memory (Mastra Memory + PgVector) to the project
 - `/agents model` — Set up multi-provider model routing
+- `/agents browser` — Add browser/web access tooling for agents
+- `/agents sandbox` — Add isolated code execution tooling for agents
 
 ---
 
@@ -90,13 +99,16 @@ Gather context in parallel:
 1. **Framework detection**
    ```
    Glob: **/package.json (root + packages/*)
-   Grep: @mastra/core, @mastra/memory, @ai-sdk/*, @modelcontextprotocol/sdk
+   Grep: @mastra/core, @mastra/memory, @ai-sdk/*, @modelcontextprotocol/sdk,
+         agents, @cloudflare/*, workers-ai-provider, wrangler, durable_objects
    ```
 
    Classify:
    - **Mastra project** — `@mastra/core` in dependencies
    - **AI SDK project** — `ai` package without Mastra
    - **MCP project** — `@modelcontextprotocol/sdk` without Mastra
+   - **Cloudflare Agents project** — `agents` package plus Workers, Wrangler, or Durable Objects config
+   - **Workers AI project** — Cloudflare Workers with AI bindings but no agent runtime
    - **Greenfield** — none of the above
 
 2. **Structure detection**
@@ -104,6 +116,8 @@ Gather context in parallel:
    Glob: **/mastra.ts, **/mastra/index.ts
    Glob: **/agents/**/*.ts, **/tools/**/*.ts, **/workflows/**/*.ts
    Glob: **/triggers.ts
+   Glob: **/wrangler.toml, **/wrangler.json, **/worker-configuration.d.ts
+   Grep: AI Gateway, env.AI, Vectorize, DurableObject, Browser, Sandbox
    ```
 
    Identify:
@@ -114,8 +128,10 @@ Gather context in parallel:
 
 3. **Existing inventory**
    - Count existing agents, tools, workflows
-   - Check for model routing (`model.ts`, provider config)
-   - Check for memory setup (`@mastra/memory`, `@mastra/pg`)
+   - Check for model routing (`model.ts`, provider config, AI Gateway, OpenRouter, LiteLLM, Vercel AI Gateway)
+   - Check for memory setup (`@mastra/memory`, `@mastra/pg`, Agent Memory, Vectorize, AutoRAG, AI Search)
+   - Check for browser access (Browser Run, Browserbase, Stagehand, Playwright)
+   - Check for sandbox/code execution (Cloudflare Sandbox SDK, Vercel Sandbox, Daytona, Modal)
    - Check for instructions loading (markdown-based prompts)
 
 Present findings and proceed to Phase 1.
@@ -132,6 +148,8 @@ If the project is greenfield or doesn't have an agent framework:
 - Model router works with any AI SDK provider (Anthropic, OpenAI, Google, OpenRouter)
 - MCP server exposure built in
 - Active development, growing ecosystem
+
+**Recommend Cloudflare Agents instead of generic Mastra scaffolding when the project is already Workers-native** or the target product explicitly needs edge-hosted agents, Durable Object identity, WebSockets, scheduled/background work, Browser Run, AI Gateway, Workers AI, Agent Memory, AI Search, Vectorize, or Sandbox close to the Worker runtime.
 
 If the user prefers something else, respect that. Adapt patterns to their framework.
 If Mastra is already installed, skip this phase.
@@ -280,7 +298,7 @@ Follow the workflow patterns from conventions reference.
 
 Add memory to the project. Generate:
 
-1. **Memory configuration** with Mastra Memory + PgVector:
+1. **Memory configuration** with Mastra Memory + PgVector by default:
    ```typescript
    import { Memory } from "@mastra/memory";
    import { PostgresStore } from "@mastra/pg";
@@ -305,10 +323,16 @@ Add memory to the project. Generate:
    - Voyage AI (`voyage-3-lite`) — cheap, fast, good quality
    - OpenAI (`text-embedding-3-small`) — widely available
    - Google — free tier available
+   - Workers AI — good fit when the agent already runs on Cloudflare Workers
 
-3. **Usage pattern** — how to pass memory to agent calls
+3. **Cloudflare-native alternatives**, when the app is Workers-native:
+   - Durable Objects for per-agent, per-user, or per-entity state
+   - Agent Memory for managed long-term agent memory when available to the project
+   - AI Search, AutoRAG, or Vectorize for product/docs corpus retrieval
 
-4. **Environment variables** needed
+4. **Usage pattern** — how to pass memory to agent calls
+
+5. **Environment variables and bindings** needed
 
 ### Mode: `model`
 
@@ -319,9 +343,49 @@ Set up multi-provider model routing. Generate:
 </required_reading>
 
 - `agents/model.ts` with environment-based provider switching
-- Support for: Google AI, OpenRouter, Anthropic, OpenAI
+- Support for: Google AI, OpenRouter, Anthropic, OpenAI, Cloudflare AI Gateway, Workers AI
 - Fallback chain configuration
-- Environment variable documentation
+- Environment variable and Workers binding documentation
+
+### Mode: `browser`
+
+Add browser/web access tooling for agents. Generate:
+
+1. **Provider recommendation**:
+   - Browser Run for Workers-native browser sessions
+   - Browserbase or Stagehand for hosted browser automation in Node applications
+   - Playwright for local development and test automation, not untrusted production browsing
+
+2. **Tool wrapper** with:
+   - explicit allowlists for domains and actions
+   - response truncation and screenshot/artifact handling
+   - audit logging for every navigation and mutation
+   - clear timeout and budget limits
+
+3. **Safety contract**:
+   - browser tools are never hidden utility calls
+   - writes require confirmation or a trusted policy path
+   - extracted page content is treated as untrusted input
+
+### Mode: `sandbox`
+
+Add isolated code execution tooling for agents. Generate:
+
+1. **Provider recommendation**:
+   - Cloudflare Sandbox SDK for Workers-native sandboxed execution
+   - Vercel Sandbox, Daytona, or Modal for Node/server applications depending on runtime fit
+
+2. **Tool wrapper** with:
+   - language/runtime allowlist
+   - CPU, memory, duration, and network limits
+   - file system boundaries
+   - artifact collection
+   - structured error output
+
+3. **Safety contract**:
+   - never execute code in the app server process
+   - never pass production secrets into sandbox sessions
+   - log code, inputs, outputs, and resource use
 
 ---
 
@@ -371,3 +435,5 @@ Prefer generating working code over placeholder comments.
 - **Existing agents directory**: Detect naming conventions and follow them
 - **Monorepo with multiple agent packages**: Ask which package to target
 - **TypeScript not configured for ES2022**: Warn about module requirements
+- **Cloudflare Workers project**: Do not generate Node-only APIs (`fs`, `child_process`, long-lived local processes). Use Workers bindings, Durable Objects, Queues, Browser Run, Sandbox, AI Gateway, Workers AI, and runtime-compatible packages.
+- **Browser or sandbox tools**: Treat as high-risk capabilities. Add allowlists, quotas, audit logs, timeout limits, and confirmation gates for writes.

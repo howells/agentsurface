@@ -181,3 +181,55 @@ export function onImageSaved(imageUrl: string) {
 
 **Rule:** Always attach `.catch()` on trigger promises. Verify env vars are
 available at server startup, not inside workflow steps.
+
+---
+
+## 8. Workers runtime is not Node.js
+
+Cloudflare Workers projects should not receive scaffolding that assumes Node.js
+process APIs, local file systems, child processes, or long-lived in-memory
+workers. Those patterns pass type checks in a shared monorepo and then fail at
+runtime.
+
+```typescript
+// WRONG for Workers
+import { readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+
+const prompt = readFileSync("./prompts/agent.md", "utf8");
+const run = spawn("python", ["script.py"]);
+```
+
+```typescript
+// CORRECT direction for Workers
+export interface Env {
+  AI: Ai;
+  MY_AGENT: DurableObjectNamespace;
+  VECTORIZE_INDEX: VectorizeIndex;
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    const id = env.MY_AGENT.idFromName("agent:default");
+    const stub = env.MY_AGENT.get(id);
+    return stub.fetch(request);
+  },
+};
+```
+
+**Rule:** For Workers-native agents, generate code around bindings and platform
+services: Durable Objects for state, Workers AI or AI Gateway for models,
+Vectorize/AI Search/AutoRAG for retrieval, Browser Run for browser access,
+Sandbox for code execution, and Queues/Cron Triggers for background work.
+
+---
+
+## 9. Browser and sandbox tools are high-risk capabilities
+
+Browser automation and code execution are powerful enough to leak data, mutate
+accounts, or run attacker-controlled instructions. Treat them as privileged
+tools, not convenience helpers.
+
+**Rule:** Every browser or sandbox tool needs domain/runtime allowlists, timeouts,
+quotas, audit logs, structured errors, output truncation, and confirmation gates
+for writes or purchases. Never pass production secrets into a sandbox session.

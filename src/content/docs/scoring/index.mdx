@@ -1,11 +1,11 @@
 ---
 title: Scoring Framework
-description: Measure and track your codebase's agent-readiness across 10 dimensions
+description: Measure and track your codebase's agent-readiness across 11 dimensions
 ---
 
 ## Summary
 
-Quantifies agent-readiness on a 0–30 spectrum across 10 concrete dimensions: API, CLI, MCP, Discovery, Auth, Error Handling, Tool Design, Context Files, Multi-Agent, and Testing. Each dimension scores 0–3 (Not Implemented → Excellent). Provides a baseline score, identifies gaps, and tracks progress as you modernize. Scale: 0–7 (Human-only) to 23–30 (Agent-first).
+Quantifies agent-readiness on a 0–30 scaled spectrum across 11 concrete dimensions: API, CLI, MCP, Discovery, Auth, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, and Data Retrievability. Each dimension scores 0–3 (Not Implemented → Excellent), then the applicable total is scaled to 30. Provides a baseline score, identifies gaps, and tracks progress as you modernize. Scale: 0–7 (Human-only) to 23–30 (Agent-first).
 
 - 0 = Not implemented (blocker)
 - 1 = Basic (weak, human-oriented)
@@ -13,7 +13,7 @@ Quantifies agent-readiness on a 0–30 spectrum across 10 concrete dimensions: A
 - 3 = Excellent (production, resilient, cross-framework)
 - N/A = Genuinely inapplicable (rare)
 
-Agent-readiness is not binary. A codebase's ability to be consumed by AI agents exists on a spectrum. The agentify scoring framework quantifies that spectrum across 10 concrete dimensions, giving you a measurement today, a clear view of gaps, and a way to track progress.
+Agent-readiness is not binary. A codebase's ability to be consumed by AI agents exists on a spectrum. The agentify scoring framework quantifies that spectrum across 11 concrete dimensions, giving you a measurement today, a clear view of gaps, and a way to track progress.
 
 ## Why Score?
 
@@ -28,7 +28,7 @@ Each dimension scores from 0 to 3:
 - **2 (Good)** — Solid implementation. Agent-oriented descriptions, structured data, clear examples. Most agent use cases work.
 - **3 (Excellent)** — Production-ready for agents. Optimized for token efficiency, cross-framework, resilient error handling, advanced patterns (OAuth, MCP Tasks, delegation). Agents perform reliably with minimal prompt engineering.
 
-## The 10 Dimensions
+## The 11 Dimensions
 
 **1. API Surface** — How well your HTTP API is described for agent tool generation. OpenAPI quality, operationIds, agent-oriented descriptions, Arazzo workflow support.
 
@@ -36,7 +36,7 @@ Each dimension scores from 0 to 3:
 
 **3. MCP Server** — Whether and how well you expose an MCP server. Tool count, annotations, resources, OAuth support, pagination, testing with InMemoryTransport.
 
-**4. Discovery & AEO** — How discoverable and consumable your project is by agents. llms.txt, AGENTS.md, JSON-LD schema, content negotiation, robots.txt, NLWeb /ask endpoint.
+**4. Discovery & AEO** — How discoverable, readable, governable, and callable your project is by agents. llms.txt, AGENTS.md, JSON-LD schema, Markdown content negotiation, robots.txt, Content Signals, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and optional commerce protocols.
 
 **5. Authentication** — Whether agents can authenticate without human browser interaction. API keys, OAuth 2.1 Client Credentials, Token Exchange (RFC 8693), agent identity as first-class principal.
 
@@ -49,6 +49,8 @@ Each dimension scores from 0 to 3:
 **9. Multi-Agent Support** — How well your project supports multi-agent orchestration. Sub-agent delegation, state management, A2A agent cards, memory patterns, dynamic agent selection.
 
 **10. Testing & Evaluation** — Whether agent interactions are tested and evaluated. Tool routing accuracy, error recovery testing, multi-step flow tests, pass@k metrics, eval-driven development.
+
+**11. Data Retrievability** — Whether project knowledge, documents, and user data are searchable and retrievable by agents. Semantic search, hybrid retrieval, reranking, metadata filters, RAG evals, and knowledge graphs.
 
 ## Confidence Levels
 

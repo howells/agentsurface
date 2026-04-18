@@ -1,20 +1,20 @@
 ---
 name: mcp-builder
-description: Create or enhance MCP servers (spec 2025-11-25) with tool annotations (READ_ONLY/WRITE/DESTRUCTIVE), Streamable HTTP transport, task async patterns, and CIMD/EMA integrations
+description: Create or enhance MCP servers (spec 2025-11-25) with tool annotations, Streamable HTTP transport, experimental task support, and OAuth protected-resource metadata
 model: opus
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Scaffold MCP 2025-11-25 servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with access-level hints (READ_ONLY/WRITE/DESTRUCTIVE), support CIMD and EMA auth models, and structure responses for streaming + batching.
+Scaffold MCP 2025-11-25 servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with MCP behavioral hints, add OAuth protected-resource metadata for protected HTTP servers, and structure responses for streaming + batching.
 
 - MCP spec 2025-11-25 compliance: Tools, Resources, Prompts, Sampling
 - Dual transport: stdio (local) + Streamable HTTP (cloud-ready)
-- Tool annotations: READ_ONLY, WRITE, DESTRUCTIVE, idempotent, requires_confirmation
-- CIMD (Client Input Metadata Directives) support
-- EMA (Enhanced Messaging Architecture) for structured responses
-- Async task patterns (long-running operations)
+- Tool annotations: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`
+- OAuth protected-resource metadata for HTTP servers
+- Client ID Metadata Documents as an OAuth client registration option when the authorization server supports them
+- Experimental MCP task patterns for long-running operations
 
 ## Mission
 
@@ -52,10 +52,10 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
        user_id: z.string().uuid().describe('UUID of user to delete'),
      }),
      annotations: {
-       type: ['DESTRUCTIVE'],      // [READ_ONLY | WRITE | DESTRUCTIVE]
-       requiresConfirmation: true,  // Agent must prompt user
-       idempotent: false,
-       openWorld: false,
+       readOnlyHint: false,
+       destructiveHint: true,
+       idempotentHint: false,
+       openWorldHint: false,
      },
    }, handler);
    ```
@@ -67,15 +67,17 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Returns: enumerate key output fields
    - Errors: what can fail and recovery suggestion
 
-5. **Implement CIMD support** (Client Input Metadata):
-   - Accept `x-client-context` header with:
-     ```json
-     { "user_id": "...", "session_id": "...", "locale": "en-US" }
+5. **Implement HTTP authorization metadata when protected**:
+   - Publish OAuth protected-resource metadata:
+     ```text
+     /.well-known/oauth-protected-resource
      ```
-   - Thread context through tool execution
-   - Use for audit logging and rate-limit bucketing
+   - Include `authorization_servers` so MCP clients can discover the correct authorization server.
+   - Validate bearer tokens on every protected HTTP request.
+   - Ensure tokens are audience-bound to this MCP server resource.
+   - Support OAuth Client ID Metadata Documents only when the authorization server advertises `client_id_metadata_document_supported`.
 
-6. **Implement EMA responses** (Enhanced Messaging):
+6. **Return structured MCP content**:
    - Use structured content blocks:
      ```typescript
      return {
@@ -87,13 +89,11 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
      ```
    - Include trace_id in error responses
 
-7. **Support async task patterns**:
-   - For long operations (>5s), return immediate task object:
-     ```json
-     { "task_id": "...", "status": "pending", "poll_url": "..." }
-     ```
-   - Implement polling endpoint returning status + progress
-   - Support webhook callbacks for completion
+7. **Support experimental MCP task patterns**:
+   - For long operations, mark tools with `execution.taskSupport` when supported by the SDK/runtime.
+   - Return task data for task-augmented requests; do not pretend the operation result is complete.
+   - Implement `tasks/get` polling and `tasks/result` retrieval.
+   - Continue polling until terminal states such as `completed`, `failed`, or `cancelled`.
 
 8. **Error handling** (RFC 9457 + MCP):
    ```typescript
@@ -139,8 +139,8 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
     - Tool count ≤20 per server
     - Tests pass with InMemoryTransport
     - No secrets in schemas or descriptions
-    - Async operations use task pattern with polling
-    - CIMD context threaded through execution
+    - Async operations use MCP task patterns with polling/result retrieval
+    - Request context threaded through execution without inventing non-standard auth metadata
 
 ## Outputs
 
@@ -152,10 +152,10 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 
 ## Spec References
 
-- MCP 2025-11-25: https://modelcontextprotocol.io/spec/2025-11-25
-- Tool Annotations: https://modelcontextprotocol.io/spec/2025-11-25#tool-definitions
-- EMA (Enhanced Messaging): `/skills/agentify/references/ema.md`
-- CIMD (Client Input Metadata): `/skills/agentify/references/cimd.md`
+- MCP 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25
+- Tool definitions: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
+- Authorization: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+- Tasks: https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks
 - RFC 9457 (Problem Details): https://tools.ietf.org/html/rfc9457
 
 ## Style Rules
@@ -164,7 +164,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 - Zod schema on every tool input; describe each field.
 - Tool descriptions must teach the agent when/why to use them.
 - Error responses must include is_retriable + suggestions[].
-- Async tasks must include poll_url or webhook mechanism.
+- Async tasks must use MCP task polling/result retrieval semantics where supported.
 - Annotations are mandatory; never omit type, requiresConfirmation, etc.
 
 ## Anti-patterns

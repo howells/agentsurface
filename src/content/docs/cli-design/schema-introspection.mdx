@@ -253,11 +253,11 @@ A complete schema exposes everything an agent needs to construct a valid call:
 }
 ```
 
-## The SKILL.md Format
+## Skill Metadata For CLIs
 
-SKILL.md is a structured capability declaration that pairs with the CLI binary to give agents a concise, versioned description of what the CLI can do and the invariants they must follow when using it.
+Agent Skills are portable folders with a `SKILL.md` entrypoint. For CLIs, you can add metadata that points agents to the live command schema and authentication checks. Treat these fields as a CLI extension to the public Agent Skills format, not as a separate incompatible format.
 
-A SKILL.md file lives in the repository root (or alongside the binary) and follows this structure:
+A CLI skill can live in the repository root, alongside the binary, or inside a skills directory:
 
 ```markdown
 ---
@@ -312,10 +312,10 @@ mytool user list --status active --all --json
 
 The YAML frontmatter is machine-readable metadata. The Markdown body is prose guidance for the agent's context. The `schema_command` field tells the agent exactly how to fetch the full runtime schema for any command.
 
-Auto-generate SKILL.md from your CLI's describe output as part of your release pipeline:
+Auto-generate or validate CLI skill metadata from your CLI's describe output as part of your release pipeline:
 
 ```bash
-# Generate SKILL.md from live schema
+# Generate or validate SKILL.md from live schema
 mytool describe --json | generate-skill-md > SKILL.md
 ```
 
@@ -339,12 +339,13 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 - [ ] Schema includes OAuth scopes or permission requirements per command
 - [ ] Nested types are included by reference or inline in the schema
 - [ ] Return schemas describe the shape of every command's output
-- [ ] SKILL.md file ships with the CLI in the repository root
-- [ ] SKILL.md frontmatter includes `schema_command` pointing to the introspection command
+- [ ] Agent Skill ships with the CLI or is linked from its schema output
+- [ ] Skill metadata includes `schema_command` or equivalent pointing to the introspection command
 - [ ] Schema generation is part of the release pipeline to prevent drift
 
 ## Related Pages
 
 - [Raw Payload Input](./raw-payload-input) — using the schema to construct payloads directly
-- [Agent Knowledge Packaging](./agent-knowledge-packaging) — SKILL.md and context file conventions
+- [Agent Knowledge Packaging](./agent-knowledge-packaging) — Agent Skills and context file conventions
+- [Agent Skills](/docs/discovery/agent-skills) — portable skill folder format
 - [The Agent DX CLI Scale](./cli-scale) — full scoring framework

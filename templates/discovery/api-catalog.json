@@ -1,0 +1,12 @@
+{
+  "apis": [
+    {
+      "id": "public-rest-api",
+      "title": "Public REST API",
+      "description": "Replace with the API's agent-facing purpose and main capability boundaries.",
+      "specification": "https://example.com/openapi.json",
+      "documentation": "https://example.com/docs/api",
+      "status": "https://status.example.com"
+    }
+  ]
+}

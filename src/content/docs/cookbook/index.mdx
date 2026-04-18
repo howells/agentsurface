@@ -56,7 +56,7 @@ This cookbook distills 10 patterns extracted from a real-world production agenti
 - `WRITE`: Idempotent state change; can be safely retried.
 - `DESTRUCTIVE`: Irreversible; requires confirmation before exposure to the model.
 
-**Stack**: MCP 0.6+, Zod for schema validation.
+**Stack**: MCP-compatible tools, Zod for schema validation.
 
 **Key files**: [`tool-annotations.mdx`](/docs/cookbook/tool-annotations)
 
@@ -120,7 +120,7 @@ This cookbook distills 10 patterns extracted from a real-world production agenti
 ### 8. MCP as External API
 **The core insight**: Ship your MCP server publicly (OAuth 2.1 + DPoP). Users connect Claude, ChatGPT, or Cursor directly to your agent's tools. "Use us where you already work" becomes a distribution channel.
 
-**Stack**: MCP 0.6+, OAuth 2.1, DPoP (Demonstration of Proof-of-Possession).
+**Stack**: MCP-compatible server, OAuth 2.1, DPoP (Demonstration of Proof-of-Possession).
 
 **Key files**: [`mcp-as-external-api.mdx`](/docs/cookbook/mcp-as-external-api)
 
@@ -155,6 +155,7 @@ This cookbook distills 10 patterns extracted from a real-world production agenti
 - **Sharing your agent?** [`mcp-as-external-api.mdx`](/docs/cookbook/mcp-as-external-api).
 - **External integrations?** [`external-app-routing.mdx`](/docs/cookbook/external-app-routing).
 - **Always-on helpers?** [`autonomous-background-agents.mdx`](/docs/cookbook/autonomous-background-agents).
+- **Workers-native runtime?** [`cloudflare-agent-stack.mdx`](/docs/cookbook/cloudflare-agent-stack).
 
 ---
 
@@ -162,7 +163,7 @@ This cookbook distills 10 patterns extracted from a real-world production agenti
 
 These patterns are extracted from a real-world production agentic SaaS application profiled in 2024–2025. The application processes millions of requests across multiple platforms (web, WhatsApp, Telegram, Slack, iMessage) using a Bun + Turborepo monorepo, Next.js, TypeScript, Vercel AI SDK, MCP, and Composio.
 
-**Stack**: Bun + Turborepo monorepo, Next.js, React, TypeScript, Vercel AI SDK 0.6+, MCP 0.6+, Composio, multi-platform bot adapters (WhatsApp, Telegram, Slack, iMessage via Sendblue).
+**Stack**: Bun + Turborepo monorepo, Next.js, React, TypeScript, Vercel AI SDK, MCP-compatible tools, Composio, multi-platform bot adapters (WhatsApp, Telegram, Slack, iMessage via Sendblue).
 
 No product names or proprietary details are disclosed. Patterns are generic and transferable to any agent-powered SaaS.
 
@@ -173,4 +174,3 @@ No product names or proprietary details are disclosed. Patterns are generic and 
 - **[Tool Design](/docs/tool-design)** — tool schema, MCP transport, discovery.
 - **[Multi-Agent](/docs/multi-agent)** — orchestrating multiple agents, delegation patterns.
 - **[MCP Servers](/docs/mcp-servers)** — authoring and deploying MCP servers.
-

@@ -64,16 +64,16 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 ## Dimension 4: Discovery & AEO
 
-**What it measures:** How discoverable and consumable the project is by AI agents.
+**What it measures:** How discoverable, readable, governable, and callable the project is by AI agents. This maps to the same broad categories external agent-readiness scanners now measure: discoverability, content accessibility, bot access control, and capability discovery.
 
 | Score | Criteria | Detection |
 |-------|----------|-----------|
-| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot. |
-| 1 | Basic discovery. AGENTS.md or llms.txt exists but minimal. No structured data. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. No JSON-LD. |
-| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows AI bots. Sitemap with accurate lastmod. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. At least FAQPage or TechArticle JSON-LD. robots.txt explicitly allows AI crawlers. |
-| 3 | Full AEO. llms.txt + llms-full.txt. Content negotiation (Accept: text/markdown → Markdown response). Vary: Accept header. x-markdown-tokens header. /.well-known/ endpoints. Stripe-style Instructions section. "Copy for AI" button. Token budgets per page. NLWeb /ask endpoint. | llms-full.txt present. Markdown content negotiation in server code. /.well-known/ai or agent-card.json. Multiple JSON-LD schema types. All docs pages <30K tokens. |
+| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or omits public docs from crawl. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot/search agents. |
+| 1 | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path. |
+| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap has accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL. |
+| 3 | Full agent-readable web surface. llms.txt + llms-full.txt. Markdown content negotiation or `.md` URL fallback with Vary: Accept and token hints. Content Signals declared. Capability discovery via `.well-known` API Catalog, MCP Server Card or MCP metadata, Agent Skills index where applicable, and OAuth protected-resource metadata for gated resources. Web Bot Auth considered for outbound or high-trust bots. Agent-commerce protocols checked when commerce applies. | llms-full.txt present. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. `/.well-known/api-catalog`, `/.well-known/mcp/server-card.json` or `/.well-known/mcp.json`, `/.well-known/agent-skills/index.json`, `/.well-known/oauth-protected-resource` where applicable. `http-message-signatures-directory` when bot identity is implemented. |
 
-**Key files:** llms.txt, llms-full.txt, AGENTS.md, robots.txt, sitemap.xml, layout files (for JSON-LD), server/middleware (for content negotiation)
+**Key files:** llms.txt, llms-full.txt, AGENTS.md, robots.txt, sitemap.xml, layout files (for JSON-LD), server/middleware (for content negotiation), `.well-known/` metadata, OpenAPI/API Catalog files, MCP metadata, Agent Skills indexes
 
 **N/A when:** Project has no web presence (pure library, CLI-only tool).
 

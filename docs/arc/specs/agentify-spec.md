@@ -13,7 +13,7 @@ The `/agentify` skill takes any codebase and makes it maximally consumable by AI
 
 Most software today is built for humans. Agents interact with it through scraping, prompt engineering, and brittle heuristics. Agentify measures how well a codebase supports agent consumption across 11 dimensions, scores each one on a 0-3 rubric, produces a detailed findings report, and can execute a transformation plan to close the gaps.
 
-The skill is the operational counterpart to the Agent Zero documentation site. The docs site is the textbook. The skill is the audit tool. Every finding links back to a docs page. Every transformation follows a documented pattern.
+The skill is the operational counterpart to the Agent Surface documentation site. The docs site is the field guide. The skill is the audit tool. Every finding links back to a docs page. Every transformation follows a documented pattern.
 
 ### Design Principles
 
@@ -105,19 +105,20 @@ Does the project expose an MCP (Model Context Protocol) server?
 
 ### Dimension 4: Discovery and AEO
 
-How discoverable is this project to AI agents? Covers Agent Engine Optimization.
+How discoverable, readable, governable, and callable is this project to AI agents? Covers Agent Engine Optimization and the public-site readiness signals agents increasingly rely on.
 
 | Score | Level | Criteria |
 |-------|-------|----------|
 | 0 | None | No agent-specific discovery files. Agents find this project only through human-written docs or web scraping. |
 | 1 | Basic | An `AGENTS.md` or `llms.txt` exists, but it is minimal, auto-generated, or outdated. Provides some signal but not enough for an agent to understand capabilities. |
-| 2 | Structured | `llms.txt` with proper sections (capabilities, endpoints, authentication). `AGENTS.md` with interaction patterns. Structured data (JSON-LD with `SoftwareApplication` or `APIReference` schema) on public pages. `robots.txt` allows AI crawlers. |
-| 3 | Full AEO | Complete discovery surface: `llms.txt` + `llms-full.txt` (token-counted, with progressive detail). Content negotiation returning Markdown for `Accept: text/markdown`. `/.well-known/ai-plugin.json` or equivalent manifest. "Copy for AI" buttons on docs. NLWeb `/ask` endpoint for natural language queries. Sitemap includes API documentation pages. AI-specific meta tags. |
+| 2 | Structured | `llms.txt` with proper sections (capabilities, endpoints, authentication). `AGENTS.md` with interaction patterns. Structured data (JSON-LD with `SoftwareApplication`, `TechArticle`, or `WebAPI` schema) on public pages. `robots.txt` allows intended retrieval/search bots. Sitemap includes accurate `lastmod`. OpenAPI is discoverable from docs or root. |
+| 3 | Full AEO | Complete discovery surface: `llms.txt` + `llms-full.txt` (token-counted, with progressive detail). Content negotiation returning Markdown for `Accept: text/markdown` or `.md` URL fallbacks. Content Signals declared. Capability discovery via `.well-known` API Catalog, MCP Server Card or metadata, Agent Skills index where applicable, and OAuth protected-resource metadata for gated resources. Web Bot Auth considered for high-trust bots. Commerce protocols checked when commerce applies. |
 
 **Detection signals:**
 - `AGENTS.md` in project root
 - `llms.txt`, `llms-full.txt` in `public/` or project root
-- `/.well-known/ai-plugin.json`
+- Content Signals in `robots.txt` or headers
+- `.well-known` API Catalog, MCP Server Card or metadata, Agent Skills index, OAuth metadata, and Web Bot Auth keys
 - JSON-LD blocks with `SoftwareApplication` schema
 - Content negotiation middleware
 - `robots.txt` with AI crawler directives
@@ -351,7 +352,7 @@ Scan for:
 - OpenAPI specs (openapi.yaml, swagger.json, etc.)
 - MCP server files (mcp.json, McpServer instantiation)
 - Context files (AGENTS.md, CLAUDE.md, .cursorrules)
-- Discovery files (llms.txt, llms-full.txt, .well-known/ai-plugin.json)
+- Discovery files (llms.txt, llms-full.txt, robots.txt, sitemap.xml, .well-known API Catalog, MCP metadata, Agent Skills index, OAuth metadata)
 - CLI tools (bin/, CLI framework deps)
 - A2A agent cards (.well-known/agent.json)
 - Agent test files (*agent*.test.*, *tool*.test.*, *mcp*.test.*)
@@ -469,7 +470,7 @@ Clustering criteria:
 **Current state:** [what exists now — with evidence]
 **Why it matters for agents:** [concrete impact on agent usage]
 **How to fix:** [specific steps]
-**Reference:** [link to agent-zero docs page]
+**Reference:** [link to Agent Surface docs page]
 **Effort estimate:** [S / M / L]
 ```
 
@@ -669,7 +670,8 @@ Each transformation type has a specialized sub-agent. Sub-agents receive the tas
 - `llms.txt` and `llms-full.txt`
 - `AGENTS.md` (if not already covered by context-writer)
 - JSON-LD structured data
-- `.well-known/ai-plugin.json`
+- `.well-known` capability metadata
+- `robots.txt` and Content Signals
 - Content negotiation middleware (at level 3)
 
 **Reference:** `references/discovery-aeo.md`
@@ -857,9 +859,9 @@ Generated in Phase 3. Contains ordered tasks with file-level specificity. See Se
 
 ---
 
-## 8. Integration with Agent Zero Docs Site
+## 8. Integration with Agent Surface Docs Site
 
-The Agent Zero documentation site at `~/Sites/agent-zero` serves as the knowledge base for the skill. Every finding references a specific docs page.
+The Agent Surface documentation site serves as the knowledge base for the skill. Every finding references a specific docs page.
 
 ### Reference Mapping
 
@@ -938,10 +940,10 @@ The skill is complete and correct when:
 - [ ] Phase 4 sub-agents produce correct transformations for their respective dimensions
 - [ ] Phase 4 re-scoring after transformation shows measurable improvement
 - [ ] Scorecard tracks history across multiple audit runs
-- [ ] All findings link to agent-zero docs pages
+- [ ] All findings link to Agent Surface docs pages
 - [ ] The skill works on projects in any supported language (TypeScript, Python, Go, Rust at minimum)
 - [ ] N/A dimensions are correctly identified and excluded from scoring
-- [ ] The skill can audit itself (meta-test: run `/agentify` on the agent-zero project)
+- [ ] The skill can audit itself (meta-test: run `/agentify` on the Agent Surface project)
 
 ---
 

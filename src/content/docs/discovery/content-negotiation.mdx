@@ -194,11 +194,13 @@ Cache-Control: public, max-age=3600
 
 ## Cloudflare Markdown for Agents
 
-Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown conversion at the edge. When enabled, Cloudflare intercepts requests with `Accept: text/markdown`, fetches the HTML origin response, converts it to Markdown, and returns the Markdown to the agent.
+Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown conversion at the edge. When enabled, Cloudflare intercepts requests with `Accept: text/markdown`, fetches the HTML origin response, converts it to Markdown, and returns the Markdown to the agent. Cloudflare docs also expose `.md` paths such as `/index.md`, which gives agents a URL fallback when they cannot set request headers.
 
-This requires no changes to your origin server. Enable it in the Cloudflare dashboard under Speed > Optimization > Markdown for Agents.
+This requires no changes to your origin server. Enable it in AI Crawl Control for the zone, or via the Cloudflare API by setting `content_converter` to `on`.
 
-The conversion is imperfect — Cloudflare strips navigation, footers, and ads, but complex layouts may not convert cleanly. Origin-served Markdown is preferable when you control the stack. Cloudflare's conversion is a pragmatic option for sites where modifying the origin is impractical.
+The response should include `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and a `Content-Signal` header. Cloudflare's default converted responses currently signal `ai-train=yes, search=yes, ai-input=yes`; override content-use policy where the platform allows it.
+
+The conversion is pragmatic, not magic. It only converts HTML origin responses, and Cloudflare documents a 2 MB origin response limit. Origin-served Markdown is preferable when you control the stack. Use edge conversion when modifying the origin is impractical. For arbitrary document conversion or dynamic pages, consider Workers AI `AI.toMarkdown()` or Browser Run's Markdown endpoint.
 
 ## HTML Fallback Signals
 

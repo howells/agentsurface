@@ -1,0 +1,11 @@
+{
+  "skills": [
+    {
+      "id": "use-api",
+      "name": "Use API",
+      "description": "Replace with a narrow task the site can teach agents to perform reliably.",
+      "format": "agent-skill",
+      "url": "https://example.com/.well-known/agent-skills/use-api/SKILL.md"
+    }
+  ]
+}

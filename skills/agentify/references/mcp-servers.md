@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard adopted by Anthropic, OpenAI, and Google for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema, resources, OAuth 2.1 via .well-known, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts/tasks, and dynamic tool loading.
+Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema, resources, OAuth protected-resource metadata for protected HTTP servers, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts/tasks, and dynamic tool loading.
 
 - **0**: No MCP server, no .mcp.json (blocker)
 - **1**: Server exists but <5 tools, terse descriptions, no annotations, errors thrown
@@ -21,7 +21,7 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 | 0 | No MCP server. No .mcp.json or .mcp/mcp.json. No SDK imports (@modelcontextprotocol/sdk, mcp-handler, @mastra/mcp). | grep -r "@modelcontextprotocol/sdk" and grep -r "mcp-handler" both return nothing. No .mcp.json. |
 | 1 | Basic MCP server exists but minimal. Fewer than 5 tools; descriptions are terse (<20 words); no annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint); no resources or prompts; errors thrown rather than structured with `isError: true`. | MCP server file imports sdk but: <5 tools defined; descriptions lack "when to use / when not to use"; no annotations object; no resources; errors not wrapped in `{ isError: true, content: [...] }`. |
 | 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data. Resources exposed for static data. Spec compliance 2025-11-25. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on error. outputSchema present on structured tools. Resources with MIME types declared. Server uses @modelcontextprotocol/sdk v2.x. |
-| 3 | Production MCP. OAuth 2.1 authorization via `.well-known/oauth-protected-resource` metadata. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. | Auth: `.well-known/oauth-protected-resource` present; JWT validation (iss/aud/exp claims); Client Credentials support. Pagination: list tools return cursor, implemented via `pagination` pattern. HTTP transport via Streamable HTTP (stateless). Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Task state transitions (working → input_required → completed/failed/cancelled) handled. |
+| 3 | Production MCP. OAuth authorization via `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and audience/resource checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use `tasks/get` polling and `tasks/result` retrieval where supported. |
 
 ## Evidence to gather
 
@@ -73,22 +73,21 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 - **Elicitation:** Server can request missing arguments from client before tool execution
 
 **New in 2025-11-25:**
-- **async Tasks:** Long-running operations with explicit state machine: `working | input_required | completed | failed | cancelled`. Use for multi-step operations where the client needs progress updates.
-- **Client ID Metadata Documents (CIMD):** Server can declare which client integrations (Claude Desktop, ChatGPT, Gemini) are supported and their version requirements.
-- **Enterprise-Managed Authorization extension:** Allows identity providers to centrally manage MCP client credentials.
-- **URL Mode Elicitation:** Clients can provide arguments as URL query parameters for browser-based elicitation flows.
+- **Tasks:** Experimental durable requests with polling and deferred result retrieval. Use for multi-step operations where the client needs progress updates.
+- **OAuth Client ID Metadata Documents:** Recommended OAuth client registration mechanism when clients and authorization servers do not have a prior relationship.
+- **Authorization server discovery improvements:** Protected HTTP MCP servers use OAuth protected-resource metadata to point clients to authorization servers, and clients support OAuth or OpenID Connect discovery.
+- **URL Mode Elicitation:** Servers can direct users to external URLs for sensitive out-of-band interactions.
 - **tool-calling in sampling:** Servers can request tool execution from the client during sampling.
 - **Icon support:** Tools and resources can declare icon URIs for client UI rendering.
-- **Extensions Framework via SEPs (Server Enhancement Proposals):** Formal process for extending MCP without breaking compatibility.
 
 **Transports:**
 - **stdio:** Local server. Single client connection. No authentication needed (trust is delegated to OS). Lowest latency.
-- **Streamable HTTP:** Remote server over HTTPS. Stateless; horizontally scalable. Clients open a long-lived POST request; server streams `ServerMessage` JSONs (delimited by newlines). Requires OAuth 2.1 for production.
+- **Streamable HTTP:** Remote server over HTTPS. Protected HTTP servers should follow the MCP authorization specification and publish OAuth protected-resource metadata.
 - **Legacy SSE (deprecated):** Do not use for new servers.
 
 ### Tool design for MCP
 
-**Annotations (2025-11-25):**
+**Annotations:**
 All tools should include a `tool.annotations` object with hints for agent reasoning:
 
 ```typescript
@@ -505,7 +504,7 @@ export default {
 ```
 
 **Discovery:**
-- Publish `.well-known/mcp.json` (server capabilities and endpoints)
+- Publish `/.well-known/mcp/server-card.json` for server capabilities and endpoints; keep `.well-known/mcp.json` only as a compatibility pointer when needed
 - Publish `/.well-known/agent.json` (if multi-agent; A2A v1.0 RC compatible)
 - Register in OpenAI Apps SDK directory, Anthropic MCP Registry, Google Gemini connectors
 

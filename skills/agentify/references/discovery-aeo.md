@@ -2,26 +2,41 @@
 
 ## Summary
 
-Dimension 4 measures how discoverable and navigable a project is for AI agents. Covers llms.txt (agent-optimized link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, content negotiation for markdown, and .well-known endpoints. AEO is to agents what SEO is to search engines: navigation files, structured data, and crawler directives enabling discovery and understanding.
+Dimension 4 measures how discoverable, readable, governable, and callable a project is for AI agents. Covers llms.txt (agent-optimized link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, Markdown content negotiation, Content Signals, `.well-known` capability discovery, OAuth metadata, MCP discovery, Agent Skills discovery, and optional agent-commerce protocol signals. AEO is to agents what SEO is to search engines: navigation files, structured data, crawler directives, and capability manifests that enable discovery and reliable use.
 
 - **llms.txt**: H1 title, blockquote summary, H2 sections with link descriptions
 - **AGENTS.md**: commands, tech stack, testing expectations, permission boundaries
 - **Structured data**: JSON-LD (FAQPage, TechArticle, etc.) on key pages
 - **robots.txt**: explicitly allow AI bots (GPTBot, ClaudeBot, etc.)
-- **Content negotiation**: Accept: text/markdown → markdown response
-- **.well-known**: /.well-known/agent.json, oauth endpoints, MCP config
+- **Content negotiation**: Accept: text/markdown → markdown response or `.md` fallback URLs
+- **Content Signals**: `search`, `ai-input`, and `ai-train` preferences in robots.txt or response headers
+- **.well-known**: API Catalog, MCP Server Card, Agent Skills index, OAuth metadata, Web Bot Auth keys
 - **Evidence**: File globs for llms.txt, AGENTS.md, sitemap, JSON-LD grep, robots.txt analysis
 
-> AEO is to agents what SEO is to search engines. It encompasses the navigation files, structured data schemas, content negotiation protocols, and crawler directives that enable AI agents to discover, understand, and navigate a codebase or web service. Key dimensions: llms.txt discovery, AGENTS.md conventions, structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, content negotiation for markdown, and well-known endpoints for authentication and inter-agent discovery.
+> AEO is to agents what SEO is to search engines. It encompasses the navigation files, structured data schemas, content negotiation protocols, crawler directives, bot identity mechanisms, and capability manifests that enable AI agents to discover, understand, navigate, authenticate against, and use a codebase or web service.
+
+## Agent-readiness scan model
+
+When auditing a public website, evaluate the same categories that current agent-readiness scanners measure:
+
+| Category | Signals |
+|---|---|
+| Discoverability | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs |
+| Content accessibility | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints |
+| Bot access control | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots |
+| Capability discovery | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata |
+| Commerce, when applicable | x402, Universal Commerce Protocol, Agentic Commerce Protocol |
+
+Use these scan results as evidence for Dimension 4. Do not overfit to one vendor's exact score: the goal is durable agent-readiness, not passing a single checker.
 
 ## Scoring rubric
 
 | Score | Criteria | Detection |
 |-------|----------|-----------|
-| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot. |
-| 1 | Basic discovery. AGENTS.md or llms.txt exists but minimal. No structured data. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. No JSON-LD. |
-| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows AI bots. Sitemap with accurate lastmod. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. At least FAQPage or TechArticle JSON-LD. robots.txt explicitly allows AI crawlers. |
-| 3 | Full AEO. llms.txt + llms-full.txt. Content negotiation (Accept: text/markdown → Markdown response). Vary: Accept header. x-markdown-tokens header. /.well-known/ endpoints. Stripe-style Instructions section. "Copy for AI" button. Token budgets per page. NLWeb /ask endpoint. | llms-full.txt present. Markdown content negotiation in server code. /.well-known/ai or agent-card.json. Multiple JSON-LD schema types. All docs pages <30K tokens. |
+| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or hides public docs from retrieval. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot/search agents. |
+| 1 | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path. |
+| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap with accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL. |
+| 3 | Full agent-readable web surface. llms.txt + llms-full.txt. Markdown content negotiation or `.md` URL fallback with Vary: Accept and token hints. Content Signals declared. Capability discovery via `.well-known` API Catalog, MCP Server Card or MCP metadata, Agent Skills index where applicable, and OAuth protected-resource metadata for gated resources. Web Bot Auth considered for outbound or high-trust bots. Agent-commerce protocols checked when commerce applies. | llms-full.txt present. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. `/.well-known/api-catalog`, `/.well-known/mcp/server-card.json` or `/.well-known/mcp.json`, `/.well-known/agent-skills/index.json`, `/.well-known/oauth-protected-resource` where applicable. `http-message-signatures-directory` when bot identity is implemented. |
 
 **N/A when:** Project has no web presence (pure library, CLI-only tool).
 
@@ -32,14 +47,16 @@ Dimension 4 measures how discoverable and navigable a project is for AI agents. 
 - `public/llms.txt`, `public/llms-full.txt` at web root
 - `AGENTS.md` in repo root (also distributed at `/agents.md` endpoint)
 - `robots.txt` and crawler directives (`User-agent`, `Disallow`)
+- Content Signals in `robots.txt` or response headers (`Content-Signal: search=yes, ai-input=yes, ai-train=no`)
 - Sitemap (`sitemap.xml`) with accurate `<lastmod>` timestamps
 - JSON-LD blocks in HTML (grep `application/ld+json` in layout / page templates)
-- `.well-known/` directory: `agent.json`, `agent-card.json`, `ai-plugin.json` (deprecated), `oauth-protected-resource`, `oauth-authorization-server`, `mcp.json` (emerging)
+- `.well-known/` directory: `api-catalog`, `mcp/server-card.json`, `mcp.json`, `agent-skills/index.json`, `agent.json`, `agent-card.json`, `oauth-protected-resource`, `oauth-authorization-server`, `http-message-signatures-directory`
 - Server middleware supporting content negotiation (`Accept: text/markdown` → markdown response)
 - `Vary: Accept` header in HTTP responses
 - `x-markdown-tokens` header on markdown responses (token budget hints)
 - NLWeb `/ask` REST endpoint or `/mcp` server mode
 - "Copy for AI" button or `.md` URL suffix on docs pages (e.g. `/docs/api.md`)
+- Commerce manifests or headers when applicable: x402, Universal Commerce Protocol, Agentic Commerce Protocol
 
 ---
 
@@ -194,13 +211,16 @@ export default function RootLayout({ children }) {
 
 ### Content negotiation (Markdown)
 
-**Pattern:** When a client sends `Accept: text/markdown`, return a markdown-formatted representation of the page instead of HTML.
+**Pattern:** When a client sends `Accept: text/markdown`, return a markdown-formatted representation of the page instead of HTML. Also expose `.md` or `index.md` URL fallbacks for clients that cannot set custom headers.
 
 **HTTP headers:**
 - Request: `Accept: text/markdown`
 - Response: `Content-Type: text/markdown; charset=utf-8`
 - Always include: `Vary: Accept` (tells caches this response varies by Accept header)
-- Optional: `x-markdown-tokens: 1250` (hint for token-constrained agents)
+- Recommended: `x-markdown-tokens: 1250` (hint for token-constrained agents)
+- Recommended: `Content-Signal: search=yes, ai-input=yes, ai-train=no` or the site's chosen content-use policy
+
+**Cloudflare option:** Cloudflare Markdown for Agents can convert HTML origin responses to Markdown at the edge when enabled. It is useful when changing the origin is impractical. Prefer origin-served Markdown when you control the docs pipeline; use edge conversion for legacy or hosted sites. Cloudflare documents a 2 MB HTML-origin response limit and alternatives such as Workers AI `AI.toMarkdown()` and Browser Run Markdown extraction for other conversion needs.
 
 **Next.js middleware example:**
 
@@ -262,28 +282,35 @@ export const config = {
 **Template for AI-friendly robots.txt:**
 
 ```
-# Allow all AI training and search bots
-User-agent: GPTBot
-Disallow: /admin
-Disallow: /private
-
-User-agent: ClaudeBot
-Disallow: /admin
-Disallow: /private
-
-User-agent: Google-Extended
-Disallow: /admin
-Disallow: /private
-
-User-agent: OAI-SearchBot
-Disallow: /admin
-Disallow: /private
-
+# State the content-use policy before per-bot directives.
 User-agent: *
-Disallow: /admin
-Disallow: /*.json$
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /docs
 Allow: /llms.txt
 Allow: /llms-full.txt
+Disallow: /admin
+Disallow: /private
+
+# Allow retrieval/search bots to use public docs.
+User-agent: OAI-SearchBot
+Allow: /docs
+Disallow: /admin
+
+User-agent: Claude-SearchBot
+Allow: /docs
+Disallow: /admin
+
+# Block or restrict model-training bots according to product policy.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://example.com/sitemap.xml
 ```
 
 **Opt-out pattern:** To block all AI bots:
@@ -299,21 +326,53 @@ Disallow: /
 
 ---
 
+### Content Signals
+
+**Spec:** https://contentsignals.org
+
+Content Signals let a site declare what automated systems may do with content after access. Use them alongside `robots.txt`; they are not a replacement for crawl allow/block rules.
+
+Supported purposes:
+
+- `search` — building a search index and returning linked search results
+- `ai-input` — using content as query-time context, grounding, or RAG input
+- `ai-train` — training or fine-tuning models
+
+Recommended default for public developer docs:
+
+```
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+```
+
+Audit for consistency. A common bad state is `robots.txt` allowing retrieval bots while response headers or managed bot settings imply `ai-input=no`.
+
+---
+
 ### .well-known/ endpoints
+
+**API discovery:**
+
+- `/.well-known/api-catalog` — RFC 9727 API Catalog listing API specs, docs, and related endpoints
 
 **OAuth endpoints (standard):**
 
 - `/.well-known/oauth-authorization-server` — describes OAuth server capabilities (RFC 8414)
-- `/.well-known/oauth-protected-resource` — describes a resource server expecting OAuth tokens (MCP extension)
+- `/.well-known/oauth-protected-resource` — describes a protected resource expecting OAuth tokens (RFC 9728)
+
+**MCP discovery:**
+
+- `/.well-known/mcp/server-card.json` — MCP Server Card describing tools, transport, auth, and connection metadata
+- `/.well-known/mcp.json` — older/emerging MCP metadata path; treat as compatibility, not the only discovery path
 
 **Agent discovery endpoints:**
 
+- `/.well-known/agent-skills/index.json` — index of reusable Agent Skills available for this site or service
 - `/.well-known/agent.json` — A2A v1.0 RC agent card (canonical endpoint)
 - `/.well-known/agent-card.json` — alternative name (accepted by most tools)
 
-**MCP endpoints (emerging):**
+**Bot identity:**
 
-- `/.well-known/mcp.json` — MCP server metadata (not yet standardised; use with caution)
+- `/.well-known/http-message-signatures-directory` — public keys for Web Bot Auth signed requests
 
 **Deprecated (do not use):**
 
@@ -341,6 +400,105 @@ Disallow: /
 ```
 
 See https://a2a-protocol.org/latest/specification/ for full schema.
+
+---
+
+### API Catalog
+
+**Spec:** RFC 9727
+
+Publish `/.well-known/api-catalog` when a service has one or more public APIs. The catalog points agents to OpenAPI specs, docs, status pages, and related machine-readable assets without forcing them to scrape a developer portal.
+
+Minimal shape:
+
+```json
+{
+  "apis": [
+    {
+      "id": "public-rest-api",
+      "title": "Public REST API",
+      "description": "Create, read, and manage resources.",
+      "specification": "https://api.example.com/openapi.json",
+      "documentation": "https://example.com/docs/api",
+      "status": "https://status.example.com"
+    }
+  ]
+}
+```
+
+Also reference the catalog with an HTTP `Link` header when possible:
+
+```
+Link: </.well-known/api-catalog>; rel="api-catalog"
+```
+
+---
+
+### MCP Server Card
+
+Publish an MCP Server Card when the project exposes MCP over HTTP. It gives agents transport, tool, and auth metadata before they connect.
+
+Preferred path:
+
+```
+/.well-known/mcp/server-card.json
+```
+
+Minimal shape:
+
+```json
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+  "version": "1.0",
+  "serverInfo": {
+    "name": "docs-search",
+    "title": "Documentation Search",
+    "version": "1.0.0"
+  },
+  "description": "Search public documentation and retrieve canonical pages.",
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://example.com/mcp"
+  },
+  "authentication": {
+    "required": false
+  }
+}
+```
+
+If the project still uses `/.well-known/mcp.json`, keep it as a compatibility redirect or pointer, but do not rely on it as the only advertised metadata.
+
+---
+
+### Agent Skills index
+
+Publish an Agent Skills index when a site can teach agents how to complete domain-specific tasks. This is especially useful for docs sites and developer platforms where a generic model may know stale or partial patterns.
+
+Use the public Agent Skills format for linked skills: a folder containing `SKILL.md`, required `name` and `description` frontmatter, and optional `scripts/`, `references/`, and `assets/` directories. The discovery index is only the catalog; the full skill is loaded later through progressive disclosure.
+
+Preferred path:
+
+```
+/.well-known/agent-skills/index.json
+```
+
+Minimal shape:
+
+```json
+{
+  "skills": [
+    {
+      "id": "create-api-token",
+      "name": "Create API Token",
+      "description": "How to create a scoped API token for automation.",
+      "format": "agent-skill",
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+    }
+  ]
+}
+```
+
+Keep skills procedural and narrow. The index should point to skill documents, not inline every workflow. Prefer descriptions that include when to use the skill, not just what topic it covers.
 
 ---
 
@@ -415,8 +573,8 @@ export default function DocsPage({ slug, content }) {
 
 **Submission:** https://developers.openai.com/apps-sdk
 
-Built on MCP. Directory launched Dec 17 2025. Apps use MCP servers as transport layer for agent interaction. Complement your MCP server with:
-1. `/.well-known/mcp.json` (emerging standard)
+Built on MCP. Apps use MCP servers as transport layer for agent interaction. Complement your MCP server with:
+1. `/.well-known/mcp/server-card.json` and `/.well-known/mcp.json` only as a compatibility pointer when needed
 2. Clear AGENTS.md with OpenAI-specific notes
 3. OAuth 2.1 client credentials for agent authentication
 
@@ -431,6 +589,9 @@ Built on MCP. Directory launched Dec 17 2025. Apps use MCP servers as transport 
 - **Using deprecated `/.well-known/ai-plugin.json`.** Removed; replaced by OpenAI Apps SDK. Delete any implementations.
 - **llms-full.txt >30k tokens without pagination hints.** Add comment like `<!-- llms-full-page-2-of-3 -->` or split into sections.
 - **No robots.txt policy for AI bots.** Default is opt-in; explicit rules signal curation.
+- **Only publishing human docs for agent-facing APIs.** If a service has public APIs, publish an API Catalog and OpenAPI link.
+- **MCP endpoint hidden in prose.** If an MCP server exists, publish a Server Card or metadata under `.well-known`.
+- **Contradictory access signals.** Do not allow a bot in robots.txt while declaring `ai-input=no` for the same public docs.
 
 ---
 
@@ -444,6 +605,9 @@ Built on MCP. Directory launched Dec 17 2025. Apps use MCP servers as transport 
 - `/templates/json-ld-softwareapp.ts` — SoftwareApplication schema helper (Next.js)
 - `/templates/content-negotiation.ts` — markdown negotiation middleware (Next.js)
 - `/templates/agent-card.json` — A2A v1.0 RC card scaffold
+- `/templates/discovery/api-catalog.json` — RFC 9727 API catalog scaffold
+- `/templates/mcp-and-api/mcp-server-card.json` — MCP Server Card scaffold
+- `/templates/discovery/agent-skills-index.json` — Agent Skills discovery index
 
 **Tooling (verify currency):**
 - `llmstxt-generator` — CLI to build llms.txt from docs structure
@@ -465,6 +629,12 @@ Built on MCP. Directory launched Dec 17 2025. Apps use MCP servers as transport 
 - https://www.rfc-editor.org/rfc/rfc9457.html — Problem Details for HTTP APIs
 - https://developers.openai.com/apps-sdk — OpenAI Apps SDK (MCP-based)
 - https://docs.cloud.google.com/agent-builder/agent-engine/overview — Google Vertex AI Agent Engine discovery
+- https://blog.cloudflare.com/agent-readiness/ — Agent Readiness scoring model and measured standards
+- https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/ — Markdown for Agents and token hints
+- https://developers.cloudflare.com/ai-crawl-control/ — AI crawler visibility and access controls
+- https://contentsignals.org — Content Signals
+- https://www.rfc-editor.org/rfc/rfc9727.html — API Catalog
+- https://www.rfc-editor.org/rfc/rfc9728.html — OAuth 2.0 Protected Resource Metadata
 
 ---
 

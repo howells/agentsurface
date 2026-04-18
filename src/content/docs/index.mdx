@@ -1,73 +1,114 @@
 ---
-title: Introduction
-description: What is Agentify and why does it exist
+title: What is Agent Surface?
+description: A resource for making software legible to AI agents
 ---
 
-## Summary
+Agent Surface is a practical resource for designing software that AI agents can understand and use.
 
-Agentify is the comprehensive reference for making any codebase, API, or CLI optimally consumable by AI agents. Provides an 11-dimension scoring framework (0–3 per dimension, max 33 points) to evaluate agent-readiness, produces clustered findings, and enables systematic modernization via specialist agents. Use this when you need to understand or improve how AI agents consume your API, CLI, or codebase.
+The core idea is that agents do not interact with a product through one neat interface. They read repository instructions, follow documentation, call APIs, run CLIs, inspect schemas, use MCP tools, parse errors, retrieve context, and coordinate work across tools. Each of those contact points is a surface. If the surfaces are ambiguous, agents improvise. If the surfaces are explicit, agents can work reliably.
 
-- API Surface & OpenAPI quality
-- CLI Design with JSON output
-- MCP Servers & tool definitions
-- Discovery & agent endpoints (llms.txt, AGENTS.md)
-- Authentication (OAuth 2.1, API keys)
-- Error Handling (RFC 9457)
-- Tool Design & schema quality
-- Context Files (AGENTS.md, CLAUDE.md)
-- Multi-Agent Orchestration
-- Testing & Agent Evaluation
-- Data Retrievability & RAG
+Agent Surface exists to make those surfaces intentional.
 
----
+## The Story
 
-Agentify is the comprehensive reference for making any codebase, API, or CLI optimally consumable by AI agents.
+Most software was built for human operators. A person can scan a docs page, infer missing context, recover from vague errors, and ask another person what a field means.
 
-## The Problem
+Agents are less forgiving. They need contracts, schemas, examples, recovery paths, permission boundaries, and machine-readable context. They can be powerful when the system gives them clear handles. They become brittle when every step depends on guessing.
 
-Traditional software is built for humans. APIs have documentation sites with marketing copy. CLIs have `--help` text designed for human readers. Error messages assume a person will read them and figure out what to do.
+Agent Surface treats agent readiness as an engineering discipline:
 
-AI agents are different. They cannot ask clarifying questions. They cannot infer context from visual cues. They cannot "just figure it out." Everything that made APIs good for developers — specificity, consistent semantics, helpful errors — matters *exponentially more* when the consumer cannot compensate for ambiguity.
+1. Name the surfaces agents touch.
+2. Define what good looks like for each surface.
+3. Score a codebase against those expectations.
+4. Fix the highest-impact gaps first.
+5. Keep the surfaces current as the product changes.
 
-## The Solution
+## What This Includes
 
-Agentify provides a systematic framework for evaluating and transforming any codebase across eleven dimensions of agent-readiness:
+### Documentation
 
-1. **API Surface** — OpenAPI specs, tool definitions, schema design
-2. **CLI Design** — Structured output, schema introspection, input hardening
-3. **MCP Servers** — Model Context Protocol server implementation
-4. **Discovery & AEO** — llms.txt, AGENTS.md, structured data, content negotiation
-5. **Authentication** — OAuth 2.1, API keys, agent identity
-6. **Error Handling** — Structured errors, recovery hints, retry guidance
-7. **Tool Design** — Naming, descriptions, schemas, idempotency, cross-framework portability
-8. **Context Files** — AGENTS.md, CLAUDE.md, cursor rules, permission boundaries
-9. **Data Retrievability** — Vector embeddings, hybrid search, reranking, knowledge graphs, agentic RAG
-10. **Multi-Agent & Orchestration** — Agent delegation, supervisor patterns, state coordination
-11. **Testing & Evaluation** — Agent evaluation, tool routing accuracy, pass@k metrics
+The docs are the field guide. They explain the surfaces that matter:
 
-## Patterns & Cookbook
+- API surface and OpenAPI design
+- CLI design for automation
+- MCP servers and tool definitions
+- discovery files such as `AGENTS.md` and `llms.txt`
+- authentication for machine-to-machine access
+- structured errors and recovery hints
+- testing, evaluations, and observability
+- retrievability, RAG, and knowledge access
+- multi-agent orchestration patterns
+- protocol choices and tradeoffs
 
-Beyond the 11 dimensions, the **[Agentic Patterns Cookbook](/docs/cookbook)** distills 10 battle-tested patterns from production agentic SaaS:
+### Approaches
 
-1. Agentic Loop as Commodity
-2. Every CRUD as Tool + Annotations
-3. Semantic Tool Selection at Scale
-4. System Prompt as Configuration
-5. Platform-Agnostic Core + Adapters
-6. Notification-to-Conversation Continuity
-7. Two-Step Confirmation for Writes
-8. MCP as External API
-9. External-App Routing via Meta-Tools
-10. Autonomous Background Agents
+The approaches are the reusable patterns behind the docs. They cover how to make existing software agent-friendly without rebuilding it around an agent framework.
 
-These patterns are extracted from a real-world production application and are immediately applicable to SaaS agents, multi-platform bots, and orchestration systems.
+Examples include:
 
-## How to Use This Reference
+- publish machine-readable contracts before adding new orchestration
+- make CLIs predictable before making them conversational
+- design errors as recovery instructions
+- expose tools with narrow, typed, idempotent operations
+- separate human UX from agent-operable surfaces
+- measure readiness before transforming a codebase
 
-Browse the sidebar to explore each dimension. Each section includes:
-- **Principles** — why this dimension matters for agents
-- **Patterns** — concrete implementation patterns with code examples
-- **Scoring** — how to evaluate your codebase on this dimension
-- **Checklists** — actionable items to improve agent-readiness
+### The `agentify` Skill
 
-Then explore the **[Patterns & Cookbook](/docs/cookbook)** for transferable, production-ready patterns.
+`agentify` is the operational part of Agent Surface. It audits a codebase across 11 dimensions, scores each one from `0` to `3`, and produces evidence-backed findings.
+
+The dimensions are:
+
+1. API Surface
+2. CLI Design
+3. MCP Server
+4. Discovery and AEO
+5. Authentication
+6. Error Handling
+7. Tool Design
+8. Context Files
+9. Data Retrievability
+10. Multi-Agent and Orchestration
+11. Testing and Evaluation
+
+The skill can stop at a scorecard, produce a transformation plan, or delegate focused improvements to specialist agents.
+
+### The `agents` Skill
+
+`agents` is the scaffolding part of Agent Surface. It helps create and update agent systems: agents, tools, workflows, memory, model routing, browser access, and sandboxed execution.
+
+The skill is project-aware. It recommends Mastra for most TypeScript agent infrastructure, but adapts when a repo already uses the AI SDK, MCP, LangGraph, or Cloudflare Workers.
+
+### Resources
+
+The repo also carries reusable resources:
+
+- templates for discovery, auth, MCP, errors, evals, and orchestration
+- specialist agent prompts for targeted codebase improvements
+- scoring rubrics and calibration guidance
+- a reference index for canonical standards, specs, and official docs
+- a tooling catalog for respected AI and agent infrastructure
+- cookbook patterns for production agent systems
+
+## How to Use It
+
+Use the documentation when you are designing an agent-facing surface.
+
+Use the scoring rubric when you need to compare projects or prioritize work.
+
+Use `agentify` when you want an evidence-backed audit and a concrete transformation plan.
+
+Use `agents` when you want to create or update agent infrastructure in the shape of the existing project.
+
+Use the templates when you are implementing a specific surface and want a starting point that is already shaped for agents.
+
+## Where to Start
+
+- [Getting Started](/docs/getting-started) for a quick assessment
+- [Reference Links](/docs/reference-links) for canonical standards, specs, and official docs
+- [Agents Skill](/docs/agents) for scaffolding and updating agent systems
+- [Scoring](/docs/scoring) for the readiness model
+- [API Surface](/docs/api-surface) for machine-readable API design
+- [CLI Design](/docs/cli-design) for automation-friendly commands
+- [MCP Servers](/docs/mcp-servers) for tool exposure
+- [Tooling Catalog](/docs/tooling-catalog) for the broader AI tooling landscape

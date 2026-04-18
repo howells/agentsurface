@@ -1,0 +1,107 @@
+---
+title: Agent Skills
+description: Packaging reusable agent instructions, scripts, references, and assets.
+---
+
+Agent Skills are portable capability folders for agents. A skill teaches an agent how to do a specific task without putting every instruction into the base prompt.
+
+Use Agent Skills when a workflow is repeatable, procedural, and specific enough that a general docs page is not enough. Good skills are narrow: "create a scoped API token", "run the design review workflow", "prepare a migration PR". They are not broad knowledge dumps.
+
+## Folder Shape
+
+A portable skill is a folder with a `SKILL.md` entrypoint:
+
+```text
+create-api-token/
+├── SKILL.md
+├── references/
+│   └── scopes.md
+├── scripts/
+│   └── validate-token.ts
+└── assets/
+    └── token-flow.png
+```
+
+`SKILL.md` carries metadata and the primary instructions:
+
+```markdown
+---
+name: create-api-token
+description: Use when an agent needs to create a scoped API token for automation.
+---
+
+# Create API Token
+
+## Steps
+
+1. Read `references/scopes.md`.
+2. Ask for the minimum required scope.
+3. Create the token through the settings API.
+4. Run `scripts/validate-token.ts` before returning it to the caller.
+
+## Safety
+
+- Never create admin-scoped tokens unless explicitly requested.
+- Never print token values into logs.
+```
+
+The `name` and `description` fields are the minimum portable metadata. Add scripts, references, and assets only when they help the agent perform the task correctly.
+
+## Progressive Disclosure
+
+Skills work because agents can index a lightweight catalog first, then load the full skill only when needed.
+
+That means descriptions matter. Write them as routing instructions:
+
+| Weak | Better |
+|---|---|
+| API tokens | Use when an agent needs to create, validate, or rotate scoped API tokens for automation. |
+| Design review | Use when reviewing a rendered web page for visual, responsive, and interaction issues. |
+| Migration | Use when preparing a database migration PR with schema diff, rollback notes, and verification steps. |
+
+Do not inline every workflow into a catalog file. Point to the skill and let the agent load details only when the task calls for it.
+
+## Publishing Skills
+
+For public sites, expose a skill index:
+
+```json
+{
+  "skills": [
+    {
+      "id": "create-api-token",
+      "name": "Create API Token",
+      "description": "Use when an agent needs to create a scoped API token for automation.",
+      "format": "agent-skill",
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+    }
+  ]
+}
+```
+
+Publish it at:
+
+```text
+/.well-known/agent-skills/index.json
+```
+
+Only publish skills that are real, reviewed, and kept current with the product.
+
+## Skills Vs Other Files
+
+| File | Role |
+|---|---|
+| `AGENTS.md` | Repository-level operating instructions for coding agents. |
+| `llms.txt` | Site/docs index for retrieval. |
+| `SKILL.md` | Task-specific instructions, scripts, references, and assets. |
+| MCP server card | Connection metadata for a tool server. |
+| OpenAPI | HTTP API contract. |
+
+Skills complement MCP. MCP exposes callable tools; skills teach an agent when and how to use a workflow.
+
+## Related
+
+- [Reference Links](/docs/reference-links)
+- [Well-Known Endpoints](/docs/discovery/well-known-endpoints)
+- [Agent Knowledge Packaging](/docs/cli-design/agent-knowledge-packaging)
+- [Context Files](/docs/context-files)

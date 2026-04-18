@@ -1,0 +1,95 @@
+---
+title: Cloudflare-Native Agent Stack
+description: When to scaffold agents on Workers, Durable Objects, AI Gateway, Browser Run, Sandbox, and Cloudflare retrieval services.
+---
+
+## Summary
+
+Use a Cloudflare-native agent stack when the agent should live at the edge, maintain per-user or per-entity state, respond over WebSockets, run on schedules, browse the web, execute code in isolation, or route model traffic through a governed gateway.
+
+This is not the default for every TypeScript app. For most application-local agents, Mastra or the AI SDK are still simpler. Choose the Cloudflare path when the runtime itself is part of the product.
+
+## Capability Map
+
+| Need | Cloudflare Surface | Use It When |
+|------|--------------------|-------------|
+| Stateful agent runtime | Cloudflare Agents + Durable Objects | Each user, tenant, project, room, or persona needs a long-lived agent identity. |
+| Model governance | AI Gateway | You need provider routing, logging, caching, rate controls, or central policy. |
+| Edge inference | Workers AI | The agent already runs in Workers and low-latency platform inference matters. |
+| Long-term memory | Agent Memory, Vectorize, AI Search, AutoRAG | The agent needs durable recall or retrieval over docs, product data, or conversation history. |
+| Browser access | Browser Run | The agent needs a remote browser from a Workers-native environment. |
+| Code execution | Sandbox SDK | The agent needs isolated execution without running untrusted code in the app process. |
+| Background work | Cron Triggers, Queues, Workflows | The agent needs scheduled checks, fan-out, retries, or durable asynchronous steps. |
+
+## Scaffolding Rules
+
+Detect the runtime before choosing a framework:
+
+- `wrangler.toml`, `wrangler.json`, `worker-configuration.d.ts`, Durable Object bindings, or the `agents` package indicate a Workers-native target.
+- `@mastra/core`, `src/mastra`, or `packages/agents` indicate a Mastra target.
+- `ai`, `@ai-sdk/*`, and app-router routes indicate an AI SDK application target.
+- `@modelcontextprotocol/sdk` indicates a tool/API exposure target.
+
+For Workers-native agents, scaffold around bindings instead of Node APIs:
+
+```typescript
+export interface Env {
+  AI: Ai;
+  AGENT: DurableObjectNamespace;
+  VECTORIZE_INDEX: VectorizeIndex;
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    const id = env.AGENT.idFromName("agent:default");
+    return env.AGENT.get(id).fetch(request);
+  },
+};
+```
+
+Avoid `fs`, `child_process`, local Playwright browsers, or process-global state in Workers scaffolding.
+
+## Memory Choices
+
+Use Durable Objects for identity and active session state. Add retrieval when the agent needs knowledge beyond the current session:
+
+| Memory Need | Use |
+|-------------|-----|
+| Current agent state | Durable Object storage |
+| Conversation or entity recall | Agent Memory, if available to the project |
+| Documentation or product corpus | AI Search, AutoRAG, or Vectorize |
+| Existing app database recall | Postgres + pgvector, or the app's current vector store |
+
+Keep user, tenant, project, and entity identifiers server-derived. Never let a model choose the memory resource key.
+
+## Browser And Sandbox Tools
+
+Browser and sandbox tools should be scaffolded as privileged tools:
+
+- domain and action allowlists
+- timeouts and token/resource budgets
+- audit logs for every run
+- output truncation and artifact capture
+- confirmation gates for writes, purchases, account changes, or destructive operations
+- no production secrets inside sandbox sessions
+
+Treat browser page text and sandbox output as untrusted input. Sanitize and summarize before returning it to the model.
+
+## When Not To Use This Stack
+
+Do not force Cloudflare-native scaffolding when:
+
+- the agent only runs inside a Next.js API route
+- existing Mastra conventions are already present and working
+- the project needs Node-only packages
+- local filesystem or child-process access is central to the agent
+- the main need is MCP exposure rather than a stateful edge runtime
+
+In those cases, use Mastra or AI SDK scaffolding and keep Cloudflare surfaces as optional deployment, gateway, or storage choices.
+
+## Related
+
+- [Autonomous Background Agents](/docs/cookbook/autonomous-background-agents)
+- [MCP as External API](/docs/cookbook/mcp-as-external-api)
+- [Memory Patterns](/docs/multi-agent/memory-patterns)
+- [Tooling Catalog](/docs/tooling-catalog)
