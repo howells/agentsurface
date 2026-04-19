@@ -280,7 +280,7 @@ Cite Simon Willison + [arxiv 2506.08837](https://arxiv.org/abs/2506.08837) on de
 
 ## Templates and tooling
 
-See `/templates/` in the agentify skill:
+See `/templates/` in the surface skill:
 
 - `/templates/eval-braintrust.ts` — Braintrust dataset + eval harness
 - `/templates/eval-promptfoo.yaml` — red-team suite with prompt injection attacks

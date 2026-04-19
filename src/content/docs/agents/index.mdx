@@ -1,9 +1,9 @@
 ---
-title: Agents Skill
-description: How the agents skill scaffolds and updates production agent systems.
+title: Agent Scaffolding
+description: How the surface skill scaffolds and updates production agent systems.
 ---
 
-The `agents` skill creates and updates agent infrastructure. Use it when you need an agent, tool, workflow, memory layer, model router, browser tool, sandbox tool, or framework-specific agent wiring.
+The `surface` skill creates and updates agent infrastructure when used in scaffold mode. Use it when you need an agent, tool, workflow, memory layer, model router, browser tool, sandbox tool, or framework-specific agent wiring.
 
 It is not a generic code generator. It reads the project first, detects the existing runtime, then follows the conventions already present.
 
@@ -11,14 +11,14 @@ It is not a generic code generator. It reads the project first, detects the exis
 
 | Mode | Output | Use When |
 |---|---|---|
-| `/agents init` | Agent directory structure, central registry, exports | A project has no agent infrastructure yet. |
-| `/agents agent <name>` | Agent definition, instructions, registration, tool stubs | You need a new agent with clear purpose and tools. |
-| `/agents tool <name>` | Typed tool with Zod schemas, safety hints, exports | An agent needs a new capability. |
-| `/agents workflow <name>` | Workflow steps, state schemas, trigger function | Work is multi-step, async, resumable, or stateful. |
-| `/agents memory` | Memory configuration and usage pattern | Agents need conversation, entity, or semantic recall. |
-| `/agents model` | Provider and gateway routing | You need model choice behind a stable app API. |
-| `/agents browser` | Browser-access tool wrapper | Agents need web browsing, extraction, screenshots, or GUI access. |
-| `/agents sandbox` | Isolated execution tool wrapper | Agents need to run generated or untrusted code. |
+| `/surface init` | Agent directory structure, central registry, exports | A project has no agent infrastructure yet. |
+| `/surface agent <name>` | Agent definition, instructions, registration, tool stubs | You need a new agent with clear purpose and tools. |
+| `/surface tool <name>` | Typed tool with Zod schemas, safety hints, exports | An agent needs a new capability. |
+| `/surface workflow <name>` | Workflow steps, state schemas, trigger function | Work is multi-step, async, resumable, or stateful. |
+| `/surface memory` | Memory configuration and usage pattern | Agents need conversation, entity, or semantic recall. |
+| `/surface model` | Provider and gateway routing | You need model choice behind a stable app API. |
+| `/surface browser` | Browser-access tool wrapper | Agents need web browsing, extraction, screenshots, or GUI access. |
+| `/surface sandbox` | Isolated execution tool wrapper | Agents need to run generated or untrusted code. |
 
 ## Runtime Decision Tree
 

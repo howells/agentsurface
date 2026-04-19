@@ -1,6 +1,6 @@
 ---
 title: Scorecard Format
-description: JSON schema and TypeScript Zod schema for agentify scorecards
+description: JSON schema and TypeScript Zod schema for scorecards
 ---
 
 ## Summary
@@ -129,7 +129,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
     "description": "Customer-facing REST API for SaaS platform"
   },
   "date": "2026-04-17T15:30:00Z",
-  "auditor": "agentify-cli@1.2.0",
+  "auditor": "surface@1.2.0",
   "dimensions": [
     {
       "name": "api-surface",
@@ -493,13 +493,13 @@ function findHighSeverityIssues(scorecard: Scorecard): Finding[] {
 Scorecards are stored in the audited project:
 
 ```
-docs/agentify/scorecard-[YYYY-MM-DD].json  # Versioned snapshots
-docs/agentify/scorecard-latest.json        # Current snapshot (symlink or copy)
-docs/agentify/history.md                   # Human-readable changelog
+docs/surface/scorecard-[YYYY-MM-DD].json  # Versioned snapshots
+docs/surface/scorecard-latest.json        # Current snapshot (symlink or copy)
+docs/surface/history.md                   # Human-readable changelog
 ```
 
 Store version history in git so you can track trends over time:
 
 ```bash
-git log docs/agentify/scorecard-*.json
+git log docs/surface/scorecard-*.json
 ```

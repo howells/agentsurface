@@ -1,16 +1,16 @@
 {
-  "name": "agentify",
-  "version": "1.0.0",
-  "description": "Audit and transform any codebase to be maximally consumable by AI agents. Scores across 11 dimensions, produces findings reports, and executes transformation plans via specialist sub-agents.",
+  "name": "surface",
+  "version": "2.0.0",
+  "description": "Make software legible to agents. One skill that routes to the right workflow: audit agent readiness, scaffold agent infrastructure, generate MCP servers, write context files, or fix specific gaps.",
   "skills": "../skills/",
   "author": {
     "name": "Daniel Howells"
   },
   "license": "MIT",
-  "homepage": "https://github.com/howells/agentify",
+  "homepage": "https://github.com/howells/agentsurface",
   "repository": {
     "type": "git",
-    "url": "https://github.com/howells/agentify.git"
+    "url": "https://github.com/howells/agentsurface.git"
   },
   "keywords": [
     "agentic",
@@ -20,12 +20,16 @@
     "agent-dx",
     "audit",
     "transformation",
+    "scaffolding",
     "llms-txt",
     "agents-md",
     "aeo",
     "data-retrievability",
-    "vectors",
-    "rag",
+    "mastra",
+    "tools",
+    "workflows",
+    "ai-sdk",
+    "memory",
     "codex-compatible"
   ]
 }

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to agentify are documented in this file.
+All notable changes to Agent Surface are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
@@ -66,11 +66,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - A2A v1.0 RC alignment
 
 - **Core Libraries** (`/packages/`):
-  - `@agentify/eval`: Pass@k evaluation harness, RAGAS metrics, golden-set tracking
-  - `@agentify/tools`: Tool validator (Zod schemas, error codes, idempotency checks)
-  - `@agentify/orchestrate`: Queue adapters (BullMQ, Trigger.dev), workflow definitions
-  - `@agentify/retrieve`: Hybrid search client, chunking utilities, reranking
-  - `@agentify/observe`: Structured logging, OpenTelemetry integration, Sentry bridges
+  - `@surface/eval`: Pass@k evaluation harness, RAGAS metrics, golden-set tracking
+  - `@surface/tools`: Tool validator (Zod schemas, error codes, idempotency checks)
+  - `@surface/orchestrate`: Queue adapters (BullMQ, Trigger.dev), workflow definitions
+  - `@surface/retrieve`: Hybrid search client, chunking utilities, reranking
+  - `@surface/observe`: Structured logging, OpenTelemetry integration, Sentry bridges
 
 - **8+10 Specialist Sub-Agents**:
   - 8 core agents: invoice-approver, transaction-categorizer, reconciler, support-classifier, data-synthesizer, tax-calculator, audit-logger, notification-router
@@ -82,7 +82,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Local dev server (bun run dev)
   - Project structure overview
 
-- **CLI (`/agentify` slash command)**:
+- **CLI (`/surface` slash command)**:
   - `design`: Generate multi-agent architecture
   - `evaluate`: Run pass@k evaluation on agents
   - `optimize`: Cost and latency optimization suggestions

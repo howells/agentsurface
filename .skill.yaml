@@ -3,26 +3,26 @@
 # Not yet standardized, but future-proofs for emerging package managers.
 #
 # Status: This manifest is supplementary. The canonical entry point is
-# skills/agentify/SKILL.md (Claude Code) and AGENTS.md (Codex, generic agents).
+# skills/surface/SKILL.md (Claude Code) and AGENTS.md (Codex, generic agents).
 
-name: agentify
-version: 1.0.0
+name: surface
+version: 2.0.0
 license: MIT
 
 description: |
-  Audit and transform any codebase for AI agent consumability. Scores across
-  11 dimensions, produces findings reports, and executes transformation plans
-  via specialist sub-agents.
+  Make software legible to agents. One skill that routes to the right workflow:
+  audit agent readiness, scaffold agent infrastructure, generate MCP servers,
+  write context files, or fix specific gaps.
 
-entry-point: ./skills/agentify/SKILL.md
+entry-point: ./skills/surface/SKILL.md
 
 author:
   name: Daniel Howells
 
-homepage: https://github.com/howells/agentify
+homepage: https://github.com/howells/agentsurface
 repository:
   type: git
-  url: https://github.com/howells/agentify.git
+  url: https://github.com/howells/agentsurface.git
 
 keywords:
   - agentic
@@ -32,12 +32,18 @@ keywords:
   - agent-dx
   - audit
   - transformation
+  - scaffolding
   - llms-txt
   - agents-md
   - aeo
   - data-retrievability
   - vectors
   - rag
+  - mastra
+  - tools
+  - workflows
+  - ai-sdk
+  - memory
 
 compatibility:
   - claude-code >= 1.0.0
@@ -61,6 +67,6 @@ specialist-agents:
 
 # Distribution URLs (for future registry lookup)
 distribution:
-  npm: "@anthropic/agentify"  # Not yet on npm, planned
-  github: "https://github.com/howells/agentify/releases"
-  claude-code-plugin: "agentify"
+  npm: "@anthropic/surface"  # Not yet on npm, planned
+  github: "https://github.com/howells/agentsurface/releases"
+  claude-code-plugin: "surface"

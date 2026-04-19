@@ -194,7 +194,7 @@ Enable agents to authenticate without human intervention or browser interaction.
 - DPoP (RFC 9449): https://tools.ietf.org/html/rfc9449
 - Token Exchange (RFC 8693): https://tools.ietf.org/html/rfc8693
 - Protected Resource Metadata (RFC 9728): https://tools.ietf.org/html/rfc9728
-- MCP Auth Model: `/skills/agentify/references/mcp-auth-model.md`
+- MCP Auth Model: `/skills/surface/references/mcp-auth-model.md`
 
 ## Style Rules
 

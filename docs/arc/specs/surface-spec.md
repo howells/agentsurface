@@ -1,4 +1,4 @@
-# Agentify Skill Specification
+# Surface Skill Specification
 
 **Author:** Daniel Howells
 **Date:** 2026-04-17
@@ -9,9 +9,9 @@
 
 ## 1. Vision
 
-The `/agentify` skill takes any codebase and makes it maximally consumable by AI agents.
+The `/surface` skill takes any codebase and makes it maximally consumable by AI agents.
 
-Most software today is built for humans. Agents interact with it through scraping, prompt engineering, and brittle heuristics. Agentify measures how well a codebase supports agent consumption across 11 dimensions, scores each one on a 0-3 rubric, produces a detailed findings report, and can execute a transformation plan to close the gaps.
+Most software today is built for humans. Agents interact with it through scraping, prompt engineering, and brittle heuristics. Surface measures how well a codebase supports agent consumption across 11 dimensions, scores each one on a 0-3 rubric, produces a detailed findings report, and can execute a transformation plan to close the gaps.
 
 The skill is the operational counterpart to the Agent Surface documentation site. The docs site is the field guide. The skill is the audit tool. Every finding links back to a docs page. Every transformation follows a documented pattern.
 
@@ -417,7 +417,7 @@ Score each applicable dimension using the rubrics defined in Section 2. This pha
 **Produce a scorecard:**
 
 ```markdown
-## Agentify Scorecard
+## Surface Scorecard
 
 | # | Dimension | Score | Rating | Confidence | Key Signal |
 |---|-----------|-------|--------|------------|------------|
@@ -500,7 +500,7 @@ Generated only when the user requests it after reviewing the findings report. Th
 **Plan structure:**
 
 ```markdown
-# Agentify Transformation Plan
+# Surface Transformation Plan
 
 **Project:** [name]
 **Current score:** [X / Y] ([Z]%) — [rating]
@@ -719,7 +719,7 @@ Each transformation type has a specialized sub-agent. Sub-agents receive the tas
 
 ```
 skills/
-  agentify/
+  surface/
     SKILL.md                    # Orchestration instructions (~300 lines)
     references/
       api-surface.md            # Detailed patterns for Dimension 1
@@ -760,13 +760,13 @@ skills/
 
 ```yaml
 ---
-name: agentify
+name: surface
 context: fork
 description: |
   Audit any codebase for AI agent consumability and transform it to be agent-first.
   Scores 11 dimensions on a 0-3 rubric, produces a findings report, and executes
   a transformation plan with specialized sub-agents.
-  Use when asked to "agentify this codebase", "make this agent-ready",
+  Use when asked to "surface this codebase", "make this agent-ready",
   "audit for agent support", "agent DX audit", or "how agent-friendly is this".
 license: MIT
 argument-hint: "[audit|score|plan|transform] [--dimension=<name>] [--format=json|markdown]"
@@ -779,13 +779,13 @@ metadata:
 
 | Command | Mode | What Happens |
 |---------|------|-------------|
-| `/agentify` | Full audit | Run all phases 0-2. Produce scorecard + findings report. |
-| `/agentify score` | Scorecard only | Run phases 0-1. Produce scorecard without detailed findings. |
-| `/agentify audit` | Same as full audit | Alias for the default mode. |
-| `/agentify plan` | Plan mode | Requires a prior audit. Generate transformation plan from findings. |
-| `/agentify transform` | Execution mode | Requires a prior plan. Execute transformation tasks with sub-agents. |
-| `/agentify --dimension=mcp` | Focused audit | Audit only the specified dimension in depth. |
-| `/agentify --format=json` | JSON output | Produce scorecard and findings as JSON (for programmatic consumption). |
+| `/surface` | Full audit | Run all phases 0-2. Produce scorecard + findings report. |
+| `/surface score` | Scorecard only | Run phases 0-1. Produce scorecard without detailed findings. |
+| `/surface audit` | Same as full audit | Alias for the default mode. |
+| `/surface plan` | Plan mode | Requires a prior audit. Generate transformation plan from findings. |
+| `/surface transform` | Execution mode | Requires a prior plan. Execute transformation tasks with sub-agents. |
+| `/surface --dimension=mcp` | Focused audit | Audit only the specified dimension in depth. |
+| `/surface --format=json` | JSON output | Produce scorecard and findings as JSON (for programmatic consumption). |
 
 ### Reference Loading Strategy
 
@@ -816,7 +816,7 @@ The skill adapts to the hosting platform's capabilities:
 
 ### Audit Report
 
-**Path:** `docs/agentify/audit-YYYY-MM-DD.md`
+**Path:** `docs/surface/audit-YYYY-MM-DD.md`
 
 Contains:
 - Project profile (stack, structure, existing surfaces)
@@ -827,12 +827,12 @@ Contains:
 
 ### Scorecard
 
-**Path:** `docs/agentify/scorecard.md`
+**Path:** `docs/surface/scorecard.md`
 
-A living document that tracks the project's agentify score over time. Updated on each audit run with a new entry.
+A living document that tracks the project's surface score over time. Updated on each audit run with a new entry.
 
 ```markdown
-# Agentify Scorecard
+# Surface Scorecard
 
 ## Latest: [date] — [score]/[max] ([percentage]%) — [rating]
 
@@ -853,7 +853,7 @@ The scorecard is designed to be committed to version control and tracked over ti
 
 ### Transformation Plan
 
-**Path:** `docs/agentify/plan.md`
+**Path:** `docs/surface/plan.md`
 
 Generated in Phase 3. Contains ordered tasks with file-level specificity. See Section 4, Phase 3 for format.
 
@@ -902,8 +902,8 @@ The findings report notes which language/surface is pulling the score down.
 
 For monorepos, the skill can audit:
 - The entire monorepo (default)
-- A specific package (`/agentify packages/api`)
-- A specific app (`/agentify apps/web`)
+- A specific package (`/surface packages/api`)
+- A specific app (`/surface apps/web`)
 
 When auditing the full monorepo, each package/app gets its own dimension scores. The top-level score is the weighted average (by number of applicable dimensions per package).
 
@@ -943,7 +943,7 @@ The skill is complete and correct when:
 - [ ] All findings link to Agent Surface docs pages
 - [ ] The skill works on projects in any supported language (TypeScript, Python, Go, Rust at minimum)
 - [ ] N/A dimensions are correctly identified and excluded from scoring
-- [ ] The skill can audit itself (meta-test: run `/agentify` on the Agent Surface project)
+- [ ] The skill can audit itself (meta-test: run `/surface` on the Agent Surface project)
 
 ---
 
@@ -952,16 +952,16 @@ The skill is complete and correct when:
 These are not in scope for v1 but are noted for future design.
 
 ### CI Integration
-A GitHub Action or CI step that runs `/agentify score` on every PR and posts the scorecard as a PR comment. Score regressions block merge.
+A GitHub Action or CI step that runs `/surface score` on every PR and posts the scorecard as a PR comment. Score regressions block merge.
 
 ### Badge Generation
 Generate a shield.io-style badge (`Agent Score: 22/30 — Agent-ready`) for README files.
 
 ### Public Leaderboard
-An optional registry where projects can publish their agentify scores. Creates competitive pressure toward agent-first design.
+An optional registry where projects can publish their surface scores. Creates competitive pressure toward agent-first design.
 
 ### Dimension Plugins
 Allow third parties to define new dimensions with scoring rubrics. The skill would load dimension plugins and incorporate them into the audit.
 
 ### Cross-Project Comparison
-Compare agentify scores across multiple projects in a portfolio. Identify which projects are lagging and which patterns could be shared.
+Compare surface scores across multiple projects in a portfolio. Identify which projects are lagging and which patterns could be shared.

@@ -142,7 +142,7 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
 - POSIX Exit Codes: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_08_02
 - NDJSON: http://ndjson.org/
 - NO_COLOR: https://no-color.org/
-- Path Traversal Prevention: `/skills/agentify/references/input-validation.md`
+- Path Traversal Prevention: `/skills/surface/references/input-validation.md`
 
 ## Style Rules
 

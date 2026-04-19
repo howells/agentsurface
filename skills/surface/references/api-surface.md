@@ -623,7 +623,7 @@ Export OpenAPI-derived schemas to Gemini using `zod-to-json-schema` (or equivale
 
 ### Shipped templates in the plugin
 
-The agentify plugin includes these template files under `/templates`:
+The surface skill includes these template files under `/templates`:
 
 - **`openapi-skeleton.yaml`** — Minimal valid OpenAPI 3.1 spec with common patterns (pagination, errors, enums)
 - **`arazzo-workflow.yaml`** — Example multi-step workflow for a common pattern (create, validate, notify)

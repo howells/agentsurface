@@ -53,11 +53,11 @@ Examples include:
 - separate human UX from agent-operable surfaces
 - measure readiness before transforming a codebase
 
-### The `agentify` Skill
+### The `surface` Skill
 
-`agentify` is the operational part of Agent Surface. It audits a codebase across 11 dimensions, scores each one from `0` to `3`, and produces evidence-backed findings.
+`surface` is the operational part of Agent Surface. It reads your project and routes to the right workflow — auditing, scoring, scaffolding, or transforming.
 
-The dimensions are:
+In audit mode, it scores a codebase across 11 dimensions, each rated `0` to `3`, and produces evidence-backed findings:
 
 1. API Surface
 2. CLI Design
@@ -71,13 +71,7 @@ The dimensions are:
 10. Multi-Agent and Orchestration
 11. Testing and Evaluation
 
-The skill can stop at a scorecard, produce a transformation plan, or delegate focused improvements to specialist agents.
-
-### The `agents` Skill
-
-`agents` is the scaffolding part of Agent Surface. It helps create and update agent systems: agents, tools, workflows, memory, model routing, browser access, and sandboxed execution.
-
-The skill is project-aware. It recommends Mastra for most TypeScript agent infrastructure, but adapts when a repo already uses the AI SDK, MCP, LangGraph, or Cloudflare Workers.
+It can stop at a scorecard, produce a transformation plan, delegate focused improvements to specialist agents, or scaffold new agent infrastructure shaped to the existing project.
 
 ### Resources
 
@@ -96,9 +90,7 @@ Use the documentation when you are designing an agent-facing surface.
 
 Use the scoring rubric when you need to compare projects or prioritize work.
 
-Use `agentify` when you want an evidence-backed audit and a concrete transformation plan.
-
-Use `agents` when you want to create or update agent infrastructure in the shape of the existing project.
+Use `surface` when you want an evidence-backed audit, a concrete transformation plan, or to scaffold and update agent infrastructure in the shape of the existing project.
 
 Use the templates when you are implementing a specific surface and want a starting point that is already shaped for agents.
 
@@ -106,7 +98,6 @@ Use the templates when you are implementing a specific surface and want a starti
 
 - [Getting Started](/docs/getting-started) for a quick assessment
 - [Reference Links](/docs/reference-links) for canonical standards, specs, and official docs
-- [Agents Skill](/docs/agents) for scaffolding and updating agent systems
 - [Scoring](/docs/scoring) for the readiness model
 - [API Surface](/docs/api-surface) for machine-readable API design
 - [CLI Design](/docs/cli-design) for automation-friendly commands

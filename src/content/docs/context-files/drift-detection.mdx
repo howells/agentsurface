@@ -5,7 +5,7 @@ description: Keeping context files current through CI checks and automated audit
 
 ## Summary
 
-Context files go stale as code evolves: commands removed, directories moved, tech stack upgraded, permissions changed. Agents following outdated files fail silently. Detect drift via CI checks: run all commands in AGENTS.md to verify they exist and succeed, verify referenced directories exist, grep tech stack to confirm current versions, compare permission boundaries to actual code. Run automated audits (agentify score --dimension=context) monthly or quarterly. Add lint rules for AGENTS.md format consistency. Version control changes with git history indicating maintenance.
+Context files go stale as code evolves: commands removed, directories moved, tech stack upgraded, permissions changed. Agents following outdated files fail silently. Detect drift via CI checks: run all commands in AGENTS.md to verify they exist and succeed, verify referenced directories exist, grep tech stack to confirm current versions, compare permission boundaries to actual code. Run automated audits (surface score --dimension=context) monthly or quarterly. Add lint rules for AGENTS.md format consistency. Version control changes with git history indicating maintenance.
 
 - **Stale commands**: pnpm dev removed from package.json
 - **Deleted directories**: src/components moved to packages/web/components
@@ -176,11 +176,11 @@ echo "✓ AGENTS.md structure valid"
 
 ### Automated: Tool Integration
 
-Use `agentify` CLI to audit context files:
+Use the `surface` skill to audit context files:
 
 ```bash
 # Command-line audit
-agentify score --dimension=context
+surface score --dimension=context
 
 # Outputs:
 # context-files dimension:
@@ -207,8 +207,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm install -g agentify
-      - run: agentify score --dimension=context --fail-below 2
+      - run: npm install -g agentsurface
+      - run: surface score --dimension=context --fail-below 2
 ```
 
 This CI gate fails if context files score `` `<2` `` (poor).
@@ -346,10 +346,10 @@ jobs:
       - name: Check structure
         run: bash scripts/validate-agents-content.sh
       
-      - name: Run agentify audit
+      - name: Run surface audit
         run: |
-          npm install -g agentify
-          agentify score --dimension=context --fail-below 2
+          npm install -g agentsurface
+          surface score --dimension=context --fail-below 2
 ```
 
 Blocks merge if validation fails.

@@ -181,7 +181,7 @@ Multi-agent workflows must be observable: which agent did what, when, with what 
 
 Multi-agent workflows are harder to test than single agents: non-determinism multiplies, state branching explodes, and failure modes are subtle.
 
-**Multi-step flow evals (agentify Dimension 10):**
+**Multi-step flow evals (Dimension 10):**
 - Define success criteria upfront: "Orchestrator correctly delegates to 3 agents" + "agents return summaries <500 tokens" + "final output correct".
 - `pass@k`: run N times, measure success rate. Example: "pass@3" = succeeded in at least 1 of 3 runs.
 - `pass^k` (rare): *all* N runs succeeded (strict, but useful for critical ops).

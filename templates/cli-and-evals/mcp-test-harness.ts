@@ -4,7 +4,7 @@
  * **What it is:** Vitest-based harness that spawns any MCP server (stdio or HTTP),
  * enumerates tools via `tools/list`, synthesizes valid inputs (via Zod + fast-check),
  * and asserts schema conformance + latency. Useful for auditing an MCP during
- * `agentify --dimension=mcp`.
+ * `surface --dimension=mcp`.
  *
  * **When to use:**
  * - Testing an MCP server before integrating with agents

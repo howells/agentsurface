@@ -1,6 +1,6 @@
 # House Style Reference
 
-Based on a surveyed production codebase, this document codifies the stack, conventions, and idioms for agentify development. Use this as the canonical reference when building agents, tools, and supporting libraries.
+Based on a surveyed production codebase, this document codifies the stack, conventions, and idioms for surface skill development. Use this as the canonical reference when building agents, tools, and supporting libraries.
 
 ---
 

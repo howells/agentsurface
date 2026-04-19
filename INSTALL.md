@@ -1,11 +1,10 @@
 # Installation Guide
 
-Install the Agent Surface skills for Claude Code, Codex CLI, or generic agent runtimes.
+Install the Agent Surface skill for Claude Code, Codex CLI, or generic agent runtimes.
 
-Agent Surface currently ships two local skills:
+Agent Surface ships a single local skill:
 
-- `agentify` - audit and transform codebases for AI agent consumption
-- `agents` - scaffold and update agent systems, tools, workflows, memory, and model routing
+- `surface` - audit, transform, scaffold, and manage AI agent systems, tools, workflows, memory, and model routing
 
 ## Claude Code (Recommended)
 
@@ -16,36 +15,34 @@ In Claude Code, type:
 /plugin install agentsurface
 ```
 
-This installs the Agent Surface plugin from the Claude Code plugin marketplace if published there. The skills are then available as `/agentify` and `/agents` in any project.
+This installs the Agent Surface plugin from the Claude Code plugin marketplace if published there. The skill is then available as `/surface` in any project.
 
 ### Option 2: Git Clone (Personal/Team)
 
 ```bash
 git clone https://github.com/howells/agentsurface /path/to/agentsurface
-cp -r /path/to/agentsurface/skills/agentify ~/.claude/skills/
-cp -r /path/to/agentsurface/skills/agents ~/.claude/skills/
+cp -r /path/to/agentsurface/skills/surface ~/.claude/skills/
 ```
 
-This copies both skills into your personal skills directory so they are available in all projects.
+This copies the skill into your personal skills directory so it is available in all projects.
 
 ### Option 3: Project-Specific
 
 Copy the skill into your project's `.claude/` directory:
 
 ```bash
-cp -r skills/agentify .claude/skills/
-cp -r skills/agents .claude/skills/
-git add .claude/skills/agentify .claude/skills/agents
-git commit -m "Add Agent Surface skills"
+cp -r skills/surface .claude/skills/
+git add .claude/skills/surface
+git commit -m "Add Agent Surface skill"
 ```
 
-Now `/agentify` and `/agents` are available only in this project.
+Now `/surface` is available only in this project.
 
 ---
 
 ## OpenAI Codex CLI (April 2026)
 
-Codex reads `AGENTS.md` at your project root. To use Agent Surface skills with Codex:
+Codex reads `AGENTS.md` at your project root. To use the Agent Surface skill with Codex:
 
 ### 1. Create an AGENTS.md (if you don't have one)
 
@@ -56,37 +53,34 @@ Describe your project here.
 
 ## Skills and Tools
 
-- [agentify](https://github.com/howells/agentsurface/blob/main/skills/agentify/SKILL.md) — Audit and transform your codebase for agent consumption
-- [agents](https://github.com/howells/agentsurface/blob/main/skills/agents/SKILL.md) — Scaffold or update agent systems
+- [surface](https://github.com/howells/agentsurface/blob/main/skills/surface/SKILL.md) — Audit, transform, scaffold, and manage agent systems
 ~~~
 
-### 2. Point to agentify
+### 2. Point to surface
 
 Replace the URL with your local path if you've cloned the repo:
 
 ```markdown
-- [agentify](./path/to/agentsurface/skills/agentify/SKILL.md) — Audit this codebase
-- [agents](./path/to/agentsurface/skills/agents/SKILL.md) — Scaffold or update agents
+- [surface](./path/to/agentsurface/skills/surface/SKILL.md) — Audit and scaffold agent systems
 ```
 
 Or use the remote GitHub URL (Codex can fetch it):
 
 ```markdown
-- [agentify](https://raw.githubusercontent.com/howells/agentsurface/main/skills/agentify/SKILL.md) — Audit this codebase
-- [agents](https://raw.githubusercontent.com/howells/agentsurface/main/skills/agents/SKILL.md) — Scaffold or update agents
+- [surface](https://raw.githubusercontent.com/howells/agentsurface/main/skills/surface/SKILL.md) — Audit and scaffold agent systems
 ```
 
 ### 3. Use with Codex
 
 In Codex CLI, type:
 ```bash
-codex "Audit this project with agentify. Focus on API design and error handling."
-codex "Use the agents skill to add memory to this Mastra project."
+codex "Audit this project with surface. Focus on API design and error handling."
+codex "Use the surface skill to add memory to this Mastra project."
 ```
 
 Codex will:
 1. Read your AGENTS.md
-2. Discover the skill references
+2. Discover the skill reference
 3. Fetch the SKILL.md if needed
 4. Delegate to Claude Code or execute the audit directly (depending on Codex version)
 
@@ -100,17 +94,15 @@ These runtimes also respect the AGENTS.md convention. Follow the Codex instructi
 
 ## Install with skills.sh
 
-The Skills CLI can install individual skills from the GitHub repo:
+The Skills CLI can install the skill from the GitHub repo:
 
 ```bash
-npx skills add https://github.com/howells/agentify --skill agentify
-npx skills add https://github.com/howells/agentify --skill agents
+npx skills add https://github.com/howells/agentsurface --skill surface
 ```
 
-This installs the two Agent Surface skills:
+This installs the Agent Surface skill:
 
-- `agentify` - audit and transform codebases for AI agent consumption
-- `agents` - scaffold and update agent systems, tools, workflows, memory, and model routing
+- `surface` - audit, transform, scaffold, and manage AI agent systems, tools, workflows, memory, and model routing
 
 See the [skills.sh CLI docs](https://skills.sh/docs/cli) for the current command reference.
 
@@ -123,8 +115,7 @@ For sharing via tarball or zip:
 1. **Create the package:**
    ```bash
    cd agentsurface
-   zip -r agentify-1.0.0.skill skills/agentify/ -x "*.git*"
-   zip -r agents-1.0.0.skill skills/agents/ -x "*.git*"
+   zip -r surface-1.0.0.skill skills/surface/ -x "*.git*"
    ```
 
 2. **Share the .skill file** with users via GitHub releases or another distribution channel.
@@ -137,19 +128,18 @@ For sharing via tarball or zip:
 
 In any project, type:
 ```
-/agentify
-/agents
+/surface
 ```
 
-You should see the selected skill begin its workflow.
+You should see the skill begin its workflow.
 
 ### For Codex
 
 ```bash
-codex "Tell me about the Agent Surface skills. What can they do?"
+codex "Tell me about the Agent Surface skill. What can it do?"
 ```
 
-Codex should cite the SKILL.md content from your AGENTS.md references.
+Codex should cite the SKILL.md content from your AGENTS.md reference.
 
 ---
 
@@ -158,16 +148,16 @@ Codex should cite the SKILL.md content from your AGENTS.md references.
 ### "Skill not found" in Claude Code
 
 - Check that the skill is in the correct directory:
-  - Personal: `~/.claude/skills/agentify/SKILL.md`
-  - Project: `.claude/skills/agentify/SKILL.md`
+  - Personal: `~/.claude/skills/surface/SKILL.md`
+  - Project: `.claude/skills/surface/SKILL.md`
   - Marketplace installs are managed by Claude Code and may not appear as a project-local file
 
 - Restart Claude Code to reload skill directories.
 
-### Codex can't find the skills
+### Codex can't find the skill
 
 - Ensure your AGENTS.md is at the project root.
-- Check the relative paths: `[agentify](./skills/agentify/SKILL.md)` and `[agents](./skills/agents/SKILL.md)`, or use the GitHub raw URLs.
+- Check the relative path: `[surface](./skills/surface/SKILL.md)`, or use the GitHub raw URL.
 - Codex may need to be updated to the latest version (April 2026+).
 
 ### Version mismatch
@@ -179,4 +169,4 @@ Codex should cite the SKILL.md content from your AGENTS.md references.
 
 ## Questions?
 
-See the [agentify skill](./skills/agentify/SKILL.md), the [agents skill](./skills/agents/SKILL.md), or the project [README](https://github.com/howells/agentsurface).
+See the [surface skill](./skills/surface/SKILL.md) or the project [README](https://github.com/howells/agentsurface).
