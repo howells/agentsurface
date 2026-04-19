@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+  "version": "1.0",
+  "serverInfo": {
+    "name": "agentsurface-docs",
+    "title": "Agent Surface Documentation",
+    "version": "1.0.0"
+  },
+  "description": "Search and retrieve Agent Surface documentation. Tools: search_docs (keyword search across 131 pages), get_page (retrieve full page content by slug).",
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://agentsurface.dev/mcp"
+  },
+  "authentication": {
+    "required": false
+  },
+  "tools": [
+    {
+      "name": "search_docs",
+      "description": "Search Agent Surface documentation by keyword. Returns matching page titles, URLs, and descriptions."
+    },
+    {
+      "name": "get_page",
+      "description": "Retrieve the full Markdown content of a documentation page by its slug (e.g. 'discovery/llms-txt')."
+    }
+  ]
+}

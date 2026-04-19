@@ -1,0 +1,186 @@
+# Agent Surface
+
+> A practical resource for making software legible to AI agents — documentation, scoring rubric, specialist agents, and the /surface skill for auditing and transforming codebases. Covers 11 agent-readiness dimensions: API Surface, CLI Design, MCP Servers, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Data Retrievability, Multi-Agent, and Testing.
+
+## Start here
+
+- [What is Agent Surface?](https://agentsurface.dev/docs) — Overview of the project, what "legible to agents" means, and how to use this resource.
+- [Getting Started](https://agentsurface.dev/docs/getting-started) — Quick assessment and prioritized roadmap for making any codebase agent-ready.
+- [Install the /surface skill](https://agentsurface.dev#skill) — One skill that audits, scores, scaffolds, and transforms codebases for agent readiness.
+
+## The /surface skill
+
+The primary deliverable of this site is a Claude Code skill (`/surface`) that agents and developers use to audit codebases and scaffold agent infrastructure.
+
+- Install: `npx skills add https://github.com/howells/agentsurface`
+- [Skill source on GitHub](https://github.com/howells/agentsurface/blob/main/skills/surface/SKILL.md)
+- [AGENTS.md](https://agentsurface.dev/AGENTS.md) — Project conventions for agents working in this repo.
+
+## Scoring & Audit
+
+- [Scoring overview](https://agentsurface.dev/docs/scoring) — The 0–3 readiness model: what scores mean, how to interpret them.
+- [Scoring rubric](https://agentsurface.dev/docs/scoring/rubric) — Dimension-by-dimension criteria for each score level.
+- [Scorecard format](https://agentsurface.dev/docs/scoring/scorecard-format) — How to read and produce a surface scorecard.
+- [Evidence](https://agentsurface.dev/docs/scoring/evidence) — What counts as proof for each score.
+- [Delta scorecard](https://agentsurface.dev/docs/scoring/delta-scorecard) — Before/after comparison after transformation.
+- [Clustering](https://agentsurface.dev/docs/scoring/clustering) — How to group findings by what you'd fix together.
+- [Calibration](https://agentsurface.dev/docs/scoring/calibration) — How to apply scores consistently across reviewers.
+
+## Discovery & AEO
+
+- [Discovery overview](https://agentsurface.dev/docs/discovery) — How agents find and navigate software surfaces.
+- [llms.txt](https://agentsurface.dev/docs/discovery/llms-txt) — The agent-optimized link index standard.
+- [AGENTS.md](https://agentsurface.dev/docs/discovery/agents-md) — Project guidance files for AI coding assistants.
+- [Agent Skills](https://agentsurface.dev/docs/discovery/agent-skills) — Publishing and discovering reusable agent skill files.
+- [Structured data](https://agentsurface.dev/docs/discovery/structured-data) — JSON-LD schemas for agent-readable page identity.
+- [Content negotiation](https://agentsurface.dev/docs/discovery/content-negotiation) — Serving Markdown when Accept: text/markdown is requested.
+- [.well-known endpoints](https://agentsurface.dev/docs/discovery/well-known-endpoints) — API Catalog, MCP Server Card, Agent Skills index, OAuth metadata.
+- [robots.txt](https://agentsurface.dev/docs/discovery/robots-txt) — Crawler policy for AI bots.
+- [Content structure](https://agentsurface.dev/docs/discovery/content-structure) — How to organize content so agents can navigate it.
+- [AEO checklist](https://agentsurface.dev/docs/discovery/aeo-checklist) — Full pre-launch checklist for agent engine optimization.
+
+## API Surface
+
+- [API Surface overview](https://agentsurface.dev/docs/api-surface) — How to design HTTP APIs for AI agent tool generation.
+- [OpenAPI for agents](https://agentsurface.dev/docs/api-surface/openapi-for-agents) — Writing OpenAPI specs that agents can use without prompt engineering.
+- [Tool definitions](https://agentsurface.dev/docs/api-surface/tool-definitions) — Mapping API operations to agent tool schemas.
+- [Arazzo workflows](https://agentsurface.dev/docs/api-surface/arazzo-workflows) — Multi-step workflow definitions for API sequences.
+- [OpenAPI extensions](https://agentsurface.dev/docs/api-surface/openapi-extensions) — x-action, x-agent-*, and semantic extensions.
+- [API versioning](https://agentsurface.dev/docs/api-surface/api-versioning) — Version strategies that don't break agent integrations.
+- [Webhooks & events](https://agentsurface.dev/docs/api-surface/webhooks-events) — Event-driven patterns for agent workflows.
+
+## CLI Design
+
+- [CLI Design overview](https://agentsurface.dev/docs/cli-design) — Designing CLIs for AI agent operation.
+- [Machine-readable output](https://agentsurface.dev/docs/cli-design/machine-readable-output) — --json flags, NDJSON streaming, structured errors.
+- [Command structure](https://agentsurface.dev/docs/cli-design/command-structure) — Predictable verbs, flags, and exit codes.
+- [Input hardening](https://agentsurface.dev/docs/cli-design/input-hardening) — Path traversal, control character, and injection defenses.
+- [Context window discipline](https://agentsurface.dev/docs/cli-design/context-window-discipline) — Token-aware output, pagination, verbosity controls.
+- [Schema introspection](https://agentsurface.dev/docs/cli-design/schema-introspection) — --schema flags that return machine-readable parameter definitions.
+- [Safety rails](https://agentsurface.dev/docs/cli-design/safety-rails) — --dry-run, confirmation prompts, and destructive action guards.
+- [Raw payload input](https://agentsurface.dev/docs/cli-design/raw-payload-input) — Accepting JSON/YAML payloads from stdin or files.
+- [Agent knowledge packaging](https://agentsurface.dev/docs/cli-design/agent-knowledge-packaging) — SKILL.md files and CLI-bundled agent context.
+
+## MCP Servers
+
+- [MCP Servers overview](https://agentsurface.dev/docs/mcp-servers) — Building and exposing MCP servers for agent tool access.
+- [Architecture](https://agentsurface.dev/docs/mcp-servers/architecture) — Server structure, transport layers, and registration.
+- [Tool best practices](https://agentsurface.dev/docs/mcp-servers/tool-best-practices) — Naming, descriptions, schemas, and tool count limits.
+- [Resources & prompts](https://agentsurface.dev/docs/mcp-servers/resources-prompts) — Exposing static data and reusable prompt templates.
+- [Transports](https://agentsurface.dev/docs/mcp-servers/transports) — stdio, Streamable HTTP, and transport selection.
+- [Authentication](https://agentsurface.dev/docs/mcp-servers/authentication) — OAuth 2.1 for remote MCP servers.
+- [Annotations](https://agentsurface.dev/docs/mcp-servers/annotations) — readOnlyHint, destructiveHint, idempotentHint.
+- [Testing](https://agentsurface.dev/docs/mcp-servers/testing) — InMemoryTransport, tool routing tests, error recovery.
+- [Next.js integration](https://agentsurface.dev/docs/mcp-servers/nextjs-integration) — Embedding MCP server in a Next.js App Router project.
+- [Auto-generation](https://agentsurface.dev/docs/mcp-servers/auto-generation) — Generating MCP tools from OpenAPI specs.
+- [Real-world examples](https://agentsurface.dev/docs/mcp-servers/real-world-examples) — Production MCP server patterns.
+
+## Authentication
+
+- [Authentication overview](https://agentsurface.dev/docs/authentication) — Machine-to-machine auth and agent identity.
+- [OAuth for agents](https://agentsurface.dev/docs/authentication/oauth-for-agents) — OAuth 2.1 Client Credentials for M2M flows.
+- [API keys](https://agentsurface.dev/docs/authentication/api-keys) — When and how to use API key auth.
+- [Agent identity](https://agentsurface.dev/docs/authentication/agent-identity) — Treating agents as first-class principals.
+- [Token exchange](https://agentsurface.dev/docs/authentication/token-exchange) — RFC 8693 for narrowly-scoped ephemeral tokens.
+- [DPoP](https://agentsurface.dev/docs/authentication/dpop) — Demonstrating proof-of-possession for token binding.
+- [MCP auth model](https://agentsurface.dev/docs/authentication/mcp-auth-model) — How MCP 2025-11-25 handles OAuth 2.1.
+- [Protected resource metadata](https://agentsurface.dev/docs/authentication/protected-resource-metadata) — .well-known/oauth-protected-resource.
+- [Idempotency & replay](https://agentsurface.dev/docs/authentication/idempotency-and-replay) — Safe retry patterns for auth flows.
+- [Anti-patterns](https://agentsurface.dev/docs/authentication/anti-patterns) — Common auth mistakes that block agent access.
+
+## Error Handling
+
+- [Error Handling overview](https://agentsurface.dev/docs/error-handling) — Designing errors that agents can act on.
+- [RFC 9457 Problem Details](https://agentsurface.dev/docs/error-handling/rfc-9457) — The standard structured error format.
+- [Errors for agents](https://agentsurface.dev/docs/error-handling/errors-for-agents) — is_retriable, suggestions, recovery hints.
+- [Agent extensions](https://agentsurface.dev/docs/error-handling/agent-extensions) — doc_uri, intent tracing, domain error codes.
+- [Retry patterns](https://agentsurface.dev/docs/error-handling/retry-patterns) — Exponential backoff, Retry-After, idempotency keys.
+- [Idempotency](https://agentsurface.dev/docs/error-handling/idempotency) — Making writes safe to retry.
+- [CLI errors](https://agentsurface.dev/docs/error-handling/cli-errors) — Semantic exit codes and structured error output.
+
+## Tool Design
+
+- [Tool Design overview](https://agentsurface.dev/docs/tool-design) — Principles for defining tools agents can use reliably.
+- [Naming and descriptions](https://agentsurface.dev/docs/tool-design/naming-and-descriptions) — verb_noun naming, "when to use" descriptions.
+- [Schemas](https://agentsurface.dev/docs/tool-design/schemas) — Zod and JSON Schema patterns for tool inputs and outputs.
+- [Idempotency and safety](https://agentsurface.dev/docs/tool-design/idempotency-and-safety) — Making tools safe to call multiple times.
+- [Cross-framework portability](https://agentsurface.dev/docs/tool-design/cross-framework-portability) — Tools that work in MCP, AI SDK, and LangChain.
+- [Tool curation](https://agentsurface.dev/docs/tool-design/tool-curation) — Keeping tool count low and descriptions sharp.
+- [Token budget](https://agentsurface.dev/docs/tool-design/token-budget) — toModelOutput and token-efficient tool responses.
+- [Anti-patterns](https://agentsurface.dev/docs/tool-design/anti-patterns) — Common tool design mistakes and how to fix them.
+
+## Context Files
+
+- [Context Files overview](https://agentsurface.dev/docs/context-files) — AGENTS.md, CLAUDE.md, and boundary definitions.
+- [AGENTS.md guide](https://agentsurface.dev/docs/context-files/agents-md) — Writing actionable agent context files.
+- [CLAUDE.md guide](https://agentsurface.dev/docs/context-files/claude-md) — Claude Code-specific settings and context.
+- [Cursor and Copilot](https://agentsurface.dev/docs/context-files/cursor-and-copilot) — .cursor/rules and Copilot instructions.
+- [Monorepos](https://agentsurface.dev/docs/context-files/monorepos) — Context files across multiple packages.
+- [Drift detection](https://agentsurface.dev/docs/context-files/drift-detection) — Keeping context files current as the codebase evolves.
+- [Anti-patterns](https://agentsurface.dev/docs/context-files/anti-patterns) — What makes a context file useless.
+
+## Data Retrievability
+
+- [Retrievability overview](https://agentsurface.dev/docs/data-retrievability) — Making knowledge accessible to agents via search and retrieval.
+- [Embeddings](https://agentsurface.dev/docs/data-retrievability/embeddings) — Embedding models, providers, and selection guidance.
+- [Hybrid search](https://agentsurface.dev/docs/data-retrievability/hybrid-search) — BM25 + dense retrieval with RRF fusion.
+- [Reranking](https://agentsurface.dev/docs/data-retrievability/reranking) — Cohere, Voyage, and cross-encoder reranking.
+- [Chunking](https://agentsurface.dev/docs/data-retrievability/chunking) — Strategies for splitting documents for retrieval.
+- [Agentic RAG](https://agentsurface.dev/docs/data-retrievability/agentic-rag) — Query planning, reflection, and multi-hop retrieval.
+- [Vector databases](https://agentsurface.dev/docs/data-retrievability/vector-databases) — Pinecone, Qdrant, pgvector, and selection.
+- [Knowledge graphs](https://agentsurface.dev/docs/data-retrievability/knowledge-graphs) — GraphRAG and entity-relationship retrieval.
+- [Evaluation](https://agentsurface.dev/docs/data-retrievability/evaluation) — RAGAS, MTEB, and retrieval metrics.
+- [Anti-patterns](https://agentsurface.dev/docs/data-retrievability/anti-patterns) — Common retrieval mistakes.
+
+## Multi-Agent
+
+- [Multi-Agent overview](https://agentsurface.dev/docs/multi-agent) — Coordination, delegation, and orchestration patterns.
+- [Orchestration patterns](https://agentsurface.dev/docs/multi-agent/orchestration-patterns) — Sequential, parallel, fan-out/fan-in.
+- [Supervisor pattern](https://agentsurface.dev/docs/multi-agent/supervisor-pattern) — Orchestrator-specialist delegation.
+- [Swarm pattern](https://agentsurface.dev/docs/multi-agent/swarm-pattern) — Peer agent coordination without a central orchestrator.
+- [Memory patterns](https://agentsurface.dev/docs/multi-agent/memory-patterns) — Working, semantic, and observational memory.
+- [Human-in-the-loop](https://agentsurface.dev/docs/multi-agent/human-in-the-loop) — Approval gates, confirmation flows, escalation.
+- [Tool sprawl](https://agentsurface.dev/docs/multi-agent/tool-sprawl) — Managing tool count across multi-agent systems.
+
+## Testing & Evals
+
+- [Testing overview](https://agentsurface.dev/docs/testing) — Agent evaluation strategy and frameworks.
+- [Evaluation framework](https://agentsurface.dev/docs/testing/evaluation-framework) — Designing a systematic eval suite.
+- [Metrics](https://agentsurface.dev/docs/testing/metrics) — pass@k, recall@k, nDCG, and agent-specific metrics.
+- [LLM-as-judge](https://agentsurface.dev/docs/testing/llm-as-judge) — Using models to evaluate model outputs.
+- [Red-teaming](https://agentsurface.dev/docs/testing/red-teaming) — Adversarial testing for agent systems.
+- [Promptfoo](https://agentsurface.dev/docs/testing/promptfoo) — Open-source eval framework with agent support.
+- [Braintrust](https://agentsurface.dev/docs/testing/braintrust) — Production eval platform.
+- [Observability](https://agentsurface.dev/docs/testing/observability) — Tracing, logging, and monitoring agent runs.
+- [CI integration](https://agentsurface.dev/docs/testing/ci-integration) — Running evals in GitHub Actions.
+- [Vitest harness](https://agentsurface.dev/docs/testing/vitest-harness) — Unit-level tool and agent testing with Vitest.
+
+## Protocols
+
+- [Protocols overview](https://agentsurface.dev/docs/protocols) — MCP, A2A, ACP, and the agent communication landscape.
+- [MCP](https://agentsurface.dev/docs/protocols/mcp) — Model Context Protocol deep dive.
+- [A2A](https://agentsurface.dev/docs/protocols/a2a) — Agent-to-Agent protocol (Google).
+- [ACP](https://agentsurface.dev/docs/protocols/acp) — Agent Communication Protocol (IBM).
+- [Comparison](https://agentsurface.dev/docs/protocols/comparison) — When to use MCP vs A2A vs ACP.
+- [Emerging standards](https://agentsurface.dev/docs/protocols/emerging-standards) — NLWeb, x402, and what's next.
+
+## Cookbook
+
+- [Cookbook overview](https://agentsurface.dev/docs/cookbook) — Reusable patterns for production agent systems.
+- [Agentic loop](https://agentsurface.dev/docs/cookbook/agentic-loop) — The core plan-act-observe cycle.
+- [Autonomous background agents](https://agentsurface.dev/docs/cookbook/autonomous-background-agents) — Long-running agents with checkpoints.
+- [Platform-agnostic core](https://agentsurface.dev/docs/cookbook/platform-agnostic-core) — Separating agent logic from runtime.
+- [Two-step confirmation](https://agentsurface.dev/docs/cookbook/two-step-confirmation) — Approval gates for destructive actions.
+- [Semantic tool selection](https://agentsurface.dev/docs/cookbook/semantic-tool-selection) — Routing to the right tool dynamically.
+- [System prompt as config](https://agentsurface.dev/docs/cookbook/system-prompt-as-config) — Runtime configuration via prompt injection.
+- [Notification to conversation](https://agentsurface.dev/docs/cookbook/notification-to-conversation) — Converting push events into agent conversations.
+- [MCP as external API](https://agentsurface.dev/docs/cookbook/mcp-as-external-api) — Wrapping third-party APIs as MCP tools.
+- [External app routing](https://agentsurface.dev/docs/cookbook/external-app-routing) — Dispatching to external services from agents.
+- [Cloudflare agent stack](https://agentsurface.dev/docs/cookbook/cloudflare-agent-stack) — Edge-native agents with Durable Objects.
+- [Tool annotations](https://agentsurface.dev/docs/cookbook/tool-annotations) — readOnly, destructive, and idempotent patterns.
+
+## Reference
+
+- [Tooling catalog](https://agentsurface.dev/docs/tooling-catalog) — Curated AI and agent infrastructure.
+- [Reference links](https://agentsurface.dev/docs/reference-links) — Canonical standards, specs, and official docs.
+- [Agents scaffold guide](https://agentsurface.dev/docs/agents) — How to build AI agent systems with scaffolding guidance.

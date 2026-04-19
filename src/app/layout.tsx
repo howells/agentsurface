@@ -6,6 +6,29 @@ import type { ReactNode } from "react";
 
 const BASE_URL = "https://agentsurface.dev";
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Agent Surface",
+  description:
+    "A practical resource for making software legible to AI agents. Covers API surface, CLI design, MCP servers, discovery, authentication, error handling, tool design, context files, data retrievability, multi-agent patterns, and testing.",
+  url: BASE_URL,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Any",
+  author: {
+    "@type": "Person",
+    name: "Daniel Howells",
+    url: "https://github.com/howells",
+  },
+  codeRepository: "https://github.com/howells/agentsurface",
+  license: "https://opensource.org/licenses/MIT",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
@@ -47,6 +70,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <link href="https://rsms.me/" rel="preconnect" />
         <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className="flex flex-col min-h-screen antialiased">
         <RootProvider>{children}</RootProvider>
