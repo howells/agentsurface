@@ -6,54 +6,27 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Line patterns by category ────────────────────────────────────────────────
+// ── Line patterns by category (pure CSS, zero DOM elements) ─────────────────
 
 const LINE_ANGLES: Record<string, number> = {
-  "Foundation": 0,              // horizontal
-  "Memory & Knowledge": 90,     // vertical
-  "Agent Infrastructure": 45,   // diagonal ↘
-  "Data & Integration": -45,    // diagonal ↗
-  "Agent Readiness": 30,        // shallow diagonal
-  "Ops & Lifecycle": -60,       // steep diagonal
+  "Foundation": 0,
+  "Memory & Knowledge": 90,
+  "Agent Infrastructure": 45,
+  "Data & Integration": -45,
+  "Agent Readiness": 30,
+  "Ops & Lifecycle": -60,
 };
 
 function CardPattern({ category }: { category: string }) {
   const angle = LINE_ANGLES[category] ?? 0;
-  const count = 18;
-  const gap = 130 / count;
-  const rad = (angle * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-
-  // Extend lines well past the viewBox so rotated lines still fill the square
-  const ext = 200;
-  const lines: React.ReactNode[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const offset = gap * (i + 0.5);
-    // Line perpendicular to the angle direction, shifted by offset
-    const cx = 65 + (offset - 65) * Math.abs(cos < 0.01 ? 1 : cos === 1 ? 0 : sin);
-    const cy = 65 + (offset - 65) * Math.abs(sin < 0.01 ? 1 : sin === 1 ? 0 : cos);
-
-    // Simpler: place horizontal lines, rotate the whole group
-    lines.push(
-      <line
-        key={i}
-        x1={-ext} y1={gap * (i + 0.5)}
-        x2={ext + 130} y2={gap * (i + 0.5)}
-        stroke="currentColor"
-        strokeWidth="0.75"
-        opacity={0.1 + (i / count) * 0.06}
-      />
-    );
-  }
-
   return (
-    <svg viewBox="0 0 130 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <g transform={`rotate(${angle} 65 65)`}>
-        {lines}
-      </g>
-    </svg>
+    <div
+      className="h-full w-full"
+      style={{
+        background: `repeating-linear-gradient(${angle}deg, currentColor 0 0.75px, transparent 0.75px 7px)`,
+        opacity: 0.12,
+      }}
+    />
   );
 }
 
