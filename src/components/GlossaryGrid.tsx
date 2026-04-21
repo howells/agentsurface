@@ -101,6 +101,8 @@ const PATTERNS: Record<string, React.FC> = {
   "Ops & Lifecycle": PatternOps,
 };
 
+const SPRING = { type: "spring" as const, stiffness: 340, damping: 30 };
+
 // ── Card ─────────────────────────────────────────────────────────────────────
 
 function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: string) => void }) {
@@ -113,7 +115,7 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
       className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
       style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)" }}
       whileHover={{ y: -6, boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)" }}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      transition={SPRING}
     >
       <div className="flex-1 overflow-hidden">
         <Pattern />
@@ -144,69 +146,94 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  /*
-   * createPortal renders the overlay at document.body so that:
-   * - position: fixed is always relative to the viewport (no ancestor transforms interfere)
-   * - overflow: hidden on any ancestor section can't clip the overlay
-   * - motion layoutId FLIP measurements are correct regardless of scroll position
-   */
   return createPortal(
     <>
       <motion.div
         key="backdrop"
-        className="fixed inset-0 z-[100] backdrop-blur-xl bg-white/55 dark:bg-zinc-950/65"
+        className="fixed inset-0 z-[100] bg-white/55 backdrop-blur-xl dark:bg-zinc-950/65"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.22 }}
         onClick={onClose}
       />
 
       <div className="pointer-events-none fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-8">
-        {/* Only layoutId on the outer shell — children fade in separately to avoid scale distortion */}
         <motion.div
           layoutId={`card-${term.id}`}
-          className="pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl"
+          className="pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border border-white/50 bg-white/85 backdrop-blur-2xl dark:border-zinc-700/40 dark:bg-zinc-900/90"
           style={{
-            background: "rgba(255,255,255,0.85)",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
-            border: "1px solid rgba(255,255,255,0.65)",
-            boxShadow: "0 40px 100px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.05)",
+            WebkitBackdropFilter: "blur(40px)",
+            boxShadow: "0 40px 100px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
           }}
-          transition={{ type: "spring", stiffness: 380, damping: 36 }}
+          transition={SPRING}
         >
           {/* Dark pattern banner */}
-          <div className="relative h-40 overflow-hidden bg-zinc-950 text-zinc-200">
+          <div className="relative h-40 overflow-hidden bg-zinc-950 text-zinc-300">
             <Pattern />
-            <button
+            <motion.button
               onClick={onClose}
-              className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white/80 transition-colors hover:bg-white/30 hover:text-white"
+              className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white/70 transition-all hover:bg-white/25 hover:text-white hover:scale-110"
               aria-label="Close"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.18, duration: 0.2 }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
-            </button>
+            </motion.button>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.13, duration: 0.22 }}
-            className="px-7 pb-8 pt-5"
-          >
-            <p className="font-mono text-[0.6rem] font-medium uppercase tracking-widest text-zinc-400">
+          <div className="px-7 pb-8 pt-5">
+            <motion.p
+              className="font-mono text-[0.6rem] font-medium uppercase tracking-widest text-fd-muted-foreground"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.28 }}
+            >
               {term.category}
-            </p>
-            <p className="mt-2 text-4xl font-semibold tracking-tight leading-none text-zinc-900">
+            </motion.p>
+            <motion.p
+              className="mt-2 text-4xl font-semibold tracking-tight leading-none text-fd-foreground"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.16, duration: 0.28 }}
+            >
               {term.acronym}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">{term.name}</p>
-            <div className="my-4 h-px bg-zinc-200" />
-            <p className="text-sm font-medium leading-6 text-zinc-800">{term.definition}</p>
-            <p className="mt-3 text-sm leading-7 text-zinc-500">{term.detail}</p>
-          </motion.div>
+            </motion.p>
+            <motion.p
+              className="mt-1 text-sm text-fd-muted-foreground"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.22, duration: 0.28 }}
+            >
+              {term.name}
+            </motion.p>
+            <motion.div
+              className="my-4 h-px bg-fd-border"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              style={{ transformOrigin: "left" }}
+              transition={{ delay: 0.28, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+            />
+            <motion.p
+              className="text-sm font-medium leading-6 text-fd-foreground"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.34, duration: 0.28 }}
+            >
+              {term.definition}
+            </motion.p>
+            <motion.p
+              className="mt-3 text-sm leading-7 text-fd-muted-foreground"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.28 }}
+            >
+              {term.detail}
+            </motion.p>
+          </div>
         </motion.div>
       </div>
     </>,
@@ -251,7 +278,8 @@ export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
   const [filter, setFilter] = useState(ALL);
 
   const categories = Array.from(new Set(terms.map((t) => t.category)));
-  const visible = filter === ALL ? terms : terms.filter((t) => t.category === filter);
+  const visible = (filter === ALL ? terms : terms.filter((t) => t.category === filter))
+    .filter((t) => t.id !== activeId);
   const activeTerm = terms.find((t) => t.id === activeId) ?? null;
 
   useEffect(() => {
