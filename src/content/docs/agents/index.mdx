@@ -7,6 +7,10 @@ The `surface` skill creates and updates agent infrastructure when used in scaffo
 
 It is not a generic code generator. It reads the project first, detects the existing runtime, then follows the conventions already present.
 
+Before scaffolding, align the boundary first:
+
+- [Agent Design Principles](/docs/agents/design-principles) — narrow ownership, bounded loops, workflow-before-agent, and eval-first scaffolding
+
 ## What It Creates
 
 | Mode | Output | Use When |
@@ -44,6 +48,17 @@ When updating an existing agent, preserve the local shape:
 - run type checks after wiring
 
 Do not switch frameworks just because a newer tool exists. Add a new framework only when it reduces complexity or matches the deployment target.
+
+## Design Defaults
+
+When `surface` scaffolds an agent, the default shape should be:
+
+- narrow domain ownership instead of broad "assistant" scope
+- tools as the path to external truth
+- explicit max steps and fallback behavior
+- workflows for predictable multi-step orchestration
+- prompts treated as configuration, not as a substitute for server logic
+- memory only when there is a clear cross-turn or retrieval need
 
 ## Memory Choices
 

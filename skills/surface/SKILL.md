@@ -58,7 +58,7 @@ metadata:
 Surface combines two workflows under one entry point:
 
 - **Audit workflow** — Scores a codebase across 11 dimensions (0-3 each, max 33 points), produces clustered findings, generates transformation plans, and dispatches specialist sub-agents to fix gaps.
-- **Scaffold workflow** — Creates and updates agent infrastructure (agents, tools, workflows, memory, model routing, browser, sandbox) shaped to the existing project. Recommends Mastra for TypeScript, adapts when a repo uses AI SDK, MCP, LangGraph, or Cloudflare Workers.
+- **Scaffold workflow** — Creates and updates agent infrastructure (agents, tools, workflows, memory, model routing, browser, sandbox) shaped to the existing project. Recommends Mastra for TypeScript, adapts when a repo uses AI SDK, MCP, LangGraph, or Cloudflare Workers, and defaults to bounded agents with explicit tool scope, fallback behavior, and evaluation hooks.
 
 Cross-runtime compatible: works with Claude Code, Claude Agent SDK, OpenAI Codex CLI, and generic agent runtimes.
 
@@ -503,6 +503,28 @@ Before wiring up agents, workflows, or memory (Phase 3), always read:
 `${CLAUDE_SKILL_DIR}/references/gotchas.md`
 </required_reading>
 
+## Core Scaffolding Rules
+
+These rules apply in every scaffold mode unless the existing project already
+uses a different deliberate pattern:
+
+1. **Tools over knowledge** — external facts, mutations, and retrieval belong in
+   tools. Do not scaffold agents that "just know" business state from prompts.
+2. **Narrow ownership** — each agent should own one decision boundary or domain,
+   not a whole product surface.
+3. **Bounded loops** — every agent scaffold must include an explicit step budget,
+   stop condition, and failure path. Never imply open-ended looping.
+4. **Workflow before agent** — if the sequence is predictable, resumable,
+   auditable, or mostly deterministic, scaffold a workflow first and use agents
+   only inside the judgment-heavy steps.
+5. **Prompt as configuration** — prompts should encode role, routing,
+   formatting, and hard constraints. Do not branch application logic on prompt
+   variants when server-side configuration can decide it deterministically.
+6. **Memory is earned** — do not add memory by default. Add it only when the
+   task needs cross-turn recall, entity state, or retrieval over durable data.
+7. **Eval and fallback paths are part of the scaffold** — generate the core
+   success criteria, likely failure cases, and the fallback behavior together.
+
 ### Mode: `init`
 
 Initialize Mastra agent infrastructure in the project.
@@ -564,18 +586,21 @@ Initialize Mastra agent infrastructure in the project.
 
 Scaffold a new agent. Ask:
 
-1. **What does this agent do?** (1-2 sentences — becomes the description)
-2. **What tools does it need?** (list existing tools or describe new ones)
-3. **How complex are its instructions?** (inline string vs. markdown files)
-4. **What model?** (default: recommend based on task complexity)
+1. **What decision boundary does this agent own?** (what it should handle vs. hand off)
+2. **What tools does it need?** (list existing tools or describe new ones; keep the set narrow)
+3. **How should it stop or fail?** (step budget, success condition, fallback or escalation path)
+4. **How complex are its instructions?** (inline string, prompt builder, or markdown files)
+5. **What model?** (default: recommend based on task complexity and latency target)
 
 Then generate:
 
 - Agent definition file: `agents/<name>.ts`
-- Instructions (inline or markdown directory)
+- Instructions (inline, prompt builder, or markdown directory)
 - Export from `agents/index.ts`
 - Register in `mastra.ts`
 - Stub any new tools mentioned
+- A clear step budget / stop condition in the generated config
+- A short list of eval scenarios or fixtures to add next if the project has a test surface
 
 Follow the agent definition pattern from conventions reference.
 
@@ -604,9 +629,11 @@ Follow the security-first tool pattern from patterns reference.
 Scaffold a workflow. Ask:
 
 1. **What does this workflow accomplish?** (end-to-end description)
-2. **What are the steps?** (sequential? parallel? fan-out/fan-in?)
-3. **What shared state is needed between steps?**
-4. **How is it triggered?** (API route? event? cron?)
+2. **Which steps are deterministic vs. agentic?** (keep agents only in judgment-heavy steps)
+3. **What are the steps?** (sequential? parallel? fan-out/fan-in?)
+4. **What shared state is needed between steps?**
+5. **How is it triggered?** (API route? event? cron?)
+6. **What retry, suspend, or human-review points are required?**
 
 Then generate:
 
@@ -628,6 +655,10 @@ Add memory to the project. Generate:
 3. **Cloudflare-native alternatives** when the app is Workers-native
 4. **Usage pattern** — how to pass memory to agent calls
 5. **Environment variables and bindings** needed
+
+Always explain why memory is needed for this use case. If the task can be
+handled with request-scoped state, retrieved context, or workflow state, prefer
+those before durable conversational memory.
 
 ### Mode: `model`
 
@@ -669,6 +700,8 @@ After generating any scaffolding:
 3. **Wire triggers** — If workflow, create trigger function
 4. **Env vars** — List any new environment variables needed
 5. **Verify** — Run `npx tsc --noEmit` to check types (suggest, don't run without asking)
+6. **Check failure shape** — confirm step limits, retries, and fallback behavior are visible in code
+7. **Note eval hooks** — point to the first 3-5 scenarios that should become tests or eval fixtures
 
 ---
 

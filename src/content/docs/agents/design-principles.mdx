@@ -1,0 +1,176 @@
+---
+title: Agent Design Principles
+description: "Bounded agent design for production systems: narrow ownership, tools over prompts, workflows for deterministic paths, and eval-first scaffolding"
+---
+
+## Summary
+
+Most agent failures are architecture failures, not model failures. The reliable pattern is boring on purpose: give each agent a narrow decision boundary, make tools the interface to external truth, keep loop budgets explicit, move predictable orchestration into workflows, and treat prompts as configuration instead of application logic.
+
+- **Tools over knowledge**: business state, retrieval, and side effects belong in tools.
+- **Narrow ownership**: one agent, one domain boundary.
+- **Bounded loops**: max steps, stop conditions, and fallback paths are mandatory.
+- **Workflow before agent**: deterministic sequences should not be hidden inside a loop.
+- **Prompt as configuration**: encode role and constraints there, not core branching logic.
+- **Eval-first**: define success cases and common failure cases with the scaffold.
+
+---
+
+## 1. Tools Over Knowledge
+
+Agents should not be prompted to "remember" live business state, product truth, or current facts. If the answer depends on something outside the request itself, the agent should reach it through a tool or retrieval layer.
+
+Use tools for:
+
+- external facts and live APIs
+- document and database retrieval
+- mutations and side effects
+- expensive deterministic transforms worth isolating
+
+Do not use prompts as a substitute for:
+
+- product catalogs
+- user or tenant identity
+- mutable workflow state
+- authorization decisions
+
+The practical rule is simple: if the value could change tomorrow, it should not live only in the prompt.
+
+## 2. Narrow Ownership
+
+A good agent owns a decision boundary, not a department.
+
+Good:
+
+- billing dispute triage
+- support ticket summarization
+- product copy generation from structured inputs
+
+Bad:
+
+- "customer operations agent"
+- "do everything for support"
+- "business assistant" with twenty unrelated tools
+
+Narrow agents are easier to evaluate, cheaper to run, and much less likely to hallucinate tool usage. If a task spans multiple domains, use routing or a workflow instead of broadening the agent until it becomes vague.
+
+## 3. Workflow Before Agent
+
+If the sequence is predictable, scaffold a workflow first.
+
+Use a workflow when the system needs:
+
+- ordered multi-step execution
+- fan-out and fan-in
+- retries and resumability
+- explicit state transitions
+- human approval gates
+- auditability
+
+Use an agent inside the workflow when a step needs judgment:
+
+- classify intent
+- synthesize tradeoffs
+- choose among candidate tools
+- generate user-facing language
+
+This keeps the reusable system deterministic at the backbone and agentic only where it needs model judgment.
+
+## 4. Bounded Loops Only
+
+Every production agent needs three explicit boundaries:
+
+1. **Step budget**: maximum number of tool-use iterations.
+2. **Stop condition**: what counts as done.
+3. **Failure path**: what happens when the budget is exhausted or a dependency fails.
+
+Bad scaffolds hide this by treating the loop as magical runtime behavior. Good scaffolds make it visible in code and easy to inspect in tests.
+
+Typical defaults:
+
+- `3-5` steps for narrow agents
+- `6-10` steps for richer interactive agents
+- explicit escalation to a workflow, human review, or structured error after that
+
+Longer loops are usually a signal that the boundary is wrong.
+
+## 5. Prompt As Configuration
+
+Prompting matters, but it should stay in its lane.
+
+Use prompts for:
+
+- role and tone
+- hard constraints
+- formatting rules
+- tool routing hints
+- environment or user context already resolved server-side
+
+Do not use prompts for:
+
+- authorization
+- tenant selection
+- branching core business logic
+- selecting which data a user is allowed to access
+
+The strongest pattern is `buildSystemPrompt(context)` where the server composes the model-facing rules from trusted state. That keeps prompts versioned and testable without turning them into a second application runtime.
+
+## 6. Memory Is Earned
+
+Memory adds complexity fast. Most systems should start with none.
+
+Add memory only when the job needs:
+
+- cross-turn recall across sessions
+- stable user or entity preferences
+- semantic recall over prior conversations
+- durable context that cannot be reconstructed cheaply
+
+Prefer these simpler options first:
+
+- request-scoped context
+- workflow state
+- retrieved documents
+- explicit tool lookups
+
+If memory is added, the model should never choose the memory key. User, tenant, project, and entity IDs must come from authenticated server context.
+
+## 7. Eval-First Scaffolding
+
+A scaffold is incomplete if it creates an agent but not the first checks for whether that agent is any good.
+
+At minimum, define:
+
+- a success path
+- a wrong-tool path
+- a malformed-arguments path
+- a timeout or dependency-failure path
+- a loop-budget-exhausted path
+
+Measure at three levels:
+
+- **reasoning**: was the plan sensible?
+- **action**: were the tools and parameters correct?
+- **outcome**: did the system reach the right end state?
+
+That separation matters because "bad answer" and "wrong tool call" are different bugs with different fixes.
+
+## Design Checklist
+
+Before shipping an agent scaffold, verify:
+
+- the tool list is intentionally small
+- the agent owns one clear domain boundary
+- a workflow was used for predictable orchestration
+- max steps and fallback behavior are explicit
+- prompts contain constraints, not authorization logic
+- memory has a concrete justification
+- the first eval cases are written down
+
+## Related
+
+- [Agent Scaffolding](/docs/agents)
+- [Agentic Loop as Commodity](/docs/cookbook/agentic-loop)
+- [System Prompt as Configuration Layer](/docs/cookbook/system-prompt-as-config)
+- [Orchestration Patterns](/docs/multi-agent/orchestration-patterns)
+- [Agent Evaluation Framework](/docs/testing/evaluation-framework)
