@@ -37,7 +37,7 @@ function CardPattern({ id }: { id: string }) {
   const rot = Math.floor(rand() * 4) * 45;
   const rx = rand() * 0.5;
 
-  const dx = 208 / (cols + 1);
+  const dx = 130 / (cols + 1);
   const dy = 130 / (rows + 1);
   const els: React.ReactNode[] = [];
 
@@ -92,7 +92,7 @@ function CardPattern({ id }: { id: string }) {
   }
 
   return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg viewBox="0 0 130 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
       {els}
     </svg>
   );
@@ -107,12 +107,12 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
     <motion.button
       layoutId={`card-${term.id}`}
       onClick={() => onOpen(term.id)}
-      className="relative flex w-52 h-56 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
+      className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
       style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)" }}
       whileHover={{ y: -6, boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)" }}
       transition={SPRING}
     >
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
         <CardPattern id={term.id} />
       </div>
       <div className="px-4 pb-5 pt-2 text-left">
