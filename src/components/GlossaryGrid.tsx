@@ -107,7 +107,7 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
     <motion.button
       layoutId={`card-${term.id}`}
       onClick={() => onOpen(term.id)}
-      className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
+      className="relative flex w-52 h-56 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
       style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)" }}
       whileHover={{ y: -6, boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)" }}
       transition={SPRING}
