@@ -6,141 +6,53 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Generative card pattern ──────────────────────────────────────────────────
+// ── Line patterns by category ────────────────────────────────────────────────
 
-function hashCode(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  return h >>> 0;
-}
+const LINE_ANGLES: Record<string, number> = {
+  "Foundation": 0,              // horizontal
+  "Memory & Knowledge": 90,     // vertical
+  "Agent Infrastructure": 45,   // diagonal ↘
+  "Data & Integration": -45,    // diagonal ↗
+  "Agent Readiness": 30,        // shallow diagonal
+  "Ops & Lifecycle": -60,       // steep diagonal
+};
 
-function seededRng(seed: number) {
-  return () => {
-    seed = (seed + 0x6D2B79F5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+function CardPattern({ category }: { category: string }) {
+  const angle = LINE_ANGLES[category] ?? 0;
+  const count = 18;
+  const gap = 130 / count;
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
 
-function CardPattern({ id }: { id: string }) {
-  const rand = seededRng(hashCode(id));
+  // Extend lines well past the viewBox so rotated lines still fill the square
+  const ext = 200;
+  const lines: React.ReactNode[] = [];
 
-  // Shape: 0=circle 1=rect 2=diamond 3=ring 4=cross 5=dash
-  const shape = Math.floor(rand() * 6);
-  const cols = 6 + Math.floor(rand() * 12);
-  const rows = 6 + Math.floor(rand() * 9);
-  const size = 1.5 + rand() * 2.5;
-  const opBase = 0.06 + rand() * 0.06;
-  const opRange = 0.08 + rand() * 0.14;
-  const offset = rand() > 0.5;
-  const rot = Math.floor(rand() * 4) * 45;
-  const rx = rand() * 0.5;
+  for (let i = 0; i < count; i++) {
+    const offset = gap * (i + 0.5);
+    // Line perpendicular to the angle direction, shifted by offset
+    const cx = 65 + (offset - 65) * Math.abs(cos < 0.01 ? 1 : cos === 1 ? 0 : sin);
+    const cy = 65 + (offset - 65) * Math.abs(sin < 0.01 ? 1 : sin === 1 ? 0 : cos);
 
-  // Spatial modulation — gives each pattern visual direction
-  const modType = Math.floor(rand() * 5);
-  const modCornerX = rand() > 0.5 ? 0 : 1;
-  const modCornerY = rand() > 0.5 ? 0 : 1;
-  const modDir = Math.floor(rand() * 4);
-  const waveAmp = 1 + rand() * 4;
-  const waveFreq = 3 + rand() * 7;
-
-  const S = 130;
-  const gx = S / (cols + 1);
-  const gy = S / (rows + 1);
-  const els: React.ReactNode[] = [];
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const xo = offset && r % 2 === 1 ? gx / 2 : 0;
-      let x = gx * (c + 1) + xo;
-      let y = gy * (r + 1);
-      const nx = x / S;
-      const ny = y / S;
-
-      // Spatial modulation (0–1)
-      let mod: number;
-      switch (modType) {
-        case 0: { // radial — center bright
-          const d = Math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2);
-          mod = Math.max(0, 1 - d * 2.2);
-          break;
-        }
-        case 1: { // radial — edges bright
-          const d = Math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2);
-          mod = Math.min(1, d * 2);
-          break;
-        }
-        case 2: // directional gradient
-          mod = [(nx + ny) / 2, (1 - nx + ny) / 2, nx, ny][modDir];
-          break;
-        case 3: { // corner focus
-          const d = Math.sqrt((nx - modCornerX) ** 2 + (ny - modCornerY) ** 2);
-          mod = Math.max(0, 1 - d * 1.4);
-          break;
-        }
-        default: { // stripe bands
-          const freq = 2 + modDir;
-          mod = 0.3 + Math.abs(Math.sin((modDir < 2 ? nx : ny) * Math.PI * freq)) * 0.7;
-          break;
-        }
-      }
-
-      // Wave displacement — breaks the rigid grid
-      x += Math.sin(ny * waveFreq * Math.PI) * waveAmp;
-      y += Math.cos(nx * waveFreq * Math.PI) * waveAmp;
-
-      // Modulated opacity & size — creates depth
-      const o = opBase + opRange * (0.15 + mod * 0.85) * (0.7 + rand() * 0.6);
-      const s = size * (0.35 + mod * 0.65) * (0.8 + rand() * 0.4);
-      const k = `${r}-${c}`;
-
-      if (s < 0.3) continue;
-
-      switch (shape) {
-        case 0:
-          els.push(<circle key={k} cx={x} cy={y} r={s} fill="currentColor" opacity={o} />);
-          break;
-        case 1:
-          els.push(
-            <rect key={k} x={x - s} y={y - s * 0.7} width={s * 2} height={s * 1.4}
-              rx={s * rx} fill="currentColor" opacity={o} />
-          );
-          break;
-        case 2:
-          els.push(
-            <rect key={k} x={x - s * 0.7} y={y - s * 0.7} width={s * 1.4} height={s * 1.4}
-              fill="currentColor" opacity={o} transform={`rotate(45 ${x} ${y})`} />
-          );
-          break;
-        case 3:
-          els.push(
-            <circle key={k} cx={x} cy={y} r={s} fill="none"
-              stroke="currentColor" strokeWidth={Math.max(0.8, s * 0.3)} opacity={o} />
-          );
-          break;
-        case 4:
-          els.push(
-            <g key={k} opacity={o} transform={`rotate(${rot} ${x} ${y})`}>
-              <line x1={x - s} y1={y} x2={x + s} y2={y} stroke="currentColor" strokeWidth={0.8} />
-              <line x1={x} y1={y - s} x2={x} y2={y + s} stroke="currentColor" strokeWidth={0.8} />
-            </g>
-          );
-          break;
-        case 5:
-          els.push(
-            <line key={k} x1={x - s} y1={y} x2={x + s} y2={y}
-              stroke="currentColor" strokeWidth={Math.max(0.8, s * 0.4)}
-              opacity={o} transform={`rotate(${rot} ${x} ${y})`} />
-          );
-          break;
-      }
-    }
+    // Simpler: place horizontal lines, rotate the whole group
+    lines.push(
+      <line
+        key={i}
+        x1={-ext} y1={gap * (i + 0.5)}
+        x2={ext + 130} y2={gap * (i + 0.5)}
+        stroke="currentColor"
+        strokeWidth="0.75"
+        opacity={0.1 + (i / count) * 0.06}
+      />
+    );
   }
 
   return (
     <svg viewBox="0 0 130 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {els}
+      <g transform={`rotate(${angle} 65 65)`}>
+        {lines}
+      </g>
     </svg>
   );
 }
@@ -160,7 +72,7 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
       transition={SPRING}
     >
       <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <CardPattern id={term.id} />
+        <CardPattern category={term.category} />
       </div>
       <div className="px-4 pb-5 pt-2 text-left">
         <p className="font-mono text-[0.55rem] font-medium uppercase tracking-widest text-fd-muted-foreground">
@@ -210,7 +122,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
         >
           {/* Dark pattern banner */}
           <div className="relative h-40 overflow-hidden bg-zinc-950 text-zinc-300">
-            <CardPattern id={term.id} />
+            <CardPattern category={term.category} />
             <motion.button
               onClick={onClose}
               className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white/70 transition-all hover:bg-white/25 hover:text-white hover:scale-110"
