@@ -6,108 +6,103 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Category patterns ────────────────────────────────────────────────────────
+// ── Generative card pattern ──────────────────────────────────────────────────
 
-function PatternFoundation() {
+function hashCode(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+function seededRng(seed: number) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function CardPattern({ id }: { id: string }) {
+  const rand = seededRng(hashCode(id));
+
+  // Shape: 0=circle 1=rect 2=diamond 3=ring 4=cross 5=dash
+  const shape = Math.floor(rand() * 6);
+  const cols = 6 + Math.floor(rand() * 16);
+  const rows = 4 + Math.floor(rand() * 10);
+  const size = 1.5 + rand() * 2.5;
+  const opBase = 0.07 + rand() * 0.05;
+  const opRange = 0.06 + rand() * 0.10;
+  const offset = rand() > 0.5;
+  const rot = Math.floor(rand() * 4) * 45;
+  const rx = rand() * 0.5;
+
+  const dx = 208 / (cols + 1);
+  const dy = 130 / (rows + 1);
+  const els: React.ReactNode[] = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const xo = offset && r % 2 === 1 ? dx / 2 : 0;
+      const x = dx * (c + 1) + xo;
+      const y = dy * (r + 1);
+      const o = opBase + rand() * opRange;
+      const s = size * (0.8 + rand() * 0.4);
+      const k = `${r}-${c}`;
+
+      switch (shape) {
+        case 0:
+          els.push(<circle key={k} cx={x} cy={y} r={s} fill="currentColor" opacity={o} />);
+          break;
+        case 1:
+          els.push(
+            <rect key={k} x={x - s} y={y - s * 0.7} width={s * 2} height={s * 1.4}
+              rx={s * rx} fill="currentColor" opacity={o} />
+          );
+          break;
+        case 2:
+          els.push(
+            <rect key={k} x={x - s * 0.7} y={y - s * 0.7} width={s * 1.4} height={s * 1.4}
+              fill="currentColor" opacity={o} transform={`rotate(45 ${x} ${y})`} />
+          );
+          break;
+        case 3:
+          els.push(
+            <circle key={k} cx={x} cy={y} r={s} fill="none"
+              stroke="currentColor" strokeWidth={Math.max(0.8, s * 0.3)} opacity={o} />
+          );
+          break;
+        case 4:
+          els.push(
+            <g key={k} opacity={o} transform={`rotate(${rot} ${x} ${y})`}>
+              <line x1={x - s} y1={y} x2={x + s} y2={y} stroke="currentColor" strokeWidth={0.8} />
+              <line x1={x} y1={y - s} x2={x} y2={y + s} stroke="currentColor" strokeWidth={0.8} />
+            </g>
+          );
+          break;
+        case 5:
+          els.push(
+            <line key={k} x1={x - s} y1={y} x2={x + s} y2={y}
+              stroke="currentColor" strokeWidth={Math.max(0.8, s * 0.4)}
+              opacity={o} transform={`rotate(${rot} ${x} ${y})`} />
+          );
+          break;
+      }
+    }
+  }
+
   return (
     <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {Array.from({ length: 20 }, (_, i) => (
-        <line key={i} x1="0" y1={6 + i * 6.5} x2="208" y2={6 + i * 6.5}
-          stroke="currentColor" strokeWidth="0.75" opacity={0.1 + i * 0.014} />
-      ))}
+      {els}
     </svg>
   );
 }
-
-function PatternMemory() {
-  return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {Array.from({ length: 13 }, (_, row) =>
-        Array.from({ length: 20 }, (_, col) => {
-          const seed = (row * 20 + col) * 2654435761;
-          const opacity = 0.04 + ((seed >>> 0) % 22) / 100;
-          return <circle key={`${row}-${col}`} cx={10 + col * 10} cy={10 + row * 9} r="1.5" fill="currentColor" opacity={opacity} />;
-        })
-      )}
-    </svg>
-  );
-}
-
-function PatternAgent() {
-  const nodes = [[104, 22], [48, 62], [160, 62], [22, 108], [80, 108], [128, 108], [186, 108]] as const;
-  const edges = [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]] as const;
-  return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {edges.map(([a, b], i) => (
-        <line key={i} x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]}
-          stroke="currentColor" strokeWidth="1" opacity="0.2" />
-      ))}
-      {nodes.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={i === 0 ? 6 : 4}
-          fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
-      ))}
-    </svg>
-  );
-}
-
-function PatternData() {
-  return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {Array.from({ length: 11 }, (_, row) =>
-        Array.from({ length: 15 }, (_, col) => {
-          const seed = (row * 15 + col) * 1664525 + 1013904223;
-          const opacity = 0.04 + ((seed >>> 0) % 18) / 100;
-          return <rect key={`${row}-${col}`} x={8 + col * 13} y={5 + row * 11} width="10" height="9" rx="1"
-            fill="currentColor" opacity={opacity} />;
-        })
-      )}
-    </svg>
-  );
-}
-
-function PatternReadiness() {
-  return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <rect x="20" y="14" width="168" height="102" rx="3" stroke="currentColor" strokeWidth="1" opacity="0.18" />
-      {[60, 98, 136, 172].map((x) => (
-        <line key={x} x1={x} y1="14" x2={x} y2="116" stroke="currentColor" strokeWidth="0.75" opacity="0.1" />
-      ))}
-      <line x1="20" y1="65" x2="188" y2="65" stroke="currentColor" strokeWidth="0.75" opacity="0.1" />
-      {[[20, 14], [188, 14], [20, 116], [188, 116]].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="2.5" fill="currentColor" opacity="0.3" />
-      ))}
-    </svg>
-  );
-}
-
-function PatternOps() {
-  const heights = [42, 64, 50, 80, 58, 88, 44, 72, 56, 82, 52, 68, 46, 76];
-  return (
-    <svg viewBox="0 0 208 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {heights.map((h, i) => (
-        <rect key={i} x={8 + i * 14} y={118 - h} width="10" height={h} rx="1.5"
-          fill="currentColor" opacity={0.05 + i * 0.016} />
-      ))}
-    </svg>
-  );
-}
-
-const PATTERNS: Record<string, React.FC> = {
-  "Foundation": PatternFoundation,
-  "Memory & Knowledge": PatternMemory,
-  "Agent Infrastructure": PatternAgent,
-  "Data & Integration": PatternData,
-  "Agent Readiness": PatternReadiness,
-  "Ops & Lifecycle": PatternOps,
-};
 
 const SPRING = { type: "spring" as const, stiffness: 340, damping: 30 };
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 
 function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: string) => void }) {
-  const Pattern = PATTERNS[term.category] ?? PatternFoundation;
-
   return (
     <motion.button
       layoutId={`card-${term.id}`}
@@ -118,7 +113,7 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
       transition={SPRING}
     >
       <div className="flex-1 overflow-hidden">
-        <Pattern />
+        <CardPattern id={term.id} />
       </div>
       <div className="px-4 pb-5 pt-2 text-left">
         <p className="font-mono text-[0.55rem] font-medium uppercase tracking-widest text-fd-muted-foreground">
@@ -138,8 +133,6 @@ function GlossaryCard({ term, onOpen }: { term: GlossaryTerm; onOpen: (id: strin
 // ── Overlay (portalled to document.body) ─────────────────────────────────────
 
 function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
-  const Pattern = PATTERNS[term.category] ?? PatternFoundation;
-
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -170,7 +163,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
         >
           {/* Dark pattern banner */}
           <div className="relative h-40 overflow-hidden bg-zinc-950 text-zinc-300">
-            <Pattern />
+            <CardPattern id={term.id} />
             <motion.button
               onClick={onClose}
               className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white/70 transition-all hover:bg-white/25 hover:text-white hover:scale-110"
