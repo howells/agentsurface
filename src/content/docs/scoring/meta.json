@@ -1,4 +1,12 @@
 {
   "title": "Scoring & Audit",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "rubric",
+    "evidence",
+    "scorecard-format",
+    "delta-scorecard",
+    "clustering",
+    "calibration"
+  ]
 }

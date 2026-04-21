@@ -1,4 +1,15 @@
 {
   "title": "Testing",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "evaluation-framework",
+    "metrics",
+    "llm-as-judge",
+    "vitest-harness",
+    "promptfoo",
+    "braintrust",
+    "observability",
+    "ci-integration",
+    "red-teaming"
+  ]
 }

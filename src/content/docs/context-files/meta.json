@@ -1,0 +1,12 @@
+{
+  "title": "Context Files",
+  "pages": [
+    "index",
+    "agents-md",
+    "claude-md",
+    "cursor-and-copilot",
+    "monorepos",
+    "drift-detection",
+    "anti-patterns"
+  ]
+}

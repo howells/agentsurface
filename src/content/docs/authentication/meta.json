@@ -1,4 +1,15 @@
 {
   "title": "Authentication",
-  "pages": ["index", "api-keys", "oauth-for-agents", "agent-identity", "anti-patterns"]
+  "pages": [
+    "index",
+    "api-keys",
+    "oauth-for-agents",
+    "agent-identity",
+    "token-exchange",
+    "dpop",
+    "protected-resource-metadata",
+    "mcp-auth-model",
+    "idempotency-and-replay",
+    "anti-patterns"
+  ]
 }

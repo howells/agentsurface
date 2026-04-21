@@ -1,4 +1,12 @@
 {
   "title": "Error Handling",
-  "pages": ["index", "rfc-7807", "errors-for-agents", "cli-errors", "retry-patterns"]
+  "pages": [
+    "index",
+    "rfc-9457",
+    "agent-extensions",
+    "errors-for-agents",
+    "retry-patterns",
+    "idempotency",
+    "cli-errors"
+  ]
 }

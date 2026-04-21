@@ -1,0 +1,13 @@
+{
+  "title": "Tool Design",
+  "pages": [
+    "index",
+    "naming-and-descriptions",
+    "schemas",
+    "idempotency-and-safety",
+    "tool-curation",
+    "cross-framework-portability",
+    "token-budget",
+    "anti-patterns"
+  ]
+}

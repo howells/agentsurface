@@ -1,0 +1,17 @@
+{
+  "title": "Cookbook",
+  "pages": [
+    "index",
+    "agentic-loop",
+    "platform-agnostic-core",
+    "system-prompt-as-config",
+    "tool-annotations",
+    "semantic-tool-selection",
+    "external-app-routing",
+    "mcp-as-external-api",
+    "notification-to-conversation",
+    "autonomous-background-agents",
+    "cloudflare-agent-stack",
+    "two-step-confirmation"
+  ]
+}

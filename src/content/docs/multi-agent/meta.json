@@ -1,4 +1,12 @@
 {
   "title": "Multi-Agent Patterns",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "orchestration-patterns",
+    "supervisor-pattern",
+    "swarm-pattern",
+    "human-in-the-loop",
+    "memory-patterns",
+    "tool-sprawl"
+  ]
 }
