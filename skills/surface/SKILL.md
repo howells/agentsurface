@@ -47,6 +47,17 @@ metadata:
     - test-writer
     - retrievability-engineer
     - agentic-patterns-writer
+    - score-api-surface
+    - score-cli-design
+    - score-mcp-server
+    - score-discovery-aeo
+    - score-authentication
+    - score-error-handling
+    - score-tool-design
+    - score-context-files
+    - score-multi-agent
+    - score-testing
+    - score-data-retrievability
 ---
 
 # Surface
@@ -162,31 +173,58 @@ Present detected surfaces and applicable dimensions. Then proceed to Phase 1.
 
 ## Phase 1: Dimension Scoring
 
-<required_reading>
-Read the scoring rubric NOW:
-`${CLAUDE_SKILL_DIR}/references/scoring-rubric.md`
-</required_reading>
+<hard_gate>
+Phase 0 MUST have completed. Applicable dimensions must be determined.
+Do NOT read scoring-rubric.md or any dimension reference file in this context.
+Scoring is performed by specialist scoring agents, each with its own context window.
+</hard_gate>
 
-Score each applicable dimension 0-3. For each:
-1. Examine relevant files identified in Phase 0
-2. Match against rubric criteria with specific evidence
-3. Assign score and confidence (high/medium/low)
+### Dispatch Scoring Agents
 
-### The 11 Dimensions
+For each applicable dimension from Phase 0, dispatch the corresponding scoring agent using the Agent tool. Pass a prompt containing:
 
-| # | Dimension | What It Measures |
-|---|-----------|-----------------|
-| 1 | **API Surface** | OpenAPI quality, agent-oriented descriptions, operationIds, Arazzo workflows |
-| 2 | **CLI Design** | JSON output, exit codes, schema introspection, input hardening, SKILL.md |
-| 3 | **MCP Server** | Tool definitions, annotations, resources, auth, testing |
-| 4 | **Discovery & AEO** | llms.txt, AGENTS.md, JSON-LD, content negotiation, robots.txt, agent-readiness standards |
-| 5 | **Authentication** | M2M auth, OAuth 2.1, scoped tokens, agent identity |
-| 6 | **Error Handling** | RFC 7807, is_retriable, suggestions, recovery hints |
-| 7 | **Tool Design** | Descriptions as prompts, schemas, toModelOutput, cross-framework |
-| 8 | **Context Files** | AGENTS.md quality, multi-tool support, permission boundaries |
-| 9 | **Multi-Agent** | Orchestration patterns, state management, A2A support |
-| 10 | **Testing** | Agent evals, tool routing accuracy, pass@k metrics |
-| 11 | **Data Retrievability** | RAG indexing, vector embeddings, semantic search, knowledge graphs |
+1. **Project summary** — name, root path, language, framework, package manager
+2. **Detected surfaces** — file paths and patterns found in Phase 0 that are relevant to this specific dimension
+3. **Applicability note** — why this dimension applies
+
+**Dispatch ALL applicable dimensions in parallel.** Use a single message with multiple Agent tool calls. Do not wait for one to complete before dispatching the next.
+
+For N/A dimensions (determined by Phase 0), do not dispatch an agent.
+
+Agent dispatch template:
+```
+Agent({
+  description: "Score {Dimension Name}",
+  prompt: "Score the {Dimension Name} dimension for this project.\n\nProject: {name}\nRoot: {absolute path}\nStack: {language, framework, package manager}\n\nDetected surfaces relevant to this dimension:\n{list of file paths and patterns from Phase 0}\n\nRead your reference file, examine the project, and return your structured score."
+})
+```
+
+The scoring agent mapping:
+| Dimension | Agent |
+|-----------|-------|
+| 1. API Surface | `score-api-surface` |
+| 2. CLI Design | `score-cli-design` |
+| 3. MCP Server | `score-mcp-server` |
+| 4. Discovery & AEO | `score-discovery-aeo` |
+| 5. Authentication | `score-authentication` |
+| 6. Error Handling | `score-error-handling` |
+| 7. Tool Design | `score-tool-design` |
+| 8. Context Files | `score-context-files` |
+| 9. Multi-Agent | `score-multi-agent` |
+| 10. Testing | `score-testing` |
+| 11. Data Retrievability | `score-data-retrievability` |
+
+### Collect and Assemble
+
+When all scoring agents return, extract the `<score_result>` block from each response. Parse:
+- `DIMENSION_NUMBER`, `SCORE`, `MAX`, `CONFIDENCE`, `BAR` — for the scorecard
+- `SUMMARY` — for the one-liner in the scorecard row
+- `FINDINGS` — for Phase 2 findings clustering
+
+**Failure handling:** If a scoring agent fails, returns an error, or produces an unparseable response:
+- Mark that dimension as `[???]  ?/3   Scoring failed` in the scorecard
+- Exclude it from the raw total (treat like N/A for math)
+- Add a footer after the scorecard: `Warning: {N} dimension(s) failed to score — results may be incomplete`
 
 ### Scorecard Output
 
@@ -249,11 +287,32 @@ Always derive the rating from the scaled score, not the raw score.
 
 If mode is `score`, STOP HERE. Present scorecard and exit.
 
+### Single-Dimension Output (`--dimension=X`)
+
+When scoring a single dimension, dispatch only the one corresponding scoring agent. Render a mini-scorecard instead of the full 11-row format:
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                    SURFACE DIMENSION SCORE                     ║
+║                    [Project Name] — [Dimension Name]           ║
+║                    [YYYY-MM-DD]                                ║
+╠══════════════════════════════════════════════════════════════════╣
+
+  6. Error Handling      [██░]  2/3   RFC 9457 with is_retriable, missing doc_uri
+
+╠══════════════════════════════════════════════════════════════════╣
+║  EVIDENCE:                                                     ║
+║  - RFC 9457 Problem Details at src/lib/errors.ts:12            ║
+║  - is_retriable field present on all error responses           ║
+║  - No doc_uri field found                                      ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
 ---
 
 ## Phase 2: Findings Report
 
-For each dimension scoring below 3, generate findings.
+Collect the FINDINGS sections from all scoring agent results. For dimensions scoring below 3 that returned findings, use those directly. If a scoring agent returned insufficient findings for its score, you may supplement with observations from Phase 0.
 
 ### Finding Structure
 
@@ -729,26 +788,12 @@ Prefer generating working code over placeholder comments.
 
 ---
 
-## Audit Reference Loading
+## Reference Loading
 
-<required_reading>
-Load `references/scoring-rubric.md` in Phase 1.
+Audit dimension references are loaded by scoring agents — do NOT load them in this context.
+The scoring agents each load their own dimension reference file independently.
 
-Load dimension-specific references ONLY when auditing that dimension:
-- `references/api-surface.md`
-- `references/cli-design.md`
-- `references/mcp-servers.md`
-- `references/discovery-aeo.md`
-- `references/authentication.md`
-- `references/error-handling.md`
-- `references/tool-design.md`
-- `references/context-files.md`
-- `references/multi-agent.md`
-- `references/testing.md`
-- `references/data-retrievability.md`
-</required_reading>
-
-## Scaffold Reference Loading
+### Scaffold Reference Loading
 
 | File | Load When |
 |------|-----------|
