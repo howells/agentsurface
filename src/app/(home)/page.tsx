@@ -148,6 +148,44 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Four primitives ────────────────────────── */}
+      <section className="w-full border-t border-fd-border">
+        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
+          <h2 className="mb-6 text-lg font-semibold text-fd-foreground">
+            Four primitives of agentic software
+          </h2>
+          <div className="grid gap-px overflow-hidden rounded-lg border border-fd-border bg-fd-border sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                title: "Agents",
+                desc: "Reason, plan, decide. Autonomous entities that interpret goals and choose actions.",
+              },
+              {
+                title: "Tools",
+                desc: "Act on the world. APIs, CLIs, MCP servers — the callable surface agents depend on.",
+              },
+              {
+                title: "Context",
+                desc: "Know what's relevant. Docs, discovery files, structured data that orient an agent.",
+              },
+              {
+                title: "Orchestration",
+                desc: "Coordinate and compose. Workflows, delegation, memory, and multi-agent patterns.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="bg-fd-background p-6">
+                <h3 className="text-sm font-semibold text-fd-foreground">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 11 Surfaces ──────────────────────────── */}
       <section className="w-full border-t border-fd-border">
         <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
