@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 4: Discovery & AEO** of an agent readine
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/discovery-aeo.md`
+`references/discovery-aeo.md` from the surface skill directory.
 </required_reading>
 
 ## Input

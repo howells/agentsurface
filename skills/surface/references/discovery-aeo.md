@@ -2,9 +2,9 @@
 
 ## Summary
 
-Dimension 4 measures how discoverable, readable, governable, and callable a project is for AI agents. Covers llms.txt (agent-optimized link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, Markdown content negotiation, Content Signals, `.well-known` capability discovery, OAuth metadata, MCP discovery, Agent Skills discovery, and optional agent-commerce protocol signals. AEO is to agents what SEO is to search engines: navigation files, structured data, crawler directives, and capability manifests that enable discovery and reliable use.
+Dimension 4 measures how discoverable, readable, governable, and callable a project is for AI agents. Covers llms.txt (a proposed inference-time Markdown link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, Markdown content negotiation, `.well-known` capability discovery, OAuth metadata, MCP discovery, Agent Skills discovery, and optional agent-commerce protocol signals.
 
-- **llms.txt**: H1 title, blockquote summary, H2 sections with link descriptions
+- **llms.txt**: H1 title, blockquote summary, H2 sections with link descriptions; useful, but not a guaranteed ranking or citation signal
 - **AGENTS.md**: commands, tech stack, testing expectations, permission boundaries
 - **Structured data**: JSON-LD (FAQPage, TechArticle, etc.) on key pages
 - **robots.txt**: explicitly allow AI bots (GPTBot, ClaudeBot, etc.)
@@ -13,7 +13,7 @@ Dimension 4 measures how discoverable, readable, governable, and callable a proj
 - **.well-known**: API Catalog, MCP Server Card, Agent Skills index, OAuth metadata, Web Bot Auth keys
 - **Evidence**: File globs for llms.txt, AGENTS.md, sitemap, JSON-LD grep, robots.txt analysis
 
-> AEO is to agents what SEO is to search engines. It encompasses the navigation files, structured data schemas, content negotiation protocols, crawler directives, bot identity mechanisms, and capability manifests that enable AI agents to discover, understand, navigate, authenticate against, and use a codebase or web service.
+Treat AEO as practical discoverability engineering, not a promise that any specific model provider will crawl, rank, or cite the site. Strong discovery combines stable URLs, crawlable content, structured data, sitemap freshness, policy files, and capability manifests.
 
 ## Agent-readiness scan model
 
@@ -66,6 +66,8 @@ Use these scan results as evidence for Dimension 4. Do not overfit to one vendor
 
 **Spec:** https://llmstxt.org
 
+**Reality check:** llms.txt is a proposal for helping models and agents use website content at inference time. It complements `robots.txt`, `sitemap.xml`, structured data, and Markdown docs; it does not replace them and should not be sold as a guaranteed AI-search ranking mechanism.
+
 **Format:** Plain text. H1 title, optional `> ` blockquote summary (one paragraph), H2 sections with markdown link + description pairs.
 
 Example structure:
@@ -96,17 +98,15 @@ Example structure:
 [Full docs concatenated as single markdown file...]
 ```
 
-**Adoption examples:** OpenAI, Vercel, Stripe, Anthropic, and 100+ open-source projects.
-
 **Detection:** Check `/llms.txt` and `/llms-full.txt` at web root. If behind auth, check repo root for both files.
 
 ---
 
 ### AGENTS.md
 
-**Specification:** https://agents.md — governed by the Agentic AI Foundation (Linux Foundation).
+**Specification:** https://agents.md — contributed to the Agentic AI Foundation under the Linux Foundation.
 
-**Adoption:** 60k+ public repositories. Read by Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, Aider, Jules, Zed, Warp, and emerging agent runtimes.
+**Adoption:** Treat AGENTS.md as the cross-tool baseline for coding-agent context. Tool-specific files such as `CLAUDE.md`, Cursor rules, Copilot instructions, and Codex instructions should layer on top rather than duplicate it.
 
 **Format:** Plain markdown. No strict schema. Recommended structure:
 

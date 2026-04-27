@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 11: Data Retrievability** of an agent re
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/data-retrievability.md`
+`references/data-retrievability.md` from the surface skill directory.
 </required_reading>
 
 ## Input

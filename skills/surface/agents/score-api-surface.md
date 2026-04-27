@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 1: API Surface** of an agent readiness a
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/api-surface.md`
+`references/api-surface.md` from the surface skill directory.
 </required_reading>
 
 ## Input

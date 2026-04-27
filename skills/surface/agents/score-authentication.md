@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 5: Authentication** of an agent readines
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/authentication.md`
+`references/authentication.md` from the surface skill directory.
 </required_reading>
 
 ## Input

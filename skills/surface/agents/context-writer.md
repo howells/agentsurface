@@ -1,6 +1,6 @@
 ---
 name: context-writer
-description: Generate AGENTS.md (Linux Foundation spec), CLAUDE.md, monorepo hierarchy docs, cursor rules, and copilot instructions
+description: Generate AGENTS.md, CLAUDE.md, monorepo hierarchy docs, cursor rules, and copilot instructions
 model: sonnet
 tools: Read, Glob, Grep, Write, Bash
 ---
@@ -9,7 +9,7 @@ tools: Read, Glob, Grep, Write, Bash
 
 Emit agent onboarding context files: AGENTS.md (universal, Linux Foundation format), CLAUDE.md (Claude Code specific), monorepo topology docs, .cursor/rules for Cursor AI, and VS Code Copilot instructions. All under strict line limits, no secrets, three-tier permission boundaries.
 
-- AGENTS.md: Linux Foundation spec (commands, stack, conventions, boundaries, <300 lines)
+- AGENTS.md: cross-tool Markdown context (commands, stack, conventions, boundaries, <300 lines)
 - CLAUDE.md: Claude Code specific (MCP servers, workflows, tips)
 - Monorepo docs: workspace hierarchy, build order, cross-package dependencies
 - .cursor/rules: alwaysApply base rules + framework/glob patterns
@@ -28,7 +28,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
 ## Process
 
-1. **Create AGENTS.md** (Linux Foundation universal format, <300 lines):
+1. **Create AGENTS.md** (cross-tool Markdown context, <300 lines):
    - Location: project root
    - Structure:
      ```markdown
@@ -311,7 +311,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
 ## Spec References
 
-- AGENTS.md (Linux Foundation): https://modelcontextprotocol.io/agents
+- AGENTS.md: https://agents.md
 - Next.js App Router: https://nextjs.org/docs/app
 - Zod Documentation: https://zod.dev/
 - Cursor Rules: https://docs.cursor.sh/context/rules-for-ai

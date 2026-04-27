@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 3: MCP Server** of an agent readiness au
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/mcp-servers.md`
+`references/mcp-servers.md` from the surface skill directory.
 </required_reading>
 
 ## Input

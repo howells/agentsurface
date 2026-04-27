@@ -235,14 +235,14 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 
 ## Spec References
 
-- llms.txt Community: https://llms-txt.github.io/
+- llms.txt proposal: https://llmstxt.org/
 - robots.txt: https://www.robotstxt.org/
 - Content Signals: https://contentsignals.org/
 - API Catalog: https://www.rfc-editor.org/rfc/rfc9727.html
 - OAuth Protected Resource Metadata: https://www.rfc-editor.org/rfc/rfc9728.html
 - JSON-LD / schema.org: https://schema.org/
 - Content Negotiation (RFC 9110): https://tools.ietf.org/html/rfc9110
-- AGENTS.md (Linux Foundation): https://modelcontextprotocol.io/agents
+- AGENTS.md: https://agents.md
 - `Anthropic Docs Crawling`: https://docs.anthropic.com/agents
 
 ## Style Rules

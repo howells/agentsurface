@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 8 scores presence and quality of AGENTS.md, CLAUDE.md, and tool-specific overrides. AGENTS.md (Linux Foundation spec, read by 9+ tools) is the unified baseline; CLAUDE.md and .cursor/rules are tool-specific overlays. Well-curated files (hand-written, <370 lines, commands-first, permission boundaries explicit) scale knowledge across all agents. Quality vs. presence: auto-generated files score low; iteratively maintained files from friction score high. Multi-tool context with progressive disclosure scores highest.
+Dimension 8 scores presence and quality of AGENTS.md, CLAUDE.md, and tool-specific overrides. AGENTS.md is the cross-tool baseline; CLAUDE.md and .cursor/rules are tool-specific overlays. Well-curated files (hand-written, <370 lines, commands-first, permission boundaries explicit) scale knowledge across agents. Quality vs. presence: auto-generated files score low; iteratively maintained files from friction score high. Multi-tool context with progressive disclosure scores highest.
 
 - **0**: No AGENTS.md or context files (blocker)
 - **1**: Generic/auto-generated, >500 lines, no actionable commands

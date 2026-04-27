@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 9: Multi-Agent** of an agent readiness a
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/multi-agent.md`
+`references/multi-agent.md` from the surface skill directory.
 </required_reading>
 
 ## Input

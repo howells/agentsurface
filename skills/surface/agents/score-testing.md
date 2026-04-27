@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 10: Testing** of an agent readiness audi
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/testing.md`
+`references/testing.md` from the surface skill directory.
 </required_reading>
 
 ## Input

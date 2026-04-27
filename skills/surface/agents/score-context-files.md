@@ -11,7 +11,7 @@ You are a scoring agent for **Dimension 8: Context Files** of an agent readiness
 
 <required_reading>
 Read this reference file NOW — it contains the scoring rubric, evidence patterns, and detection instructions:
-`${CLAUDE_SKILL_DIR}/references/context-files.md`
+`references/context-files.md` from the surface skill directory.
 </required_reading>
 
 ## Input

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Surface"
+  short_description: "Audit and improve agent readiness"
+  default_prompt: "Use $surface to audit this codebase for agent readiness and propose the highest-impact improvements."
