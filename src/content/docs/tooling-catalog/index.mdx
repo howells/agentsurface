@@ -3,9 +3,40 @@ title: AI Tooling Catalog
 description: Well-regarded AI and agent tooling worth tracking
 ---
 
-Curated AI and agent tooling worth knowing about. Focused on tools that directly help with model access, agents, tools, memory, retrieval, evaluation, observability, browser access, AI UI, voice, or multimodal generation.
+Curated AI and agent tooling worth knowing about. Focused on tools that directly help with model access, agents, tools, memory, retrieval, evaluation, observability, browser access, document ingestion, integration, AI UI, voice, or multimodal generation.
 
-Last curated: April 18, 2026.
+Last curated: April 29, 2026.
+
+## Source-Driven Crawl Notes
+
+This catalog favors tools that appear in current agent-framework docs, tutorials, registries, or integration indexes. The goal is not to list every SaaS product that could be called by an agent; it is to track the tools framework authors repeatedly treat as agent-ready building blocks.
+
+| Source crawled | High-signal tools and integrations surfaced | What to take from it |
+|---|---|---|
+| [Vercel AI SDK tool registry](https://ai-sdk.dev/llms.txt) | Vercel Sandbox code execution, Exa, Parallel, ctx-zip, Perplexity Search, Tavily, Firecrawl, Amazon Bedrock AgentCore, Superagent, Tako Search, Valyu, Airweave, bash-tool, Browserbase | The AI SDK ecosystem is converging on packaged tools for web search/extraction, browser automation, sandboxed execution, RAG connectors, and guardrails. |
+| [Mastra docs and reference](https://mastra.ai/llms.txt) | Firecrawl tutorial, Tavily tools, Stagehand browser, Vercel Sandbox workspace, AI SDK UI, CopilotKit, assistant-ui, Inngest, Arize, Braintrust, Langfuse, LangSmith, OpenTelemetry, PostHog, Sentry, Datadog, Auth0, Clerk, Firebase, Okta, Supabase, WorkOS, Pinecone, Qdrant, Chroma, LanceDB, MongoDB, Elasticsearch, OpenSearch, pgvector, Turbopuffer, Upstash, Cloudflare Vectorize | Mastra points to a production stack: tools, browser, auth, observability exporters, UI surfaces, deployment targets, storage, and vector stores. |
+| [LangChain Python tool integrations](https://docs.langchain.com/oss/python/integrations/tools/index.md) | Bing, Brave, DuckDuckGo, Exa, Google Search, Google Serper, Jina Search, Linkup, Parallel, SearchApi, SearxNG, SerpApi, Tavily, Apify, You.com, Amazon Bedrock AgentCore Code Interpreter, Azure Container Apps dynamic sessions, Bearly, Riza, GitHub, GitLab, Gmail, Jira, Office365, Slack, Twilio, AgentQL, Hyperbrowser, MultiOn, Oxylabs, Playwright, SQLDatabase, Spark SQL, Drasi, Stardog, Composio | LangChain remains the widest source for practical prebuilt tools. Treat it as an inventory, then curate aggressively before giving tools to an agent. |
+| [LangChain JavaScript tool integrations](https://docs.langchain.com/oss/javascript/integrations/tools/index.md) | Composio, Azure dynamic sessions, DuckDuckGo, Exa, Gmail, Google Calendar, Google Places, Google Routes, Google Scholar, Google Trends, JigsawStack, AWS Lambda, SearchApi, SearxNG, SerpApi, Stagehand, Tavily Crawl/Extract/Map/Search, Web Browser Tool, Wikipedia, WolframAlpha | The JS side overlaps heavily with search, browser, Google productivity APIs, and composable integration platforms. |
+| [LangSmith Fleet tools](https://docs.langchain.com/langsmith/fleet/tools.md) | Gmail, Google BigQuery, Google Calendar, Google Docs, Google Sheets, Excel, Outlook, PowerPoint, SharePoint, Teams, Word, Exa, GitHub, Linear, LinkedIn, Pylon, Slack, Tavily, X, remote MCP servers, Arcade integration | Fleet highlights what business users expect: email, calendar, docs, sheets, chat, project management, code hosting, social, CRM/support, search, and MCP. |
+| [LlamaIndex / LlamaCloud docs](https://developers.llamaindex.ai/llms.txt) | LlamaParse, LlamaExtract, LlamaClassify, LlamaSheets, Split, LlamaCloud Index, LlamaHub data connectors, MCP tools, data sources for S3, Azure Blob, Box, Confluence, Google Drive, Jira, OneDrive, SharePoint; data sinks for Astra DB, Azure AI Search, Milvus, MongoDB Atlas Vector Search, Pinecone, Postgres, Qdrant | LlamaIndex is strongest evidence for document ingestion, RAG indexing, data connectors, vector sinks, and retrieval-oriented agent workflows. |
+
+## High-Signal Default Stack
+
+If you only need a practical shortlist, start here. These are not universal defaults; they are the tools that repeatedly show up as useful building blocks for production agent workflows.
+
+| Job | Strong starting points | Why |
+|---|---|---|
+| Agent runtime | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph | Covers TypeScript apps, OpenAI-native agents, and explicit graph workflows. |
+| Tool interoperability | MCP, JSON Schema, OpenAPI, Arazzo | Keeps tools inspectable, portable, and less prompt-dependent. |
+| Web search and extraction | Firecrawl, Tavily, Exa, Browserbase, Stagehand, Apify | Covers search, crawling, extraction, JavaScript-heavy browsing, and repeatable browser automation. |
+| RAG and retrieval | pgvector, Qdrant, Pinecone, Weaviate, Cloudflare AI Search, Voyage AI, Cohere, Jina AI | Covers vector storage, hybrid search, embeddings, and reranking. |
+| Document ingestion | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence | Turns messy PDFs, docs, tables, and scanned content into retrievable structure. |
+| Memory | Honcho, Zep, Letta, Mem0, Supermemory, Graphiti | Covers explicit agent memory, temporal graphs, user memory, and recall layers. |
+| External app actions | Composio, Arcade, Pipedream, Zapier, n8n, Paragon | Gives agents controlled access to SaaS actions without writing every connector from scratch. |
+| Sandboxed execution | E2B, Daytona, Vercel Sandbox, Cloudflare Sandbox, Modal | Lets agents run code or generated artifacts away from production systems. |
+| Durable workflows | Temporal, Trigger.dev, Inngest, Hatchet, LangGraph, Mastra workflows | Keeps multi-step agent work resumable, observable, and retryable. |
+| Observability and evals | Braintrust, Langfuse, Arize Phoenix, LangSmith, Promptfoo, RAGAS, DeepEval, OpenTelemetry GenAI | Gives traces, datasets, evaluations, and regression gates. |
+| Guardrails and security | Guardrails AI, NeMo Guardrails, Lakera, Llama Guard, Presidio, Pangea | Helps with validation, policy checks, PII handling, prompt-injection risk, and auditability. |
 
 ## Standards and Protocols
 
@@ -48,6 +79,10 @@ Use these when the product needs agents, tools, memory, workflows, or structured
 | [Pydantic AI](https://ai.pydantic.dev/agent/) | ai.pydantic.dev | Python agent framework built around Pydantic typing and validation | Conditional | Good Python choice when schema safety and FastAPI-style ergonomics matter. |
 | [Semantic Kernel](https://learn.microsoft.com/semantic-kernel/) | learn.microsoft.com | Microsoft-backed agent and orchestration SDK | Conditional | Strongest in .NET and Azure-heavy enterprise environments. |
 | [Google ADK](https://adk.dev/) | adk.dev | Google's agent development kit for building and deploying agents | Conditional | Use when a system is already aligned with Gemini, Vertex AI, or Google Cloud. |
+| [Agno](https://docs.agno.com/agents/introduction) | docs.agno.com | Python agent framework with tools, memory, knowledge, storage, sessions, metrics, and guardrails | Conditional | Good when Python owns the agent runtime and the team wants a compact framework with built-in memory and knowledge primitives. |
+| [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) | learn.microsoft.com | Microsoft framework for agents, tools, memory, persistence, workflows, hosting, and Azure integrations | Conditional | Use for Azure/.NET/Python enterprise systems; it is the successor direction for Semantic Kernel and AutoGen-style work. |
+| [Strands Agents](https://strandsagents.com/docs/) | strandsagents.com | Open-source agent SDK for model-driven tool use and production deployment | Watch | Worth tracking for AWS/Bedrock-aligned teams and lightweight Python agent loops. |
+| [smolagents](https://huggingface.co/docs/smolagents) | huggingface.co | Hugging Face agent framework focused on concise code agents and tool use | Watch | Useful for small Python agents and open-model experiments; evaluate before using for complex production workflows. |
 | [Cloudflare Agents](https://developers.cloudflare.com/agents/) | developers.cloudflare.com | Durable Object-backed TypeScript agents with state, scheduling, tools, MCP, chat, and browser access | Conditional | Strong when the agent should live close to Workers, Durable Objects, AI Gateway, or edge-hosted tool surfaces. |
 | [Agentuity](https://agentuity.com/) | agentuity.com | Cloud platform for deploying, running, observing, and scaling AI agents | Watch | Promising agent-native infrastructure; evaluate maturity before treating it as foundational. |
 | [CrewAI](https://docs.crewai.com/) | docs.crewai.com | Multi-agent crews, tasks, flows, memory, and tools | Conditional | Useful for role-based multi-agent prototypes; review security and observability before production use. |
@@ -65,16 +100,17 @@ Use this as the working index for deciding what to learn next. Tools can appear 
 | Structured output and bounded LLM tasks | JSON Schema, OpenAPI 3.1, Arazzo, AI SDK `Output.object`, OpenRouter structured outputs, Response Healing, Workers AI JSON Mode | Core/Conditional | You need parseable responses, workflow steps with schemas, API-derived tools, or small deterministic model substeps. |
 | Context and memory | Honcho, QMD, Cloudflare Agent Memory, Letta, Zep, Graphiti, Mem0, Supermemory, Hindsight, semantic recall, working memory, memory processors, context compression | Core/Conditional | Agents need cross-session continuity, local document recall, user modeling, temporal knowledge graphs, or context-window management. |
 | Retrieval and RAG | Cloudflare AI Search, Vectorize, pgvector, Pinecone, Qdrant, Weaviate, Chroma, LanceDB, Milvus, Elasticsearch, OpenSearch, Haystack, Ragie, Voyage AI, Jina AI, BGE, rerank APIs | Core/Conditional | The agent needs to find relevant knowledge from documents, code, user data, or search indexes before answering. |
-| Workflow orchestration | Mastra workflows, LangGraph graphs, OpenProse, Trigger.dev, durable task flows, subagents, ToolLoopAgent patterns | Core/Conditional | Work must be inspectable, resumable, multi-step, parallel, or safe around side effects. |
+| Workflow orchestration | Mastra workflows, LangGraph graphs, OpenProse, Trigger.dev, Temporal, Inngest, Hatchet, durable task flows, subagents, ToolLoopAgent patterns | Core/Conditional | Work must be inspectable, resumable, multi-step, parallel, or safe around side effects. |
 | Coding agents and local development | Codex, Claude Code, Anthropic Agent SDK, OpenHands SDK, Aider, Cline, Augment Code, Factory, CodeRabbit, Greptile, Macroscope, Roo Code, Kilo Code, Deep Agents CLI | Conditional/Watch | The target workflow is software development, repo navigation, code editing, testing, review, or issue-to-PR automation. |
 | Agent sandboxes and compute | Daytona, Modal, Cloudflare Sandbox SDK, Vercel Sandbox, Agentuity Sandboxes | Conditional/Watch | Agents need to run code, execute untrusted workloads, preserve stateful dev environments, or burst into GPU/Python jobs. |
-| Browser and web access | Browserbase, Kernel, Stagehand, Browser Run, Firecrawl, Tavily, Exa, Apify, browserless | Core/Conditional | Agents need current web context, authenticated browsing, extraction, crawling, screenshots, or GUI automation. |
+| Browser and web access | Browserbase, Kernel, Stagehand, Browser Run, Firecrawl, Tavily, Exa, Apify, browserless, Bright Data, SerpAPI, Serper, Brave Search API, Linkup, Jina Reader | Core/Conditional | Agents need current web context, authenticated browsing, extraction, crawling, screenshots, or GUI automation. |
+| Document ingestion and OCR | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence, Google Document AI, AWS Textract, Chunkr, Marker, MinerU | Core/Conditional | Agents need to read PDFs, scans, tables, slides, forms, invoices, or mixed-layout documents reliably. |
 | Observability and evaluation | Agent Readiness, Braintrust, Langfuse, LangSmith, Arize Phoenix/AX, OpenTelemetry GenAI, Promptfoo, RAGAS, DeepEval, Opik, Weave, Helicone, PostHog LLM Observability, AgentOps | Core/Conditional | You need traces, evals, regression tests, prompt experiments, cost tracking, RAG metrics, site-readiness audits, or production monitoring. |
 | AI UI and product surfaces | AI SDK UI, AI Elements, assistant-ui, CopilotKit, AG-UI, OpenAI Apps SDK, Mastra Client SDK | Core/Conditional | The agent needs chat, generative UI, tool-call rendering, human-in-the-loop flows, or host-app integration. |
 | AI app builders and design tools | v0, Bolt.new, Lovable, Chef, Rork, Magic Patterns | Conditional/Watch | You want quick prototypes, design-to-code loops, or generated app scaffolds that will still get engineering review. |
 | Voice and realtime agents | OpenAI Realtime, Vapi, LiveKit Agents, Pipecat, ElevenLabs, Deepgram, AssemblyAI, Azure AI Speech, Google Speech-to-Text, Agora Conversational AI, Hume, LMNT | Conditional | Voice, realtime turn-taking, transcription, text-to-speech, or conversational audio is part of the product. |
 | Image, video, and multimodal generation | OpenAI image generation, Replicate, fal, Runway, Luma, Black Forest Labs, video generation APIs | Conditional | Agents produce or interpret media rather than only text. |
-| Governance and gateway operations | AI Crawl Control, Content Signals, Web Bot Auth, Guardrails, provider/model allowlists, ZDR controls, app attribution, input/output logging, API-key budgets, management API keys, key rotation | Core/Conditional | Model use and agent access must be controlled across a team, tenant, product, content site, or production gateway. |
+| Governance and gateway operations | AI Crawl Control, Content Signals, Web Bot Auth, Guardrails AI, NeMo Guardrails, Lakera, Llama Guard, Presidio, Pangea, provider/model allowlists, ZDR controls, app attribution, input/output logging, API-key budgets, management API keys, key rotation | Core/Conditional | Model use and agent access must be controlled across a team, tenant, product, content site, or production gateway. |
 | Discovery and packaging | AGENTS.md, Agent Skills, llms.txt, Markdown content negotiation, API Catalog, MCP Server Cards, MCP Registry, AI SDK Tools Registry, plugin bundles | Core/Conditional | You want agents to discover project instructions, reusable skills, public docs, API contracts, MCP endpoints, or vetted tool packages. |
 
 ## Agent-Readable Web and Access Control
@@ -111,6 +147,10 @@ These are not always full agent frameworks. They are worth tracking because they
 |---|---|---|---|---|
 | [OpenProse](https://www.prose.md) | prose.md | Markdown-first multi-agent workflow programs with explicit parallelism and reusable `.prose` files | Watch | Promising for portable, reviewable agent workflow recipes. |
 | [Trigger.dev](https://trigger.dev/) | trigger.dev | TypeScript workflows, background tasks, retries, checkpointing, and AI agent jobs | Conditional | Strong when agent work needs durable execution rather than an in-request loop. |
+| [Temporal](https://docs.temporal.io/) | docs.temporal.io | Durable workflow engine with retries, timers, signals, queries, and long-running execution | Conditional | Use when agent work must survive process restarts, human delays, retries, and multi-day workflows. |
+| [Inngest](https://www.inngest.com/docs) | inngest.com | Durable serverless functions, background jobs, retries, and event-driven workflows | Conditional | Good TypeScript path for event-driven agent tasks that should not run inside a request lifecycle. |
+| [Hatchet](https://docs.hatchet.run/) | docs.hatchet.run | Open-source task queue and durable workflow engine | Watch | Useful when teams want self-hostable workflows with retries, concurrency, and observability. |
+| [Prefect](https://docs.prefect.io/) | docs.prefect.io | Python workflow orchestration for data and AI pipelines | Conditional | Relevant when agent workflows are coupled to Python data processing or scheduled RAG pipelines. |
 
 ## Coding Agents and Developer Workflows
 
@@ -187,6 +227,13 @@ Use these when agents need to run code, execute untrusted workloads, or access G
 | [Cloudflare Sandbox SDK](https://developers.cloudflare.com/sandbox/) | developers.cloudflare.com | Isolated container sandboxes for command execution, files, terminals, and code interpreter workflows from Workers | Conditional | Strong fit when code execution should be controlled by a Worker and stay close to edge-hosted agents. |
 | [Agentuity Sandboxes](https://agentuity.com/) | agentuity.com | Isolated containers inside an agent deployment platform | Watch | Track as part of agent-native infrastructure rather than generic cloud hosting. |
 | [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) | vercel.com | Ephemeral microVMs for running generated or untrusted code | Conditional | Relevant when AI code execution should stay isolated from the app runtime. |
+| [E2B](https://e2b.dev/docs) | e2b.dev | Secure sandboxes and code interpreter infrastructure for AI agents | Conditional | Strong fit for data analysis, generated-code execution, and code-interpreter features. |
+| [Amazon Bedrock AgentCore Code Interpreter](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter.html) | docs.aws.amazon.com | Managed code interpreter for Bedrock AgentCore agents | Conditional | Good fit when agent execution, browser, and code interpretation are intentionally AWS-native. |
+| [Azure Container Apps dynamic sessions](https://learn.microsoft.com/azure/container-apps/sessions-code-interpreter) | learn.microsoft.com | Session-based sandboxed code interpreter backed by Azure Container Apps | Conditional | Good Azure-native route for Python execution and uploaded-file analysis. |
+| [Riza Code Interpreter](https://docs.riza.io/) | docs.riza.io | Hosted and self-hostable code interpreter for model-generated code | Watch | Surfaced in LangChain integrations; evaluate if language coverage or self-hosting is important. |
+| [bash-tool](https://github.com/vercel/bash-tool) | github.com/vercel | AI SDK-compatible bash tool intended for sandboxed execution | Watch | Useful pattern for controlled shell execution; never expose it without a sandbox and policy layer. |
+| [ctx-zip](https://github.com/karthikscale3/ctx-zip/blob/main/README.md) | github.com/karthikscale3 | Converts MCP and AI SDK tools into code-mode tools that run through Vercel Sandbox | Watch | Interesting for large tool sets and code-mode execution, but keep it behind strict permissions. |
+| [Morph](https://docs.morph.so/) | docs.morph.so | Fast code editing and apply-patch infrastructure for AI coding workflows | Watch | Useful for coding agents that need reliable patch application rather than raw text replacement. |
 
 ## Retrieval, RAG, and Memory
 
@@ -206,8 +253,13 @@ This section keeps only retrieval tools that directly support RAG, semantic sear
 | [Chroma](https://docs.trychroma.com) | trychroma.com | Embedding database for local and application RAG | Conditional | Useful for prototyping and smaller RAG systems. |
 | [LanceDB](https://lancedb.github.io/lancedb/) | lancedb.github.io | Embedded and serverless vector database | Conditional | Good for local, multimodal, and file-backed vector workflows. |
 | [Milvus](https://milvus.io/docs) | milvus.io | Open-source vector database | Conditional | Good when vector scale and self-hosting are central requirements. |
+| [Astra DB Vector](https://docs.datastax.com/en/astra-db-serverless/databases/vector-search.html) | docs.datastax.com | Managed Cassandra-compatible database with vector search | Conditional | Appears in Mastra and LlamaCloud vector sink docs; use when DataStax/Astra is already in the stack. |
+| [MongoDB Atlas Vector Search](https://www.mongodb.com/docs/atlas/atlas-vector-search/) | mongodb.com | Vector search inside MongoDB Atlas | Conditional | Good when operational data and retrieval data already live in MongoDB. |
+| [Azure AI Search](https://learn.microsoft.com/azure/search/vector-search-overview) | learn.microsoft.com | Hybrid search, vector search, semantic ranking, and enterprise search on Azure | Conditional | Strong Azure-native retrieval option and a LlamaCloud Index data sink. |
 | [Elasticsearch Vector Search](https://www.elastic.co/guide/en/elasticsearch/reference/current/semantic-search.html) | elastic.co | Hybrid lexical and vector search | Conditional | Include when search is already Elastic-based or hybrid retrieval matters. |
 | [OpenSearch Vector Search](https://opensearch.org/docs/latest/vector-search/) | opensearch.org | Open-source hybrid search and vector search | Conditional | Include when OpenSearch is already the search platform. |
+| [Upstash Vector](https://upstash.com/docs/vector) | upstash.com | Serverless vector database | Conditional | Appears in Mastra vector/storage references; good for lightweight serverless retrieval. |
+| [Turbopuffer](https://turbopuffer.com/docs) | turbopuffer.com | Object-storage-backed vector and full-text search | Watch | Appears in Mastra vector stores; track for high-scale, cost-sensitive retrieval. |
 | [Haystack](https://docs.haystack.deepset.ai/) | docs.haystack.deepset.ai | RAG pipelines, retrieval, readers, generators, and evals | Conditional | Strong Python RAG framework, especially for explicit pipelines. |
 | [Ragie](https://www.ragie.ai/) | ragie.ai | Managed ingestion, connectors, and retrieval for AI applications | Conditional | Useful when RAG needs many data connectors without building ingestion plumbing. |
 | [Voyage AI](https://docs.voyageai.com) | voyageai.com | Embeddings and reranking | Conditional | Retrieval-specialized model provider. |
@@ -274,11 +326,81 @@ These are included because their primary use is giving agents live web context, 
 | [Kernel](https://www.kernel.sh/) | kernel.sh | Fast browser infrastructure for web agents and browser automation | Conditional | Good signal for production browser-agent infrastructure. |
 | [Stagehand](https://docs.browserbase.com/introduction/stagehand) | docs.browserbase.com | AI-native browser automation built around Playwright plus `act`, `extract`, and `observe` | Core | Good bridge between deterministic browser automation and LLM-driven page interaction. |
 | [Browser Run](https://developers.cloudflare.com/browser-run/) | developers.cloudflare.com | Headless browser automation with screenshots, PDFs, Markdown extraction, crawling, Playwright, CDP, Stagehand, and MCP options | Conditional | Strong fit when browser execution should be available as managed infrastructure near edge agents. |
+| [Amazon Bedrock AgentCore Browser](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-tool.html) | docs.aws.amazon.com | Managed browser automation capability for Bedrock AgentCore | Conditional | Use when the agent stack is already AWS/Bedrock-native and browser control needs to stay inside AWS boundaries. |
 | [Firecrawl](https://docs.firecrawl.dev/introduction) | docs.firecrawl.dev | Search, scrape, crawl, extract, and interact APIs with LLM-ready output and MCP support | Core | Good for docs ingestion, web research, and RAG pipelines. |
 | [Tavily](https://docs.tavily.com/welcome) | docs.tavily.com | Search, extract, crawl, map, and research API for AI applications | Conditional | Good for web-aware agents that need current search results. |
 | [Exa](https://exa.ai/docs/reference/search-api-guide) | exa.ai | AI-oriented web search, contents extraction, and structured web research | Conditional | Good for semantic web retrieval and research agents. |
+| [Parallel](https://parallel.ai) | parallel.ai | Web search and extraction tools for agents with token-efficient context | Watch | Surfaced by the AI SDK tool registry; evaluate where compressed web results matter. |
+| [Perplexity Search API](https://docs.perplexity.ai/guides/search-quickstart) | docs.perplexity.ai | Search API for current web answers and source-backed search results | Conditional | Useful when a workflow wants search-backed synthesis rather than raw crawler output. |
+| [Valyu](https://docs.valyu.ai/integrations/vercel-ai-sdk) | docs.valyu.ai | Domain-focused search tooling for AI agents | Watch | Surfaced by the AI SDK tool registry; evaluate for specialized research domains. |
+| [Airweave](https://docs.airweave.ai) | docs.airweave.ai | Semantic search and RAG data-source tooling for AI apps | Watch | Useful signal for connector-backed semantic search, especially when search spans app data sources. |
+| [Tako Search](https://github.com/TakoData/ai-sdk#readme) | github.com/TakoData | Search/data/visualization tool package for AI SDK workflows | Watch | Track for data-rich research and visualization workflows. |
+| [Apify](https://docs.apify.com/) | docs.apify.com | Web scraping, crawling, browser automation, and actor marketplace | Conditional | Useful when agents need durable crawlers or a marketplace of maintained extractors. |
+| [browserless](https://docs.browserless.io/) | docs.browserless.io | Hosted Chrome automation over CDP, Playwright, Puppeteer, and REST APIs | Conditional | Practical browser infrastructure when the app already owns deterministic automation code. |
+| [AgentQL](https://docs.agentql.com/) | docs.agentql.com | Query-like web interaction and extraction for agent/browser workflows | Watch | Surfaced in LangChain browser-tool integrations; useful when selectors are brittle. |
+| [Hyperbrowser](https://docs.hyperbrowser.ai/) | docs.hyperbrowser.ai | Browser automation and web scraping infrastructure for AI agents | Watch | Appears in LangChain browser integrations; evaluate against Browserbase/Stagehand. |
+| [MultiOn](https://docs.multion.ai/) | docs.multion.ai | Browser-agent automation API | Watch | Interesting for delegated web tasks, but validate reliability and control boundaries carefully. |
+| [Bright Data](https://docs.brightdata.com/) | docs.brightdata.com | Web data, scraping browsers, datasets, proxies, and unlocker infrastructure | Conditional | Consider for difficult extraction at scale; keep compliance and site terms explicit. |
+| [Oxylabs Web Scraper API](https://developers.oxylabs.io/) | developers.oxylabs.io | Web scraping and SERP extraction infrastructure | Conditional | Consider for scale and difficult extraction where proxy/compliance operations are already understood. |
+| [SerpAPI](https://serpapi.com/search-api) | serpapi.com | Search engine results API | Conditional | Useful for search-result pages when you need structured SERP data rather than semantic search. |
+| [Serper](https://serper.dev/) | serper.dev | Google Search API for AI apps and automation | Conditional | Lightweight option for web-search tools where raw search results are enough. |
+| [Brave Search API](https://api.search.brave.com/) | api.search.brave.com | Independent web search API | Conditional | Good alternative search source when avoiding Google-dependent SERP APIs matters. |
+| [Linkup](https://docs.linkup.so/) | docs.linkup.so | Search and retrieval API for AI agents | Watch | Track as part of the agent-native web search category. |
+| [Jina Reader](https://jina.ai/reader/) | jina.ai | URL-to-Markdown and web content extraction service | Conditional | Useful as a simple reader tool before adding a full crawler or browser stack. |
+| [Jina Search](https://jina.ai/search/) | jina.ai | Search API returning web results and page content for AI workflows | Conditional | Surfaced in LangChain search-tool integrations and pairs naturally with Jina Reader. |
+| [SearchApi](https://www.searchapi.io/docs) | searchapi.io | Search engine results API | Conditional | Another SERP-style option; use only when its engine coverage and pricing fit. |
+| [SearxNG](https://docs.searxng.org/) | docs.searxng.org | Self-hostable metasearch engine | Conditional | Good when search should be self-hosted or privacy-sensitive. |
+| [DuckDuckGo Search](https://duckduckgo.com/) | duckduckgo.com | General web search source used by several toolkits | Conditional | Useful as a low-friction tool in prototypes; production use needs reliability checks. |
+| [You.com Search API](https://docs.you.com/) | docs.you.com | Search API for AI applications | Watch | Appears in LangChain search integrations; evaluate against Exa/Tavily/Firecrawl/Brave. |
 | [Composio](https://docs.composio.dev) | docs.composio.dev | Tool integrations for AI agents | Watch | Useful breadth, but avoid outsourcing core product semantics without evaluation. |
 | [n8n AI Agent](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/) | docs.n8n.io | No-code/low-code AI agent node with tools and workflow automation | Conditional | It straddles the line. Include for AI automation workflows, not as the default code-first agent runtime. |
+
+## Document Ingestion, OCR, and Parsing
+
+Use these when agent quality depends on reading messy source material rather than clean Markdown. Document tooling is often the hidden difference between a decent RAG demo and a useful production agent.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [LlamaParse](https://docs.cloud.llamaindex.ai/llamaparse) | docs.cloud.llamaindex.ai | Document parsing service from LlamaIndex for PDFs, tables, layouts, and multimodal documents | Core | Strong default for RAG projects already using LlamaIndex or needing high-quality PDF-to-structured-text conversion. |
+| [Unstructured](https://docs.unstructured.io/) | docs.unstructured.io | Ingestion and partitioning for PDFs, Office docs, HTML, images, and enterprise files | Core | Good when the ingestion problem spans many file types and connectors. |
+| [Docling](https://ds4sd.github.io/docling/) | ds4sd.github.io | Open-source document conversion, parsing, OCR, layout, table, and multimodal extraction | Conditional | Strong local/open-source path when teams want control over document processing. |
+| [Reducto](https://docs.reducto.ai/) | docs.reducto.ai | Document ingestion and extraction API for complex PDFs and structured outputs | Conditional | Worth evaluating for finance, legal, healthcare, and other layout-heavy document workflows. |
+| [Mistral OCR](https://docs.mistral.ai/capabilities/document_ai) | docs.mistral.ai | OCR and document AI through Mistral's Document AI stack | Conditional | Good when Mistral is already in the model/provider mix or OCR quality is central. |
+| [Azure AI Document Intelligence](https://learn.microsoft.com/azure/ai-services/document-intelligence/) | learn.microsoft.com | Enterprise document extraction for forms, invoices, receipts, layout, and custom models | Conditional | Strong when compliance, Azure integration, and existing enterprise document flows matter. |
+| [Google Document AI](https://cloud.google.com/document-ai/docs) | cloud.google.com | Document processors for OCR, forms, invoices, layout, and custom extraction | Conditional | Best when the app and data are already on Google Cloud. |
+| [AWS Textract](https://docs.aws.amazon.com/textract/) | docs.aws.amazon.com | AWS document text, table, form, and layout extraction | Conditional | Best when documents already live in S3 or the system is AWS-native. |
+| [Chunkr](https://docs.chunkr.ai/) | docs.chunkr.ai | Document parsing API for layout-aware extraction and chunking | Watch | Track for document-heavy RAG where chunk quality is a bottleneck. |
+| [Marker](https://github.com/datalab-to/marker) | github.com/datalab-to | Open-source document conversion to Markdown, JSON, and HTML | Conditional | Useful local option for PDF-to-Markdown pipelines and batch ingestion. |
+| [MinerU](https://github.com/opendatalab/MinerU) | github.com/opendatalab | Open-source document extraction and conversion toolkit | Watch | Track for open document parsing, especially PDFs with tables, formulas, and layout needs. |
+
+## External App Integration and Tool Hubs
+
+Use these when the value of the agent is acting across SaaS systems. Prefer scoped, auditable tool access over dumping every possible integration into the model context.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Composio](https://docs.composio.dev) | docs.composio.dev | Managed integrations and tools for AI agents across SaaS apps | Conditional | Good for breadth and fast prototypes; keep permissions, user connection state, and tool curation explicit. |
+| [Arcade](https://docs.arcade.dev/) | docs.arcade.dev | Authenticated tools and integrations for AI agents | Watch | Useful direction for delegated app actions where auth and user consent matter. |
+| [Pipedream Connect](https://pipedream.com/docs/connect/) | pipedream.com | User-authenticated integrations and workflows that apps can expose to AI features | Conditional | Good when agent tools need many SaaS connectors plus managed OAuth. |
+| [Zapier AI Actions](https://actions.zapier.com/docs/) | actions.zapier.com | Zapier actions exposed to AI assistants and agent workflows | Conditional | Good for long-tail SaaS actions, especially non-engineering workflows. |
+| [n8n](https://docs.n8n.io/advanced-ai/) | docs.n8n.io | Workflow automation with AI nodes, tools, agents, and human-in-the-loop steps | Conditional | Useful for operations teams and internal workflows; use code-first runtimes for core product logic. |
+| [Paragon](https://docs.useparagon.com/) | docs.useparagon.com | Embedded integrations platform with managed auth and sync | Conditional | Useful when integrations are a product feature rather than only an agent convenience. |
+| [Merge](https://docs.merge.dev/) | docs.merge.dev | Unified APIs for categories such as HRIS, CRM, ticketing, accounting, and file storage | Conditional | Good when agents need normalized access to business systems through category APIs. |
+| [Metorial](https://metorial.com/docs) | metorial.com | Tool and MCP infrastructure for connecting agents to external services | Watch | Track in the agent-tool hub category; evaluate security and connector quality before adoption. |
+
+## Guardrails, Security, and Policy Tools
+
+Use these when agents read untrusted content, handle user data, call write tools, or operate in regulated environments. These tools do not replace product-level permission design; they help enforce and observe it.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Guardrails AI](https://www.guardrailsai.com/docs) | guardrailsai.com | Validation, structured-output checks, and guardrail orchestration for LLM apps | Conditional | Good when output shape, policy checks, or validation failures need first-class handling. |
+| [NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/) | docs.nvidia.com | Programmable guardrails and dialog controls for LLM applications | Conditional | Useful in enterprise/NVIDIA-aligned stacks or policy-heavy conversational systems. |
+| [Lakera](https://docs.lakera.ai/) | docs.lakera.ai | Prompt-injection and LLM security protection | Conditional | Consider for agents browsing or ingesting hostile/untrusted web content. |
+| [Llama Guard](https://www.llama.com/docs/model-cards-and-prompt-formats/llama-guard-4/) | llama.com | Safety classification model family | Conditional | Useful as a self-hostable or model-based safety classifier, depending on deployment needs. |
+| [Microsoft Presidio](https://microsoft.github.io/presidio/) | microsoft.github.io | PII detection, redaction, and anonymization | Conditional | Practical for logs, traces, eval datasets, and tool outputs that may contain sensitive data. |
+| [Pangea AI Guard](https://pangea.cloud/docs/ai-guard/) | pangea.cloud | AI security guardrail API for prompt, response, and data protection | Watch | Track for teams already using Pangea security services. |
+| [Superagent](https://docs.superagent.sh) | docs.superagent.sh | Guardrails, PII, prompt-injection, and verification tooling surfaced by the AI SDK registry | Watch | Worth evaluating as the AI SDK ecosystem adds packaged security tools. |
 
 ## Multimodal and Voice AI
 
