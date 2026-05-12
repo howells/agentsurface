@@ -122,7 +122,6 @@ When working in this repo:
 ## Key References
 
 - [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md)
-- [`./docs/arc/specs/surface-spec.md`](./docs/arc/specs/surface-spec.md)
 - [`./README.md`](./README.md)
 - [`./INSTALL.md`](./INSTALL.md)
 
