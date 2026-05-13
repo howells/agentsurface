@@ -1,22 +1,22 @@
 ---
 title: Cross-Framework Portability
-description: Defining tools once and exporting adapters for MCP, Claude Agent SDK, and OpenAI
+description: Defining tools once and exporting adapters for MCP, Claude Code SDK, and OpenAI
 ---
 
 ## Summary
 
-Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK, LangChain). Keeps logic centralized, ensures consistency across platforms, reduces duplication. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Tool constructor, OpenAI FunctionDeclaration). Single source of truth for tool behavior means updates flow everywhere.
+Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Code SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). Keeps logic centralized, ensures consistency across platforms, reduces duplication. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations). Single source of truth for tool behavior means updates flow everywhere.
 
 - **Shared registry**: Tool metadata, handler, schema (Zod)
 - **MCP adapter**: server.tool() registration
-- **Claude Agent SDK adapter**: Tool() constructor
+- **Claude Code SDK adapter**: expose the registry as MCP or allowed SDK tools
 - **OpenAI adapter**: FunctionDeclaration with handler wrapper
 - **Vercel AI SDK adapter**: tools object
 - **Benefits**: Single source of truth, reduced duplication, consistent behavior
 
 ---
 
-Tool definitions are business logic. Frameworks are deployment targets. Define your tool once in a framework-neutral module; emit adapters for each framework (MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK). This keeps logic centralized and ensures consistency across platforms.
+Tool definitions are business logic. Frameworks are deployment targets. Define your tool once in a framework-neutral module; emit adapters for each framework (MCP, Claude Code SDK, @openai/agents, Vercel AI SDK). This keeps logic centralized and ensures consistency across platforms.
 
 ## The Pattern
 
@@ -118,52 +118,43 @@ server.tool(
 export default server;
 ```
 
-### Step 3: Claude Agent SDK Adapter
+### Step 3: Claude Code SDK / MCP Adapter
 
-```typescript
-// tools/claude-agent-sdk.ts
-import { tool } from '@anthropic-ai/claude-agent-sdk';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import { allTools } from './registry';
+Claude Code and the Claude Code SDK are usually best served by exposing the same shared registry through MCP. That keeps the tool contract portable to Claude Code, Claude Desktop-style clients, OpenAI remote MCP, Gemini connectors, and other MCP clients.
 
-// Export each tool for use in Claude Agent SDK
-export const claudeTools = allTools.map(t => 
-  tool({
-    name: t.name,
-    description: t.description,
-    inputSchema: zodToJsonSchema(t.schema),
-    execute: async (params: any) => {
-      const result = await t.handler(params);
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result),
-        }],
-      };
-    },
-  })
-);
-
-// Or destructure for use in agent:
-export const searchDocsTool = claudeTools.find(t => t.name === 'search_docs');
-export const createDocTool = claudeTools.find(t => t.name === 'create_doc');
-```
-
-In an agent:
-
-```typescript
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import { searchDocsTool, createDocTool } from './tools/claude-agent-sdk';
-
-async function main() {
-  const response = await query({
-    prompt: 'Find the authentication guide',
-    tools: [searchDocsTool, createDocTool],
-  });
-  
-  console.log(response);
+```json
+// .mcp.json
+{
+  "mcpServers": {
+    "docs": {
+      "command": "node",
+      "args": ["dist/tools/mcp.js"],
+      "env": {
+        "DOCS_API_TOKEN": "${DOCS_API_TOKEN}"
+      }
+    }
+  }
 }
 ```
+
+Then use the Claude Code SDK with the repo or service MCP configuration and an allowlist:
+
+```typescript
+import { query } from "@anthropic-ai/claude-code";
+
+for await (const message of query({
+  prompt: "Find the authentication guide and summarize the setup steps.",
+  options: {
+    mcpConfig: ".mcp.json",
+    allowedTools: ["mcp__docs__search_docs"],
+    maxTurns: 6,
+  },
+})) {
+  // Stream messages, tool calls, and final result through your app.
+}
+```
+
+For Claude Managed Agents, register equivalent tool definitions or MCP servers in the managed-agent session rather than creating a separate in-process adapter. Keep the registry as the source of truth.
 
 ### Step 4: OpenAI Agents SDK Adapter
 
@@ -351,7 +342,7 @@ describe('MCP adapter', () => {
 // test/claude-agent-sdk.test.ts
 import { searchDocsTool } from '../tools/claude-agent-sdk';
 
-describe('Claude Agent SDK adapter', () => {
+describe('Claude Code SDK adapter', () => {
   it('tool has correct shape', () => {
     expect(searchDocsTool).toHaveProperty('name', 'search_docs');
     expect(searchDocsTool).toHaveProperty('description');
@@ -368,7 +359,7 @@ src/
 ├── tools/
 │   ├── registry.ts           # Shared handlers + metadata
 │   ├── mcp.ts                # MCP Server adapter
-│   ├── claude-agent-sdk.ts   # Claude Agent SDK adapter
+│   ├── claude-agent-sdk.ts   # Claude Code SDK adapter
 │   ├── openai-agents.ts      # OpenAI Agents SDK adapter
 │   └── vercel-ai.ts          # Vercel AI SDK adapter
 ├── test/
@@ -391,6 +382,6 @@ src/
 - `/templates/tools-and-orchestration/tool-definition.ts` — starter template
 - `/templates/tools-and-orchestration/tool-registry.ts` — registry pattern for >10 tools
 - ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
-- ([Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/typescript))
+- ([Claude Code SDK](https://docs.anthropic.com/en/docs/claude-code/sdk))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Vercel AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/))

@@ -20,7 +20,7 @@ Use [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md) when the task is to
 - generate a transformation plan
 - execute targeted upgrades with specialist agents
 - scaffold a new AI agent, tool, or workflow
-- initialize Mastra agent infrastructure in a project
+- initialize framework-appropriate agent infrastructure in a project
 - set up multi-provider model routing
 - add memory (vector search, semantic recall) to agents
 - create production-grade agent scaffolding based on proven patterns
@@ -31,7 +31,7 @@ Core characteristics:
 - clustered findings with concrete fixes
 - prioritized transformation planning
 - optional execution through specialist agents
-- Mastra-first framework recommendation (with graceful alternatives)
+- framework selection across OpenAI Agents SDK, Claude Managed Agents/Claude Code SDK, Vercel AI SDK/Workflow, Cloudflare Agents, Mastra, LangGraph, and MCP-first designs
 - 8 production patterns codified from deployed systems
 - project-aware scaffolding that reads existing structure
 - conversational — asks the right questions before generating code

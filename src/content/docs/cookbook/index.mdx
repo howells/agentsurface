@@ -7,7 +7,7 @@ description: Battle-tested patterns from production agentic SaaS — 10 transfer
 
 This cookbook distills 10 patterns extracted from a real-world production agentic application (Bun + Turborepo + Next.js + TypeScript + Vercel AI SDK + MCP + Composio + multi-platform bots). Each pattern solves a specific scaling challenge: loop commodity, tool safety, semantic selection, configuration, multi-platform adaptation, notification continuity, confirmation workflows, external connectivity, dynamic routing, and autonomous behavior.
 
-- **Agentic Loop as Commodity**: Use framework abstractions (`ToolLoopAgent`, `generateText` with `stopWhen`, Claude Agent SDK) instead of custom state machines.
+- **Agentic Loop as Commodity**: Use framework abstractions (`ToolLoopAgent`, `generateText` with `stopWhen`, Claude Code SDK) instead of custom state machines.
 - **Tool Annotations (READ_ONLY/WRITE/DESTRUCTIVE)**: Declare intent once; drive system prompts, client UI, and safety rules automatically.
 - **Semantic Tool Selection**: At >20 tools, use embedding-based picking (~12 per turn) instead of passing all tools every request.
 - **System Prompt as Configuration**: Compose identity, safety, routing, formatting, and platform rules into one immutable string.
@@ -40,9 +40,9 @@ This cookbook distills 10 patterns extracted from a real-world production agenti
 ## Patterns Overview
 
 ### 1. Agentic Loop as Commodity
-**The core insight**: The "loop" is a solved problem. Stop building custom tool-call orchestration. Use `ToolLoopAgent` (Vercel AI), `generateText` with `stopWhen`/`maxSteps` (Vercel AI), Claude Agent SDK `query()`, or OpenAI `@openai/agents`. The *agentic* part is the tools and prompts, not the control flow.
+**The core insight**: The "loop" is a solved problem. Stop building custom tool-call orchestration. Use `ToolLoopAgent` (Vercel AI), `generateText` with `stopWhen`/`maxSteps` (Vercel AI), Claude Code SDK `query()`, or OpenAI `@openai/agents`. The *agentic* part is the tools and prompts, not the control flow.
 
-**Stack**: Vercel AI SDK 0.6+, Claude Agent SDK, OpenAI Agents.
+**Stack**: Vercel AI SDK 0.6+, Claude Code SDK, OpenAI Agents.
 
 **Key files**: [`agentic-loop.mdx`](/docs/cookbook/agentic-loop)
 

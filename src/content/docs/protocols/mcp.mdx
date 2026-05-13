@@ -302,7 +302,7 @@ Tool definitions support an `annotations` field. Annotations communicate behavio
 | `idempotentHint` | boolean | Calling with the same arguments multiple times has the same effect as calling once |
 | `openWorldHint` | boolean | Tool interacts with external systems outside the MCP server's control |
 
-Annotations are hints, not enforcement. Clients may use them to require user confirmation before destructive calls or to allow unrestricted use of read-only tools.
+Annotations are hints, not enforcement. Clients may use them to require user confirmation before destructive calls or to allow unrestricted use of read-only tools, but trusted server or workflow code must still enforce authorization, scopes, tenant boundaries, and approval gates.
 
 ## New in 2025-11-25
 

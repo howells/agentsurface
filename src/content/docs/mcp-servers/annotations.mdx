@@ -5,18 +5,18 @@ description: Communicating tool behavior hints to clients through MCP annotation
 
 ## Summary
 
-Tool annotations are metadata hints signaling tool behavior to clients. Four hints: readOnlyHint (does not modify state), destructiveHint (irreversibly deletes), progressIndicators (reports progress), and costWarning (expensive operation). Annotations are hints, not guarantees. Unverified servers' annotations are treated as untrusted. Verified, trusted servers can enable smarter client behavior without human confirmation.
+Tool annotations are metadata hints signaling tool behavior to clients. Current MCP tool hints include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint. Annotations are hints, not guarantees or permission policy. Unverified servers' annotations are treated as untrusted. Verified, trusted servers can enable smarter client behavior, but destructive and high-risk tools still need server-side approval and authorization policy.
 
 - readOnlyHint: tool does not modify persistent state
 - destructiveHint: tool may permanently delete or irreversibly modify
-- progressIndicators: tool reports incremental progress
-- costWarning: tool is expensive (time, tokens, money)
+- idempotentHint: repeated calls with the same arguments have no additional effect
+- openWorldHint: tool interacts with external systems outside the server boundary
 - Default destructiveHint: true (assume worst)
 - Hints enable smarter client behavior (auto-run safe tools, warn on destructive)
 
 Tool annotations are metadata hints that tell MCP clients about the behavioral characteristics of a tool — whether it reads or writes, whether the operation can be reversed, whether it might affect systems outside the server's own domain. Clients use these hints to decide whether to show a confirmation dialog, allow automatic retry, or warn the user before proceeding.
 
-Annotations are hints, not guarantees. A tool that declares `readOnlyHint: true` might still write to a log file. Clients that come from unverified servers must treat annotations as untrusted information. For verified, trusted servers, annotations enable smarter client behavior without requiring humans in the loop for every tool call.
+Annotations are hints, not guarantees. A tool that declares `readOnlyHint: true` might still write to a log file. Clients that come from unverified servers must treat annotations as untrusted information. For verified, trusted servers, annotations enable smarter client behavior, but they never replace server-side auth, tenant checks, scope checks, or confirmation gates.
 
 ## The Four Hints
 
@@ -169,6 +169,18 @@ The default for every annotation is the most conservative possible value:
 | openWorldHint    | `true`   | Assume the tool makes external requests         |
 
 This means that an unannotated tool gets the most restrictive behavior from clients. Annotating your tools is how you opt in to smoother experiences — fewer confirmation dialogs, safer automatic retries, unrestricted use in sandboxed environments.
+
+## What Annotations Do Not Do
+
+Annotations do not enforce policy. They do not prove that a tool is safe, read-only, idempotent, or internal-only. They only tell a client what the server claims about a tool.
+
+For production systems:
+
+- enforce user, tenant, and scope authorization in trusted server code
+- require approval for destructive, authenticated, production, browser, sandbox, package-install, payment, email-send, and file-write tools
+- log the annotation set and the actual approval decision
+- default unknown tools to high-risk behavior
+- pin or trust remote servers before relying on their metadata for automation
 
 ## Full Annotation Reference
 

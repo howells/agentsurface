@@ -193,7 +193,7 @@ Each package can override permission boundaries (e.g., API server can deploy, we
 
 ## Cross-vendor notes
 
-- **Anthropic** treats AGENTS.md as first-class. CLAUDE.md takes precedence when both present. Fully supported: [Claude Code docs](https://code.claude.com/docs/en/claude-code).
+- **Anthropic** treats AGENTS.md as first-class. CLAUDE.md takes precedence when both present. Fully supported: [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code/overview).
 - **Cursor** reads AGENTS.md + .cursor/rules/ with high fidelity. See [Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai).
 - **GitHub Copilot** reads AGENTS.md and .github/copilot-instructions.md. Lower token budget than Claude; keep instructions terse.
 - **Google Gemini CLI** reads GEMINI.md + AGENTS.md (if Gemini-specific file missing, defaults to AGENTS.md).
@@ -297,7 +297,7 @@ This example is ~90 lines, command-first, boundary-explicit, and ready to ship.
 ## Citations
 
 - [agents.md](https://agents.md) — Agentic AI Foundation (Linux Foundation).
-- [Claude Code docs on CLAUDE.md](https://code.claude.com/docs/en/claude-code).
+- [Claude Code docs on CLAUDE.md](https://docs.anthropic.com/en/docs/claude-code/overview).
 - [Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai).
 - [GitHub Copilot custom instructions](https://docs.github.com/en/copilot/customizing-copilot/adding-custom-instructions-for-copilot).
 - Simon Willison: [Context Engineering](https://simonwillison.net/2023/Dec/28/context-engineering/) (foundational essay on agent context design).

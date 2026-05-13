@@ -7,7 +7,7 @@ Dimension 5 scores machine-to-machine (M2M) authentication capability. Agents ca
 - **0**: Browser-only auth or CAPTCHA (blocker)
 - **1**: API keys without M2M OAuth or overly broad scopes
 - **2**: OAuth 2.1 Client Credentials, scoped, short-lived tokens
-- **3**: Token Exchange (RFC 8693), agent identity tracking, .well-known endpoints
+- **3**: Token Exchange (RFC 8693), agent identity tracking, RFC 9728 protected-resource metadata
 - **Evidence**: client_credentials grants, Bearer token validation, scope definitions, env-var injection
 
 ---
@@ -21,13 +21,13 @@ Agents cannot solve CAPTCHAs, complete OAuth authorization-code redirects, or in
 | 0 | Browser-only auth. OAuth authorization code flow as only option. CAPTCHAs. Session cookies required. | Auth requires redirect to browser. No client_credentials grant. CAPTCHA in auth flow. Cookie-based sessions only. |
 | 1 | API keys exist but no M2M OAuth. Keys may be long-lived or overly broad. | API key auth available. No OAuth client_credentials. Keys may be permanent. No scope limitation. |
 | 2 | OAuth 2.1 Client Credentials grant. Scoped, short-lived tokens. Env var injection. JWT validation (iss, aud, exp). | OAuth config with client_credentials grant_type. Token scopes defined. JWT validation checking signature + claims. Tokens expire in hours. |
-| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth 2.1 compliance. | Token exchange endpoint. Audience-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. |
+| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance with RFC 9728 protected-resource metadata. | Token exchange endpoint. Audience-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. |
 
 ## Evidence to gather
 
 - Grep for `client_credentials`, `Bearer`, `JWT`, `iss`, `aud`, `exp` tokens
 - Auth config files: Clerk, Auth0, WorkOS, Supabase Auth, NextAuth, better-auth
-- `.well-known/oauth-authorization-server` and `.well-known/oauth-protected-resource` (RFC 8414)
+- `.well-known/oauth-authorization-server` (RFC 8414) and `.well-known/oauth-protected-resource` (RFC 9728)
 - API key generation endpoints and rotation mechanisms
 - Token exchange implementation and audience restrictions
 - CAPTCHAs in auth flow (anti-pattern)
@@ -66,19 +66,19 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
 
 ### Protected resource metadata
 
-([RFC 8414 extension](https://datatracker.ietf.org/doc/html/rfc8414)) defines `.well-known/oauth-protected-resource`. A public resource server exposes:
+([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html)) defines OAuth 2.0 Protected Resource Metadata at `.well-known/oauth-protected-resource`. A public resource server exposes:
 
 ```json
 {
-  "resource_url": "https://api.example.com",
+  "resource": "https://api.example.com",
   "authorization_servers": ["https://auth.example.com"],
   "scopes_supported": ["users:read", "users:write", "billing:read"],
   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
-  "response_types_supported": ["token"]
+  "bearer_methods_supported": ["header"]
 }
 ```
 
-This is consumed by MCP 2025-11-25 remote servers to validate and route requests. Always publish this metadata if your API is exposed to remote agents.
+Authorization server metadata remains RFC 8414. This protected-resource metadata is consumed by MCP 2025-11-25 clients to discover authorization servers and request the right resource/scopes. Always publish it if your API or MCP server is exposed to remote agents.
 
 ### Agent identity and delegation
 
@@ -281,7 +281,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 ## Cross-vendor notes
 
-**Anthropic Claude Agent SDK:** Auth is handled by the host environment. Remote MCP servers must expose OAuth metadata at `.well-known/oauth-protected-resource`. The SDK passes `Authorization` headers forwarded from the agent's context.
+**Anthropic Claude platform:** Claude Code SDK and Claude Managed Agents can call remote MCP tools. Protected remote MCP servers should expose RFC 9728 metadata at `.well-known/oauth-protected-resource`, and app code should forward only scoped, aud/resource-bound credentials.
 
 **OpenAI Responses API:** Remote MCP tools require auth headers forwarded. Use `authorization` in the tool config. OAuth 2.0 Client Credentials is the recommended M2M pattern.
 
@@ -305,7 +305,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 - `/templates/oauth-client-credentials.ts` — complete M2M flow with short-lived tokens.
 - `/templates/jwt-validate.ts` — jose-based token validation with JWKS caching.
-- `/templates/well-known-oauth-protected-resource.ts` — Next.js endpoint serving RFC 8414 metadata.
+- `/templates/well-known-oauth-protected-resource.ts` — Next.js endpoint serving RFC 9728 protected-resource metadata.
 - `/templates/token-exchange.ts` — RFC 8693 token exchange implementation.
 - `/templates/dpop-header.ts` — DPoP proof signing for sender-constrained tokens.
 
@@ -320,7 +320,8 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 ## Citations
 
 - ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) — Client Credentials, token endpoint.
-- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — `.well-known/oauth-authorization-server` and `.well-known/oauth-protected-resource`.
+- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — `.well-known/oauth-authorization-server`.
+- ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — `.well-known/oauth-protected-resource`.
 - ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — Delegated access, narrowly-scoped tokens.
 - ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — DPoP, sender-constrained tokens.
 - ([OAuth 2.1 (draft)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) — PKCE, removed insecure flows, refresh token rotation.

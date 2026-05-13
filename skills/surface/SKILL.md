@@ -86,11 +86,11 @@ Gather these surfaces before scoring:
 - Stack files: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `deno.json`, `bun.lockb`, lockfiles.
 - API specs/routes: OpenAPI, Swagger, `app/api`, `pages/api`, route handlers, controllers.
 - CLI: `bin` field, command entrypoints, argument parsers, TTY/output handling.
-- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/sdk`, `mcp-handler`, `@mastra/mcp`, server transports.
+- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/sdk`, `mcp-handler`, `@mastra/mcp`, server transports, protocol version, roots, sampling, elicitation, and task support.
 - Discovery: `AGENTS.md`, `CLAUDE.md`, Cursor/Copilot/Windsurf rules, `llms.txt`, `llms-full.txt`, `robots.txt`, `sitemap.xml`, `.well-known`.
 - Agent web readiness: Markdown content negotiation, JSON-LD, OpenAPI links, API catalog, MCP metadata, OAuth protected-resource metadata.
 - Auth: OAuth, API keys, bearer/JWT validation, scopes, token exchange, env-var handling.
-- Tools/agents/workflows: Mastra, AI SDK, LangGraph, OpenAI Agents SDK, Cloudflare Agents, custom tool registries.
+- Tools/agents/workflows: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, Cloudflare Agents, custom tool registries.
 - Retrieval: embeddings, vector DBs, hybrid search, rerankers, eval scripts.
 - Tests/evals: unit, integration, MCP transport tests, CLI contract tests, agent evals, CI.
 
@@ -133,9 +133,14 @@ Load additional scaffold references only as needed:
 
 ## Framework Guidance
 
-- Prefer Mastra for TypeScript projects that need agents, tools, workflows, memory, and MCP unless the repo already uses another framework deliberately.
-- Prefer Cloudflare Agents when the project is already Workers-native or needs Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Sandbox close to the Worker runtime.
-- Adapt to existing AI SDK, OpenAI Agents SDK, LangGraph, MCP, or custom runtime patterns when already present.
+- Prefer the project's existing deliberate agent framework first.
+- Prefer OpenAI Agents SDK when the project is OpenAI-native, uses the Responses API, needs OpenAI tracing/evals/handoffs, hosted tools, remote MCP, realtime voice, files, or sandbox execution close to OpenAI's platform.
+- Prefer Claude Managed Agents when the project is Claude-native and needs Anthropic-managed sessions, containers/sandboxing, Agent Skills, built-in tools, memory, vault credentials, webhooks, multiagent sessions, or outcomes.
+- Prefer Claude Code SDK when the project is building coding/repo agents that need the Claude Code harness, tool permissions, file/shell/code execution, session management, and MCP extensibility.
+- Prefer Vercel AI SDK for Next.js/Vercel apps that already use streaming UI, tool calling, provider routing, AI Gateway, or route-handler based chat. Pair it with Vercel Workflow when execution must pause, resume, retry, wait on approvals, or span minutes to months.
+- Prefer Cloudflare Agents when the project is Workers-native or needs Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Sandbox close to the Worker runtime.
+- Prefer Mastra for TypeScript projects that need a full local agent/workflow/memory/MCP framework and do not already have a stronger platform constraint.
+- Adapt to existing LangGraph, MCP, or custom runtime patterns when already present.
 - Do not generate Node-only APIs in Workers-native projects.
 
 ## Interaction Pattern
@@ -182,8 +187,11 @@ Use these defaults unless the project already has a better convention:
 
 - AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files as overlays.
 - `llms.txt` is a useful Markdown discovery convention for inference-time retrieval, not a guaranteed SEO or citation signal. Pair it with crawlable docs, structured data, sitemap, and stable canonical URLs.
-- Remote protected MCP servers should publish OAuth protected-resource metadata and validate token audience/resource claims.
-- MCP tools should provide input schemas, output schemas for structured results, annotations, resource links where useful, and structured recoverable errors.
+- MCP 2025-11-25 is the current baseline for this skill. Check tools, resources, prompts, roots, sampling, elicitation, tasks, Streamable HTTP, and protocol-version negotiation where relevant.
+- Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request.
+- MCP tool descriptions and annotations are advisory hints, not authorization policy. Treat them as untrusted unless the server is trusted, and enforce approvals, auth, and scope checks in the server or workflow.
+- MCP tools should provide input schemas, `outputSchema` plus `structuredContent` for structured results, annotations, resource links where useful, and structured recoverable errors.
+- Anthropic guidance changes quickly. For Claude-native scaffolds, check Claude Platform release notes for Managed Agents, Agent Skills, MCP connector limits, current model IDs, context limits, and beta headers before hard-coding recommendations.
 
 ## Useful References
 
@@ -191,3 +199,10 @@ Use these defaults unless the project already has a better convention:
 - AGENTS.md format: https://agents.md
 - llms.txt proposal: https://llmstxt.org
 - MCP specification: https://modelcontextprotocol.io/specification
+- OpenAI Agents SDK: https://platform.openai.com/docs/guides/agents-sdk/
+- Claude Platform release notes: https://platform.claude.com/docs/en/release-notes/overview
+- Claude Managed Agents: https://platform.claude.com/docs/en/managed-agents/overview
+- Claude Code SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
+- Vercel AI SDK: https://ai-sdk.dev/docs
+- Vercel Workflow: https://vercel.com/docs/workflow
+- OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html

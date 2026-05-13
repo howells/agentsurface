@@ -1,15 +1,16 @@
 ---
 title: Agentic Loop as Commodity
-description: Stop building custom orchestration. Use ToolLoopAgent, generateText stopWhen, or Claude Agent SDK. The loop is solved.
+description: Stop building custom orchestration. Use ToolLoopAgent, generateText stopWhen, or Claude Code SDK. The loop is solved.
 ---
 
 ## Summary
 
-The "agentic loop" — request user message, call tool, stream response, repeat until done — is a commodity problem solved by modern AI frameworks. `ToolLoopAgent` (Vercel AI), `generateText`/`streamText` with `stopWhen`+`maxSteps`, Claude Agent SDK `query()`, and OpenAI `@openai/agents` all handle state, streaming, tool execution, and max-step limits. The value is in tools, prompts, and error handling, not in reinventing control flow.
+The "agentic loop" — request user message, call tool, stream response, repeat until done — is a commodity problem solved by modern AI frameworks. Vercel AI SDK `generateText`/`streamText` with `stopWhen`, Claude Code SDK `query()`, Claude Managed Agents, and OpenAI Agents SDK all handle state, streaming, tool execution, and max-step limits. The value is in tools, prompts, and error handling, not in reinventing control flow.
 
-- **Vercel AI SDK**: `ToolLoopAgent` class; integrates with 50+ model providers; built-in streaming support.
-- **Claude Agent SDK**: `query()` method; simplest API; agents run in Claude's infrastructure.
-- **OpenAI Agents**: `@openai/agents` library; OpenAI-only models; beta feature.
+- **Vercel AI SDK**: `generateText`/`streamText` with `stopWhen`; integrates with many providers and app-route streaming.
+- **Claude Code SDK**: `query()` method; strong fit for coding/repo agents, MCP tools, and permissioned tool execution.
+- **Claude Managed Agents**: managed sessions, containers, Skills, vault credentials, memory, webhooks, outcomes, and multiagent sessions.
+- **OpenAI Agents SDK**: OpenAI-native agents, handoffs, hosted tools, tracing/evals, and remote MCP.
 - **Custom loops**: 500–1000 lines of state management, streaming, tool execution, error retry. High maintenance.
 
 ---
@@ -149,58 +150,40 @@ export async function generateMonthlyInsights(params: {
 
 ---
 
-## Pattern: Claude Agent SDK query()
+## Pattern: Claude Code SDK query()
 
-Simplest API. Agents run in Anthropic's infrastructure; no local orchestration.
+Use this when you want Claude Code's harness programmatically for repository work, coding tasks, local automation, or MCP-backed tools.
 
 ```typescript
-// Requires: Claude Agent SDK (beta)
-import Anthropic from "@anthropic-ai/sdk";
-import { Tool } from "@anthropic-ai/sdk/lib/agents";
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { query } from "@anthropic-ai/claude-code";
 
 async function askAgent(userMessage: string) {
-  const response = await client.agents.query({
-    system: "You are a helpful business assistant...",
-    tools: [
-      {
-        name: "get_customer",
-        description: "Fetch a customer by ID",
-        input_schema: {
-          type: "object",
-          properties: {
-            customerId: { type: "string" },
-          },
-          required: ["customerId"],
-        },
-      },
-    ],
-    messages: [
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ],
-    max_iterations: 10,
-  });
+  const messages = [];
 
-  // response.messages contains full conversation
-  return response.messages;
+  for await (const message of query({
+    prompt: userMessage,
+    options: {
+      mcpConfig: ".mcp.json",
+      allowedTools: ["mcp__docs__search_docs"],
+      maxTurns: 8,
+    },
+  })) {
+    messages.push(message);
+  }
+
+  return messages;
 }
 ```
 
 **Pros**:
-- Minimal code; no orchestration overhead.
-- Managed by Anthropic; always up-to-date model.
-- No tool execution on client; security is handled.
+- Reuses Claude Code's tool harness and permission model.
+- Works naturally with local/repo context and MCP configuration.
+- Good for coding, incident response, migration, and agentic CLI workflows.
 
 **Cons**:
-- Tool results returned as messages; less control over streaming.
-- Limited semantic tool selection.
-- Requires internet call for every user request.
+- Fit is weaker for product chat UI than Vercel AI SDK.
+- App-specific tools are usually exposed through MCP rather than direct in-process handlers.
+- Permission and allowed-tool policy still need explicit configuration.
 
 ---
 
@@ -289,7 +272,7 @@ interface Tool {
 }
 ```
 
-**Framework difference**: Vercel AI SDK uses Zod schemas and `execute` handlers. Claude Agent SDK uses JSON Schema via `input_schema` (tools execute server-side). OpenAI Agents may return tool calls for client-side execution.
+**Framework difference**: Vercel AI SDK uses Zod schemas and `execute` handlers. Claude Code SDK uses JSON Schema via `input_schema` (tools execute server-side). OpenAI Agents may return tool calls for client-side execution.
 
 ### Error Handling
 
@@ -350,7 +333,7 @@ const agent = new ToolLoopAgent({
   maxSteps: 15, // Safety limit (shouldn't reach this)
 });
 
-// Claude Agent SDK
+// Claude Code SDK
 const response = await client.agents.query({
   max_iterations: 10,
 });
@@ -371,7 +354,7 @@ const stream = await client.agents.stream({
 - Use `agent.stream()` or `client.agents.stream()`.
 - Emit tokens as they arrive.
 - Better UX for chat interfaces.
-- Use Vercel AI or Claude Agent SDK.
+- Use Vercel AI or Claude Code SDK.
 
 **Non-streaming** (background jobs, deterministic output):
 - Use `generateText()` or `client.agents.query()`.
@@ -450,7 +433,7 @@ async function chatLoop(userMessage: string) {
 
 ## Checklist
 
-- [ ] Choose framework: Vercel AI (recommended), Claude Agent SDK, or OpenAI Agents.
+- [ ] Choose framework: Vercel AI (recommended), Claude Code SDK, or OpenAI Agents.
 - [ ] Define tools with `execute` handlers and error recovery.
 - [ ] Set system prompt with domain context, safety rules, and tool descriptions.
 - [ ] Wrap agent call in streaming handler (for chat) or `generateText` (for workers).
@@ -465,4 +448,3 @@ async function chatLoop(userMessage: string) {
 - [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — composing prompts with context.
 - [Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — selecting ~12 tools at >20 tool scale.
 - [Tool Annotations](/docs/cookbook/tool-annotations) — declaring tool intent (READ_ONLY, WRITE, DESTRUCTIVE).
-

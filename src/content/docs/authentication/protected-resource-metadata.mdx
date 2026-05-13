@@ -1,20 +1,20 @@
 ---
 title: Protected Resource Metadata
-description: RFC 9728 and RFC 8414 extension for resource server discovery
+description: RFC 9728 resource server discovery for OAuth-protected APIs and MCP servers
 ---
 
 ## Summary
 
 Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to validate tokens against the correct JWKS, determine if DPoP is required, and learn which scopes you support.
 
-- `resource_url`: your API's base URI
+- `resource`: your API or MCP server's resource URI
 - `authorization_servers`: list of trusted identity providers
 - `scopes_supported`: all scopes your API recognizes
 - `jwks_uri`: public key endpoint for JWT validation
-- `proof_types_supported`: DPoP requirements and algorithms
+- `bearer_methods_supported`: accepted bearer token transport methods
 - Cache with `Cache-Control: max-age=3600`
 
-When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, where to validate JWTs, and whether you require DPoP. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the auth server metadata endpoint. RFC 9728 Protected Resource Metadata (the extension) defines the metadata that a resource server exposes about itself.
+When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, where to validate JWTs, and whether bearer tokens require extra constraints such as DPoP. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the authorization server metadata endpoint. RFC 9728 Protected Resource Metadata defines the metadata that a resource server exposes about itself.
 
 Publish this metadata at `/.well-known/oauth-protected-resource` to allow clients (including MCP) to discover your auth requirements and validate tokens correctly.
 
@@ -22,7 +22,7 @@ Publish this metadata at `/.well-known/oauth-protected-resource` to allow client
 
 ```json
 {
-  "resource_url": "https://api.example.com",
+  "resource": "https://api.example.com",
   "authorization_servers": [
     "https://auth.example.com/"
   ],
@@ -35,39 +35,23 @@ Publish this metadata at `/.well-known/oauth-protected-resource` to allow client
     "payments:write"
   ],
   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
-  "response_types_supported": [
-    "token"
-  ],
-  "proof_types_supported": {
-    "dpop": {
-      "alg_values_supported": [
-        "ES256",
-        "RS256"
-      ]
-    }
-  },
-  "token_endpoint_auth_methods_supported": [
-    "client_secret_basic",
-    "client_secret_post"
-  ],
-  "grant_types_supported": [
-    "client_credentials",
-    "urn:ietf:params:oauth:grant-type:token-exchange"
-  ],
-  "oauth_protected_resource_version": "1.0"
+  "bearer_methods_supported": ["header"],
+  "resource_signing_alg_values_supported": ["RS256", "ES256"],
+  "resource_name": "Example API"
 }
 ```
 
 Key fields:
 
-- `resource_url` — your API's base URI
+- `resource` — your API's base URI or MCP endpoint resource identifier
 - `authorization_servers` — list of auth servers that can issue tokens you accept
 - `scopes_supported` — all scopes your API recognizes
 - `jwks_uri` — where to fetch public keys for JWT validation
-- `response_types_supported` — typically just `["token"]` for agents
-- `proof_types_supported` — if you require DPoP, include this section with supported algorithms
-- `grant_types_supported` — which OAuth grants clients can use (usually `client_credentials` and `token-exchange`)
-- `token_endpoint_auth_methods_supported` — how clients authenticate to the token endpoint
+- `bearer_methods_supported` — accepted bearer token locations, usually `["header"]`
+- `resource_signing_alg_values_supported` — algorithms used when the resource signs responses or metadata
+- `resource_name` — human-readable resource name for client UI
+
+Authorization-server capabilities such as `grant_types_supported`, `response_types_supported`, token endpoints, and token endpoint auth methods belong in the authorization server metadata document, not the protected resource metadata document.
 
 ## Next.js Implementation
 
@@ -81,7 +65,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const metadata = {
-    resource_url: 'https://api.example.com',
+    resource: 'https://api.example.com',
     authorization_servers: [
       'https://auth.example.com/',
     ],
@@ -94,21 +78,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       'payments:write',
     ],
     jwks_uri: 'https://auth.example.com/.well-known/jwks.json',
-    response_types_supported: ['token'],
-    proof_types_supported: {
-      dpop: {
-        alg_values_supported: ['ES256', 'RS256'],
-      },
-    },
-    grant_types_supported: [
-      'client_credentials',
-      'urn:ietf:params:oauth:grant-type:token-exchange',
-    ],
-    token_endpoint_auth_methods_supported: [
-      'client_secret_basic',
-      'client_secret_post',
-    ],
-    oauth_protected_resource_version: '1.0',
+    bearer_methods_supported: ['header'],
+    resource_signing_alg_values_supported: ['RS256', 'ES256'],
+    resource_name: 'Example API',
   };
 
   res.setHeader('Content-Type', 'application/json');
@@ -132,10 +104,10 @@ MCP 2025-11-25 clients fetch this metadata to:
 When an MCP server calls your resource server, it:
 
 1. Fetches `/.well-known/oauth-protected-resource`
-2. Validates the resource URL matches
+2. Validates the resource identifier matches
 3. Fetches the JWKS from the declared `jwks_uri`
 4. On every request, validates the JWT signature against JWKS and verifies `iss` and `aud` claims
-5. If `proof_types_supported.dpop` is present, includes a DPoP proof
+5. Includes a DPoP proof when the selected authorization flow or resource policy requires sender-constrained tokens
 
 ```typescript
 // MCP client example (simplified)
@@ -150,9 +122,9 @@ async function callResourceServer(token: string, endpoint: string) {
   // Validate token before sending
   // (server-side validation happens too)
 
-  // If DPoP is required, generate a proof
+  // If DPoP is required by this resource or token, generate a proof
   let dpopProof = null;
-  if (metadata.proof_types_supported?.dpop) {
+  if (requiresDpop(metadata)) {
     dpopProof = await generateDPopProof('GET', endpoint);
   }
 
@@ -174,7 +146,7 @@ If you're not using DPoP or token exchange yet, a minimal metadata document is a
 
 ```json
 {
-  "resource_url": "https://api.example.com",
+  "resource": "https://api.example.com",
   "authorization_servers": [
     "https://auth.example.com/"
   ],
@@ -183,12 +155,7 @@ If you're not using DPoP or token exchange yet, a minimal metadata document is a
     "write"
   ],
   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
-  "response_types_supported": [
-    "token"
-  ],
-  "grant_types_supported": [
-    "client_credentials"
-  ]
+  "bearer_methods_supported": ["header"]
 }
 ```
 
@@ -240,12 +207,12 @@ Clients typically cache metadata for 1 hour (specify `Cache-Control: max-age=360
 ## Checklist
 
 - [ ] Endpoint is served at `/.well-known/oauth-protected-resource`
-- [ ] `resource_url` matches your API's base URI
+- [ ] `resource` matches your API's base URI or MCP endpoint resource identifier
 - [ ] `authorization_servers` includes all trusted identity providers
 - [ ] `scopes_supported` is exhaustive and matches your API's permission model
 - [ ] `jwks_uri` points to a valid JWKS endpoint with current public keys
-- [ ] `proof_types_supported` is included if DPoP is required
-- [ ] `grant_types_supported` includes the flows your API accepts
+- [ ] `bearer_methods_supported` is explicit and does not permit query-string bearer tokens
+- [ ] Authorization server metadata advertises the grants and token endpoint methods clients can use
 - [ ] Response includes `Cache-Control` header with appropriate TTL
 - [ ] Metadata is served with `Content-Type: application/json`
 

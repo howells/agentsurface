@@ -2,13 +2,13 @@
 
 ## Summary
 
-Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema, resources, OAuth protected-resource metadata for protected HTTP servers, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts/tasks, and dynamic tool loading.
+Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema with structuredContent, resources, OAuth protected-resource metadata for protected HTTP servers, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts/tasks, roots, sampling/elicitation gates, consent policies, and dynamic tool loading.
 
 - **0**: No MCP server, no .mcp.json (blocker)
 - **1**: Server exists but <5 tools, terse descriptions, no annotations, errors thrown
-- **2**: Proper annotations, agent-oriented descriptions, structured errors, outputSchema, resources
-- **3**: Production-ready (OAuth, pagination, multiple transports, InMemoryTransport tests, <20 tools)
-- **Evidence**: @modelcontextprotocol/sdk imports, .mcp.json, annotations, error handling patterns
+- **2**: Proper annotations, agent-oriented descriptions, structured errors, outputSchema/structuredContent, resources
+- **3**: Production-ready (OAuth, pagination, multiple transports, InMemoryTransport tests, consent gates, <20 tools)
+- **Evidence**: @modelcontextprotocol/sdk imports, .mcp.json, annotations, outputSchema/structuredContent, error handling patterns
 
 ---
 
@@ -20,8 +20,8 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 |-------|----------|-----------|
 | 0 | No MCP server. No .mcp.json or .mcp/mcp.json. No SDK imports (@modelcontextprotocol/sdk, mcp-handler, @mastra/mcp). | grep -r "@modelcontextprotocol/sdk" and grep -r "mcp-handler" both return nothing. No .mcp.json. |
 | 1 | Basic MCP server exists but minimal. Fewer than 5 tools; descriptions are terse (<20 words); no annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint); no resources or prompts; errors thrown rather than structured with `isError: true`. | MCP server file imports sdk but: <5 tools defined; descriptions lack "when to use / when not to use"; no annotations object; no resources; errors not wrapped in `{ isError: true, content: [...] }`. |
-| 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data. Resources exposed for static data. Spec compliance 2025-11-25. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on error. outputSchema present on structured tools. Resources with MIME types declared. Server uses @modelcontextprotocol/sdk v2.x. |
-| 3 | Production MCP. OAuth authorization via `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and audience/resource checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use `tasks/get` polling and `tasks/result` retrieval where supported. |
+| 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Spec compliance 2025-11-25. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses @modelcontextprotocol/sdk v2.x. |
+| 3 | Production MCP. OAuth authorization via RFC 9728 `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. Consent gates for destructive/authenticated/production tools. Roots, sampling, and elicitation are explicitly gated where implemented. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and issuer/audience/resource/scope checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use `tasks/get` polling and `tasks/result` retrieval where supported. Consent policy exists for high-risk calls. |
 
 ## Evidence to gather
 
@@ -50,6 +50,19 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 - `destructiveHint: true` on operations that modify/delete
 - `idempotentHint: true` on idempotent operations
 - `openWorldHint: true` on tools that accept arbitrary strings (not enums)
+
+**Structured result patterns:**
+- `outputSchema` on tools that return machine-consumable data
+- `structuredContent` matching the output schema
+- concise `content` text for human-readable summaries
+- resource links via returned resource content where useful
+
+**Security and consent patterns:**
+- protocol version declared and validated
+- roots honored for filesystem/resource scope
+- sampling and elicitation require explicit client/server policy
+- destructive, authenticated, production, browser, sandbox, and network tools require approval or a documented allowlist
+- bearer token validation checks issuer, audience/resource, expiry, and scopes
 
 **Test patterns:**
 - `InMemoryTransport.createLinkedPair()` — canonical MCP server testing pattern
@@ -204,14 +217,26 @@ server.tool(
 ```
 
 **Principles:**
-- Use **tool annotations** on every tool. Agents reason better with hints.
+- Use **tool annotations** on every tool. Agents reason better with hints, but annotations are not authorization policy.
 - Write **agent-oriented descriptions**. Not "Gets the user" but "Retrieve user details by ID. Use when you need to look up a user's name, email, or profile info. Do not use for authentication."
 - Input schemas with **Zod**. Describe every field. Provide `example` on constrained types.
-- Include **outputSchema** for tools returning structured data (not just text).
-- Use **toModelOutput** to compress response token count (return semantic fields only, not raw JSON blobs).
+- Include **outputSchema** for tools returning structured data and return **structuredContent** where the SDK supports it.
+- Keep model-facing text concise. Return semantic fields only, not raw JSON blobs, unless raw JSON is explicitly the requested artifact.
 - Keep tool count **≤20 per server**. Use namespacing (`user_get`, `user_create`, `user_delete`).
 - **Paginate list operations** with cursor-based pagination, not offset.
 - Return **structured errors** via `{ isError: true, content: [...] }` instead of throwing. Agents recover better from recoverable errors.
+
+### Security and consent
+
+MCP metadata improves routing, but it does not replace policy.
+
+- Treat tool descriptions, annotations, resource contents, prompt contents, and server-provided metadata as untrusted unless the server is trusted and pinned.
+- Never rely on `readOnlyHint`, `destructiveHint`, or descriptions for authorization. Enforce auth, tenant identity, scopes, and approval gates in trusted server or workflow code.
+- Require confirmation for destructive, authenticated, production, browser, sandbox, package-install, payment, email-send, file-write, and network-expanding tools unless a narrow allowlist explicitly permits them.
+- Honor roots as capability boundaries. Filesystem/resource tools must reject access outside declared roots.
+- Gate sampling and elicitation. Servers should not silently ask the client model or user for secrets, credentials, or sensitive data.
+- Validate remote bearer tokens on every protected request: signature, issuer, audience/resource, expiry, not-before, scopes, and token binding where DPoP is required.
+- Log tool name, inputs after redaction, user/tenant context, approval decision, trace ID, and result status.
 
 ### Resources
 

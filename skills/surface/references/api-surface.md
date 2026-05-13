@@ -525,22 +525,29 @@ Generated MCP servers inherit operationId naming, descriptions, and examples fro
 
 ### Anthropic Claude tool definitions
 
-Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) tool definitions accept a Zod schema or JSON Schema. Agent-first descriptions matter equally:
+For Claude Code SDK and Claude Managed Agents, prefer exposing API-derived tools through MCP when the tools should also work outside Anthropic. Keep the OpenAPI-derived registry as the source of truth, then emit MCP tool definitions with agent-first descriptions:
 
 ```typescript
-import { tool } from '@anthropic-ai/claude-agent-sdk';
-import { z } from 'zod';
-
-const listUsers = tool(
-  'list_users',
-  'Retrieve a paginated list of users. Use when you need to find users matching criteria or display a directory. Do not use to get a single user by ID (use get_user_by_id instead). Requires users:read scope.',
+server.tool(
+  "list_users",
+  "Retrieve a paginated list of users. Use when you need to find users matching criteria or display a directory. Do not use to get a single user by ID (use get_user_by_id instead). Requires users:read scope.",
   {
-    limit: z.number().min(1).max(100).default(20).describe('Number of results per page'),
-    offset: z.number().min(0).default(0).describe('Pagination offset'),
+    limit: z.number().min(1).max(100).default(20).describe("Number of results per page"),
+    cursor: z.string().optional().describe("Cursor returned from the previous page"),
   },
-  async ({ limit, offset }) => {
-    // implementation
-    return { data: [...], total: 42 };
+  async ({ limit, cursor }) => {
+    const page = await users.list({ limit, cursor });
+    return {
+      structuredContent: page,
+      content: [{ type: "text", text: `Returned ${page.items.length} users.` }],
+    };
+  },
+  {
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 );
 ```

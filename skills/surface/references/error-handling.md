@@ -324,7 +324,7 @@ const result = await generateText({
 
 ## Cross-vendor notes
 
-**Anthropic Claude Agent SDK:**
+**Anthropic Claude Code SDK:**
 - Tool errors returned as `{ isError: true, content: [...] }`. Include ProblemDetails JSON in the content string. Agent examines the error and recurses if `is_retriable: true`.
 
 **OpenAI Agents SDK (TypeScript):**

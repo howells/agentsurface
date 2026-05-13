@@ -1,0 +1,122 @@
+---
+title: Anthropic Platform
+description: "Current Claude Platform surfaces for agent systems: Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, tools, memory, context, and model changes."
+---
+
+## Summary
+
+Anthropic's agent surface is now broader than "Claude plus tool use." As of May 2026, Agent Surface should treat Claude as a platform with managed agents, code-oriented SDK agents, Skills, hosted tools, MCP connector support, vault credentials, memory, webhooks, multiagent sessions, outcomes, and fast-changing model/runtime capability fields.
+
+Use this page when evaluating or scaffolding Claude-native systems.
+
+## Current Surfaces
+
+| Surface | Use When | Notes |
+|---|---|---|
+| Claude Managed Agents | You want Anthropic to run the autonomous agent harness. | Public beta. Sessions, containers, streaming events, memory, webhooks, vault credentials, multiagent sessions, and outcomes use the `managed-agents-2026-04-01` beta header. |
+| Claude Code SDK | You need the Claude Code harness in an app or service. | File operations, code execution, web search, permissions, sessions, monitoring, and MCP extensibility. |
+| Messages API with MCP Connector | A Claude request should call public remote MCP tools directly. | Supports remote HTTP/SSE or Streamable HTTP servers. Current connector support is tool-focused, not the full MCP primitive set. |
+| Agent Skills | You need reusable procedures, scripts, assets, and domain workflows. | Skills complement MCP: MCP exposes callable systems; Skills teach Claude how to carry out repeatable work. |
+| Built-in tools | Claude should use web search, web fetch, code execution, tool search, or memory without custom servers. | Several tools became generally available in 2026, reducing the need for custom wrappers. |
+| Claude Platform on AWS / Bedrock / Microsoft Foundry / Vertex AI | Enterprise deployment, regional, cloud billing, or IAM constraints drive the choice. | Capabilities vary by cloud and release channel; check the current platform docs before assuming parity. |
+
+## What Changed Recently
+
+Important 2026 platform changes to account for in recommendations:
+
+- **Claude Platform on AWS** launched on May 11, 2026, with AWS billing/IAM and access to Messages API, Files API, Message Batches, Managed Agents, Agent Skills, code execution, and tool use through native AWS endpoints.
+- **Claude Managed Agents** launched in public beta on April 8, 2026, with secure sandboxing, built-in tools, and server-sent event streaming.
+- **Managed Agents memory** entered public beta on April 23, 2026.
+- **Multiagent sessions and outcomes** entered public beta on May 6, 2026.
+- **Vault credential background refresh for `mcp_oauth` credentials** and Managed Agents webhooks landed on May 6, 2026.
+- **Claude Opus 4.7** launched on April 16, 2026, with breaking changes versus Opus 4.6. Do not silently upgrade model IDs without checking migration notes.
+- **Claude Sonnet 4 and Opus 4** are scheduled for retirement on June 15, 2026. Prefer Sonnet 4.6 and Opus 4.7 for new scaffolds.
+- **1M context** is generally available for Sonnet 4.6 and Opus 4.6 at standard pricing; older beta headers for Sonnet 4.5 and Sonnet 4 were retired.
+- **Models API capability fields** now expose `max_input_tokens`, `max_tokens`, and `capabilities`; use discovery rather than hard-coded assumptions where possible.
+- **Web search, web fetch, code execution, tool search, memory tool, and programmatic tool calling** are now first-class platform capabilities in relevant release channels.
+- **Agent Skills** package repeatable workflows as folders of instructions, scripts, and resources and should be considered alongside MCP servers.
+
+## Decision Guide
+
+Choose **Claude Managed Agents** when:
+
+- sessions, lifecycle events, memory, or outcomes should be managed by Anthropic
+- the agent needs secure containers or platform-managed code execution
+- credential vaulting and `mcp_oauth` refresh matter
+- a product wants a cloud agent service rather than embedding the loop in its own app server
+
+Choose **Claude Code SDK** when:
+
+- the job is coding, repository inspection, editing, test execution, or incident response
+- the product needs permission modes, allowed/disallowed tools, or local/project/user MCP configuration
+- the developer wants Claude Code's harness but needs to invoke it programmatically
+
+Choose **Messages API plus MCP Connector** when:
+
+- the request only needs tool calls to one or more public remote MCP servers
+- the agent loop can stay inside a single Messages API interaction
+- you do not need managed sessions, memory, containers, outcomes, or webhooks
+
+Choose **Agent Skills** when:
+
+- the system needs procedural know-how, templates, scripts, examples, or domain assets
+- the work is repeatable but not just a single tool call
+- a Skill can teach Claude how to use existing tools rather than adding another API surface
+
+Choose **custom MCP servers** when:
+
+- Claude, OpenAI, Gemini, Cursor, Codex, and other clients should all use the same external capability
+- the system needs a vendor-neutral tool/resource/prompt contract
+- auth, scopes, audit, pagination, and structured results must be server-owned
+
+## MCP Notes for Claude
+
+Claude has multiple MCP paths and they are not identical:
+
+- Claude Code can use local stdio and remote HTTP/SSE MCP servers through `.mcp.json` and CLI configuration.
+- Claude Code can also expose its own tools as an MCP server with `claude mcp serve`; the client connecting to it must implement user confirmation for risky calls.
+- Claude Code SDK supports MCP configuration and allowed tool filtering.
+- The Messages API MCP connector supports remote public servers and OAuth bearer tokens, but its documented limitations say only MCP tool calls are currently supported.
+
+When documenting or scaffolding MCP for Claude, always state which path is being used. Do not assume support for resources, prompts, roots, sampling, elicitation, or tasks unless the selected Claude surface documents it.
+
+## Tooling Guidance
+
+Prefer Claude built-in tools when they match the job:
+
+- web search or web fetch for current public web context
+- code execution for data processing, generated code checks, and tool-efficient workflows
+- tool search for large tool catalogs
+- memory tool or Managed Agents memory for cross-session recall
+- Agent Skills for packaged procedures
+
+Prefer custom tools or MCP when the capability is product-specific, authenticated, auditable, cross-vendor, or needs strict schemas and server-side authorization.
+
+## Model Guidance
+
+Use current model discovery and migration docs rather than hard-coding old IDs:
+
+- For new complex agent/coding scaffolds, prefer current Opus/Sonnet generation IDs, not retired Claude 3.x or deprecated Claude 4.0 IDs.
+- Check breaking changes before moving to Opus 4.7.
+- Use the Models API capability fields for context length and feature support where the app can do so.
+- Account for extended/adaptive thinking controls, effort parameters, and thinking display options when designing cost and latency tiers.
+
+## Security Guidance
+
+Claude-native systems still need server-side policy:
+
+- Treat model-visible tool descriptions, MCP annotations, resources, and Skill content as advisory inputs.
+- Enforce authorization, tenant identity, and scope checks in trusted server code.
+- Gate destructive, external, authenticated, production, browser, and sandbox tools with confirmation policies.
+- Store credentials in vaults or environment-backed secret managers, not prompts or Skill text.
+- Log agent ID, session ID, user/tenant context, tool calls, approvals, and outcomes.
+
+## Source Links
+
+- [Claude Platform release notes](https://platform.claude.com/docs/en/release-notes/overview)
+- [Claude Managed Agents overview](https://platform.claude.com/docs/en/managed-agents/overview)
+- [Claude Code SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)
+- [MCP connector](https://docs.anthropic.com/en/docs/agents-and-tools/mcp-connector)
+- [Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
+- [Agent Skills engineering post](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)
+- [Anthropic engineering posts](https://www.anthropic.com/engineering)

@@ -507,7 +507,7 @@ Agents ignore stderr; they parse stdout. This pattern lets humans see progress w
 
 ## Cross-vendor notes
 
-**Anthropic Claude Code CLI** (https://code.claude.com/docs/en/cli-reference) is the gold standard:
+**Anthropic Claude Code CLI** (https://docs.anthropic.com/en/docs/claude-code/cli-reference) is the gold standard:
 - Every command supports `--json` (consistent envelope: `{ ok: true, data }, { ok: false, error }`).
 - Semantic exit codes (0 success, non-zero failure).
 - `--dry-run` on write operations.
@@ -574,7 +574,7 @@ All three converge on: structured output + semantic exit codes + TTY detection +
 
 ## Citations
 
-- https://code.claude.com/docs/en/cli-reference — Anthropic Claude Code CLI reference (gold standard)
+- https://docs.anthropic.com/en/docs/claude-code/cli-reference — Anthropic Claude Code CLI reference (gold standard)
 - https://jsonlines.org — NDJSON specification
 - https://github.com/ndjson/ndjson-spec — NDJSON spec repository
 - https://www.freebsd.org/cgi/man.cgi?query=sysexits — BSD sysexits.h conventions

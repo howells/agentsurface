@@ -1,0 +1,122 @@
+---
+title: Framework Selection
+description: Choosing between OpenAI Agents SDK, Claude Managed Agents and Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, and MCP-first designs.
+---
+
+## Summary
+
+Agent frameworks are deployment choices, not identities. Pick the smallest runtime that fits the product boundary already present in the repo. Prefer existing deliberate framework choices, then choose by where the agent runs, which platform owns the tools, and how much durability or UI integration is required.
+
+| Project Shape | Prefer | Why |
+|---|---|---|
+| OpenAI-native app, Responses API, OpenAI tracing/evals, hosted tools, remote MCP, realtime voice, files, or sandbox execution | OpenAI Agents SDK | Keeps OpenAI response items, traces, hosted tools, handoffs, and platform behavior intact. |
+| Claude-native autonomous work, managed sandboxes, Agent Skills, vault credentials, multiagent sessions, outcomes, webhooks, or Claude Platform on AWS | Claude Managed Agents | Anthropic owns the agent harness, sandbox, credential vaulting, events, and Claude-specific primitives. |
+| Claude Code-style coding agents, local repo work, file editing, shell tools, permission modes, or MCP from a code harness | Claude Code SDK | Reuses the Claude Code harness with tool permissions and MCP configuration. |
+| Next.js/Vercel app with streaming UI, route handlers, AI Gateway, provider routing, UI message persistence, or app-local tools | Vercel AI SDK | Best fit for product UI and server route integration. |
+| Vercel app where work must pause, resume, wait on approvals, sleep, retry, or span minutes to months | Vercel Workflow plus AI SDK | Adds durable workflow state, hooks, retries, and observability around AI steps. |
+| Workers-native app, Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Cloudflare Sandbox | Cloudflare Agents | Keeps stateful agents and supporting infra in the Worker runtime. |
+| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without stronger platform constraints | Mastra | Coherent app-owned framework for TypeScript agent infrastructure. |
+| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs, or existing LangChain stack | LangGraph | Mature graph model for stateful multi-step flows. |
+| The product mainly exposes tools, resources, prompts, or workflows to outside agents | MCP-first | Avoids building a private agent loop when the integration surface is the product. |
+
+## Selection Rules
+
+Start with what exists:
+
+1. If the repo already has a deliberate agent framework, extend it.
+2. If the project is platform-native, use that platform's agent/runtime primitives.
+3. If the product needs external agent interoperability, design MCP first and adapt the app runtime around it.
+4. If the work is deterministic and long-running, make it a workflow before adding an agent loop.
+5. If the need is just tool calling inside a chat route, use the app's existing AI SDK surface.
+
+Do not add a second framework for novelty. Add one only when it removes a real mismatch: deployment target, durability, hosted tools, managed credentials, sandboxing, tracing, or UI integration.
+
+## OpenAI Agents SDK
+
+Use OpenAI Agents SDK when OpenAI is the product runtime, not just a model provider. Good signals:
+
+- Responses API items need to remain first-class.
+- The system uses OpenAI hosted tools, remote MCP, file search, code/sandbox execution, tracing, or evals.
+- Handoffs between specialist agents should be visible in OpenAI traces.
+- Realtime voice or multimodal OpenAI surfaces are part of the product.
+
+Avoid wrapping it in another framework unless the repo already has a strong orchestration layer. The value is in keeping OpenAI platform semantics visible.
+
+## Anthropic / Claude Platform
+
+Anthropic now has several distinct surfaces:
+
+- **Claude Managed Agents**: public beta agent harness with managed sessions, containers/sandboxing, Agent Skills, tool use, code execution, streaming events, memory, webhooks, vault credentials, multiagent sessions, and outcomes.
+- **Claude Code SDK**: coding-agent harness for local or service-side agents that need files, shell/code execution, tool permissions, session management, and MCP extensibility.
+- **MCP Connector in Messages API**: direct remote MCP tool access from Claude Messages API requests. It currently targets public HTTP/SSE or Streamable HTTP servers and supports MCP tool calls, not the full MCP primitive set.
+- **Agent Skills**: packaged folders of instructions, scripts, and resources that Claude can load dynamically. Use Skills for repeatable procedures and domain workflows; use MCP for callable external systems.
+
+Use Claude Managed Agents when Anthropic should own the harness and operational envelope. Use Claude Code SDK when you need the Claude Code execution model in your own application. Use the Messages API MCP connector when a Claude request only needs remote MCP tools and you do not need a full managed agent session.
+
+## Vercel AI SDK and Workflow
+
+Use Vercel AI SDK for app-local AI:
+
+- streaming responses in Next.js routes
+- structured outputs and tool calls
+- provider routing through AI Gateway
+- active tool subsets in product flows
+- chat UI state and persistence
+
+Add Vercel Workflow when the job has durable control flow:
+
+- human approval hooks
+- delayed follow-ups
+- retries around external calls
+- steps that outlive one HTTP request
+- audit and replay requirements
+
+The combination is usually: AI SDK for model/tool execution, Workflow for state and lifecycle.
+
+## Cloudflare Agents
+
+Use Cloudflare Agents when runtime locality matters:
+
+- Durable Objects for per-user, per-tenant, room, or session agents
+- Workers-native WebSockets
+- Queues and event-driven background work
+- Workers AI or AI Gateway close to the edge
+- Browser Rendering/Browser Run or Sandbox near the Worker
+- Vectorize, AI Search, or AutoRAG already in use
+
+Do not generate Node-only scaffolds in this path. Treat bindings, Durable Object state, and Worker limits as first-class design inputs.
+
+## Mastra
+
+Use Mastra when a TypeScript repo wants app-owned agent infrastructure and does not have a stronger platform-native framework. It is a good default for:
+
+- local agent definitions
+- typed tools
+- workflows
+- memory/RAG
+- MCP exposure
+- conventional TypeScript project structure
+
+Mastra is no longer the blanket default for all TypeScript. It is the default when the app owns the agent runtime and there is no stronger OpenAI, Claude, Vercel, Cloudflare, or LangGraph signal.
+
+## MCP-First
+
+Choose MCP-first when your primary job is to make a product usable by external agents:
+
+- expose tools with input schemas and output schemas
+- expose resources and prompts where useful
+- publish Streamable HTTP for remote use
+- provide OAuth protected-resource metadata for protected servers
+- keep tool count curated and dynamically load large catalogs
+
+MCP-first does not prevent using an internal agent framework. It means the public contract is MCP, and the internal runtime is an implementation detail.
+
+## Related
+
+- [Anthropic Platform](/docs/agents/anthropic-platform)
+- [Agent Design Principles](/docs/agents/design-principles)
+- [MCP Protocol](/docs/protocols/mcp)
+- [MCP Authentication](/docs/mcp-servers/authentication)
+- [Cross-Framework Portability](/docs/tool-design/cross-framework-portability)
+- [Cloudflare-Native Agent Stack](/docs/cookbook/cloudflare-agent-stack)
+

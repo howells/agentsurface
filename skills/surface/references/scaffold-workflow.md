@@ -10,7 +10,7 @@ Detect:
 
 - Package manager and workspace layout.
 - Framework/runtime: Next.js, Node, Python, Workers, serverless, CLI, library.
-- Existing agent framework: Mastra, AI SDK, OpenAI Agents SDK, LangGraph, MCP, Cloudflare Agents, custom.
+- Existing agent framework: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, MCP, Cloudflare Agents, custom.
 - Existing directories: `agents`, `tools`, `workflows`, `src/mastra`, `packages/agents`, `triggers`.
 - Existing model routing, memory, retrieval, browser access, sandbox execution.
 - TypeScript module target and runtime constraints.
@@ -20,18 +20,51 @@ Present the inventory before generating code.
 
 ## Framework Recommendation
 
-Recommend Mastra when:
+Choose the framework by project shape, not by preference.
 
-- The project is TypeScript.
-- It does not already have a deliberate agent framework.
-- The user needs agents, tools, workflows, memory, RAG, or MCP.
+Prefer the existing framework when the repo already has one deliberately wired.
+
+Recommend OpenAI Agents SDK when:
+
+- The project is OpenAI-native or already uses the Responses API.
+- The user needs handoffs, tracing, evals, built-in/hosted tools, remote MCP, realtime voice, files, or sandbox execution close to OpenAI's platform.
+- The agent should preserve OpenAI response items, traces, and hosted tool behavior rather than abstracting them behind another framework.
+
+Recommend Claude Managed Agents when:
+
+- The project is Claude-native and the agent runtime should be managed by Anthropic.
+- The user needs managed sessions, secure containers/sandboxing, Agent Skills, code execution, memory, vault credentials, webhooks, multiagent sessions, outcomes, or Claude Platform on AWS.
+- The app benefits from Anthropic-owned event/session lifecycle more than embedding the loop inside the app server.
+
+Recommend Claude Code SDK when:
+
+- The project is building coding, repository, incident response, or local automation agents.
+- It needs the Claude Code harness, file/shell/code tools, explicit tool permissions, session management, and MCP extensibility.
+- The user wants programmatic control of Claude Code-like behavior from a service or CLI.
+
+Recommend Vercel AI SDK when:
+
+- The project is a Next.js or Vercel app.
+- It already uses `ai`, `@ai-sdk/*`, streaming chat UI, route handlers, provider routing, AI Gateway, or UI message persistence.
+- The primary need is app-local generation, tool calling, streaming UX, structured outputs, or active tool selection.
+
+Recommend Vercel Workflow in addition to AI SDK when:
+
+- Agent work must pause/resume, wait for human approval, retry durable steps, react to hooks/webhooks, or span minutes to months.
+- The app is already deployed on Vercel or the user wants Vercel-managed workflow state, queues, and observability.
 
 Recommend Cloudflare Agents when:
 
 - The project is Workers-native.
 - It uses or needs Durable Objects, WebSockets, Queues, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, or Sandbox near the Worker runtime.
 
-Respect existing AI SDK, MCP, OpenAI Agents SDK, LangGraph, or custom patterns when the repo already uses them.
+Recommend Mastra when:
+
+- The project is TypeScript.
+- It does not already have a stronger platform-native agent framework.
+- The user needs a full local agent/workflow/memory/RAG/MCP framework with explicit app-owned orchestration.
+
+Respect existing MCP, LangGraph, or custom patterns when the repo already uses them.
 
 ## Shared Scaffolding Rules
 
@@ -114,7 +147,7 @@ Generate:
 - Zod or native schema equivalent.
 - Field descriptions.
 - Output schema.
-- MCP annotations when MCP is present or likely.
+- MCP annotations plus `outputSchema`/`structuredContent` when MCP is present or likely.
 - Security pattern for user context.
 - Tests or fixtures when the project has a test surface.
 

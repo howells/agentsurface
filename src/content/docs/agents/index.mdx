@@ -10,6 +10,8 @@ It is not a generic code generator. It reads the project first, detects the exis
 Before scaffolding, align the boundary first:
 
 - [Agent Design Principles](/docs/agents/design-principles) — narrow ownership, bounded loops, workflow-before-agent, and eval-first scaffolding
+- [Framework Selection](/docs/agents/framework-selection) — choosing between OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, and MCP-first designs
+- [Anthropic Platform](/docs/agents/anthropic-platform) — current Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, tools, model, and security guidance
 
 ## What It Creates
 
@@ -30,11 +32,14 @@ Start with the project shape:
 
 | Project Shape | Default Choice | Reason |
 |---|---|---|
-| `@mastra/core`, `src/mastra`, or `packages/agents` | Mastra | Best fit for local TypeScript agents, tools, workflows, memory, and MCP exposure. |
-| `ai` or `@ai-sdk/*` with app routes | Vercel AI SDK patterns | Best fit for chat routes, streaming, structured output, and app-local tools. |
+| OpenAI Responses API, `@openai/agents`, hosted tools, remote MCP, tracing/evals, realtime, files, or sandbox | OpenAI Agents SDK | Best fit when OpenAI platform semantics should stay visible. |
+| Claude Managed Agents, Agent Skills, Claude Code SDK, `@anthropic-ai/claude-code`, or Claude-native hosted tools | Claude platform patterns | Best fit when Claude owns the harness, sandbox, Skills, code work, or MCP connector path. |
+| `ai` or `@ai-sdk/*` with app routes | Vercel AI SDK patterns | Best fit for chat routes, streaming, structured output, provider routing, and app-local tools. |
+| Vercel app plus long-running, resumable, approval-based, or delayed work | Vercel Workflow plus AI SDK | Best fit for durable steps, hooks, retries, sleeps, and replayable AI workflows. |
 | `@modelcontextprotocol/sdk` with no app agent runtime | MCP-first | The product is exposing tools or resources to external agents more than running its own agent. |
 | `wrangler.toml`, Workers bindings, Durable Objects, or `agents` package | Cloudflare Agents | Best fit for edge-hosted, stateful, Workers-native agents. |
-| No agent packages | Mastra-first recommendation | Gives a coherent TypeScript default without inventing local conventions. |
+| `@mastra/core`, `src/mastra`, or `packages/agents` | Mastra | Best fit for local TypeScript agents, tools, workflows, memory, and MCP exposure. |
+| No agent packages and no stronger platform signal | Mastra for TypeScript, LangGraph for Python/graph-heavy systems, or MCP-first for external tool surfaces | Gives a coherent default without inventing local conventions. |
 
 ## Updating Existing Agents
 

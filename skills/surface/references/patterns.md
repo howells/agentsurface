@@ -220,7 +220,7 @@ Especially important when the data model has sensitive fields.
 **Problem:** Agents waste tokens trying dangerous operations, or proceed with
 mutations without understanding consequences.
 
-**Rule:** Annotate every tool with MCP hints so the model understands safety characteristics.
+**Rule:** Annotate every tool with MCP hints so the model understands safety characteristics. Treat annotations as advisory only; server-side auth, scopes, confirmation gates, and audit logs still enforce policy.
 
 ```typescript
 // Read-only tool
@@ -254,7 +254,9 @@ mcp: {
 },
 ```
 
-**When to apply:** Every tool. Default to read-only annotations and adjust as needed.
+Pair annotations with output schemas and structured results where MCP is present. Use confirmation gates for destructive, authenticated, production, browser, sandbox, payment, email-send, package-install, and file-write tools.
+
+**When to apply:** Every tool. Default to conservative annotations and adjust only when the behavior is guaranteed.
 
 ---
 

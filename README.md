@@ -56,14 +56,14 @@ The 11 dimensions are:
 
 ### Scaffold
 
-For agent system scaffolding, `surface` is Mastra-first for local TypeScript agent infrastructure, while respecting existing AI SDK, MCP, LangGraph, and Cloudflare Workers projects. It detects project shape before scaffolding and chooses conservative defaults for the runtime already in front of it.
+For agent system scaffolding, `surface` chooses the framework from the project shape. It prefers existing deliberate infrastructure, then selects OpenAI Agents SDK, Claude Managed Agents/Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, or MCP-first patterns based on runtime, deployment target, durability needs, and external agent interoperability.
 
 Core outputs:
 
 - agent definitions with clear instructions and tool registration
 - typed tools with Zod schemas and MCP annotations
 - workflow scaffolds with state, triggers, and safety patterns
-- memory setup for Mastra, Postgres/pgvector, or Workers-native alternatives
+- memory setup for Claude Managed Agents, Mastra, Postgres/pgvector, Workers-native alternatives, or the repo's existing storage
 - model routing across providers and gateways
 - browser and sandbox tool wrappers with safety boundaries
 
@@ -72,6 +72,8 @@ Core outputs:
 High-signal parts of the repo:
 
 - [`skills/surface/`](./skills/surface/) - main skill entrypoint, scoring references, specialist agents, and agent system scaffolding
+- [`src/content/docs/agents/framework-selection.mdx`](./src/content/docs/agents/framework-selection.mdx) - current framework selection guidance
+- [`src/content/docs/agents/anthropic-platform.mdx`](./src/content/docs/agents/anthropic-platform.mdx) - Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, and Anthropic platform notes
 - [`disciplines/`](./disciplines/) - longer-form guidance on agent design topics
 - [`templates/`](./templates/) - reusable templates for discovery, auth, MCP, errors, evals, and orchestration
 - [`src/app/`](./src/app/) - Next.js application for the docs site

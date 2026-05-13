@@ -27,7 +27,7 @@ Community consensus from Cognition, 12-factor agents, and Lilian Weng is clear: 
 
 ## Evidence to Gather
 
-- **Agent definitions**: `.claude/agents/` (Anthropic Claude Agent SDK), Agent instantiation in code, ADK `Agent` classes, LangGraph `Graph` nodes, Mastra `Agent` definitions.
+- **Agent definitions**: `.claude/agents/` (Anthropic Claude Code SDK), Agent instantiation in code, ADK `Agent` classes, LangGraph `Graph` nodes, Mastra `Agent` definitions.
 - **A2A discovery**: `/.well-known/agent.json` or `/.well-known/agent-card.json`.
 - **Durable execution**: Temporal, Inngest, Trigger.dev, LangGraph checkpointers, step-function platforms.
 - **State management**: Typed state schemas, checkpointers, multi-turn resumption patterns.
@@ -54,7 +54,7 @@ Lilian Weng: agent = LLM + tools + memory + planning. Multi-agent is *compositio
 
 Central agent decomposes task, routes to specialists, gathers and synthesizes. Best for clearly separable work (research + review + writing).
 
-**Anthropic Claude Agent SDK:** Subagents defined in `.claude/agents/*.md` with YAML frontmatter. Orchestrator calls them via tool-like syntax, receives summaries.
+**Anthropic Claude Code SDK:** Subagents defined in `.claude/agents/*.md` with YAML frontmatter. Orchestrator calls them via tool-like syntax, receives summaries.
 
 **LangGraph StateGraph:** Typed state schema, supervisor node makes routing decisions, specialist nodes process tasks, final node synthesizes.
 
@@ -154,7 +154,7 @@ Multi-agent workflows must be observable: which agent did what, when, with what 
 
 ### Cross-Vendor Integration
 
-**Anthropic Claude Agent SDK (TypeScript):** Subagents in `.claude/agents/*.md` (YAML: name, description, prompt, tools, model). Ephemeral context, summary → parent. Supports `resume` option for multi-turn state.
+**Anthropic Claude Code SDK (TypeScript):** Subagents in `.claude/agents/*.md` (YAML: name, description, prompt, tools, model). Ephemeral context, summary → parent. Supports `resume` option for multi-turn state.
 
 **Anthropic Claude Code:** Skill `context: fork` + `agent: <name>` for isolated, fresh conversation. Subagent auto-messages include `parent_tool_use_id` for tracing.
 
@@ -230,8 +230,8 @@ When designing a multi-agent system:
 - Anthropic multi-agent research system: https://www.anthropic.com/engineering/multi-agent-research-system
 - 12-factor agents: https://github.com/humanlayer/12-factor-agents
 - A2A v1.0 RC specification: https://a2a-protocol.org/latest/specification/
-- Claude Agent SDK (TypeScript): https://code.claude.com/docs/en/agent-sdk/typescript
-- Subagents: https://code.claude.com/docs/en/sub-agents
+- Claude Code SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
+- Claude Code subagents: https://docs.anthropic.com/en/docs/claude-code/sub-agents
 - OpenAI Agents SDK (TypeScript): https://openai.github.io/openai-agents-js/
 - Google ADK: https://google.github.io/adk-docs/
 - LangGraph JS: https://langchain-ai.github.io/langgraphjs/
