@@ -1,0 +1,131 @@
+---
+title: Browser Access
+description: Choosing and scaffolding browser access for agents.
+---
+
+Browser access is useful when an agent must interact with a site the way a person would: authenticated pages, JavaScript-heavy apps, screenshots, downloads, forms, or pages with no stable API.
+
+It is also one of the highest-risk tools an agent can receive. A browser can read private data, click destructive controls, submit purchases, download files, and follow prompt-injected page content. Treat it as a constrained runtime, not as a general search tool.
+
+## Decision Matrix
+
+| Need | Prefer | Why |
+|---|---|---|
+| Deterministic web automation in your own code | Playwright or Puppeteer | Stable selectors, explicit waits, and testable scripts beat model-driven clicking. |
+| Python agent that should decide browser steps | Browser Use | Good when the browser loop itself is the product and a Python agent owns planning and recovery. |
+| TypeScript automation with occasional AI decisions | Stagehand | Bridges Playwright-style code with `act`, `extract`, and `observe` calls for brittle pages. |
+| Hosted cloud browser infrastructure | Browserbase, Kernel, or browserless | Keeps browsers, sessions, recordings, proxies, and scaling outside the app server. |
+| Workers-native browser access | Cloudflare Browser Run | Fits Cloudflare Agents, Workers, Browser Rendering, and edge-hosted MCP/tool surfaces. |
+| Fast browser sessions colocated with agent code | Kernel | Useful when CDP-compatible browsers, pools, profiles, live view, and app-hosted agent loops matter. |
+| Search, scrape, crawl, or Markdown extraction | Firecrawl, Tavily, Exa, Jina Reader, or Apify | Prefer extraction/search APIs when clicking through a live browser is unnecessary. |
+| Visual computer-use loop | Kernel Computer Controls, Bedrock AgentCore Browser, or provider-native computer use | Use when the model predicts screen actions from screenshots rather than DOM selectors. |
+
+## Browser Use
+
+Browser Use has two relevant shapes:
+
+- **Open source library**: a Python framework for AI browser automation where you bring the model and run locally or self-hosted.
+- **Cloud API**: managed browser-agent sessions with task dispatch, profiles, proxies, workspaces, recordings, structured output, and cost/session controls.
+
+Use Browser Use when the agent should own the step-by-step browsing task, especially for messy sites where deterministic selectors are brittle. It is a stronger fit for autonomous web tasks than for stable internal workflows that can be scripted directly with Playwright.
+
+Scaffold it with:
+
+- a task-level tool such as `run_browser_task`, not broad page-control tools by default
+- explicit allowed domains and blocked domains
+- max step, max cost, and timeout limits
+- optional output schema for extraction tasks
+- session/profile IDs chosen by server code
+- recordings or trace links in the tool result for audit
+- confirmation gates before writes, purchases, messages, uploads, or account changes
+
+Do not pass arbitrary user credentials directly through the prompt. Use a server-owned profile, OAuth flow, or human handoff where authentication is required.
+
+## Kernel
+
+Kernel is browser infrastructure for agents and automations. It exposes CDP-compatible cloud browsers, so Playwright, Puppeteer, Browser Use, Stagehand, Selenium, and computer-use loops can connect to the same browser layer.
+
+Use Kernel when the browser infrastructure is the hard part:
+
+- many short-lived browser sessions
+- browser pools for lower startup latency
+- profiles for authenticated state
+- live view or MP4 replays for debugging
+- colocated app code and browsers
+- low-level mouse, keyboard, and screenshot controls for vision-based agents
+
+Kernel is not a replacement for an agent framework. Pair it with your existing loop: Browser Use for Python autonomous browsing, Stagehand or Playwright for TypeScript automation, or a provider computer-use model for screenshot-driven control.
+
+## Browserbase And Stagehand
+
+Browserbase is the hosted browser layer. Stagehand is the browser-agent SDK that sits above Playwright-style automation and adds AI actions.
+
+Use Browserbase when you need managed sessions, persistent browser state, downloads, proxies, recordings, and cloud execution. Use Stagehand when a workflow is mostly deterministic but has brittle interaction or extraction steps that benefit from AI.
+
+Good Stagehand candidates:
+
+- extracting fields from pages with unstable DOM structure
+- clicking through a familiar flow where labels move around
+- fallback recovery when a Playwright selector fails
+- generating a durable script from an exploratory interaction
+
+Avoid giving Stagehand unrestricted autonomy for high-risk accounts. Keep the workflow shape in code and use AI steps for narrow observations or interactions.
+
+## Cloudflare Browser Run
+
+Use Browser Run when the application is already Cloudflare-native: Workers, Durable Objects, Cloudflare Agents, Vectorize, AI Search, Queues, or Cloudflare Sandbox.
+
+It is a better fit than local Playwright inside Workers because browser execution is managed as platform infrastructure. This keeps the agent close to Cloudflare runtime primitives and avoids trying to run Node/browser processes in an edge worker.
+
+## Safer Tool Shapes
+
+Prefer coarse, auditable browser tools over exposing raw click/type/navigation controls to the model.
+
+Good tools:
+
+- `extract_page_data(url, schema)`
+- `search_site(query, allowed_domains)`
+- `run_browser_task(task, allowed_domains, output_schema)`
+- `capture_page_snapshot(url)`
+- `download_report(url, expected_file_type)`
+
+Riskier tools:
+
+- `click(selector)`
+- `type(text)`
+- `goto(url)`
+- `eval_js(script)`
+- `use_logged_in_browser(task)`
+
+Raw browser-control tools can be appropriate for a dedicated browser agent, but the agent then needs a stricter policy envelope: step budget, domain allowlist, screenshots/trace capture, credentials boundary, and human approval before side effects.
+
+## Guardrails Checklist
+
+- [ ] Domain allowlist and network egress policy are enforced outside the prompt.
+- [ ] Browser sessions have timeouts, cost limits, and max action counts.
+- [ ] Authenticated profiles are scoped to a user, tenant, and task type.
+- [ ] Tool output is summarized and truncated before reaching the model.
+- [ ] Downloads are scanned, size-limited, and stored outside production paths.
+- [ ] Page text is treated as untrusted input.
+- [ ] Writes, purchases, messages, account changes, and destructive actions require confirmation.
+- [ ] Every run emits trace IDs, screenshots or recordings, and structured errors.
+- [ ] Secrets are never injected into page context or browser-local storage unless the target site explicitly requires them.
+
+## Default Recommendation
+
+Start with the least powerful browser surface that can complete the workflow:
+
+1. Use a search or extraction API for public content.
+2. Use Playwright for deterministic internal or partner flows.
+3. Add Stagehand for brittle interaction or extraction steps.
+4. Add Browserbase, Kernel, browserless, or Browser Run when hosting and scale become the problem.
+5. Use Browser Use when the browser agent itself needs to plan and recover across a multi-step task.
+6. Use computer-use APIs only when DOM/CDP automation is insufficient.
+
+## Related
+
+- [Tooling Catalog](/docs/tooling-catalog)
+- [Framework Selection](/docs/agents/framework-selection)
+- [Tool Design](/docs/tool-design)
+- [Runtime Boundaries](/docs/runtime-boundaries)
+- [Cloudflare-Native Agent Stack](/docs/cookbook/cloudflare-agent-stack)

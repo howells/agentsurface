@@ -12,6 +12,7 @@ Before scaffolding, align the boundary first:
 - [Agent Design Principles](/docs/agents/design-principles) — narrow ownership, bounded loops, workflow-before-agent, and eval-first scaffolding
 - [Framework Selection](/docs/agents/framework-selection) — choosing between OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, and MCP-first designs
 - [Anthropic Platform](/docs/agents/anthropic-platform) — current Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, tools, model, and security guidance
+- [Browser Access](/docs/agents/browser-access) — choosing between Browser Use, Kernel, Browserbase, Stagehand, Playwright, Browser Run, and extraction APIs
 
 ## What It Creates
 
@@ -91,12 +92,13 @@ Browser and sandbox capabilities are high-risk. The skill should scaffold them w
 - confirmation gates for writes, purchases, and destructive actions
 - no production secrets inside sandbox sessions
 
-Use Browser Run for Workers-native browser sessions. Use Browserbase, Stagehand, or Playwright where they match the existing runtime. Use Cloudflare Sandbox, Vercel Sandbox, Daytona, or Modal when code must execute away from the app server.
+Use Browser Run for Workers-native browser sessions. Use Browser Use when the browser agent should plan and recover across a task. Use Kernel, Browserbase, Stagehand, browserless, or Playwright where they match the existing runtime and hosting needs. Use Cloudflare Sandbox, Vercel Sandbox, Daytona, or Modal when code must execute away from the app server.
 
 ## Related
 
 - [Cloudflare-Native Agent Stack](/docs/cookbook/cloudflare-agent-stack)
 - [Agentic Loop as Commodity](/docs/cookbook/agentic-loop)
+- [Browser Access](/docs/agents/browser-access)
 - [Tool Design](/docs/tool-design)
 - [MCP Servers](/docs/mcp-servers)
 - [Multi-Agent Patterns](/docs/multi-agent)

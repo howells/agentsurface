@@ -15,6 +15,7 @@ Vector databases store and search high-dimensional embeddings efficiently via ap
 - **Qdrant:** HNSW + quantization, self-host or cloud. $0.20/1M RUs.
 - **Weaviate:** Native BM25 + dense hybrid, GraphQL API. $0.50/1k reads.
 - **LanceDB:** Multi-vector (ColBERT), serverless, TypeScript-native.
+- **Turbopuffer:** Object-storage-backed vector and BM25 search for high-scale first-stage retrieval.
 
 ## Selection matrix
 
@@ -314,6 +315,86 @@ async function tokenSearch(queryTokens: number[][], limit: number = 10) {
 }
 ```
 
+## Turbopuffer: object-storage backed retrieval
+
+Turbopuffer is best treated as a first-stage retrieval engine: use it to narrow a large namespace down to a small candidate set, then do rank fusion, reranking, and answer assembly in your application code.
+
+Its architecture keeps durable state in object storage and caches actively searched data on memory/SSD. That makes it a strong option for very large corpora, long-tail namespaces, and cost-sensitive retrieval where not every tenant or collection needs to stay hot all the time.
+
+Use Turbopuffer when:
+
+- the corpus may grow to millions or billions of documents
+- cold-start latency is acceptable for rarely queried namespaces
+- warm-cache latency matters for active namespaces
+- you want vector search and BM25 full-text search in the same retrieval substrate
+- your application already owns ranking, reranking, and evaluation logic
+
+Avoid Turbopuffer as the first default when:
+
+- you need a full database with joins, transactions, or rich update semantics
+- you need native graph traversal, faceted search UI primitives, or mature admin tooling
+- every query must have consistently low latency without cache planning
+- the team wants a batteries-included RAG product rather than a retrieval building block
+
+### Basic write and query shape
+
+The important design point is to make namespace and schema choices explicit. Put tenant, source, document type, and freshness fields in filterable attributes instead of burying them in text.
+
+```typescript
+import Turbopuffer from "@turbopuffer/turbopuffer";
+
+const tpuf = new Turbopuffer({
+  apiKey: process.env.TURBOPUFFER_API_KEY,
+});
+
+const ns = tpuf.namespace("tenant-1-docs");
+
+async function indexDocs(
+  docs: Array<{
+    id: string;
+    text: string;
+    source: string;
+    embedding: number[];
+  }>
+) {
+  await ns.write({
+    upsert_rows: docs.map((doc) => ({
+      id: doc.id,
+      vector: doc.embedding,
+      text: doc.text,
+      source: doc.source,
+      indexed_at: new Date().toISOString(),
+    })),
+    schema: {
+      text: { type: "string", full_text_search: true },
+      source: { type: "string", filterable: true },
+      indexed_at: { type: "string", filterable: true },
+    },
+  });
+}
+
+async function vectorSearch(embedding: number[]) {
+  return ns.query({
+    rank_by: ["vector", "ANN", embedding],
+    top_k: 50,
+    include_attributes: ["text", "source", "indexed_at"],
+    filters: ["source", "Eq", "docs"],
+  });
+}
+```
+
+### Hybrid search pattern
+
+For agent retrieval, use multiple first-stage queries and combine them outside the database. A common pattern is:
+
+1. Run a vector query for semantic recall.
+2. Run a BM25 query for exact identifiers, product names, error messages, and API fields.
+3. Fuse results with reciprocal rank fusion.
+4. Rerank the top 50-100 candidates.
+5. Return a compact, cited context pack to the agent.
+
+This keeps the agent away from raw search mechanics. The agent should call a `search_docs` or `retrieve_context` tool with a task-level query; server code should own embeddings, namespaces, filters, fusion, reranking, and token trimming.
+
 ## Migration checklist: switching vector DBs
 
 - [ ] Identify current index schema (dims, distance metric, quantization)
@@ -341,3 +422,4 @@ async function tokenSearch(queryTokens: number[][], limit: number = 10) {
 - [Qdrant docs](https://qdrant.tech/documentation/)
 - [Weaviate docs](https://weaviate.io/developers/weaviate)
 - [LanceDB docs](https://lancedb.com/docs)
+- [Turbopuffer docs](https://turbopuffer.com/docs)
