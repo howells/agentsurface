@@ -1,0 +1,310 @@
+---
+title: RAG Patterns
+description: Naive, hybrid, contextual, graph, agentic, corrective, self-reflective, compiled, hierarchical, and multimodal RAG
+---
+
+RAG is not one architecture. It is a family of retrieval, ranking, context assembly, and generation patterns. Treat each named variant as a design move, not a product category. Most production systems combine several patterns: hybrid retrieval, reranking, contextual chunks, query rewriting, metadata filters, and evaluation.
+
+## Summary
+
+The useful taxonomy is based on where the system improves the pipeline:
+
+| Stage | Pattern family | Use when |
+|-------|----------------|----------|
+| Query | HyDE, query rewriting, multi-query, RAG-Fusion | User queries are short, vague, or phrased differently from source docs |
+| Retrieval | Dense, hybrid, graph, multimodal, structured | Corpus contains different data shapes or exact terms matter |
+| Ranking | Reranked, late-interaction, ColBERT/ColPali | Top-k retrieval is noisy or documents are visually complex |
+| Context | Parent-child, contextual, hierarchical, RAPTOR | Chunks lose document-level meaning |
+| Control | Agentic, Self-RAG, Corrective RAG | Retrieval may need planning, validation, or repair |
+| Optimization | Compiled RAG | You have eval data and want the pipeline tuned against a metric |
+
+## The baseline: naive RAG
+
+Naive RAG is the classic loop:
+
+1. Embed the user query.
+2. Retrieve top-k similar chunks from a vector store.
+3. Put those chunks in the prompt.
+4. Generate an answer.
+
+This is a good prototype and a poor production default. It fails on exact identifiers, rare terms, stale chunks, multi-hop questions, bad chunk boundaries, and irrelevant top-k results.
+
+Use it only for:
+
+- prototypes
+- small, clean corpora
+- low-risk internal search
+- baseline evaluation before adding complexity
+
+## Dense RAG
+
+Dense RAG uses embeddings and nearest-neighbor search. It is strong for semantic similarity, synonyms, paraphrases, and fuzzy recall.
+
+Weaknesses:
+
+- poor exact match for IDs, error codes, filenames, and proper nouns
+- embedding model may underperform in niche domains
+- top-k similarity is not the same as answer relevance
+
+Use dense retrieval as one signal, not the whole system.
+
+## Hybrid RAG
+
+Hybrid RAG combines sparse retrieval such as BM25 with dense vector retrieval. Results are usually merged with Reciprocal Rank Fusion (RRF), weighted score fusion, or a database-native hybrid query.
+
+Use it when:
+
+- exact terms and semantic similarity both matter
+- the corpus contains product names, codes, APIs, tickets, or logs
+- dense-only retrieval misses obvious keyword matches
+
+Default production stance: use hybrid retrieval unless there is a strong reason not to.
+
+## Reranked RAG
+
+Reranked RAG retrieves broadly, then uses a cross-encoder or reranking model to sort candidates before generation.
+
+Typical pipeline:
+
+1. Retrieve top 50-100 with dense, sparse, or hybrid search.
+2. Rerank to top 5-10.
+3. Assemble context from only the highest-confidence results.
+
+Use it when retrieved context is noisy. Do not use reranking to compensate for a broken ingestion or chunking strategy.
+
+## Contextual RAG
+
+Contextual RAG adds document-aware context to each chunk before indexing. Anthropic's Contextual Retrieval pattern prepends a short explanation of what the chunk means within the larger document, then indexes the enriched chunk for embedding search and BM25.
+
+Use it when:
+
+- chunks are ambiguous without the surrounding document
+- financial, legal, research, or policy documents repeat generic phrases
+- retrieval finds correct-looking chunks that lack entity, date, or section context
+
+Watch for:
+
+- index-time LLM cost
+- chunk context exceeding embedding model limits
+- generated context becoming stale if source docs change
+
+## Parent-child RAG
+
+Parent-child RAG retrieves small child chunks but returns larger parent sections to the model. This preserves precision during retrieval and enough context during generation.
+
+Use it when:
+
+- small chunks rank well but answer synthesis needs a full section
+- documents have stable headings or page/section IDs
+- citations should point to a larger human-readable unit
+
+This is often simpler than graph RAG or hierarchical summarization.
+
+## Hierarchical RAG and RAPTOR
+
+Hierarchical RAG indexes multiple abstraction levels: chunks, section summaries, document summaries, and sometimes corpus-level summaries.
+
+RAPTOR is a named hierarchical pattern. It recursively clusters chunks, summarizes those clusters, builds a tree, and retrieves across the tree at inference time. It helps when a question requires both local facts and higher-level document understanding.
+
+Use it when:
+
+- long documents need global and local context
+- summaries answer some queries better than raw chunks
+- users ask synthesis questions across a document set
+
+Avoid it when:
+
+- documents change frequently
+- traceability to exact source text matters more than abstraction
+- the corpus is small enough for simpler parent-child retrieval
+
+## HyDE
+
+HyDE, or Hypothetical Document Embeddings, asks an LLM to generate a hypothetical answer or passage for the query, embeds that generated text, and uses it as the retrieval query.
+
+Use it when:
+
+- user queries are short or underspecified
+- the corpus is written in a different style from user questions
+- zero-shot retrieval quality is weak
+
+Risks:
+
+- the hypothetical answer can bias retrieval toward a wrong assumption
+- it adds query-time latency and model cost
+- it should be evaluated against direct query embeddings and multi-query rewriting
+
+## Multi-query RAG and RAG-Fusion
+
+Multi-query RAG rewrites the user query into several search queries. RAG-Fusion combines this with reciprocal rank fusion: generate multiple queries, retrieve for each, fuse ranked results, then answer from the merged context.
+
+Use it when:
+
+- a single phrasing misses relevant evidence
+- queries have multiple facets
+- recall matters more than minimal latency
+
+Pair it with reranking. Query expansion improves recall, but it can also increase noise.
+
+## GraphRAG
+
+GraphRAG builds or uses a knowledge graph of entities, relationships, and communities. Retrieval can then combine entity lookup, graph traversal, community summaries, and vector search.
+
+Use it when:
+
+- relationships are first-class facts
+- questions require multi-hop traversal
+- the domain has stable entities and relationship types
+- global summarization across communities matters
+
+Avoid it when:
+
+- the data is mostly unstructured prose with weak entity relationships
+- you cannot maintain entity resolution
+- simple hybrid retrieval answers most questions
+
+## LightRAG
+
+LightRAG is a graph-augmented RAG pattern that aims to keep graph retrieval simpler and faster than heavy community-building GraphRAG systems. It indexes entities and relationships for direct retrieval, then combines low-level and high-level retrieval views.
+
+Use it when:
+
+- graph structure helps but full GraphRAG is too heavy
+- you need faster updates
+- token and indexing cost matter
+
+Treat LightRAG as a graph retrieval design, not a universal replacement for hybrid search.
+
+## Agentic RAG
+
+Agentic RAG gives an agent control over retrieval. Instead of one fixed retrieve-then-answer step, the agent can plan subqueries, choose tools, call vector search, query SQL, traverse graphs, inspect results, and retrieve again.
+
+Use it when:
+
+- questions are multi-step
+- data spans documents, tables, APIs, and graphs
+- the retrieval strategy depends on the query
+- answer validation or source inspection is required
+
+Do not use it for simple FAQ-style lookups. Agentic retrieval increases latency, cost, and failure surface.
+
+## Self-RAG
+
+Self-RAG adds self-reflection around retrieval and generation. The model decides whether retrieval is needed, evaluates retrieved passages, critiques whether the answer is supported, and can revise or retrieve again.
+
+Use it when:
+
+- factuality matters
+- retrieval quality varies by query
+- you can afford extra model calls or a model trained for reflection tokens
+
+In many production systems, a simpler approximation is enough: retrieve, grade document relevance, rerank, generate, then run a faithfulness check.
+
+## Corrective RAG
+
+Corrective RAG, often abbreviated CRAG, evaluates the quality of retrieved documents and triggers corrective actions when retrieval is poor. Corrective actions can include filtering, query rewriting, web search fallback, or decomposing documents into finer units.
+
+Use it when:
+
+- retrieval sometimes returns irrelevant context
+- the answer should abstain or repair instead of hallucinating
+- you need explicit confidence gates before generation
+
+CRAG pairs well with observability: log retrieval quality, corrective action, final answer faithfulness, and whether the fallback helped.
+
+## Compiled RAG
+
+Compiled RAG is an optimization pattern rather than a retriever type. In DSPy-style systems, you define the RAG pipeline as a program with modules, signatures, tools, and metrics. An optimizer then compiles that program into better prompts, demonstrations, or weights using training examples and an evaluation metric.
+
+Use it when:
+
+- you have representative questions and expected answers
+- the retrieval and generation pipeline is stable enough to optimize
+- prompt tuning by hand is becoming brittle
+- you need measurable improvements against a domain metric
+
+Avoid it when:
+
+- there is no eval set
+- the corpus or task changes daily
+- failures are caused by missing data, bad chunking, or weak permissions rather than prompt behavior
+
+Compiled RAG does not remove the need for hybrid retrieval, reranking, source filtering, and evals. It tunes the program that orchestrates those pieces.
+
+## Multimodal RAG
+
+Multimodal RAG retrieves from images, PDFs, tables, diagrams, audio, video, or mixed document layouts. ColPali-style late-interaction retrieval treats PDF pages as images and can outperform OCR-first pipelines on visually rich documents.
+
+Use it when:
+
+- source truth lives in charts, forms, tables, slides, scans, or screenshots
+- OCR loses layout semantics
+- answers require visual evidence
+
+Keep citations precise: page, bounding box, slide, timestamp, or image region.
+
+## Structured and tool-backed RAG
+
+Not all retrieval should be vector search. Agents often need structured retrieval from SQL, OpenAPI endpoints, GraphQL, logs, ticket systems, file indexes, or MCP tools.
+
+Use structured retrieval when:
+
+- the answer depends on live state
+- filters, joins, permissions, or aggregations matter
+- exactness beats semantic similarity
+
+This is still RAG if the retrieved result grounds generation. The retrieval layer just happens to be a tool or database query rather than a vector store.
+
+## Choosing a pattern
+
+| Problem | Start with |
+|---------|------------|
+| Dense retrieval misses exact terms | Hybrid RAG |
+| Top-k results are noisy | Reranked RAG |
+| Chunks lose meaning | Contextual RAG or parent-child RAG |
+| User query is vague | HyDE or multi-query RAG |
+| Long docs need synthesis | Parent-child or RAPTOR |
+| Relationships matter | GraphRAG or LightRAG |
+| Query needs planning | Agentic RAG |
+| Retrieved docs may be wrong | Corrective RAG |
+| Answer must critique itself | Self-RAG or faithfulness checks |
+| Pipeline needs metric-driven tuning | Compiled RAG |
+| PDFs and visual documents dominate | Multimodal RAG |
+| Facts live in databases or APIs | Structured/tool-backed RAG |
+
+## Production default
+
+For most product systems, start here:
+
+1. Ingest with stable document IDs, metadata, permissions, and source hashes.
+2. Chunk semantically, then add contextual chunk descriptions where ambiguity is common.
+3. Retrieve with hybrid search.
+4. Rerank to a small context set.
+5. Enforce metadata and authorization filters at retrieval time.
+6. Generate with citations.
+7. Evaluate recall, ranking quality, faithfulness, latency, and cost in CI.
+8. Add agentic, graph, corrective, or compiled layers only when evals show a specific failure mode.
+
+## Anti-patterns
+
+- Naming the architecture after the newest acronym instead of the failure mode it fixes.
+- Adding graph retrieval before entity resolution is reliable.
+- Using agentic RAG for single-hop lookups.
+- Expanding queries without reranking.
+- Compiling prompts before creating an eval set.
+- Treating generated summaries as source truth.
+- Measuring answer quality without measuring retrieval quality.
+
+## See also
+
+- [Original RAG paper](https://arxiv.org/abs/2005.11401)
+- [Microsoft GraphRAG](https://www.microsoft.com/en-us/research/project/graphrag/)
+- [LightRAG paper](https://arxiv.org/abs/2410.05779)
+- [DSPy documentation](https://dspy.ai/)
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)
+- [Self-RAG paper](https://arxiv.org/abs/2310.11511)
+- [Corrective RAG paper](https://arxiv.org/abs/2401.15884)
+- [RAPTOR paper](https://arxiv.org/abs/2401.18059)
+- [HyDE paper](https://arxiv.org/abs/2212.10496)
+- [RAG-Fusion paper](https://arxiv.org/abs/2402.03367)
+- [ColBERT paper](https://arxiv.org/abs/2004.12832)

@@ -2,6 +2,7 @@
   "title": "Data Retrievability",
   "pages": [
     "index",
+    "rag-patterns",
     "embeddings",
     "multimodal-embeddings",
     "chunking",

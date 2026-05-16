@@ -5,7 +5,7 @@ description: How your codebase makes data searchable, retrievable, and understan
 
 import { Card, Cards } from 'fumadocs-ui/components/card';
 
-Data Retrievability is how effectively your codebase enables agents to find, understand, and retrieve information. This includes vector embeddings (dense and multimodal), vector databases, hybrid search combining keyword and semantic matching, reranking for precision, intelligent chunking strategies, knowledge graphs for complex reasoning, agentic RAG patterns with query planning, and evaluation frameworks that measure retrieval quality.
+Data Retrievability is how effectively your codebase enables agents to find, understand, and retrieve information. This includes RAG pattern selection, vector embeddings (dense and multimodal), vector databases, hybrid search combining keyword and semantic matching, reranking for precision, intelligent chunking strategies, knowledge graphs for complex reasoning, agentic RAG patterns with query planning, and evaluation frameworks that measure retrieval quality.
 
 ## Summary
 
@@ -71,6 +71,11 @@ For most TypeScript/Node teams:
 ## Dimensions & pages
 
 <Cards>
+  <Card
+    title="RAG Patterns"
+    description="Naive, hybrid, contextual, graph, agentic, corrective, self-reflective, compiled, hierarchical, and multimodal RAG."
+    href="/docs/data-retrievability/rag-patterns"
+  />
   <Card
     title="Dense Embeddings"
     description="OpenAI, Voyage, Cohere, Google, and open-source models. Model selection, Matryoshka embeddings, cost vs. quality."
