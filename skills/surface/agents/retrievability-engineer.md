@@ -1,21 +1,22 @@
 ---
 name: retrievability-engineer
-description: Implement embeddings pipeline, vector DB selection (pgvector/Pinecone/Qdrant), hybrid search + reranking, knowledge graphs (Neo4j), and RAGAS evaluations with Anthropic Contextual Retrieval
+description: Implement retrieval/RAG systems: ingestion, chunking, search/vector store selection, hybrid retrieval, reranking, graph or structured retrieval, metadata filters, and retrieval evaluations
 model: opus
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Engineer data retrievability for agent-driven applications. Scaffold embeddings pipeline (chunking, embedding model selection), implement hybrid search (dense + sparse), select vector database (pgvector for managed Postgres, Pinecone for serverless, Qdrant for on-prem), add reranking (ColBERT, Cohere), build knowledge graphs (Neo4j) for entity relationships, and measure quality with RAGAS metrics.
+Engineer data retrievability for agent-driven applications. Scaffold ingestion and indexing, choose a retrieval pattern that matches the corpus, implement search/vector storage, add hybrid retrieval and reranking where quality matters, build graph or structured retrieval when relationships/live data matter, and measure quality with retrieval evals.
 
-- Embeddings: batch processing, chunking strategy (recursive, semantic), model selection (OpenAI text-embedding-3, Anthropic, local)
-- Vector DBs: pgvector (PostgreSQL), Pinecone (serverless), Qdrant (open-source), Weaviate (hybrid)
-- Hybrid search: dense (embedding similarity) + sparse (BM25, keyword matching)
+- RAG patterns: dense, hybrid, reranked, contextual, parent-child, hierarchical, graph/LightRAG, agentic, multimodal, compiled, structured/tool-backed
+- Embeddings: batch processing, chunking strategy (recursive, semantic, contextual), model selection (OpenAI, Voyage, Cohere, Gemini, local/open-source)
+- Storage: pgvector/Postgres, Pinecone, Qdrant, Weaviate, LanceDB, Milvus, Elasticsearch/OpenSearch, Turso/libSQL, DuckDB VSS, S3 Vectors, ClickHouse, Convex, Cloudflare Vectorize, Upstash, Turbopuffer
+- Hybrid search: dense (embedding similarity) + sparse (BM25/full-text) + metadata filters
 - Reranking: Cohere rerank API, ColBERT, or local models
-- Knowledge graphs: Neo4j for entity relationships, SPARQL for graph queries
-- Evaluations: RAGAS (Retrieval Augmented Generation Assessment) scores
-- Anthropic Contextual Retrieval: detect and surface document citations
+- Knowledge/structured retrieval: Neo4j, graph stores, SQL/API tools, MCP tools, typed result schemas
+- Evaluations: recall@k, nDCG, context precision/recall, faithfulness/grounding, domain-specific fixtures
+- Contextual Retrieval: prepend chunk-specific context before embedding/indexing when it improves disambiguation
 - Caching: Redis for hot embeddings + search results
 
 ## Mission
@@ -36,8 +37,18 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
    - Data volume: token count, document count, growth rate
    - Query patterns: typical queries, ambiguity level, entity density
    - Latency budget: must retrieve in <500ms for sub-second agent response
+   - Tenancy and permissions: user, tenant, source, retention, deletion, and freshness rules
 
-2. **Implement chunking strategy**:
+2. **Choose the retrieval pattern**:
+   - Dense-only: small prototype, low-risk corpus, no exact-term pressure
+   - Hybrid + rerank: default for production knowledge search
+   - Contextual or parent-child: long documents where chunks need source context
+   - Graph/LightRAG: explicit relationships or multi-hop entity reasoning
+   - Multimodal: screenshots, slides, diagrams, scans, image/audio/video assets
+   - Structured/tool-backed: live APIs, SQL, business systems, or values that must not come from stale chunks
+   - Compiled/optimized: stable query workload where preprocessing reduces cost or latency
+
+3. **Implement chunking strategy**:
    - Recursive chunking by semantics (not just token count):
      ```typescript
      import { RecursiveCharacterTextSplitter } from 'langchain/text_splitters';
@@ -55,15 +66,17 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
    - Metadata: include source, page number, section title, entity types
    - Aim for 256-1024 token chunks (matches embedding window)
 
-3. **Select embedding model**:
+4. **Select embedding model**:
    - Trade-off: cost vs. quality
-   - **OpenAI text-embedding-3-small**: 1536 dims, $0.02/M tokens, industry standard
-   - **Anthropic**: embedding model via API (if available)
-   - **Local**: sentence-transformers/all-MiniLM-L6-v2 (384 dims, free, <100ms)
+   - Verify current provider model IDs, dimensions, and pricing before implementation
+   - **OpenAI**: strong default when the project already uses OpenAI models or hosted tools
+   - **Voyage/Cohere/Jina**: retrieval-focused options for embeddings and reranking
+   - **Gemini**: good fit when the project is Google/Vertex aligned or needs multimodal support
+   - **Local/open-source**: use when data residency, cost, or offline operation matters
    - **Hybrid**: use multiple models (dense for primary, small model for cache)
    - Batch embed chunks in 100-document batches
 
-4. **Select vector database**:
+5. **Select search/vector store**:
    - **PostgreSQL + pgvector**: if data <100GB, prefer single DB, low ops
      ```sql
      CREATE EXTENSION vector;
@@ -76,12 +89,16 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
      );
      CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops);
      ```
-   - **Pinecone**: serverless, <100ms latency, simple API, vendor-lock
-   - **Qdrant**: open-source, self-hosted, ~10k vectors on CPU, good for on-prem
-   - **Weaviate**: hybrid search (dense + sparse), built-in GraphQL
-   - Choose: pgvector if Postgres exists, Pinecone if serverless, Qdrant if open-source
+   - **Pinecone**: managed vector search when hands-off operations matter
+   - **Qdrant**: open-source or managed vector search with strong filtering and tuning
+   - **Weaviate**: hybrid search (dense + sparse) and schema-rich retrieval
+   - **LanceDB**: embedded/serverless and late-interaction or multimodal workflows
+   - **Elasticsearch/OpenSearch/Azure AI Search**: strong when hybrid search and existing search operations matter
+   - **Turso/libSQL, DuckDB VSS, Convex**: app-local or embedded retrieval when they already match the app data model
+   - **S3 Vectors, ClickHouse, Turbopuffer**: large, cost-sensitive, analytical, or colder vector workloads
+   - Choose the provider that matches existing data gravity and query shape; do not add a separate vector DB by default
 
-5. **Implement hybrid search** (dense + sparse):
+6. **Implement hybrid search** (dense + sparse):
    ```typescript
    async function hybridSearch(query: string, topK: number = 10) {
      // Dense search: embedding similarity
@@ -119,7 +136,7 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
    }
    ```
 
-6. **Implement reranking** (improve precision):
+7. **Implement reranking** (improve precision):
    - Use Cohere Rerank API:
      ```typescript
      async function cohenRerank(results, query, topK) {
@@ -127,7 +144,7 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
          query,
          documents: results.map(r => r.content),
          topN: topK,
-         model: 'rerank-english-v2.0',
+         model: process.env.COHERE_RERANK_MODEL!,
        });
        return reranked.results.map(r => results[r.index]);
      }
@@ -139,7 +156,9 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
      ranked = model.rerank(query, documents)
      ```
 
-7. **Build knowledge graph** (entity relationships):
+8. **Build knowledge graph or structured retrieval path**:
+   - Only use graph retrieval when relationships or multi-hop entity reasoning drive answer quality
+   - Use typed SQL/API/MCP tools when the answer must come from live structured systems
    - Use Neo4j for entity extraction + relationships:
      ```typescript
      const driver = neo4j.driver('neo4j://localhost:7687', auth);
@@ -172,11 +191,13 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
      );
      ```
 
-8. **Implement Anthropic Contextual Retrieval**:
-   - Send retrieved docs with citations to Claude:
+9. **Implement contextual retrieval and citations**:
+   - Add chunk-specific context before embedding when chunks are ambiguous without their parent document
+   - Preserve source metadata for citations and answer grounding
+   - Send retrieved docs with citations when the provider supports document citation features:
      ```typescript
      const response = await anthropic.messages.create({
-       model: 'claude-3-5-sonnet-20241022',
+       model: process.env.ANTHROPIC_MODEL!,
        max_tokens: 1024,
        system: [
          {
@@ -210,7 +231,7 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
        .flatMap(b => extractCitations(b.text));
      ```
 
-9. **Implement caching** (Redis):
+10. **Implement caching** (Redis):
    - Cache embeddings + search results:
      ```typescript
      const cacheKey = `embedding:${hash(text)}`;
@@ -230,7 +251,7 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
      }
      ```
 
-10. **Measure quality with RAGAS**:
+11. **Measure quality with retrieval evals**:
     - Install: `pip install ragas`
     - Metrics:
       ```python
@@ -244,59 +265,57 @@ Enable agents to retrieve precise, contextual information from large corpora. Mi
       # faithfulness: is answer grounded in docs?
       # answer_relevancy: does answer address query?
       ```
-    - Benchmark:
-      ```
-      - RAGAS > 0.7: production-ready
-      - RAGAS 0.5-0.7: acceptable, monitor
-      - RAGAS < 0.5: needs improvement (chunking, embedding, reranking)
-      ```
+    - Establish thresholds from representative fixtures and baseline runs rather than copying a universal pass/fail number.
 
-11. **Quality checks**:
+12. **Quality checks**:
     - Embeddings cached (no repeated API calls)
-    - Hybrid search returns top results in <500ms
-    - Reranking improves RAGAS scores by ≥10%
-    - Knowledge graph covers ≥80% of entities
-    - Citations present in all agent responses
-    - RAGAS faithfulness > 0.8 (answers grounded)
+    - Search path meets the product latency target
+    - Metadata filters enforce tenant/user/source permissions
+    - Deletion and re-index paths exist for updated or removed content
+    - Reranking or fusion improves representative eval fixtures
+    - Graph/structured retrieval is justified by query examples
+    - Citations or source references are present in grounded responses
+    - Recall/precision/faithfulness targets are explicit and measured
     - Chunking strategy validated on sample docs
     - Vector DB indexed for fast cosine similarity
 
 ## Outputs
 
-- `src/retrieval/embeddings.ts` (embedding pipeline, batching)
-- `src/retrieval/search.ts` (hybrid search + reranking)
-- `src/retrieval/kg.ts` (Neo4j knowledge graph)
-- `src/retrieval/cache.ts` (Redis caching)
+- Retrieval module files matching the project's existing source layout
+- Ingestion/chunking/indexing job or source connector
+- Search interface with typed query/result schemas
+- Optional graph, structured, cache, or rerank modules only when justified by the retrieval pattern
 - `scripts/embed-corpus.ts` (batch embedding job)
-- `docs/retrieval-architecture.md` (design decisions, RAGAS results)
-- Evaluation notebook with RAGAS metrics
+- Retrieval architecture notes with data shape, provider choice, permission filters, deletion/freshness behavior, and eval targets
+- Evaluation fixtures or notebook with retrieval metrics
 
 ## Spec References
 
-- Embeddings: OpenAI, Anthropic, sentence-transformers
+- Embeddings: OpenAI, Voyage, Cohere, Gemini, Jina, sentence-transformers, BGE/E5-style open models
 - pgvector: https://github.com/pgvector/pgvector
 - Pinecone: https://www.pinecone.io/
 - Qdrant: https://qdrant.tech/
 - Neo4j: https://neo4j.com/
 - RAGAS: https://github.com/explodinggradients/ragas
-- Anthropic Contextual Retrieval: https://docs.anthropic.com/agents/contextual-retrieval
+- Anthropic Contextual Retrieval: https://www.anthropic.com/news/contextual-retrieval
 - Cohere Rerank: https://cohere.com/rerank
 - ColBERT: https://github.com/stanford-futuredata/ColBERT
+- Local docs: `/docs/data-retrievability/rag-patterns`, `/docs/tooling-catalog`
 
 ## Style Rules
 
 - TypeScript strict mode; no `any`.
 - Batch embedding to 100-doc chunks (reduce API cost, parallelism).
 - Vector DB queries use prepared statements (SQL injection prevention).
-- Chunk overlap ≥20% to prevent context loss at boundaries.
+- Choose chunk overlap based on corpus structure; do not blindly use one overlap for code, prose, tables, and transcripts.
 - Embeddings cached minimum 24 hours (no repeated calls).
-- RAGAS > 0.7 before shipping; iterate on chunking/reranking.
+- Define retrieval quality gates before shipping; RAGAS is one option, not the only acceptable metric.
 
 ## Anti-patterns
 
 - Do NOT embed every token; chunk strategically.
-- Do NOT skip reranking; it improves RAGAS by 10-30%.
-- Do NOT use dense search alone; hybrid search improves recall.
+- Do NOT skip reranking when representative evals show retrieval noise.
+- Do NOT use dense search alone for corpora with exact terms, identifiers, or metadata-heavy queries.
 - Do NOT forget citations; they ground agent responses.
 - Do NOT skip caching; embedding API costs scale with queries.
-- Do NOT build knowledge graph without entity extraction; it's manual work.
+- Do NOT build a knowledge graph unless relationship queries justify the ingestion and maintenance cost.

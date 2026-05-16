@@ -144,9 +144,9 @@ async function generateDPopProof(method: string, uri: string, publicKeyPEM: stri
 }
 ```
 
-### OAuth 2.1 (draft as of April 2026)
+### OAuth 2.1
 
-([OAuth 2.1 draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) consolidates best practices:
+([OAuth 2.1 draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) consolidates best practices. Verify the current IETF status before calling it a final RFC in generated docs or implementation notes.
 
 - **PKCE mandatory** on all authorization-code flows (even confidential clients).
 - **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code only.

@@ -12,7 +12,7 @@ Detect:
 - Framework/runtime: Next.js, Node, Python, Workers, serverless, CLI, library.
 - Existing agent framework: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, MCP, Cloudflare Agents, custom.
 - Existing directories: `agents`, `tools`, `workflows`, `src/mastra`, `packages/agents`, `triggers`.
-- Existing model routing, memory, retrieval, browser access, sandbox execution.
+- Existing model routing, retrieval/RAG, memory, browser access, sandbox execution.
 - TypeScript module target and runtime constraints.
 - Test and typecheck commands.
 
@@ -65,6 +65,8 @@ Recommend Mastra when:
 - The user needs a full local agent/workflow/memory/RAG/MCP framework with explicit app-owned orchestration.
 
 Respect existing MCP, LangGraph, or custom patterns when the repo already uses them.
+
+For retrieval and integration choices, use the local tooling catalog as a shortlist, not as a dependency list. Add only the storage provider, parser, reranker, graph store, MCP hub, or observability sink that matches the project's existing platform and query shape.
 
 ## Shared Scaffolding Rules
 
@@ -171,6 +173,37 @@ Generate:
 - Trigger function when needed.
 - Registration/export.
 - Tests/evals for happy path, recoverable error, and cancellation/escalation.
+
+## Mode: retrieval
+
+Add retrieval or RAG infrastructure only after identifying the data shape and query pattern.
+
+Ask only for missing decisions:
+
+- What corpus is being searched: docs, code, database rows, app data, tickets, emails, images, audio, or mixed media?
+- What answers require retrieval: exact lookup, semantic recall, multi-hop relationship reasoning, current web context, or structured tool/database access?
+- What freshness, tenancy, deletion, and access-control rules apply?
+- What latency and quality target should the first version meet?
+
+Default recommendations:
+
+- Use hybrid lexical + dense retrieval with reranking for most production knowledge search.
+- Use simple dense retrieval only for prototypes or small low-risk corpora.
+- Use graph or LightRAG-style retrieval when explicit relationships, entity histories, dependencies, or multi-hop questions drive quality.
+- Use multimodal retrieval when source material is visual, audio, slides, screenshots, diagrams, or scanned PDFs.
+- Use structured/tool-backed retrieval when the answer must come from live APIs, SQL, or business systems rather than chunked text.
+- Consider compiled/optimized retrieval only for stable query workloads where preprocessing, generated indexes, or query plans materially reduce cost or latency.
+
+Generate:
+
+- Ingestion/chunking or source connector code.
+- Search interface with typed query and result schemas.
+- Storage provider wiring that matches the existing platform.
+- Metadata filters for tenant, user, source, freshness, and permissions.
+- Reranking or rank-fusion stage when quality matters.
+- Eval fixtures for recall@k, context precision, grounding, and representative failure cases.
+
+Do not add durable agent memory when request-scoped retrieval, workflow state, or a searchable corpus is the actual requirement.
 
 ## Mode: memory
 

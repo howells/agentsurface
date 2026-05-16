@@ -171,7 +171,7 @@ Provide copy-paste patterns for common agentic workflows. No boilerplate; every 
          const prompt = config[role].systemPrompt;
          const tools = getTools(config[role].tools);
          return anthropic.messages.create({
-           model: 'claude-3-5-sonnet-20241022',
+           model: process.env.ANTHROPIC_MODEL!,
            system: prompt,
            tools: tools.map(t => ({
              name: t.name,
@@ -204,7 +204,7 @@ Provide copy-paste patterns for common agentic workflows. No boilerplate; every 
      export async function runAgent(req: AgentRequest): Promise<AgentResponse> {
        const tools = getToolsForAgent(req.userPermission);
        const response = await anthropic.messages.create({
-         model: 'claude-3-5-sonnet-20241022',
+         model: process.env.ANTHROPIC_MODEL!,
          system: `You have access to: ${tools.map(t => t.name).join(', ')}`,
          messages: [{ role: 'user', content: req.query }],
          tools: tools.map(toolToMcpFormat),
@@ -430,7 +430,7 @@ Provide copy-paste patterns for common agentic workflows. No boilerplate; every 
 
       export async function runAgentLoop(query: string) {
         const result = await generateText({
-          model: anthropic('claude-3-5-sonnet-20241022'),
+          model: anthropic(process.env.ANTHROPIC_MODEL!),
           system: 'You are a helpful assistant.',
           tools: {
             list_users: tool({

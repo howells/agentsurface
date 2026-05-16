@@ -1,4 +1,4 @@
-# Agentify Scoring Rubric
+# Surface Scoring Rubric
 
 ## Summary
 
@@ -139,22 +139,7 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 ---
 
-## Dimension 9: Data Retrievability
-
-**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via vector embeddings, hybrid search, reranking, and agentic RAG patterns.
-
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No data retrieval infrastructure. Documents or data are not indexed, searchable, or retrievable by agents. No embeddings, vector DB, or search indexing. | No `.embed()` calls, no vector DB client, no BM25 index, no `retriever()` or `RAG()` patterns. Files are static or database-only without semantic search. |
-| 1 | Basic single-stage dense retrieval only. Embeddings are computed but no reranking, no hybrid search, no chunking strategy. No evaluation. | Vector DB exists (Pinecone, Qdrant, pgvector) but no hybrid layer, no chunking logic, no RAGAS/MTEB evals. Embedding model is generic. |
-| 2 | Good retrieval infrastructure. Hybrid search (BM25 + dense) with fusion (RRF). Reranking (Cohere/Voyage) present. Chunking strategy documented with >10% overlap. Basic evaluation metrics (recall@k, nDCG). | Hybrid pipeline in code: BM25 + dense + RRF/Weaviate fusion. Reranking step before generation. Chunk size/overlap >10% documented. RAGAS or MTEB eval script present. Mid-tier embedding model. |
-| 3 | Excellent retrieval system. Multi-stage with query planning and reflection. Metadata filtering and namespace isolation. Contextual Retrieval (Anthropic pattern) or late-interaction (ColBERT). Knowledge graph or agentic RAG. Embedding drift detection. Comprehensive evaluation (RAGAS + domain metrics in CI/CD). | Agentic retriever with query decomposition and reflection. Contextual embeddings or prepended summaries. ColBERT/ColPali or hybrid graph+vector. Metadata filters on all queries. Drift detection. RAGAS + custom metrics. GraphRAG or LightRAG for complex domains. |
-
-**Key files:** embedding pipelines, vector DB clients, chunking logic, reranking setup, RAG frameworks, eval scripts
-
----
-
-## Dimension 10: Multi-Agent Support
+## Dimension 9: Multi-Agent Support
 
 **What it measures:** How well the project supports multi-agent orchestration.
 
@@ -171,7 +156,7 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 ---
 
-## Dimension 11: Testing & Evaluation
+## Dimension 10: Testing & Evaluation
 
 **What it measures:** Whether agent interactions are tested and evaluated.
 
@@ -179,10 +164,25 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 |-------|----------|-----------|
 | 0 | No agent-specific tests. Standard unit/integration tests only. | No test files targeting tool selection, agent behavior, or MCP server testing. |
 | 1 | Basic tool routing tests. Some verification that tools are called correctly. | Test files that verify tool selection or MCP tool responses. But: no error recovery testing, no multi-step flow testing. |
-| 2 | Comprehensive tool testing. Selection accuracy, parameter correctness, error recovery. Multi-step flow tests. MCP server tested with InMemoryTransport. | Tests cover: correct tool selection, valid parameters, error → recovery, multi-step sequences. MCP tests use InMemoryTransport.createLinkedPair(). |
+| 2 | Comprehensive tool testing. Selection accuracy, parameter correctness, error recovery. Multi-step flow tests. MCP server tested with InMemoryTransport. | Tests cover: correct tool selection, valid parameters, error -> recovery, multi-step sequences. MCP tests use InMemoryTransport.createLinkedPair(). |
 | 3 | Full eval suite. pass@k and pass^k metrics. Non-determinism handling (multiple runs per test). Regression detection. CI-integrated. Eval-driven development. | Statistical metrics (multiple runs per test case). Baseline comparison for regression. Eval suite runs in CI. Test cases from real production failures. |
 
 **Key files:** Test directories, eval suites, CI configuration
+
+---
+
+## Dimension 11: Data Retrievability
+
+**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via search indexes, vector embeddings, hybrid retrieval, reranking, graph/structured retrieval, and fit-for-purpose RAG patterns.
+
+| Score | Criteria | Detection |
+|-------|----------|-----------|
+| 0 | No retrieval infrastructure. Documents or data are not indexed, searchable, or retrievable by agents. No search index, embeddings, vector store, or structured retrieval path. | No `.embed()` calls, no vector/search client, no BM25/full-text index, no `retriever()` or `RAG()` patterns, no queryable docs/API/database tool. Files are static or database-only without agent-facing search. |
+| 1 | Basic single-stage retrieval. Dense vector search, keyword search, or a simple file/database lookup exists, but no reranking, no hybrid strategy, no documented chunking/source strategy, and no evaluation. | Vector/search store exists but no fusion or reranking. Chunking is ad hoc or absent. Metadata filters are weak. No RAGAS, recall@k, nDCG, or domain evals. |
+| 2 | Good retrieval infrastructure. Hybrid lexical + dense retrieval or an equivalent structured retrieval design. Reranking or rank fusion present where quality matters. Chunking/source strategy documented. Metadata filters and namespace isolation exist. Basic quality metrics are tracked. | BM25/full-text + dense + RRF/weighted fusion, or structured SQL/API retrieval with typed result schemas. Reranking before generation. Chunking/source config present. Tenant/user filters on queries. Recall@k, nDCG, RAGAS, or domain eval script present. |
+| 3 | Excellent retrieval system. Retrieval architecture matches the corpus: contextual, hierarchical, graph/LightRAG, agentic, multimodal, compiled/optimized, or structured/tool-backed RAG as appropriate. Query planning/reflection appears where queries are complex. Drift/freshness and deletion are handled. Evals run in CI or release gates. | Query decomposition, dynamic retriever/tool selection, contextual embeddings, ColBERT/ColPali, graph + vector, multimodal indexes, compiled query plans, or typed live-data tools. Metadata filters on all queries. Freshness/deletion/re-embed path exists. RAGAS + custom metrics or equivalent evals in CI/CD. |
+
+**Key files:** ingestion pipelines, embedding pipelines, vector/search clients, chunking logic, reranking setup, graph or structured retrieval tools, RAG frameworks, eval scripts
 
 ---
 

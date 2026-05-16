@@ -10,7 +10,7 @@ Make software easier for agents to discover, understand, call, test, and safely 
 Surface has two main workflows:
 
 - **Audit**: detect project surfaces, score agent readiness, produce findings, and write improvement plans.
-- **Scaffold**: add or extend agent infrastructure such as agents, tools, workflows, model routing, memory, browser access, sandbox execution, and MCP.
+- **Scaffold**: add or extend agent infrastructure such as agents, tools, workflows, model routing, retrieval/RAG, memory, browser access, sandbox execution, and MCP.
 
 Use the existing project shape first. Read files before making claims or generating code.
 
@@ -22,7 +22,7 @@ Use the existing project shape first. Read files before making claims or generat
 | plan, transform, improve, fix agent DX | Audit, then optionally execute |
 | add MCP, create llms.txt, write AGENTS.md, improve discovery | Audit single-area transform unless they ask for direct generation |
 | create agent, add tool, build workflow, scaffold, init | Scaffold |
-| add memory, model routing, browser tool, sandbox tool | Scaffold |
+| add retrieval, RAG, semantic search, memory, model routing, browser tool, sandbox tool | Scaffold |
 | ambiguous "make this agentic" | Start with Audit unless they clearly want new agent runtime code |
 
 If the user explicitly wants a direct artifact, do not force a full audit. Do a narrow detection pass, create the artifact, and explain the skipped audit scope.
@@ -43,6 +43,7 @@ Scaffold modes:
 - `agent <name>`: create a bounded agent.
 - `tool <name>`: create a typed tool.
 - `workflow <name>`: create a deterministic or partly agentic workflow.
+- `retrieval`: add document retrieval, RAG, semantic search, or search-backed agent context.
 - `memory`: add durable memory only when the use case requires it.
 - `model`: add multi-provider model routing.
 - `browser`: add browser/web access with guardrails.
@@ -91,7 +92,7 @@ Gather these surfaces before scoring:
 - Agent web readiness: Markdown content negotiation, JSON-LD, OpenAPI links, API catalog, MCP metadata, OAuth protected-resource metadata.
 - Auth: OAuth, API keys, bearer/JWT validation, scopes, token exchange, env-var handling.
 - Tools/agents/workflows: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, Cloudflare Agents, custom tool registries.
-- Retrieval: embeddings, vector DBs, hybrid search, rerankers, eval scripts.
+- Retrieval: RAG pattern family, document ingestion, embeddings, vector/search stores, hybrid search, rerankers, graph/structured retrieval, metadata filters, eval scripts.
 - Tests/evals: unit, integration, MCP transport tests, CLI contract tests, agent evals, CI.
 
 ### Scoring Rules
@@ -139,7 +140,7 @@ Load additional scaffold references only as needed:
 - Prefer Claude Code SDK when the project is building coding/repo agents that need the Claude Code harness, tool permissions, file/shell/code execution, session management, and MCP extensibility.
 - Prefer Vercel AI SDK for Next.js/Vercel apps that already use streaming UI, tool calling, provider routing, AI Gateway, or route-handler based chat. Pair it with Vercel Workflow when execution must pause, resume, retry, wait on approvals, or span minutes to months.
 - Prefer Cloudflare Agents when the project is Workers-native or needs Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Sandbox close to the Worker runtime.
-- Prefer Mastra for TypeScript projects that need a full local agent/workflow/memory/MCP framework and do not already have a stronger platform constraint.
+- Prefer Mastra for TypeScript projects that need a full local agent/workflow/memory/RAG/MCP framework and do not already have a stronger platform constraint.
 - Adapt to existing LangGraph, MCP, or custom runtime patterns when already present.
 - Do not generate Node-only APIs in Workers-native projects.
 
@@ -187,6 +188,7 @@ Use these defaults unless the project already has a better convention:
 
 - AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files as overlays.
 - `llms.txt` is a useful Markdown discovery convention for inference-time retrieval, not a guaranteed SEO or citation signal. Pair it with crawlable docs, structured data, sitemap, and stable canonical URLs.
+- Choose RAG architecture by data shape and query need, not by trend: dense-only for prototypes, hybrid + rerank for most production knowledge search, graph/LightRAG when relationships drive answers, multimodal retrieval for visual/audio corpora, and compiled/optimized retrieval when the query workload is stable enough to justify preprocessing.
 - MCP 2025-11-25 is the current baseline for this skill. Check tools, resources, prompts, roots, sampling, elicitation, tasks, Streamable HTTP, and protocol-version negotiation where relevant.
 - Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request.
 - MCP tool descriptions and annotations are advisory hints, not authorization policy. Treat them as untrusted unless the server is trusted, and enforce approvals, auth, and scope checks in the server or workflow.
@@ -206,3 +208,5 @@ Use these defaults unless the project already has a better convention:
 - Vercel AI SDK: https://ai-sdk.dev/docs
 - Vercel Workflow: https://vercel.com/docs/workflow
 - OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html
+- Agent Surface RAG patterns: /docs/data-retrievability/rag-patterns
+- Agent Surface tooling catalog: /docs/tooling-catalog

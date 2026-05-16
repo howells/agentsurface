@@ -2,37 +2,38 @@
 
 ## Summary
 
-Dimension 11 scores how effectively a codebase enables agents to find, understand, and retrieve information. Covers dense and multimodal embeddings, vector databases, hybrid search (BM25 + dense + reranking), chunking strategies (fixed, semantic, contextual), knowledge graphs, agentic RAG with query planning, and evaluation metrics (RAGAS, MTEB). Consensus 2026: hybrid beats dense-only; Contextual Retrieval (Anthropic pattern with summaries) reduces failure 49–67%; agentic RAG with reflection outperforms single-stage; LightRAG 6,000x cheaper than GraphRAG for knowledge graphs.
+Dimension 11 scores how effectively a codebase enables agents to find, understand, and retrieve information. Covers document ingestion, dense and multimodal embeddings, vector/search stores, hybrid search, reranking, chunking strategies, metadata filters, knowledge graphs, structured/tool-backed retrieval, agentic RAG with query planning, and retrieval evaluation. Match the RAG pattern to the corpus and query shape: dense-only can be fine for small prototypes, hybrid + rerank is the common production baseline, graph/LightRAG is useful when relationships matter, multimodal retrieval belongs with visual/audio corpora, and compiled or optimized retrieval only pays off for stable high-volume workloads.
 
 - **0**: No retrieval infrastructure (blocker)
-- **1**: Dense-only, no reranking/hybrid, no evaluation
-- **2**: Hybrid (BM25 + dense + fusion), reranking, chunking strategy documented
-- **3**: Agentic RAG with query planning, metadata filtering, Contextual Retrieval, RAGAS+domain evals
-- **Evidence**: embedding model, vector DB client, BM25 grep, rerank calls, chunking docs, eval scripts
+- **1**: Basic single-stage retrieval, weak chunking/source strategy, no evaluation
+- **2**: Hybrid or equivalent structured retrieval, reranking/fusion where useful, metadata filters, basic evals
+- **3**: Fit-for-purpose advanced RAG pattern, query planning/reflection where needed, freshness/deletion handling, CI/release evals
+- **Evidence**: ingestion pipeline, embedding model, vector/search client, BM25/full-text grep, rerank calls, metadata filters, graph/structured tools, chunking docs, eval scripts
 
 ---
 
-Data Retrievability measures how effectively a codebase makes its data searchable, understandable, and retrievable to AI agents. This dimension covers vector embeddings (dense and multimodal), vector databases, hybrid search (BM25 + dense), reranking, chunking strategies, knowledge graphs, agentic RAG patterns, and the evaluation frameworks that measure retrieval quality. In April 2026, the consensus is clear: hybrid retrieval (sparse + dense + rerank) beats naive dense-only; agentic RAG with query planning surpasses single-stage retrieval; and Anthropic's Contextual Retrieval pattern (prepend summaries to chunks before embedding) reduces retrieval failures by 49–67%.
+Data Retrievability measures how effectively a codebase makes its data searchable, understandable, and retrievable to AI agents. This dimension covers vector embeddings, keyword/full-text search, hybrid retrieval, reranking, chunking strategies, knowledge graphs, agentic RAG patterns, structured/tool-backed retrieval, and the evaluation frameworks that measure retrieval quality.
 
 ## Scoring rubric
 
 | Score | Criteria | Detection |
 |-------|----------|-----------|
-| 0 | No data retrieval infrastructure. Documents or data are not indexed, searchable, or retrievable by agents. No embeddings, vector DB, or search indexing present. | No `.embed()`, no vector DB client, no BM25 index, no `retriever()` or `RAG()` patterns. Files are static or database-only without semantic search. |
-| 1 | Basic single-stage dense retrieval only. Embeddings are computed but no reranking, no hybrid search, no chunking strategy. Documents are raw or poorly chunked. No evaluation. | Vector DB exists (Pinecone, Qdrant, pgvector) but no hybrid layer. No chunking logic or overlap. No RAGAS, MTEB, or recall metrics. Embedding model is generic (text-embedding-3-small). |
-| 2 | Good retrieval infrastructure. Hybrid search (BM25 + dense) with fusion. Reranking (Cohere/Voyage) present. Chunking strategy documented (fixed-size, semantic, or contextual). Basic evaluation metrics (recall@k, nDCG). | Hybrid pipeline in code: BM25 + dense + RRF/Weaviate fusion. Reranking step before generation. Chunk size/overlap >10% documented. RAGAS or MTEB eval script present. Embedding model is mid-tier (Voyage 3, Cohere v4, or bgе-m3). |
-| 3 | Excellent retrieval system. Multi-stage retrieval with query planning and reflection. Metadata filtering and namespace isolation. Contextual Retrieval (Anthropic pattern) or late-interaction (ColBERT/ColPali). Knowledge graph or agentic RAG. Embedding drift detection. Comprehensive evaluation (RAGAS + domain-specific metrics). | Agentic retriever with query decomposition, reflection, and tool selection. Contextual embeddings or prepended summaries. ColBERT/ColPali or hybrid (graph + vector). Metadata filters on all queries. Drift detection on embedding similarity. RAGAS + custom metrics in CI/CD. GraphRAG or LightRAG integration for complex domains. |
+| 0 | No retrieval infrastructure. Documents or data are not indexed, searchable, or retrievable by agents. No search index, embeddings, vector store, or structured retrieval path. | No `.embed()` calls, no vector/search client, no BM25/full-text index, no `retriever()` or `RAG()` patterns, no queryable docs/API/database tool. Files are static or database-only without agent-facing search. |
+| 1 | Basic single-stage retrieval. Dense vector search, keyword search, or a simple file/database lookup exists, but no reranking, no hybrid strategy, no documented chunking/source strategy, and no evaluation. | Vector/search store exists but no fusion or reranking. Chunking is ad hoc or absent. Metadata filters are weak. No RAGAS, recall@k, nDCG, or domain evals. |
+| 2 | Good retrieval infrastructure. Hybrid lexical + dense retrieval or an equivalent structured retrieval design. Reranking or rank fusion present where quality matters. Chunking/source strategy documented. Metadata filters and namespace isolation exist. Basic quality metrics are tracked. | BM25/full-text + dense + RRF/weighted fusion, or structured SQL/API retrieval with typed result schemas. Reranking before generation. Chunking/source config present. Tenant/user filters on queries. Recall@k, nDCG, RAGAS, or domain eval script present. |
+| 3 | Excellent retrieval system. Retrieval architecture matches the corpus: contextual, hierarchical, graph/LightRAG, agentic, multimodal, compiled/optimized, or structured/tool-backed RAG as appropriate. Query planning/reflection appears where queries are complex. Drift/freshness and deletion are handled. Evals run in CI or release gates. | Query decomposition, dynamic retriever/tool selection, contextual embeddings, ColBERT/ColPali, graph + vector, multimodal indexes, compiled query plans, or typed live-data tools. Metadata filters on all queries. Freshness/deletion/re-embed path exists. RAGAS + custom metrics or equivalent evals in CI/CD. |
 
 ## Evidence to gather
 
 - **Embedding models and APIs:** Check imports for OpenAI embeddings, Voyage, Cohere, Gemini, or open-source (BGE, E5). Look for embedding batch calls, retry logic, and cost tracking.
-- **Vector database:** Identify all Vector DB clients (Pinecone, Qdrant, Weaviate, pgvector, LanceDB, Milvus). Check for serverless vs. self-hosted, schema/index definitions, namespace/multi-tenancy setup.
-- **Hybrid search:** Grep for BM25 implementations (Elasticsearch, OpenSearch, Typesense, meilisearch). Detect fusion algorithms (RRF, relative score fusion). Check for parallel sparse + dense queries.
+- **Vector/search stores:** Identify clients such as pgvector, Pinecone, Qdrant, Weaviate, Chroma, LanceDB, Milvus, Elasticsearch, OpenSearch, Azure AI Search, Turso/libSQL, Couchbase, DuckDB VSS, S3 Vectors, ClickHouse, Convex, Upstash, or Turbopuffer. Check schema/index definitions, namespace/multi-tenancy setup, deletion behavior, and hot/cold query expectations.
+- **Hybrid search:** Grep for BM25/full-text implementations (Elasticsearch, OpenSearch, Typesense, Meilisearch, Postgres FTS, Weaviate hybrid, Pinecone sparse+dense). Detect fusion algorithms (RRF, relative score fusion, weighted scoring). Check for parallel sparse + dense queries.
 - **Reranking:** Look for Cohere rerank, Voyage rerank, or BGE rerank API calls. Two-stage pipeline (retrieve top-50, rerank to top-5).
 - **Chunking strategy:** Read documents in docstrings, config files, or README. Check for fixed-size chunking, semantic splitting, overlap %, and token counting.
 - **Contextual Retrieval:** Detect calls to Claude/LLM to prepend chunk context before embedding. Check for prompt caching usage. Compare `contextual_embed()` vs. raw embedding calls.
 - **Knowledge graphs:** Neo4j/Cypher queries, KuzuDB embedded graphs, GraphRAG/LightRAG patterns. Detect entity extraction and relationship indexing.
-- **Agentic RAG:** Query planning agents (Claude + tool use), reflection loops, dynamic retriever selection. LangGraph, LlamaIndex, Mastra, or custom agent frameworks.
+- **RAG pattern fit:** Identify naive/dense, hybrid, reranked, contextual, parent-child, hierarchical/RAPTOR, HyDE, multi-query/RAG-Fusion, GraphRAG, LightRAG, agentic, Self-RAG, Corrective RAG, compiled/optimized, multimodal, or structured/tool-backed retrieval. Check whether the chosen pattern matches the actual corpus and query needs.
+- **Agentic RAG:** Query planning agents, reflection loops, dynamic retriever selection, and tool-backed retrieval. LangGraph, LlamaIndex, Mastra, OpenAI Agents SDK, Vercel AI SDK, or custom agent frameworks can all implement it.
 - **Multimodal:** Voyage Multimodal, Gemini Embedding 2, CLIP, SigLIP. Image embeddings stored alongside text.
 - **Evaluation:** RAGAS metrics (faithfulness, answer_relevancy, context_precision, context_recall), MTEB evals, domain-specific metrics. CI/CD eval runs.
 - **Metadata filtering:** Queries include `where`, `filter`, or `metadata` clauses. Namespace isolation in Vector DB.
@@ -40,9 +41,9 @@ Data Retrievability measures how effectively a codebase makes its data searchabl
 
 ## Deep dive
 
-### Embedding models: choosing the right one (April 2026)
+### Embedding models: choosing the right one
 
-The embedding model is the foundation of retrieval quality. Select based on cost, latency, quality, and modality:
+The embedding model is the foundation of retrieval quality. Select based on cost, latency, quality, modality, data residency, and ecosystem fit. Before hard-coding provider IDs, dimensions, prices, or benchmark claims, verify the current provider docs and leaderboard state.
 
 **Dense text embeddings:**
 
@@ -87,6 +88,16 @@ The embedding model is the foundation of retrieval quality. Select based on cost
 **Turbopuffer** — Best for: serverless, agentic RAG workloads, automatic scaling. New entrant in 2025.
 
 **Redis Vector Search** — Best for: low-latency retrieval in real-time systems, session-scoped caches.
+
+**Turso / libSQL** — Best for: embedded, local-first, or SQLite-style apps that need vector search without adding a separate retrieval service.
+
+**DuckDB VSS** — Best for: local analytics, offline evals, batch RAG experiments, and agent workflows where embeddings already sit in DuckDB. Treat experimental extension constraints as part of the design.
+
+**Amazon S3 Vectors** — Best for: AWS-native, very large, lower-query-frequency vector stores where cost and durability matter more than high-QPS latency. Pair with OpenSearch or another hot index when serving tight realtime paths.
+
+**ClickHouse Vector Search** — Best for: analytical workloads that need vector search beside large tables, metadata filters, aggregations, and SQL.
+
+**Convex Vector Search** — Best for: Convex-backed apps where retrieval should stay close to the app database and actions, not as a standalone vector platform.
 
 ### Hybrid search: BM25 + dense + reranking
 
@@ -195,15 +206,15 @@ async function hybridSearch(query: string, limit: number = 10) {
 - Avoids context loss at chunk boundaries
 - Expensive (one embedding per document, not per chunk)
 
-**Contextual Retrieval (Anthropic, 2024) — 2026 STANDARD:**
+**Contextual Retrieval (Anthropic pattern):**
 
 Before embedding or indexing, prepend chunk-specific context:
 
 ```typescript
 async function contextualEmbed(chunk: string, fullDoc: string): Promise<number[]> {
-  // Use Claude Haiku to generate chunk context (50–100 tokens)
+  // Use a low-cost context-generation model to generate chunk context (50-100 tokens)
   const context = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022',
+    model: process.env.CONTEXTUAL_RETRIEVAL_MODEL!,
     max_tokens: 150,
     system: 'Generate a concise 1-2 sentence context for this chunk within the broader document.',
     messages: [{
@@ -271,7 +282,7 @@ async function contextualEmbed(chunk: string, fullDoc: string): Promise<number[]
 - **Mastra** — TypeScript-first agents
 - **Haystack** — Pipeline flexibility
 
-**2026 state:** Single-stage RAG (embed query, retrieve, generate) is outdated. Expect multi-agent, reflection, and dynamic tool selection.
+**Current state:** Single-stage RAG (embed query, retrieve, generate) is still useful for simple corpora, but complex domains often need query decomposition, reflection, dynamic tool selection, or structured retrieval.
 
 ### ColBERT / ColPali: late-interaction retrieval
 
@@ -414,35 +425,29 @@ test('retrieval maintains >0.85 recall@10', async () => {
 ## Anti-patterns to avoid
 
 1. **"Just dump docs in Pinecone."** No chunking strategy, no metadata, no eval. Guaranteed poor recall.
-2. **Dense-only retrieval.** Skip BM25. Hybrid always beats dense; 2026 consensus.
+2. **Dense-only retrieval by default.** Dense-only can be fine for prototypes and small corpora, but production knowledge search usually needs lexical recall, metadata filters, reranking, or structured retrieval.
 3. **Single embedding model for all domains.** Domain-specific embeddings (legal, medical, code) outperform generalists (BGE-M3 for multilingual, Cohere v4 for mixed modality).
-4. **No reranking.** Two-stage (retrieve broad, rerank narrow) is 2026 baseline. Expect Cohere/Voyage in production.
-5. **Contextless chunks.** Anthropic Contextual Retrieval reduces failures 49–67%. No reason not to use it.
+4. **No reranking where quality matters.** Two-stage retrieval often improves grounding and lowers generation cost; choose a hosted or local reranker based on latency, privacy, and language needs.
+5. **Contextless chunks in long or ambiguous documents.** Contextual Retrieval can reduce failures, but it adds preprocessing cost; use it where chunks lose meaning outside the parent document.
 6. **Stale embeddings.** Drift occurs; detect and re-embed. Monitor similarity distribution monthly.
 7. **Ignoring metadata filters.** Multi-tenant systems require namespace isolation. Access control is non-optional.
 8. **No evaluation.** Always run RAGAS (faithfulness, answer_relevancy, context_precision) in CI/CD. MTEB for embeddings, domain-specific metrics for retrieval quality.
-9. **GraphRAG for token efficiency.** Use LightRAG or vector-only instead. GraphRAG is 6,000x more expensive.
+9. **GraphRAG because it sounds advanced.** Use graph retrieval only when relationships, communities, or multi-hop entity reasoning drive answers; otherwise hybrid or structured retrieval is usually simpler.
 10. **Naive pagination.** No `next_cursor`, `has_more`. Agents can't reason over large result sets without explicit pagination.
 11. **Cold-start: no embeddings for new docs.** Incremental indexing required. New docs get embeddings on ingest, not on first query.
 
 ## Templates and code examples
 
-See `/templates/data-retrievability/` for:
-- `embedding-pipeline.ts` — OpenAI batch embedding with retry, Matryoshka truncation
-- `contextual-retrieval.ts` — Anthropic's pattern (prepend summaries via Haiku)
-- `hybrid-search.ts` — BM25 + dense + RRF fusion (Typesense + Qdrant)
-- `rerank.ts` — Two-stage retrieval with Cohere/Voyage rerank
-- `pinecone-client.ts` — Production Pinecone (serverless, namespaces, sparse-dense)
-- `pgvector-schema.sql` + `pgvector-client.ts` — pgvector + pgvectorscale + Drizzle/Kysely
-- `qdrant-client.ts` — Qdrant client (HNSW, quantization, collections)
-- `neo4j-knowledge-graph.ts` — GraphRAG extraction and retrieval (Cypher)
-- `multimodal-embed.ts` — Voyage Multimodal or Gemini Multimodal
-- `ragas-eval.ts` — RAGAS evaluation loop (TypeScript)
-- `agentic-rag.ts` — Query planning agent with Claude + dynamic tool selection
+See `/templates/data-retrievability/` for reusable starter code where present. Today this directory includes:
+
+- `embedding-pipeline.ts` — batch embedding with retry and dimensionality controls
+
+Use the docs pages below for the broader implementation patterns rather than assuming every pattern has a checked-in template.
 
 ## See also
 
 - `/docs/data-retrievability/index.mdx` — TL;DR and decision tree
+- `/docs/data-retrievability/rag-patterns.mdx` — RAG taxonomy and when each pattern is worth using
 - `/docs/data-retrievability/embeddings.mdx` — Model selection (OpenAI, Voyage, Cohere, open-source)
 - `/docs/data-retrievability/multimodal-embeddings.mdx` — Image/video/audio (Voyage Multimodal, Gemini)
 - `/docs/data-retrievability/vector-databases.mdx` — Pinecone vs. Qdrant vs. Weaviate vs. pgvector
@@ -453,6 +458,7 @@ See `/templates/data-retrievability/` for:
 - `/docs/data-retrievability/agentic-rag.mdx` — Query planning, reflection, tool selection
 - `/docs/data-retrievability/evaluation.mdx` — RAGAS, MTEB, custom metrics
 - `/docs/data-retrievability/anti-patterns.mdx` — What not to do
+- `/docs/tooling-catalog/index.mdx` — current tooling shortlist for vector stores, observability, MCP hubs, and voice/realtime tools
 - [Anthropic Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
 - [Cohere Rerank 4](https://cohere.com/blog/rerank-4)
 - [Weaviate Hybrid Search](https://docs.weaviate.io/weaviate/search/hybrid)

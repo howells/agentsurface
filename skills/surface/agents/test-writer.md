@@ -57,7 +57,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
        ],
        task: async (data) => {
          const response = await generateText({
-           model: anthropic("claude-3-5-sonnet-20241022"),
+           model: anthropic(process.env.ANTHROPIC_MODEL!),
            tools: [
              { name: "get_user", ... },
              { name: "search_users", ... },
@@ -90,7 +90,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
      providers:
        - id: anthropic
          config:
-           model: claude-3-5-sonnet-20241022
+           model: ${ANTHROPIC_MODEL}
      
      tests:
        - description: "Email parameter validation"
