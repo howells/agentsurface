@@ -18,7 +18,7 @@ Check there before starting any audit or remediation work to avoid duplicating p
 
 ## Build Notes
 
-`postinstall` runs `fumadocs-mdx`, so `npm install` will regenerate `.source/`.
+`postinstall` runs `fumadocs-mdx`, so `pnpm install` will regenerate `.source/`.
 This is expected — do not flag `.source/` changes as unexpected drift.
 
 ## Permission Boundaries

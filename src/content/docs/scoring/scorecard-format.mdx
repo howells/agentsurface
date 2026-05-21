@@ -16,7 +16,7 @@ Machine-readable scorecard format (JSON + TypeScript Zod schema) capturing proje
 
 ---
 
-Agentify emits structured scorecards as JSON. This page documents the schema, provides a TypeScript/Zod definition, and shows a worked example.
+Agent Surface emits structured scorecards as JSON. This page documents the schema, provides a TypeScript/Zod definition, and shows a worked example.
 
 ## Schema Overview
 
@@ -44,7 +44,8 @@ const DimensionName = z.enum([
   'tool-design',
   'context-files',
   'multi-agent',
-  'testing-evaluation',
+  'testing',
+  'data-retrievability',
 ]);
 
 const ConfidenceLevel = z.enum(['high', 'medium', 'low']);
@@ -99,11 +100,12 @@ const Scorecard = z.object({
   }),
   date: z.string().datetime().describe('ISO 8601, e.g., 2026-04-17T15:30:00Z'),
   auditor: z.string().optional(),
-  dimensions: z.array(Dimension).length(10),
+  dimensions: z.array(Dimension).length(11),
   findingClusters: z.array(FindingCluster),
   overall: z.object({
-    totalScore: z.number().int().min(0).max(30),
-    scaledScore: z.number().int().min(0).max(30).describe('Scaled if dimensions are N/A'),
+    rawScore: z.number().int().min(0).max(33),
+    maxApplicable: z.number().int().min(1).max(33),
+    scaledScore: z.number().int().min(0).max(30).describe('Raw score scaled to 30 after excluding N/A dimensions'),
     rating: OverallRating,
     percentile: z.number().min(0).max(100).optional(),
   }),
@@ -250,7 +252,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "type": "file",
           "description": "Error middleware",
           "location": "src/middleware/errors.ts:50–80",
-          "result": "Returns RFC 7807 Problem Details: { type, title, status, detail, instance }"
+          "result": "Returns RFC 9457 Problem Details: { type, title, status, detail, instance }"
         },
         {
           "type": "grep",
@@ -266,7 +268,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
         }
       ],
       "findings": ["error-missing-suggestions", "error-incomplete-retriable"],
-      "notes": "RFC 7807 implemented. is_retriable present but not on all error types. Missing suggestions array and doc_uri."
+      "notes": "RFC 9457 implemented. is_retriable present but not on all error types. Missing suggestions array and doc_uri."
     },
     {
       "name": "tool-design",
@@ -331,7 +333,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
       "notes": "N/A: Project is a web API, not an agent system"
     },
     {
-      "name": "testing-evaluation",
+      "name": "testing",
       "score": 1,
       "confidence": "medium",
       "evidence": [
@@ -362,6 +364,14 @@ export type Scorecard = z.infer<typeof Scorecard>;
       ],
       "findings": ["testing-error-recovery-missing", "testing-multi-step-missing"],
       "notes": "Basic tests exist but no agent-specific evaluation. Missing error recovery and multi-step flow testing."
+    },
+    {
+      "name": "data-retrievability",
+      "score": null,
+      "confidence": null,
+      "evidence": [],
+      "findings": [],
+      "notes": "N/A: Project does not expose a searchable knowledge or retrieval surface"
     }
   ],
   "findingClusters": [
@@ -426,7 +436,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "what": "tests/: No error recovery tests. grep 'retry' returns 2 matches (minimal).",
           "why": "Without tests, error recovery logic regresses. Agents depend on consistent behavior.",
           "fix": "Add tests for: rate limit → retry, validation error → no retry, timeout → retry. Cover multi-step recovery.",
-          "dimension": "testing-evaluation",
+          "dimension": "testing",
           "currentScore": 1,
           "targetScore": 2,
           "severity": "medium"
@@ -437,7 +447,8 @@ export type Scorecard = z.infer<typeof Scorecard>;
     }
   ],
   "overall": {
-    "totalScore": 11,
+    "rawScore": 11,
+    "maxApplicable": 24,
     "scaledScore": 14,
     "rating": "agent-tolerant",
     "percentile": 35

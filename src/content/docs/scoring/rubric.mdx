@@ -137,29 +137,14 @@ This is the authoritative rubric for scoring. For each dimension, the 0/1/2/3 sc
 |-------|----------|-------------------|
 | **0** | No AGENTS.md, CLAUDE.md, or equivalent context files. | No agent context files found in repo root or standard locations. |
 | **1** | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands. | AGENTS.md or CLAUDE.md present but: >500 lines of prose; auto-generated (shows no curation, mentions "auto-generated" or similar); lacks command section; architecture narrative without boundaries. |
-| **2** | Hand-curated context files. Commands with exact flags first. Permission boundaries. Testing expectations. | Commands section at top with exact invocations (e.g., `npm run build`, `npm test -- --watch`); permission boundaries defined (always/ask-first/never); `` `<370` `` lines; non-obvious conventions documented with code examples; updated iteratively (git history shows refinements). |
+| **2** | Hand-curated context files. Commands with exact flags first. Permission boundaries. Testing expectations. | Commands section at top with exact invocations (e.g., `pnpm build`, `pnpm test -- --watch`); permission boundaries defined (always/ask-first/never); `` `<370` `` lines; non-obvious conventions documented with code examples; updated iteratively (git history shows refinements). |
 | **3** | Multi-tool context. AGENTS.md (universal) + CLAUDE.md (Claude-specific) + .cursor/rules (Cursor-specific). Progressive disclosure. Updated from friction. | Multiple context file formats present and maintained; progressive disclosure via file references (e.g., AGENTS.md links to CLAUDE.md for Claude-specific setup); permission boundaries enforced in text; files clearly evolved from usage friction (not auto-generated). |
 
 **Key files to examine:** `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/*.mdc`, `.github/copilot-instructions.md`, `.windsurf/rules/`.
 
 ---
 
-## Dimension 9: Data Retrievability
-
-**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via vector embeddings, hybrid search, reranking, knowledge graphs, agentic RAG patterns, and evaluation frameworks.
-
-| Score | Criteria | Evidence Patterns |
-|-------|----------|-------------------|
-| **0** | No data retrieval infrastructure. Documents not indexed, searchable, or retrievable. No embeddings, vector DB, or search. | No `.embed()` calls, no vector DB client (Pinecone/Qdrant/pgvector), no BM25 index, no retriever/RAG patterns. Files static or database-only. |
-| **1** | Basic single-stage dense retrieval. Embeddings computed but no reranking, hybrid, or chunking strategy. No evaluation. | Vector DB exists but: no hybrid layer (BM25+dense), no chunking strategy documented, no RAGAS/MTEB evals, generic embedding model. |
-| **2** | Good retrieval infrastructure. Hybrid search (BM25+dense) with RRF fusion. Reranking (Cohere/Voyage) present. Chunking with >10% overlap. Basic eval metrics. | Hybrid pipeline: BM25+dense+RRF or Weaviate native. Reranking before generation. Chunk size/overlap documented >10%. RAGAS or MTEB eval present. Mid-tier embedding (Voyage 3, Cohere v4, BGE-M3). |
-| **3** | Excellent system. Query planning agents + reflection. Metadata filtering + namespaces. Contextual Retrieval (Anthropic) or ColBERT. Knowledge graphs or agentic RAG. Drift detection. Comprehensive CI/CD evals. | Agentic retriever: query decomposition, multi-hop, reflection loops. Contextual embeddings or prepended summaries. ColBERT/ColPali or graph+vector hybrid. Metadata filters enforced. Embedding drift monitoring. RAGAS+custom metrics in CI/CD. LightRAG for complex domains. |
-
-**Key files to examine:** Embedding pipelines, vector DB clients, chunking logic, reranking setup, RAG frameworks (LangGraph, LlamaIndex), knowledge graph code (Neo4j, KuzuDB), eval scripts (RAGAS, MTEB).
-
----
-
-## Dimension 11: Multi-Agent Support
+## Dimension 9: Multi-Agent Support
 
 **What it measures:** How well the project supports multi-agent orchestration, delegation, state management, and discovery.
 
@@ -168,15 +153,15 @@ This is the authoritative rubric for scoring. For each dimension, the 0/1/2/3 sc
 | **0** | No multi-agent patterns. Single-agent or no agent support. | No agent orchestration code. No sub-agent definitions. No delegation logic. |
 | **1** | Basic sub-agent support. Can spawn agents but no structured delegation. | Agent definitions exist but: no state management between agents; no delegation patterns or heuristics; memory not shared; no handoff mechanism. |
 | **2** | Supervisor pattern. Structured delegation with clear roles. State management. HITL at critical points. | Supervisor/orchestrator agent routes to specialist agents; state explicitly passed between agents; approval gates on destructive actions; agent roles clearly separated in code. |
-| **3** | Advanced multi-agent. A2A agent cards published. Workflow composition. Memory patterns. Dynamic selection. Cross-framework interop. | `/.well-known/agent-card.json` (A2A format) published and discoverable; multiple orchestration patterns (supervisor, swarm, sequential); memory system with persistence (working, semantic, episodic); agents dynamically selected based on task; agent definitions portable across frameworks. |
+| **3** | Advanced multi-agent. A2A agent cards published. Workflow composition. Memory patterns. Dynamic selection. Cross-framework interop. | `/.well-known/agent.json` or `/.well-known/agent-card.json` published and discoverable; multiple orchestration patterns (supervisor, swarm, sequential); memory system with persistence (working, semantic, episodic); agents dynamically selected based on task; agent definitions portable across frameworks. |
 
-**Key files to examine:** Agent definitions (`.claude/agents/*.md`), orchestration code, `.well-known/agent-card.json`, workflow files.
+**Key files to examine:** Agent definitions (`.claude/agents/*.md`), orchestration code, `.well-known/agent.json`, `.well-known/agent-card.json`, workflow files.
 
 **N/A when:** Project is not an agent system and does not orchestrate or coordinate agents.
 
 ---
 
-## Dimension 12: Testing & Evaluation
+## Dimension 10: Testing & Evaluation
 
 **What it measures:** Whether agent interactions are tested and evaluated. Includes tool routing accuracy, error recovery, multi-step flows, and statistical metrics.
 
@@ -188,6 +173,21 @@ This is the authoritative rubric for scoring. For each dimension, the 0/1/2/3 sc
 | **3** | Full eval suite. pass@k and pass^k metrics. Non-determinism handling. Regression detection. CI integration. Eval-driven development. | Statistical metrics (pass@k: any of k runs succeed; pass^k: all k runs succeed); multiple runs per test case to handle non-determinism; baseline comparison for regression detection; eval suite runs in CI; test cases derived from real production failures. |
 
 **Key files to examine:** Test directories, eval suites, CI configuration (`.github/workflows/`, `package.json` test scripts).
+
+---
+
+## Dimension 11: Data Retrievability
+
+**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via vector embeddings, hybrid search, reranking, knowledge graphs, agentic RAG patterns, and evaluation frameworks.
+
+| Score | Criteria | Evidence Patterns |
+|-------|----------|-------------------|
+| **0** | No data retrieval infrastructure. Documents not indexed, searchable, or retrievable. No embeddings, vector DB, or search. | No `.embed()` calls, no vector DB client (Pinecone/Qdrant/pgvector), no BM25 index, no retriever/RAG patterns. Files static or database-only. |
+| **1** | Basic single-stage dense retrieval. Embeddings computed but no reranking, hybrid, or chunking strategy. No evaluation. | Vector DB exists but: no hybrid layer (BM25+dense), no chunking strategy documented, no RAGAS/MTEB evals, generic embedding model. |
+| **2** | Good retrieval infrastructure. Hybrid search (BM25+dense) with RRF fusion. Reranking (Cohere/Voyage) present. Chunking with >10% overlap. Basic eval metrics. | Hybrid pipeline: BM25+dense+RRF or Weaviate native. Reranking before generation. Chunk size/overlap documented >10%. RAGAS or MTEB eval present. Mid-tier embedding (Voyage 3, Cohere v4, BGE-M3). |
+| **3** | Excellent system. Query planning agents + reflection. Metadata filtering + namespaces. Contextual Retrieval (Anthropic) or ColBERT. Knowledge graphs or agentic RAG. Drift detection. Comprehensive CI/CD evals. | Agentic retriever: query decomposition, multi-hop, reflection loops. Contextual embeddings or prepended summaries. ColBERT/ColPali or graph+vector hybrid. Metadata filters enforced. Embedding drift monitoring. RAGAS+custom metrics in CI/CD. LightRAG for complex domains. |
+
+**Key files to examine:** Embedding pipelines, vector DB clients, chunking logic, reranking setup, RAG frameworks (LangGraph, LlamaIndex), knowledge graph code (Neo4j, KuzuDB), eval scripts (RAGAS, MTEB).
 
 ---
 

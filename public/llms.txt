@@ -1,6 +1,6 @@
 # Agent Surface
 
-> A practical resource for making software legible to AI agents — documentation, scoring rubric, specialist agents, and the /surface skill for auditing and transforming codebases. Covers 11 agent-readiness dimensions: API Surface, CLI Design, MCP Servers, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Data Retrievability, Multi-Agent, and Testing.
+> A practical resource for making software legible to AI agents — documentation, scoring rubric, specialist agents, and the /surface skill for auditing and transforming codebases. Covers 11 agent-readiness dimensions: API Surface, CLI Design, MCP Servers, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, and Data Retrievability.
 
 ## Start here
 
@@ -13,7 +13,7 @@
 The primary deliverable of this site is a Claude Code skill (`/surface`) that agents and developers use to audit codebases and scaffold agent infrastructure.
 
 - Install: `npx skills add https://github.com/howells/agentsurface`
-- [Skill source on GitHub](https://github.com/howells/agentsurface/blob/main/skills/surface/SKILL.md)
+- [Skill source](https://agentsurface.dev/skills/surface/SKILL.md)
 - [AGENTS.md](https://agentsurface.dev/AGENTS.md) — Project conventions for agents working in this repo.
 
 ## Scoring & Audit

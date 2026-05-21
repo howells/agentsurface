@@ -35,7 +35,7 @@ The premise is simple: agents do not consume software through one interface. The
 
 Core outputs:
 
-- scorecard across 11 dimensions, `0-3` each, max `33`
+- scorecard across 11 dimensions, `0-3` each, max raw score `33`, scaled to `30` for ratings
 - clustered findings with concrete fixes
 - prioritized transformation plan
 - post-change delta scorecard
@@ -50,9 +50,9 @@ The 11 dimensions are:
 6. Error Handling
 7. Tool Design
 8. Context Files
-9. Data Retrievability
-10. Multi-Agent and Orchestration
-11. Testing and Evaluation
+9. Multi-Agent and Orchestration
+10. Testing and Evaluation
+11. Data Retrievability
 
 ### Scaffold
 
@@ -85,20 +85,20 @@ High-signal parts of the repo:
 Prerequisites:
 
 - Node.js 20+
-- npm
+- pnpm 9
 
 Install and run the docs site:
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Other useful commands:
 
 ```bash
-npm run build
-npm start
+pnpm build
+pnpm start
 ```
 
 Notes:
@@ -109,7 +109,7 @@ Notes:
 
 ## Using The Skill
 
-`surface` routes to the right workflow based on the command:
+`surface` routes to the right workflow based on the invocation:
 
 - `/surface` - full audit with scorecard and findings
 - `/surface score` - scorecard only
@@ -125,6 +125,8 @@ Notes:
 - `/surface model` - configure model routing
 - `/surface browser` - add browser/web access tooling
 - `/surface sandbox` - add isolated code execution tooling
+
+These are skill/runtime invocations, not an npm binary. This repository does not currently publish a `bin` entry in `package.json`.
 
 See [`skills/surface/SKILL.md`](./skills/surface/SKILL.md) for the operative workflow.
 
@@ -175,7 +177,7 @@ This repository is structured to be readable by multiple agent runtimes.
 - Claude Code can consume the plugin and skill layout directly
 - Codex and other generic runtimes can use `AGENTS.md` plus the linked skill file
 
-No standalone MCP server is bundled in this repository today. The repo mainly distributes the surface skill, related templates, and supporting documentation.
+The docs site also exposes a lightweight HTTP MCP endpoint at `/mcp` for documentation search and page retrieval. This is a docs discovery surface, not a generated project MCP server; the surface skill, templates, and guidance remain the primary distribution artifacts.
 
 ## Current Stack
 

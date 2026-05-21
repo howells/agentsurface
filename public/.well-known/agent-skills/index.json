@@ -3,9 +3,9 @@
     {
       "id": "surface",
       "name": "surface",
-      "description": "Audit a codebase for AI agent readiness, score it across 11 dimensions (0-3 each), generate clustered findings, produce a transformation plan, dispatch specialist agents to fix gaps, or scaffold new agent infrastructure. Install with: npx skills add https://github.com/howells/agentsurface",
+      "description": "Audit a codebase for AI agent readiness, score it across 11 dimensions (0-3 each, raw max 33 scaled to 30), generate clustered findings, produce a transformation plan, dispatch specialist agents to fix gaps, or scaffold new agent infrastructure. Install with: npx skills add https://github.com/howells/agentsurface",
       "format": "agent-skill",
-      "url": "https://raw.githubusercontent.com/howells/agentsurface/main/skills/surface/SKILL.md",
+      "url": "https://agentsurface.dev/skills/surface/SKILL.md",
       "install": "npx skills add https://github.com/howells/agentsurface",
       "modes": [
         "audit",

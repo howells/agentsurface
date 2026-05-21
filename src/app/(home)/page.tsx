@@ -56,21 +56,21 @@ const dimensions = [
   },
   {
     num: "09",
-    name: "Retrievability",
-    desc: "Searchable, retrievable knowledge access",
-    href: "/docs/data-retrievability",
-  },
-  {
-    num: "10",
     name: "Multi-Agent",
     desc: "Coordination, delegation, and orchestration",
     href: "/docs/multi-agent",
   },
   {
-    num: "11",
+    num: "10",
     name: "Testing & Evals",
     desc: "Metrics, red-team suites, and observability",
     href: "/docs/testing",
+  },
+  {
+    num: "11",
+    name: "Retrievability",
+    desc: "Searchable, retrievable knowledge access",
+    href: "/docs/data-retrievability",
   },
 ];
 
@@ -194,7 +194,7 @@ export default function HomePage() {
               The 11 surfaces
             </h2>
             <span className="text-xs text-fd-muted-foreground">
-              scored 0–3 each · 33 total
+              scored 0–3 each · scaled to 30
             </span>
           </div>
           <p className="mt-2 max-w-lg text-sm leading-6 text-fd-muted-foreground">

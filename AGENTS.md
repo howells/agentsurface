@@ -27,7 +27,7 @@ Use [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md) when the task is to
 
 Core characteristics:
 
-- 11 scored dimensions, `0-3` each, for a maximum of `33`
+- 11 scored dimensions, `0-3` each, for a maximum raw score of `33`, scaled to `30` for ratings
 - clustered findings with concrete fixes
 - prioritized transformation planning
 - optional execution through specialist agents
@@ -67,15 +67,15 @@ High-signal directories:
 ### Prerequisites
 
 - Node.js 20+
-- npm
+- pnpm 9
 
 ### Common Commands
 
 ```bash
-npm install
-npm run dev
-npm run build
-npm start
+pnpm install
+pnpm dev
+pnpm build
+pnpm start
 ```
 
 Notes:

@@ -40,7 +40,7 @@ Now `/surface` is available only in this project.
 
 ---
 
-## OpenAI Codex CLI (April 2026)
+## OpenAI Codex CLI
 
 Codex reads `AGENTS.md` at your project root. To use the Agent Surface skill with Codex:
 
@@ -82,7 +82,7 @@ Codex will:
 1. Read your AGENTS.md
 2. Discover the skill reference
 3. Fetch the SKILL.md if needed
-4. Delegate to Claude Code or execute the audit directly (depending on Codex version)
+4. Execute the audit or scaffold workflow using the skill instructions
 
 ---
 
@@ -158,11 +158,11 @@ Codex should cite the SKILL.md content from your AGENTS.md reference.
 
 - Ensure your AGENTS.md is at the project root.
 - Check the relative path: `[surface](./skills/surface/SKILL.md)`, or use the GitHub raw URL.
-- Codex may need to be updated to the latest version (April 2026+).
+- Codex may need to be updated to a version that supports project instructions and linked skill files.
 
 ### Version mismatch
 
-- Ensure you're running Claude Code 1.0.0+ and Codex 0.1.0+.
+- Ensure you're running current versions of Claude Code or Codex.
 - For plugin-based installation, check the marketplace for version compatibility.
 
 ---

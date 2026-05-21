@@ -57,6 +57,8 @@ interface DeltaScorecard {
   dimensions: DeltaDimension[];
   totalBefore: number;
   totalAfter: number;
+  maxBefore: number;
+  maxAfter: number;
   scaledBefore: number;
   scaledAfter: number;
   ratingBefore: string;
@@ -109,8 +111,10 @@ export function deltaScorecard(
   });
 
   // Overall scores
-  const totalBefore = before.overall.totalScore;
-  const totalAfter = after.overall.totalScore;
+  const totalBefore = before.overall.rawScore;
+  const totalAfter = after.overall.rawScore;
+  const maxBefore = before.overall.maxApplicable;
+  const maxAfter = after.overall.maxApplicable;
   const overallDelta = totalAfter - totalBefore;
 
   // Cluster impact
@@ -129,6 +133,8 @@ export function deltaScorecard(
     dimensions,
     totalBefore,
     totalAfter,
+    maxBefore,
+    maxAfter,
     scaledBefore: before.overall.scaledScore,
     scaledAfter: after.overall.scaledScore,
     ratingBefore: before.overall.rating,
@@ -144,7 +150,7 @@ export function deltaScorecard(
 export function formatDeltaScorecard(delta: DeltaScorecard): string {
   const lines: string[] = [
     '╔════════════════════════════════════════════════════════╗',
-    '║              AGENTIFY DELTA SCORECARD                 ║',
+    '║              SURFACE DELTA SCORECARD                 ║',
     `║              ${delta.projectName.padEnd(47)}║`,
     '╠════════════════════════════════════════════════════════╣',
     '',
@@ -170,7 +176,7 @@ export function formatDeltaScorecard(delta: DeltaScorecard): string {
   lines.push('');
   lines.push('  ─────────────────────────────────────────────────────');
   lines.push(
-    `  TOTAL: ${delta.totalBefore}/27 → ${delta.totalAfter}/27 (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`
+    `  TOTAL: ${delta.totalBefore}/${delta.maxBefore} → ${delta.totalAfter}/${delta.maxAfter} (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`
   );
   lines.push(
     `  RATING: ${delta.ratingBefore} → ${delta.ratingAfter} ${delta.overallDelta > 0 ? '✦' : delta.overallDelta < 0 ? '✗' : '—'}`
@@ -208,6 +214,7 @@ Tool Design:        0/3 (no tool definitions)
 Context Files:      1/3 (auto-generated AGENTS.md)
 Multi-Agent:        N/A
 Testing:            0/3 (no agent tests)
+Data Retrievability: N/A
 
 Total: 3/24 (scaled: 4/30)
 Rating: Human-only
@@ -233,7 +240,7 @@ Following the transformation plan, the team:
    - JWT validation (iss, aud, exp)
 
 4. **Enhanced error handling** (1.5 hours)
-   - RFC 7807 Problem Details format
+   - RFC 9457 Problem Details format
    - `is_retriable` on all errors
    - `suggestions` array with recovery steps
 
@@ -257,11 +264,12 @@ CLI Design:         N/A
 MCP Server:         2/3 (well-structured, no pagination)
 Discovery & AEO:    2/3 (AGENTS.md + llms.txt, no JSON-LD)
 Authentication:     3/3 (OAuth 2.1 M2M, scoped tokens)
-Error Handling:     2/3 (RFC 7807, missing doc_uri)
+Error Handling:     2/3 (RFC 9457, missing doc_uri)
 Tool Design:        2/3 (good descriptions, no toModelOutput)
 Context Files:      2/3 (AGENTS.md curated, no CLAUDE.md)
 Multi-Agent:        N/A
 Testing:            2/3 (tool + error recovery, no evals)
+Data Retrievability: N/A
 
 Total: 16/24 (scaled: 18/30)
 Rating: Agent-ready
@@ -281,7 +289,7 @@ Output:
 
 ```
 ╔════════════════════════════════════════════════════════╗
-║              AGENTIFY DELTA SCORECARD                 ║
+║              SURFACE DELTA SCORECARD                 ║
 ║              acme-api                                  ║
 ╠════════════════════════════════════════════════════════╣
 
@@ -296,7 +304,8 @@ Output:
   tool-design                    0/3    2/3   +2 ✦     ↑
   context-files                  1/3    2/3   +1 ✦     ↑
   multi-agent                     N/A    N/A    —      →
-  testing-evaluation             0/3    2/3   +2 ✦     ↑
+  testing                        0/3    2/3   +2 ✦     ↑
+  data-retrievability             N/A    N/A    —      →
 
   ─────────────────────────────────────────────────────
   TOTAL: 3/24 → 16/24 (scaled: 4/30 → 18/30)
@@ -317,7 +326,7 @@ Output:
 - **Authentication** jumped from 1 → 3: OAuth 2.1 Client Credentials + scoped tokens is complete
 - **API Surface** 0 → 2: OpenAPI spec exists with agent-oriented descriptions (missing Arazzo for 3)
 - **MCP Server** 0 → 2: Tools exposed via MCP with proper structure (missing pagination for 3)
-- **Error Handling** 0 → 2: RFC 7807 with is_retriable (missing doc_uri for 3)
+- **Error Handling** 0 → 2: RFC 9457 with is_retriable (missing doc_uri for 3)
 
 **Partial improvements** (↑):
 

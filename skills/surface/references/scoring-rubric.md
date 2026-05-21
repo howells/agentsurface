@@ -102,7 +102,7 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 |-------|----------|-----------|
 | 0 | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail. | Error responses return plain text or empty bodies. No consistent error schema. |
 | 1 | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't. | Partial error schema (some endpoints have type/message, others don't). No is_retriable field. |
-| 2 | RFC 7807 Problem Details everywhere. type, title, status, detail fields. is_retriable boolean. suggestions array. trace_id for debugging. | Consistent error schema matching RFC 7807. is_retriable on all errors. suggestions array with recovery steps. Rate limit 429 includes Retry-After. |
+| 2 | RFC 9457 Problem Details everywhere. type, title, status, detail fields. is_retriable boolean. suggestions array. trace_id for debugging. | Consistent error schema matching RFC 9457. is_retriable on all errors. suggestions array with recovery steps. Rate limit 429 includes Retry-After. |
 | 3 | Full agent error design. doc_uri linking to documentation. Intent tracing on cancellation. Domain-specific error codes alongside HTTP. X-RateLimit-* headers on every response. CLI errors with semantic exit codes + JSON. | doc_uri in error responses. Intent trace structure on cancel/abort. Rate limit headers on all responses (not just 429). Structured CLI errors. |
 
 **Key files:** error handling middleware, API error responses, error types/classes

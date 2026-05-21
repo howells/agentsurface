@@ -6,7 +6,7 @@
     "title": "Agent Surface Documentation",
     "version": "1.0.0"
   },
-  "description": "Search and retrieve Agent Surface documentation. Tools: search_docs (keyword search across 131 pages), get_page (retrieve full page content by slug).",
+  "description": "Search and retrieve Agent Surface documentation. Tools: search_docs (keyword search across documentation pages), get_page (retrieve full page content by slug).",
   "transport": {
     "type": "streamable-http",
     "endpoint": "https://agentsurface.dev/mcp"
@@ -17,7 +17,7 @@
   "tools": [
     {
       "name": "search_docs",
-      "description": "Search Agent Surface documentation by keyword. Returns matching page titles, URLs, and descriptions."
+      "description": "Search Agent Surface documentation by keyword. Returns matching page titles, URLs, descriptions, and slugs."
     },
     {
       "name": "get_page",

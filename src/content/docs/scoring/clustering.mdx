@@ -136,7 +136,7 @@ When organizing findings into clusters:
 
 **Cluster name:** Error recovery for agents
 
-**Findings:** No RFC 7807 + missing is_retriable + no suggestions array + no error tests
+**Findings:** No RFC 9457 + missing is_retriable + no suggestions array + no error tests
 
 **Outcome:** Agents can recover from transient failures
 
@@ -208,7 +208,7 @@ Testing:             0/3 (no agent tests)
 - Error responses are plain HTTP status
 - Tool descriptions are `<10` words
 - No tool naming convention (verb_noun)
-- No RFC 7807 Problem Details
+- No RFC 9457 Problem Details
 - No is_retriable on errors
 - No agent-specific tests
 - No error recovery tests
@@ -229,7 +229,7 @@ Testing:             0/3 (no agent tests)
 - Effort: 4 hours | Impact: +1 dimension (fully) | Ratio: Good
 
 **Cluster 3: Error recovery**
-- RFC 7807 Problem Details (↑Error Handling 0→2)
+- RFC 9457 Problem Details (↑Error Handling 0→2)
 - is_retriable field (↑Error Handling 0→2)
 - Error recovery tests (↑Testing 0→1)
 - Effort: 3 hours | Impact: +2 dimensions | Ratio: Excellent
@@ -254,7 +254,7 @@ PHASE 2: Machine-readable auth (Week 1, 4 hours)
 ├─ Task 2.2: Add token scoping and JWT validation [2h]
 
 PHASE 3: Error recovery (Week 2, 3 hours)
-├─ Task 3.1: Refactor to RFC 7807 format [1.5h]
+├─ Task 3.1: Refactor to RFC 9457 format [1.5h]
 ├─ Task 3.2: Write error recovery tests [1.5h]
 
 PHASE 4: Context & conventions (Week 2, 2 hours)
@@ -322,7 +322,7 @@ This leads to working on things that don't create user value.
 Bad:
 ```
 Cluster: Error resilience
-├─ Add RFC 7807 (1 hour) ✓ Easy
+├─ Add RFC 9457 (1 hour) ✓ Easy
 ├─ Implement custom error codes (4 hours) ✗ Hard
 ├─ Multi-vendor error handling (8 hours) ✗ Very hard
 ```
