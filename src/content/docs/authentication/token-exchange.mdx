@@ -128,6 +128,8 @@ The sub-agent receives a token that:
 
 A human user authorizes an agent to act on their behalf. The identity provider issues a token with the user's `sub` claim. The agent exchanges it for a token that includes both the user and the agent in the actor chain.
 
+Use Token Exchange when the agent already has a valid subject token or delegation to narrow. If the agent first needs to register or claim a user-bound credential, use [auth.md](/docs/authentication/auth-md) or another explicit registration flow before token exchange.
+
 ```typescript
 async function exchangeForDelegatedAccess(
   userToken: string,
@@ -299,4 +301,5 @@ async function handleTokenExchange(req: Request) {
 - [Agent Identity](/docs/authentication/agent-identity) — actor chains and audit logging
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance and caching
 - [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — advertising token exchange support
+- [auth.md](/docs/authentication/auth-md) — registering or claiming user-bound credentials before delegation
 - ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — full specification

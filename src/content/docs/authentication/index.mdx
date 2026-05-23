@@ -5,15 +5,16 @@ description: Machine-to-machine and delegated authorization for agents
 
 ## Summary
 
-Agents cannot click "Sign in with Google" or solve CAPTCHAs — every flow requiring a browser or session state is incompatible with automation. This section covers OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, and first-class agent identity for auditability. Error handling and retry safety are threaded throughout.
+Agent authentication has two jobs: issue the right credential, then validate it on every request. Runtime API access should be programmatic: no login pages, CAPTCHAs, or session cookies in the request path. Registration can still include explicit human consent or an OTP claim ceremony when the goal is a user-bound credential. This section covers OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, first-class agent identity for auditability, and emerging `auth.md` registration discovery.
 
 - OAuth 2.1 Client Credentials with token caching for M2M auth
 - Token Exchange (RFC 8693) for narrowing scope and delegation
 - DPoP (RFC 9449) for sender-constrained tokens and replay protection
 - Agent Identity: first-class principals, audit trails, and actor chains
+- auth.md: agentic registration discovery for provider assertions and OTP claim flows
 - Idempotency and replay protection: nonce stores and DPoP jti uniqueness
 
-Agents cannot click "Sign in with Google" or solve CAPTCHAs. Every flow requiring a browser, human interaction, or session state is incompatible with automation. Agent authentication is purely programmatic: OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, and verifiable agent identity for auditability.
+The key distinction is request path versus registration path. Agents should call APIs with bearer credentials, validated scopes, audience checks, and structured errors. If a user needs to approve or claim a delegation, keep that interaction bounded to registration and return a credential the agent can use programmatically afterward.
 
 ## Decision Tree
 
@@ -23,7 +24,7 @@ Start here: what kind of credential do you need?
 
 - **I have a simple third-party API and don't want OAuth complexity.** Use [API Keys](/docs/authentication/api-keys), but only if the key can be scoped, rotated, and short-lived.
 
-- **An agent needs to act on behalf of a user or delegate to a sub-agent.** Use [Token Exchange](/docs/authentication/token-exchange) (RFC 8693) to narrow scope and audience.
+- **An agent already has authority and needs to act on behalf of a user or delegate to a sub-agent.** Use [Token Exchange](/docs/authentication/token-exchange) (RFC 8693) to narrow scope and audience.
 
 - **I need to prevent stolen tokens from being replayed.** Use [DPoP](/docs/authentication/dpop) (RFC 9449) to bind tokens to a client keypair.
 
@@ -32,6 +33,8 @@ Start here: what kind of credential do you need?
 - **I'm building an MCP server.** Publish [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) at `/.well-known/oauth-protected-resource` and validate inbound JWTs.
 
 - **I'm integrating with MCP's auth model.** See [MCP Authorization](/docs/authentication/mcp-auth-model) for OAuth protected-resource metadata, authorization-server discovery, and Client ID Metadata Documents.
+
+- **An agent needs to register or claim a user-bound credential.** Publish [auth.md](/docs/authentication/auth-md), pair it with protected-resource metadata, and choose provider-attested or OTP-backed registration.
 
 ## What You'll Find Here
 
@@ -42,5 +45,6 @@ Start here: what kind of credential do you need?
 - [DPoP](/docs/authentication/dpop) — RFC 9449 sender-constrained tokens, preventing replay attacks
 - [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — RFC 9728, `.well-known/oauth-protected-resource`, client discovery
 - [MCP Authorization](/docs/authentication/mcp-auth-model) — protected-resource metadata, authorization-server discovery, and Client ID Metadata Documents
+- [auth.md](/docs/authentication/auth-md) — agentic registration discovery, ID-JAG, and user-claimed OTP flows
 - [Auth Anti-Patterns](/docs/authentication/anti-patterns) — what silently breaks agents, and the fixes
 - [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — nonce stores, DPoP `jti` uniqueness, preventing double-submission

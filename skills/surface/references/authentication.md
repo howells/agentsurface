@@ -2,17 +2,17 @@
 
 ## Summary
 
-Dimension 5 scores machine-to-machine (M2M) authentication capability. Agents cannot solve CAPTCHAs, complete OAuth redirects, or interactively enter credentials. Baseline is OAuth 2.1 Client Credentials with scoped short-lived tokens injected via environment variables. Frontier includes token exchange (RFC 8693) for narrowly-scoped ephemeral tokens and agent identity as first-class principal. Scores based on auth mechanism, token scope/lifetime, and agent-consumability.
+Dimension 5 scores programmatic authentication capability for agents. Agents cannot depend on login pages, CAPTCHAs, session cookies, or generic browser redirects in the runtime request path. Baseline is OAuth 2.1 Client Credentials with scoped short-lived tokens injected via environment variables. Frontier includes token exchange (RFC 8693) for narrowly-scoped ephemeral tokens, agent identity as first-class principal, RFC 9728 protected-resource metadata, and emerging `auth.md` discovery for agentic user registration. Scores based on auth mechanism, token scope/lifetime, and agent-consumability.
 
 - **0**: Browser-only auth or CAPTCHA (blocker)
 - **1**: API keys without M2M OAuth or overly broad scopes
 - **2**: OAuth 2.1 Client Credentials, scoped, short-lived tokens
-- **3**: Token Exchange (RFC 8693), agent identity tracking, RFC 9728 protected-resource metadata
+- **3**: Token Exchange (RFC 8693), agent identity tracking, RFC 9728 protected-resource metadata, optionally `auth.md` for user-bound agent registration
 - **Evidence**: client_credentials grants, Bearer token validation, scope definitions, env-var injection
 
 ---
 
-Agents cannot solve CAPTCHAs, complete OAuth authorization-code redirects, or interactively enter credentials. Machine-to-machine (M2M) authentication via OAuth 2.0 Client Credentials is the baseline; token exchange and agent-delegated identities represent the frontier. Effective agent auth ensures credentials live in environment variables, tokens expire in hours, and every resource access is scoped to a minimal set of operations. The difference between a fully agent-consumable system and one requiring manual intervention often turns on whether secrets are injectable via `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET`, not hardcoded in code or stored in a browser's local storage.
+Agents cannot solve CAPTCHAs, complete generic OAuth authorization-code redirects, or interactively enter credentials during routine API calls. Machine-to-machine (M2M) authentication via OAuth 2.0 Client Credentials is the baseline; token exchange and agent-delegated identities represent the frontier. Bounded registration ceremonies, such as an `auth.md` OTP claim, are acceptable when they end by issuing a programmatic credential. Effective agent auth ensures credentials live in environment variables or a managed registration flow, tokens expire in hours, and every resource access is scoped to a minimal set of operations.
 
 ## Scoring rubric
 
@@ -21,13 +21,15 @@ Agents cannot solve CAPTCHAs, complete OAuth authorization-code redirects, or in
 | 0 | Browser-only auth. OAuth authorization code flow as only option. CAPTCHAs. Session cookies required. | Auth requires redirect to browser. No client_credentials grant. CAPTCHA in auth flow. Cookie-based sessions only. |
 | 1 | API keys exist but no M2M OAuth. Keys may be long-lived or overly broad. | API key auth available. No OAuth client_credentials. Keys may be permanent. No scope limitation. |
 | 2 | OAuth 2.1 Client Credentials grant. Scoped, short-lived tokens. Env var injection. JWT validation (iss, aud, exp). | OAuth config with client_credentials grant_type. Token scopes defined. JWT validation checking signature + claims. Tokens expire in hours. |
-| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance with RFC 9728 protected-resource metadata. | Token exchange endpoint. Audience-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. |
+| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance with RFC 9728 protected-resource metadata. `auth.md` when agents need to register user-bound credentials. | Token exchange endpoint. Audience-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. auth.md and agent_auth metadata when applicable. |
 
 ## Evidence to gather
 
 - Grep for `client_credentials`, `Bearer`, `JWT`, `iss`, `aud`, `exp` tokens
 - Auth config files: Clerk, Auth0, WorkOS, Supabase Auth, NextAuth, better-auth
 - `.well-known/oauth-authorization-server` (RFC 8414) and `.well-known/oauth-protected-resource` (RFC 9728)
+- `auth.md` at the service root, plus `agent_auth` metadata in authorization server metadata
+- `/agent/auth`, `/agent/auth/claim`, `/agent/auth/claim/complete`, and `/agent/auth/revoke` endpoints
 - API key generation endpoints and rotation mechanisms
 - Token exchange implementation and audience restrictions
 - CAPTCHAs in auth flow (anti-pattern)
@@ -79,6 +81,26 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
 ```
 
 Authorization server metadata remains RFC 8414. This protected-resource metadata is consumed by MCP 2025-11-25 clients to discover authorization servers and request the right resource/scopes. Always publish it if your API or MCP server is exposed to remote agents.
+
+### auth.md for agentic registration
+
+`auth.md` is an emerging WorkOS-authored open protocol for services that want agents to register or claim user-bound credentials without an interactive sign-up form. The app publishes `https://service.com/auth.md` as a readable walkthrough, keeps RFC 9728 protected-resource metadata as the resource authority, and can add an `agent_auth` block to authorization server metadata.
+
+Use it when a service wants agents to:
+
+- discover registration and claim endpoints from docs or a 401 challenge
+- choose between provider-attested identity assertions and OTP-backed user claim flows
+- receive scoped API keys or access tokens tied to a user or pre-claim principal
+- handle revocation and registration errors in a structured way
+
+The two core flow families:
+
+| Flow | Use when | Key checks |
+|------|----------|------------|
+| Agent verified | A trusted agent provider can mint an audience-bound ID-JAG for the user. | Trust-list issuer, verify JWKS signature, validate `aud`, `exp`, `iat`, `jti`, `client_id`, and verified identity claims. |
+| User claimed | No trusted provider assertion is available. | Own the OTP ceremony, hash claim tokens, expire attempts, keep pre-claim scopes small, and bind or upgrade credentials after completion. |
+
+`auth.md` is not a substitute for OAuth validation. Issued credentials still need normal bearer-token validation, scope enforcement, audience checks, replay protection, audit logging, and revocation handling.
 
 ### Agent identity and delegation
 
@@ -154,7 +176,7 @@ async function generateDPopProof(method: string, uri: string, publicKeyPEM: stri
 - **Exact-match redirect URIs.** No wildcard paths.
 - **Bearer tokens restricted to authenticated channels.** No query strings (tokens leak in logs).
 
-For agents, the takeaway: if you offer OAuth, use Client Credentials + Token Exchange. Avoid interactive flows.
+For agents, the takeaway: use Client Credentials for service-owned runtime credentials and Token Exchange for delegation. Keep any human consent or OTP flow in a bounded registration path such as `auth.md`, not in every API request.
 
 ### JWT validation
 
@@ -292,11 +314,13 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 ## Anti-patterns
 
 - **Long-lived API keys with full-account scope.** Rotate every 90 days. Always scope to a subset of operations.
-- **Auth via browser redirect only.** Agents can't click links or enter credentials. Always offer M2M.
+- **Auth via browser redirect only.** Agents can't click links or enter credentials in the runtime path. Offer M2M for service-owned access or a bounded registration flow for user-bound credentials.
 - **CAPTCHAs in the auth flow.** Agents fail silently. Use rate limiting instead.
 - **JWT validation that trusts the `alg` header.** Whitelist algorithms (`RS256`, `ES256`). Reject `none` and downgrades to symmetric (`HS256`).
 - **Storing access tokens in client-side storage (localStorage, sessionStorage).** Use HttpOnly cookies or in-memory storage.
 - **Missing `.well-known` metadata on public resource servers.** Agents and external integrations depend on it.
+- **Publishing `auth.md` without machine-readable metadata.** The Markdown file should point back to RFC 9728 protected-resource metadata and authorization server metadata.
+- **Anonymous agent registration with full scopes.** Pre-claim credentials should be low-scope, expirable, revocable, and auditable.
 - **No token rotation.** Require token refresh every 1–2 hours. Auto-rotate on key rotation.
 - **Hardcoding secrets in code.** Always read from env vars or secret managers.
 - **Omitting agent identity from logs.** Track both `azp` (agent) and `sub` (user) for audit and debugging.
@@ -326,11 +350,15 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — DPoP, sender-constrained tokens.
 - ([OAuth 2.1 (draft)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) — PKCE, removed insecure flows, refresh token rotation.
 - ([MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25)) — Remote MCP OAuth 2.0 compliance.
+- ([WorkOS auth.md](https://workos.com/auth-md)) — agentic registration discovery.
+- ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) — example service and provider implementations.
+- ([ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)) — provider-attested identity assertions.
 - ([jose on npm](https://www.npmjs.com/package/jose)) — TypeScript JWT library.
 
 ## See also
 
 - `docs/authentication` — Full guide to agent auth patterns.
+- `docs/authentication/auth-md` — Agentic registration discovery and user-claim flows.
 - `references/mcp-servers.md` — Remote MCP auth and metadata.
 - `references/scoring-rubric.md#dimension-5-authentication` — Dimension 5 scoring.
 - `templates/oauth-client-credentials.ts` — M2M token flow.

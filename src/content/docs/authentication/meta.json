@@ -9,6 +9,7 @@
     "dpop",
     "protected-resource-metadata",
     "mcp-auth-model",
+    "auth-md",
     "idempotency-and-replay",
     "anti-patterns"
   ]

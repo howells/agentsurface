@@ -5,11 +5,11 @@ description: Silent failures and late-stage breakage in agent auth workflows
 
 ## Summary
 
-Nine patterns that break agent auth silently: authorization code flow, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silent or fail late.
+Nine patterns that break agent auth silently: authorization-code-only API access, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silently or fail late.
 
 | Pattern | Fix |
 |---------|-----|
-| Authorization Code only | Support Client Credentials |
+| Authorization Code only for API access | Support Client Credentials or an explicit registration flow |
 | CAPTCHA on token endpoint | Use rate limiting instead |
 | Session cookies | Use Bearer tokens with explicit `exp` |
 | Long-lived broad-scope keys | Short-lived, minimum-scope |
@@ -21,9 +21,9 @@ Nine patterns that break agent auth silently: authorization code flow, CAPTCHA o
 
 Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silent or fail late.
 
-## Authorization Code (Browser-Only)
+## Authorization Code as the Only API Path
 
-Authorization Code flow requires a browser. It redirects to a login page, the user clicks "Allow," the server redirects back with a code. Agents cannot render login pages or click buttons.
+Authorization Code flow requires a browser-mediated consent path. It redirects to a login page, the user clicks "Allow," and the server redirects back with a code. That can be acceptable for explicit user consent or client registration, but it is a poor default for unattended agent API access.
 
 ```
 1. Agent navigates to https://auth.example.com/authorize?response_type=code&...
@@ -32,9 +32,9 @@ Authorization Code flow requires a browser. It redirects to a login page, the us
 4. Flow stops; agent receives HTML where it expected JSON
 ```
 
-If your service only supports Authorization Code, agents fail at step one.
+If your service only supports Authorization Code for all programmatic access, agents fail at step one.
 
-Fix: Support Client Credentials for machine-to-machine. Single POST to token endpoint, no redirect, no interaction.
+Fix: support Client Credentials for service-owned machine-to-machine access. If the agent needs user-bound credentials, publish a bounded registration path such as `auth.md` rather than forcing agents through a generic sign-in page.
 
 ```bash
 POST /oauth/token
@@ -186,7 +186,7 @@ For high-value resources and sensitive agent-to-agent communication, require DPo
 
 | Anti-pattern | Why it breaks | Fix |
 |---|---|---|
-| Authorization Code only | Requires browser | Support Client Credentials |
+| Authorization Code only for API access | Requires browser-mediated consent | Support Client Credentials or bounded registration |
 | CAPTCHA on token endpoint | Blocks automated requests | Remove; use rate limiting |
 | Session cookies | Expire without structured signal | Use Bearer tokens + explicit `exp` |
 | Long-lived broad-scope keys | Maximum blast radius on leak | Short-lived, minimum-scope |
@@ -196,6 +196,8 @@ For high-value resources and sensitive agent-to-agent communication, require DPo
 | No `aud` claim | Token valid everywhere | Always set `aud`; use Token Exchange |
 | No DPoP binding | Token can be replayed if stolen | Add DPoP for sensitive resources |
 
+`auth.md` OTP claim flows are not the same anti-pattern as browser-only login. They are bounded registration ceremonies that end by issuing or upgrading a programmatic credential. They become an anti-pattern only when OTP or browser state is required on every API call.
+
 ## See Also
 
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — Client Credentials implementation
@@ -203,3 +205,4 @@ For high-value resources and sensitive agent-to-agent communication, require DPo
 - [Agent Identity](/docs/authentication/agent-identity) — establishing verifiable principals
 - [DPoP](/docs/authentication/dpop) — sender-constrained tokens
 - [Token Exchange](/docs/authentication/token-exchange) — narrowing scope for delegation
+- [auth.md](/docs/authentication/auth-md) — bounded registration for user-bound credentials

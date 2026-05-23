@@ -5,15 +5,17 @@ description: Client Credentials grant, PKCE, token caching, and JWT validation f
 
 ## Summary
 
-The Client Credentials grant is the baseline for agents. Agents POST client_id and client_secret to the token endpoint, receive a short-lived JWT, cache and reuse it for its full lifetime. JWT validation checks signature, issuer, audience, and expiry before trusting any claim inside.
+The Client Credentials grant is the baseline for service-owned agent credentials. Agents POST client_id and client_secret to the token endpoint, receive a short-lived JWT, cache and reuse it for its full lifetime. JWT validation checks signature, issuer, audience, and expiry before trusting any claim inside.
 
-- Client Credentials grant: single POST, no redirect, no human interaction
+- Client Credentials grant: single POST for runtime credentials, no redirect or session state
 - Short-lived tokens (1–4 hours) cached and refreshed proactively
 - Scopes follow principle of least privilege (resource:action pairs)
 - JWT validation: always verify signature, issuer, audience, expiry
-- Optional: PKCE for authorization code flows, Token Exchange for narrowing scope
+- Optional: PKCE for authorization code flows, Token Exchange for narrowing scope, `auth.md` for user-bound registration
 
-Agents need OAuth 2.1, but not the browser-based Authorization Code flow. The grant for agents is **Client Credentials** ([RFC 6749 §4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)): service makes a single POST to the token endpoint with credentials, receives a short-lived JWT, caches it, and uses it on every request. No redirect, no user interaction, no session state. OAuth 2.1 ([draft-ietf-oauth-v2-1-13](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) consolidates 2.0 + best practices: PKCE is mandatory on auth-code flows, implicit and password grants are removed, and refresh token rotation is required. For agents calling APIs, the focus is Client Credentials + proper token lifecycle.
+Agents need OAuth 2.1, but service-owned agents should not depend on a browser-based Authorization Code flow for routine API access. The baseline grant is **Client Credentials** ([RFC 6749 §4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)): the agent makes a single POST to the token endpoint with credentials, receives a short-lived JWT, caches it, and uses it on every request. No redirect, no session cookie, no login page in the request path.
+
+User-bound credentials are a separate problem. If an agent needs to register or claim credentials for a user, use a bounded registration flow such as [`auth.md`](/docs/authentication/auth-md), then return a credential that follows the same bearer-token validation rules described here.
 
 ## Client Credentials Request
 
@@ -188,52 +190,33 @@ async function authorize(token: string, resourceOrgId: string): Promise<void> {
 }
 ```
 
-## Authorization Code + PKCE (when needed)
+## Authorization Code + PKCE
 
-For flows where agents interact with browser-based authorization (rare, but MCP servers can expose this):
+Authorization Code with PKCE is still valid for human-facing consent and some MCP client authorization flows. Treat it as a registration or consent path, not the default credential mechanism for unattended agents. After consent completes, the agent should use normal bearer tokens with explicit expiry, audience, and scopes.
 
-```typescript
-import { openidClient } from '@panva/oauth4webapi';
+```http
+GET /authorize?response_type=code
+  &client_id=client_123
+  &redirect_uri=https%3A%2F%2Fclient.example.com%2Fcallback
+  &scope=openid%20profile%20invoices%3Aread
+  &code_challenge=...
+  &code_challenge_method=S256
 
-async function authorizationCodeFlow(clientId: string, clientSecret: string) {
-  const as = await openidClient.discoveryRequest(
-    new URL('https://auth.example.com')
-  );
-  const client = { client_id: clientId, client_secret: clientSecret };
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
 
-  // Generate PKCE code verifier + challenge
-  const codeVerifier = openidClient.generateRandomCodeVerifier();
-  const codeChallenge = openidClient.calculatePKCECodeChallenge(codeVerifier);
-
-  // Build authorization URL
-  const authorizationUrl = new URL(as.authorization_endpoint);
-  authorizationUrl.searchParams.set('client_id', clientId);
-  authorizationUrl.searchParams.set('response_type', 'code');
-  authorizationUrl.searchParams.set('redirect_uri', 'http://localhost:3000/callback');
-  authorizationUrl.searchParams.set('scope', 'openid profile invoices:read');
-  authorizationUrl.searchParams.set('code_challenge', codeChallenge);
-  authorizationUrl.searchParams.set('code_challenge_method', 'S256');
-
-  // User (or agent with browser capability) navigates to authorizationUrl
-  // Server redirects back with authorization code
-
-  // Exchange code for token
-  const tokenRequest = openidClient.buildClientCredentialsRequest(client, {
-    code: authorizationCode,
-    code_verifier: codeVerifier,
-    redirect_uri: 'http://localhost:3000/callback',
-  });
-
-  const tokenResponse = await openidClient.processResponse(as, client, tokenRequest);
-  return tokenResponse.access_token;
-}
+grant_type=authorization_code
+&code=...
+&redirect_uri=https%3A%2F%2Fclient.example.com%2Fcallback
+&client_id=client_123
+&code_verifier=...
 ```
 
 PKCE ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)) is mandatory in OAuth 2.1 even for confidential clients. It prevents authorization-code interception attacks.
 
 ## Checklist
 
-- [ ] Client Credentials is used for all M2M auth
+- [ ] Client Credentials is used for service-owned M2M auth
 - [ ] Tokens are cached for their full lifetime
 - [ ] Token cache refreshes proactively (5+ minutes before expiry)
 - [ ] Each request asks for only the minimum required scopes
@@ -248,5 +231,6 @@ PKCE ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)) is mandatory in
 - [API Keys](/docs/authentication/api-keys) — simpler alternative for single-service credentials
 - [Agent Identity](/docs/authentication/agent-identity) — first-class agent principals and audit trails
 - [DPoP](/docs/authentication/dpop) — sender-constrained tokens
-- ([OAuth 2.1 draft](https://oauth.net/2.1/)) — final specification
+- [auth.md](/docs/authentication/auth-md) — registering or claiming user-bound credentials
+- ([OAuth 2.1 draft](https://oauth.net/2.1/)) — current OAuth 2.1 work
 - ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) — Client Credentials and token endpoints

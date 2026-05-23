@@ -53,6 +53,38 @@ Key fields:
 
 Authorization-server capabilities such as `grant_types_supported`, `response_types_supported`, token endpoints, and token endpoint auth methods belong in the authorization server metadata document, not the protected resource metadata document.
 
+## Agent Registration Discovery
+
+If your service supports agentic user registration through `auth.md`, keep the split explicit:
+
+- Protected-resource metadata tells the agent which resource it is calling and which authorization servers protect it.
+- Authorization server metadata advertises the optional `agent_auth` block with registration, claim, and revocation endpoints.
+- `auth.md` gives agents a readable walkthrough of the same flow, including supported registration methods, scopes, error recovery, and contact links.
+
+A protected resource can point agents toward the registration path without embedding registration details directly:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
+```
+
+Then the authorization server metadata can advertise supported agent registration flows:
+
+```json
+{
+  "issuer": "https://auth.example.com/",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "agent_auth": {
+    "skill": "https://example.com/auth.md",
+    "register_uri": "https://auth.example.com/agent/auth",
+    "claim_uri": "https://auth.example.com/agent/auth/claim",
+    "identity_types_supported": ["identity_assertion", "anonymous"]
+  }
+}
+```
+
+Use [auth.md](/docs/authentication/auth-md) for the full registration model. Treat this metadata as discovery only; authorization still depends on validating the issued bearer token on every request.
+
 ## Next.js Implementation
 
 ```typescript
@@ -221,5 +253,6 @@ Clients typically cache metadata for 1 hour (specify `Cache-Control: max-age=360
 - [DPoP](/docs/authentication/dpop) — sender-constrained tokens
 - [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 delegation
 - [MCP Authorization](/docs/authentication/mcp-auth-model) — MCP's use of metadata
+- [auth.md](/docs/authentication/auth-md) — agentic registration discovery
 - ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — base specification
 - ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — resource server extension

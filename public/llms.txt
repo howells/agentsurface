@@ -85,6 +85,7 @@ The primary deliverable of this site is a Claude Code skill (`/surface`) that ag
 - [DPoP](https://agentsurface.dev/docs/authentication/dpop) — Demonstrating proof-of-possession for token binding.
 - [MCP auth model](https://agentsurface.dev/docs/authentication/mcp-auth-model) — How MCP 2025-11-25 handles OAuth 2.1.
 - [Protected resource metadata](https://agentsurface.dev/docs/authentication/protected-resource-metadata) — .well-known/oauth-protected-resource.
+- [auth.md](https://agentsurface.dev/docs/authentication/auth-md) — Agentic registration discovery with ID-JAG and OTP claim flows.
 - [Idempotency & replay](https://agentsurface.dev/docs/authentication/idempotency-and-replay) — Safe retry patterns for auth flows.
 - [Anti-patterns](https://agentsurface.dev/docs/authentication/anti-patterns) — Common auth mistakes that block agent access.
 

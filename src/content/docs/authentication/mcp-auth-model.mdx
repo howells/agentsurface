@@ -36,6 +36,15 @@ Use this page for:
 
 Do not use this page as the primary model for stdio MCP servers. Stdio servers normally receive credentials from environment variables, local config, keychains, or the host application.
 
+## Relationship to auth.md
+
+MCP authorization and `auth.md` solve adjacent problems:
+
+- MCP authorization describes how an MCP client obtains and presents an access token to a protected HTTP MCP server.
+- `auth.md` describes how an agent can register or claim a user-bound credential with a service before making authenticated calls.
+
+Use MCP authorization for the transport-level OAuth flow. Use `auth.md` only when the service also wants to publish an agent-readable registration path, such as provider-attested ID-JAG registration or an OTP-backed user claim ceremony.
+
 ## Protected Resource Metadata
 
 A protected MCP server must advertise how clients can discover its authorization server.
@@ -163,4 +172,5 @@ Clients should treat a challenged scope as authoritative for satisfying that req
 
 - [Protected Resource Metadata](/docs/authentication/protected-resource-metadata)
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents)
+- [auth.md](/docs/authentication/auth-md)
 - [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
