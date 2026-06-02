@@ -1,11 +1,11 @@
 ---
 title: Real-World MCP Patterns
-description: How GitHub, Stripe, and Vercel structure their production MCP servers
+description: Recurring patterns in GitHub, Stripe, and Vercel MCP server designs
 ---
 
 ## Summary
 
-GitHub, Stripe, and Vercel reveal consistent patterns: toolset grouping (organize tools by feature, enable/disable at startup), environment-based configuration, error recovery strategies, and logging. GitHub's 60+ tools are managed via toolsets; Stripe uses composable operations; Vercel exposes deployment and analytics. All follow the single-responsibility principle and provide clear error paths.
+The examples below use recurring implementation patterns: toolset grouping, environment-driven configuration, structured error paths, lean responses, and startup-time tool selection. GitHub's 60+ tools are managed via toolsets; Stripe uses composable operations; Vercel exposes deployment and analytics.
 
 - Toolset grouping: organize tools into named groups, enable via config
 - Startup configuration: load toolsets/features at server start
@@ -14,7 +14,7 @@ GitHub, Stripe, and Vercel reveal consistent patterns: toolset grouping (organiz
 - Logging: use MCP logging facilities, write to stderr
 - GitHub, Stripe, Vercel all use 10-60 tools per server (not 300)
 
-Production MCP servers from major platforms reveal consistent patterns that go beyond what the spec requires. The GitHub MCP server, Stripe's agent toolkit, and Vercel's MCP server each solve the same core challenges — tool explosion, auth flexibility, deployment variety — and their approaches are worth studying directly.
+Production MCP servers from major platforms go beyond the spec in similar ways. The GitHub MCP server, Stripe's agent toolkit, and Vercel's MCP server each deal with tool explosion, auth flexibility, and deployment variety.
 
 ## GitHub MCP Server
 
@@ -287,4 +287,4 @@ Reviewing GitHub, Stripe, and Vercel's approaches reveals five consistent patter
 
 **5. Lean responses.** Tool responses return the minimum fields needed for the agent to proceed. Full API responses are never passed through directly.
 
-These patterns are not incidental. They emerge from operating MCP servers at scale, with real agents, and observing where failures occur. They are worth adopting even for small internal servers.
+These patterns address failures that show up as MCP deployments grow: tool sprawl, permission drift, environment-specific behavior, and oversized responses.

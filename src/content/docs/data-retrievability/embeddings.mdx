@@ -9,11 +9,11 @@ Freshness note: last reviewed 2026-06-02. Embedding model names, pricing, dimens
 
 ## Summary
 
-Dense embeddings transform text into fixed-length vectors suitable for nearest-neighbor search. April 2026: **open-source models now match or exceed commercial APIs on MTEB leaderboard.** Choose based on cost sensitivity, latency SLA (API calls slower than self-hosted), and specialized domains (legal, code, medical models exist). **Matryoshka embeddings** (supported by OpenAI 3-large and Cohere v4) let you store full dimensions but truncate to 256–512 at query time for cost savings without recomputing.
+Dense embeddings transform text into fixed-length vectors suitable for nearest-neighbor search. Several open-source models now beat some commercial APIs on specific MTEB tasks, but leaderboard rank is not a substitute for a domain eval. Choose based on cost sensitivity, latency SLA, privacy boundary, and corpus shape. **Matryoshka embeddings** (supported by OpenAI 3-large and Cohere v4) let you store full dimensions but truncate to 256–512 at query time for cost savings without recomputing.
 
 **Key takeaways:**
 - Commercial APIs (OpenAI, Voyage, Cohere) are integrated but expensive ($0.01–0.12 per 1M tokens).
-- Open-source (BGE-M3, E5-Mistral, Nomic) compete on MTEB; zero API costs, variable latency.
+- Open-source (BGE-M3, E5-Mistral, Nomic) can perform well on MTEB; zero API costs, variable latency.
 - Matryoshka: store 1,536 dims, truncate to 256/512 at query time for 4–36x speedup + cost drop.
 - Specialized models beat generalists on domain-specific benchmarks (legal, medical, code).
 
@@ -26,11 +26,11 @@ Dense embeddings transform text into fixed-length vectors suitable for nearest-n
 | **Voyage 3** | 1,536 | $0.01/1M | 64.8 | 50–150ms (API) | Rerank-2.5 companion; MongoDB-owned |
 | **Voyage 4** | 1,536 | $0.01/1M | 65.5 | 50–150ms (API) | Latest Voyage; slightly better than v3 |
 | **Cohere Embed v4** | 1,536 (Matryoshka) | $0.12/1M | 64.2 | 100–300ms (API) | Multimodal (text + images); enterprise rerank |
-| **BGE-M3** | 1,024 | Free | 65.1 | 10–20ms (GPU) | Open-source; multilingual; beat commercial APIs March 2026 |
+| **BGE-M3** | 1,024 | Free | 65.1 | 10–20ms (GPU) | Open-source; multilingual |
 | **E5-Mistral-7B** | 768 | Free | 63.8 | 20–40ms (GPU) | Compact; semantic-focused |
 | **Nomic Embed 1.5** | 384 | Free | 62.1 | 5–10ms (CPU) | Smallest; matryoshka-native |
 | **Jina V3** | 1,024 | Free | 64.5 | 15–30ms (GPU) | Long-context (8,191 tokens) |
-| **Google Gemini Embedding 2** | 768 | ~$0.02/1M | 68.3 | 100–300ms (API) | **Top MTEB leaderboard** (March 2026); all-modality (text, image, video, audio, code) |
+| **Google Gemini Embedding 2** | 768 | ~$0.02/1M | Verify current benchmark | 100–300ms (API) | All-modality family (text, image, video, audio, code) |
 
 ## Matryoshka embeddings: truncation without recomputing
 
@@ -89,7 +89,7 @@ const results = await pinecone.index('main').query({
 **Code:** Code2Vec, CodeBERT, or specialized models like GitCode embeddings.  
 **Multilingual:** BGE-M3 (67 languages), LABSE, mBERT embeddings.
 
-These **outperform generalists by 10–20% on domain-specific retrieval benchmarks.**
+On domain-specific corpora, compare specialized and general models with recall@k or nDCG before switching.
 
 ## API vs. self-hosted trade-offs
 

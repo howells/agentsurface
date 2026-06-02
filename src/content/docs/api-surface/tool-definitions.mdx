@@ -13,7 +13,7 @@ Tool definitions consist of three universal fields across all frameworks: name, 
 - Include positive and negative trigger conditions in descriptions
 - Document prerequisites and output shape to aid agent reasoning
 
-Every major agent framework — MCP, Vercel AI SDK, Mastra, LangChain, OpenAI, CrewAI, Semantic Kernel, Amazon Bedrock — uses a different syntax for tool definitions. The underlying design principles are identical across all of them. This page covers those universal principles, then shows how each framework implements them.
+MCP, Vercel AI SDK, Mastra, LangChain, OpenAI tools, CrewAI, Semantic Kernel, and Amazon Bedrock use different APIs for tool definitions. The shared concepts are the same: a name, a description, an input schema, and a handler. This page covers those portable design rules, then shows how each framework implements them.
 
 ## The Three-Field Minimum
 

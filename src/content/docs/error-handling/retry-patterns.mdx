@@ -18,7 +18,7 @@ delay = base * 2^attempt + random(0, base)  (capped at 60s)
 - Idempotency-Key required for write operations
 - is_retriable from problem body overrides status code heuristics
 
-Agents retry. Unlike humans, who might manually retry a failed request once or twice, an agent following a retry loop will retry at whatever cadence its logic allows — which, without constraints, can become a thundering herd that makes an already-degraded service worse. Retry patterns for agent systems are not just about eventual success; they are about failing safely without amplifying failures.
+Agents retry. Unlike humans, who might manually retry a failed request once or twice, an agent following a retry loop will retry at whatever cadence its logic allows — which, without constraints, can become a thundering herd that makes an already-degraded service worse. Retry patterns for agent systems must fail safely without amplifying failures.
 
 ## Exponential Backoff with Jitter
 
@@ -355,7 +355,7 @@ The `is_retriable` field in the RFC 9457 Problem Details body takes precedence o
 ## Checklist
 
 - [ ] Retry logic uses exponential backoff: `base * 2^attempt + random(0, base)`
-- [ ] Jitter is applied on every retry — not just the first
+- [ ] Jitter is applied on every retry
 - [ ] Maximum delay is capped (60 seconds recommended)
 - [ ] Circuit breakers stop retrying after N consecutive failures
 - [ ] 429 responses use the `Retry-After` header value as the wait time

@@ -18,7 +18,7 @@ Client: (with private key)        Server: (verifies)
 - Server validates signature, claim values, and jti uniqueness (prevents replay)
 - Token includes `dpop_jkt`: thumbprint of the DPoP proof's JWK
 - Required for financial operations, user data access, administrative actions
-- Use standard exponential backoff with jitter (ES256 or Ed25519)
+- Use ES256 or Ed25519 for DPoP proof signing
 
 When an access token is stolen — via a log, a memory dump, a man-in-the-middle attack — the attacker can replay it against the resource server until it expires. Demonstrating Proof-of-Possession (DPoP, RFC 9449) solves this by binding the token to the client's public key. If the token is stolen, it cannot be replayed because the attacker lacks the private key.
 

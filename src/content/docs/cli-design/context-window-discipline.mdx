@@ -62,7 +62,7 @@ $ mytool users list --fields id,name,status --json
 ]
 ```
 
-Field masks should work on every read command — not just list operations. Getting a single resource should also support `--fields`:
+Field masks should work on every read command, including single-resource reads. Getting a single resource should also support `--fields`:
 
 ```bash
 $ mytool user get usr_01HV3K8MNPQR --fields id,email,role --json

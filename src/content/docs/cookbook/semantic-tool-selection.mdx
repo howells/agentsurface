@@ -8,7 +8,7 @@ description: At >20 tools, use embedding-based selection. Pick ~12 per turn with
 Passing 50+ tool definitions to the model per request wastes tokens and dilutes focus. Semantic tool selection uses embeddings to pick ~12 relevant tools per turn based on the user's message. The "toolpick" pattern: embed tool descriptions once at startup, cache them, then at each step use cosine similarity to rank tools and pass only the top candidates.
 
 - **20-tool threshold**: Beyond 20 tools, token cost of listing all tools + context loss > benefit of pre-loaded tools.
-- **~12 tools per turn**: Empirically optimal; balances discovery vs. context window.
+- **~12 tools per turn**: Good starting point; tune against your tool set, model, and evals.
 - **"Always active" set**: Small, critical tools (web_search, search_tools, meta-tools) always available.
 - **Embedding cache**: Compute embeddings once at startup; reuse across requests (Redis or file cache).
 - **prepareStep hook**: Vercel AI SDK's integration point; called before model receives tools.
@@ -380,4 +380,3 @@ logger.debug("[toolpick] Selected tools", {
 - [Agentic Loop](/docs/cookbook/agentic-loop) — prepareStep integration.
 - [External-App Routing](/docs/cookbook/external-app-routing) — meta-tools for discovery.
 - [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) — tool description best practices (embedding quality depends on description quality).
-

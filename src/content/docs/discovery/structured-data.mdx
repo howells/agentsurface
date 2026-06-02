@@ -1,19 +1,19 @@
 ---
 title: Structured Data for Agents
-description: JSON-LD schema markup that improves AI Overview inclusion and agent comprehension of your content
+description: JSON-LD schema markup that gives search and agent systems machine-readable facts about your content
 ---
 
 ## Summary
 
-JSON-LD markup embeds structured data so AI systems can extract facts without natural language inference. Pages with FAQPage schema are 3.2x more likely in AI Overviews. Independent testing shows GPT-4 accuracy improves from 16% to 54% with JSON-LD. The fundamental rule: schema must exactly match visible page content, not supplement it.
+JSON-LD markup embeds structured data so search engines and agents can extract facts without relying only on natural language inference. Use it to describe FAQs, breadcrumbs, products, articles, APIs, and other page entities in a machine-readable form. The fundamental rule: schema must exactly match visible page content, not supplement it.
 
-- JSON-LD is the preferred format for AI systems (no HTML parsing required)
+- JSON-LD is the easiest structured-data format for agents to parse directly
 - FAQPage schema for FAQ sections, definitions, troubleshooting guides
 - BreadcrumbList schema for navigation and hierarchy
 - LocalBusiness, Product, and NewsArticle schemas for specific content types
 - Schema must match visible content exactly; penalized if mismatch occurs
 
-Search-augmented AI systems — Google AI Overviews, Perplexity, ChatGPT's web browsing — retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Pages with relevant structured data are measurably more likely to appear in AI-generated answers.
+Search-augmented AI systems retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Treat it as an extraction aid and search-quality signal, not as a guarantee that a page will appear in generated answers.
 
 ## Why JSON-LD
 
@@ -21,10 +21,10 @@ JSON-LD embeds structured data in a separate `` `<script>` `` block rather than 
 
 - No HTML parsing required — the agent reads the JSON directly
 - The data model is explicit and fully typed
-- Google's documentation confirms JSON-LD is the recommended format for AI Overviews
+- Google recommends JSON-LD for structured data because it does not require annotating visible HTML
 - Multiple schemas can coexist in the same page without interference
 
-The performance numbers are significant: pages with `FAQPage` schema are 3.2 times more likely to appear in AI Overviews. Independent testing shows GPT-4 answer accuracy on structured content improves from 16% to 54% when JSON-LD is present. These are not marginal gains.
+The practical benefit is extraction reliability: agents can read named fields instead of guessing from prose. Validate the effect on your own pages with search appearance data, answer-quality tests, and retrieval logs.
 
 ## The Fundamental Rule
 
@@ -302,5 +302,5 @@ The `schema-dts` package provides TypeScript types for all Schema.org types, cat
 Test structured data before deploying:
 
 - **Google Rich Results Test** — `search.google.com/test/rich-results` — validates whether Google can process your schema and whether it qualifies for rich results
-- **Schema.org Validator** — `validator.schema.org` — validates against the full Schema.org specification, not just Google's subset
+- **Schema.org Validator** — `validator.schema.org` — validates against the full Schema.org specification, including fields outside Google's subset
 - **JSON-LD Playground** — `json-ld.org/playground` — useful for debugging `@context` and `@graph` issues

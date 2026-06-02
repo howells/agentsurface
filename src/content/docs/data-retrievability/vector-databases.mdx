@@ -9,11 +9,11 @@ Freshness note: last reviewed 2026-06-02. Managed database features, pricing, la
 
 ## Summary
 
-**April 2026 breakthrough:** pgvector + pgvectorscale now rivals Pinecone at 75% lower cost. Choose serverless (Pinecone) for hands-off ops, pgvector for cost-sensitive, Qdrant for fine-grained control, or Weaviate for native hybrid search. **Self-hosted is now cost-competitive for >100K vectors.**
+Choose serverless vector databases for hands-off operations, pgvector for cost-sensitive Postgres-backed systems, Qdrant for fine-grained control, or Weaviate for native hybrid search. Timescale's 50M-vector benchmark reported lower p95 latency and lower self-hosted cost for pgvector + pgvectorscale than Pinecone s1, but vendor pricing and workloads vary.
 
 **Key takeaways:**
-- **Pinecone serverless:** Managed, hybrid + rerank, auto-scaling. $16/1M RUs.
-- **pgvector + pgvectorscale:** Self-hosted PostgreSQL, 28x lower latency, 75% cheaper. Requires ops.
+- **Pinecone serverless:** Managed, hybrid + rerank, auto-scaling.
+- **pgvector + pgvectorscale:** Self-hosted PostgreSQL path for teams that can operate Postgres.
 - **Qdrant:** HNSW + quantization, self-host or cloud. $0.20/1M RUs.
 - **Weaviate:** Native BM25 + dense hybrid, GraphQL API. $0.50/1k reads.
 - **LanceDB:** Multi-vector (ColBERT), serverless, TypeScript-native.
@@ -80,7 +80,7 @@ async function search(query: string, embedding: number[]) {
 
 ## pgvector + pgvectorscale
 
-**2026 winner for cost-sensitive production:**
+**Cost-sensitive Postgres path:**
 
 ```sql
 -- Install extension
@@ -411,10 +411,10 @@ This keeps the agent away from raw search mechanics. The agent should call a `se
 
 ## Cost estimation (100K vectors, 1536 dims)
 
-**Pinecone:** 100K × 0.33 cents/vector/month = $330 storage + $16 per 1M RUs ≈ $500/mo  
-**pgvector (AWS EC2 t3.large):** ~$70/mo (reusable for other services)  
-**Qdrant Cloud:** ~$100/mo (similar to pgvector self-host)  
-**Weaviate Cloud:** ~$200/mo
+- **Pinecone:** estimate from current storage, read-unit, write-unit, and rerank pricing; do not treat old cost examples as stable.
+- **pgvector (AWS EC2 t3.large):** ~$70/mo (reusable for other services)
+- **Qdrant Cloud:** ~$100/mo (similar to pgvector self-host)
+- **Weaviate Cloud:** ~$200/mo
 
 ## See also
 

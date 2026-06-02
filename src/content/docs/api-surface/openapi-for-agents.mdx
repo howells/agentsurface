@@ -1,6 +1,6 @@
 ---
 title: OpenAPI for Agents
-description: Writing OpenAPI specifications that AI agents can use as executable contracts, not just documentation
+description: Writing OpenAPI specifications that AI agents can use as executable contracts
 ---
 
 ## Summary
@@ -269,7 +269,7 @@ responses:
 
 ### Concrete Examples
 
-Examples are part of the contract. Include them at the operation level so agents see a real response shape, not just an abstract schema.
+Examples are part of the contract. Include them at the operation level so agents see a real response shape alongside the abstract schema.
 
 ```yaml
 responses:
@@ -355,7 +355,7 @@ Long descriptions hurt agent performance more than they help. A 2000-token descr
 
 ## OpenAPI 3.1 Features That Matter
 
-OpenAPI 3.1 aligns with JSON Schema 2020-12, which unlocks several patterns important for agent-ready specs.
+OpenAPI 3.1 aligns with JSON Schema 2020-12, which enables several patterns important for agent-ready specs.
 
 ### Type Arrays
 
@@ -370,7 +370,7 @@ properties:
 
 ### `$ref` with Sibling Keywords
 
-In 3.1, `$ref` can appear alongside other keywords (not just as a standalone reference):
+In 3.1, `$ref` can appear alongside other keywords:
 
 ```yaml
 properties:

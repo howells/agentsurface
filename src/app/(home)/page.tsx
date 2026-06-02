@@ -1,248 +1,268 @@
 import Link from "next/link";
-import { glossaryTerms } from "@/data/glossary";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
-import { AnimatedScorecard } from "@/components/AnimatedScorecard";
+import { glossaryTerms } from "@/data/glossary";
 
-/* ── Data ──────────────────────────────────────── */
-
-const dimensions = [
+const paths = [
   {
-    num: "01",
-    name: "API Surface",
-    desc: "Machine-readable contracts and tool definitions",
+    title: "Understand agent systems",
+    desc: "Design principles, runtime choices, browser access, and protocol boundaries.",
+    href: "/docs/agents",
+  },
+  {
+    title: "Build production agents",
+    desc: "Framework selection, orchestration, retrieval, memory, UI, testing, and deployment patterns.",
+    href: "/docs/getting-started",
+  },
+  {
+    title: "Expose software to agents",
+    desc: "APIs, CLIs, MCP servers, discovery files, auth, errors, and tool definitions.",
     href: "/docs/api-surface",
   },
   {
-    num: "02",
-    name: "CLI Design",
-    desc: "Predictable commands with structured output",
-    href: "/docs/cli-design",
-  },
-  {
-    num: "03",
-    name: "MCP Servers",
-    desc: "Protocol-native tool exposure",
-    href: "/docs/mcp-servers",
-  },
-  {
-    num: "04",
-    name: "Discovery & AEO",
-    desc: "Agent-findable capabilities and metadata",
-    href: "/docs/discovery",
-  },
-  {
-    num: "05",
-    name: "Authentication",
-    desc: "Machine-to-machine access and token flows",
-    href: "/docs/authentication",
-  },
-  {
-    num: "06",
-    name: "Error Handling",
-    desc: "Structured errors with recovery paths",
-    href: "/docs/error-handling",
-  },
-  {
-    num: "07",
-    name: "Tool Design",
-    desc: "Narrow, typed, idempotent operations",
-    href: "/docs/tool-design",
-  },
-  {
-    num: "08",
-    name: "Context Files",
-    desc: "AGENTS.md, CLAUDE.md, and boundary definitions",
-    href: "/docs/context-files",
-  },
-  {
-    num: "09",
-    name: "Multi-Agent",
-    desc: "Coordination, delegation, and orchestration",
-    href: "/docs/multi-agent",
-  },
-  {
-    num: "10",
-    name: "Testing & Evals",
-    desc: "Metrics, red-team suites, and observability",
-    href: "/docs/testing",
-  },
-  {
-    num: "11",
-    name: "Retrievability",
-    desc: "Searchable, retrievable knowledge access",
-    href: "/docs/data-retrievability",
-  },
-];
-
-const resources = [
-  {
-    title: "Approaches",
-    desc: "Reusable patterns for agent-friendly software without rebuilding around a framework",
-    href: "/docs/cookbook",
-  },
-  {
-    title: "Protocols & Standards",
-    desc: "MCP, A2A, ACP, and the agent communication landscape",
-    href: "/docs/protocols",
-  },
-  {
-    title: "Scoring Framework",
-    desc: "The 0–3 rubric and calibration guidance behind each dimension",
+    title: "Evaluate readiness",
+    desc: "Score a surface, collect evidence, group fixes, and track before-and-after deltas.",
     href: "/docs/scoring",
   },
   {
-    title: "Tooling Catalog",
-    desc: "Curated AI and agent infrastructure worth knowing about",
+    title: "Choose standards and tools",
+    desc: "Compare protocols, runtimes, model providers, retrieval systems, eval tools, and sandboxes.",
+    href: "/docs/tooling-catalog",
+  },
+];
+
+const systemTopics = [
+  {
+    title: "Agent systems",
+    desc: "Architecture, scaffolding, browser access, and platform tradeoffs.",
+    href: "/docs/agents",
+  },
+  {
+    title: "Runtime boundaries",
+    desc: "Where logic, tools, state, approvals, and persistence should live.",
+    href: "/docs/runtime-boundaries",
+  },
+  {
+    title: "Agentic UI",
+    desc: "Interfaces for steering agents, reviewing work, and keeping users in control.",
+    href: "/docs/agentic-ui",
+  },
+  {
+    title: "Multi-agent",
+    desc: "Supervisors, swarms, councils, delegation, memory, and tool sprawl.",
+    href: "/docs/multi-agent",
+  },
+  {
+    title: "Data retrievability",
+    desc: "RAG patterns, embeddings, retrieval pipelines, vector stores, and knowledge graphs.",
+    href: "/docs/data-retrievability",
+  },
+  {
+    title: "Testing and evals",
+    desc: "Metrics, judges, red teams, traces, CI checks, and workflow harnesses.",
+    href: "/docs/testing",
+  },
+];
+
+const surfaces = [
+  {
+    title: "API Surface",
+    desc: "HTTP contracts, OpenAPI, Arazzo workflows, versions, and events.",
+    href: "/docs/api-surface",
+  },
+  {
+    title: "Tool Design",
+    desc: "Names, descriptions, schemas, safety, portability, curation, and token budgets.",
+    href: "/docs/tool-design",
+  },
+  {
+    title: "CLI Design",
+    desc: "Structured output, predictable commands, stdin payloads, schemas, and safety rails.",
+    href: "/docs/cli-design",
+  },
+  {
+    title: "MCP Servers",
+    desc: "Tools, resources, prompts, transports, auth, annotations, and server tests.",
+    href: "/docs/mcp-servers",
+  },
+  {
+    title: "Discovery",
+    desc: "llms.txt, AGENTS.md, structured data, content negotiation, robots, and endpoints.",
+    href: "/docs/discovery",
+  },
+  {
+    title: "Context Files",
+    desc: "Repository instructions for Codex, Claude Code, Cursor, Copilot, and monorepos.",
+    href: "/docs/context-files",
+  },
+  {
+    title: "Authentication",
+    desc: "Agent identity, OAuth, token exchange, DPoP, protected resources, and replay safety.",
+    href: "/docs/authentication",
+  },
+  {
+    title: "Error Handling",
+    desc: "Problem Details, recovery hints, retries, idempotency, trace IDs, and CLI errors.",
+    href: "/docs/error-handling",
+  },
+];
+
+const references = [
+  {
+    title: "Scoring framework",
+    desc: "The 0-3 rubric, scorecard format, evidence rules, clustering, and calibration.",
+    href: "/docs/scoring",
+  },
+  {
+    title: "Protocols",
+    desc: "MCP, A2A, ACP, Arazzo, discovery specs, and adjacent standards.",
+    href: "/docs/protocols",
+  },
+  {
+    title: "Tooling catalog",
+    desc: "Frameworks, providers, gateways, retrieval systems, eval tools, browsers, and sandboxes.",
     href: "/docs/tooling-catalog",
   },
   {
-    title: "Reference Links",
-    desc: "Canonical standards, specs, and official documentation",
+    title: "Cookbook",
+    desc: "Reusable production patterns for loops, approvals, background agents, routing, and MCP.",
+    href: "/docs/cookbook",
+  },
+  {
+    title: "Reference links",
+    desc: "Canonical specs, vendor docs, research notes, and source material.",
     href: "/docs/reference-links",
   },
 ];
 
-/* ── Page ──────────────────────────────────────── */
+function LinkList({
+  items,
+}: {
+  items: Array<{ title: string; desc: string; href: string }>;
+}) {
+  return (
+    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <Link
+          key={item.title}
+          href={item.href}
+          className="group rounded-lg border border-fd-border p-4 transition-colors hover:border-fd-ring hover:bg-fd-accent"
+        >
+          <h3 className="text-sm font-medium text-fd-foreground group-hover:text-fd-accent-foreground">
+            {item.title}
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-fd-muted-foreground">
+            {item.desc}
+          </p>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
     <main className="flex flex-col items-center bg-fd-background text-fd-foreground">
-      {/* ── Hero ──────────────────────────────────── */}
-      <section className="w-full max-w-5xl px-6 pt-16 pb-16 sm:px-10">
+      <section className="w-full max-w-5xl px-6 pb-14 pt-16 sm:px-10">
+        <p className="mb-4 text-xs font-medium uppercase tracking-[0.14em] text-fd-muted-foreground">
+          Agent-readable software
+        </p>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.1]">
-          Make software
-          <br />
-          legible to agents.
+          A field guide for software that agents can use.
         </h1>
         <p className="mt-6 max-w-2xl text-[0.9375rem] leading-7 text-fd-muted-foreground">
-          A practical resource by{" "}
-          <a
-            href="https://danielhowells.com"
-            className="text-fd-foreground transition-colors hover:text-fd-muted-foreground"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Daniel Howells
-          </a>{" "}
-          for the surfaces AI agents depend on — APIs,
-          CLIs, tools, MCP servers, docs, errors, auth, retrieval, and the
-          skill that ties them together. Part field guide, part scoring model,
-          part workflow.
+          Agent Surface explains how agents read context, call tools, retrieve
+          knowledge, handle errors, ask for approval, and coordinate work. Use
+          it to design agent systems, expose existing products to agents, score
+          readiness, and choose protocols or tools with the engineering detail
+          intact.
         </p>
-
-        <AnimatedScorecard />
 
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href="/docs"
             className="inline-flex h-10 items-center rounded-md bg-fd-primary px-5 text-sm font-medium text-fd-primary-foreground transition-colors hover:bg-fd-primary/90"
           >
-            Read the docs
+            Start the guide
           </Link>
           <Link
-            href="#skill"
+            href="/docs/getting-started"
             className="inline-flex h-10 items-center rounded-md border border-fd-border px-5 text-sm font-medium text-fd-muted-foreground transition-colors hover:border-fd-ring hover:text-fd-foreground"
           >
-            Get the CLI skill
+            Choose a path
           </Link>
         </div>
       </section>
 
-      {/* ── Four primitives ────────────────────────── */}
       <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
-          <h2 className="mb-6 text-lg font-semibold text-fd-foreground">
-            Four primitives of agentic software
-          </h2>
-          <div className="grid gap-px overflow-hidden rounded-lg border border-fd-border bg-fd-border sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                title: "Agents",
-                desc: "Reason, plan, decide. Autonomous entities that interpret goals and choose actions.",
-              },
-              {
-                title: "Tools",
-                desc: "Act on the world. APIs, CLIs, MCP servers — the callable surface agents depend on.",
-              },
-              {
-                title: "Context",
-                desc: "Know what's relevant. Docs, discovery files, structured data that orient an agent.",
-              },
-              {
-                title: "Orchestration",
-                desc: "Coordinate and compose. Workflows, delegation, memory, and multi-agent patterns.",
-              },
-            ].map((item) => (
-              <div key={item.title} className="bg-fd-background p-6">
-                <h3 className="text-sm font-semibold text-fd-foreground">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 11 Surfaces ──────────────────────────── */}
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 className="text-lg font-semibold text-fd-foreground">
-              The 11 surfaces
+              Start with the job
             </h2>
             <span className="text-xs text-fd-muted-foreground">
-              scored 0–3 each · scaled to 30
+              five routes through the same dense guide
             </span>
           </div>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-fd-muted-foreground">
-            Every dimension an agent touches when it operates inside your
-            codebase. Each one has a reference guide, scoring rubric, and
-            transformation path.
-          </p>
-
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {dimensions.map((d) => (
-              <Link
-                key={d.num}
-                href={d.href}
-                className="group rounded-lg border border-fd-border p-4 transition-colors hover:border-fd-ring hover:bg-fd-accent"
-              >
-                <span className="font-mono text-[0.6875rem] text-fd-muted-foreground">
-                  {d.num}
-                </span>
-                <p className="mt-1 text-sm font-medium text-fd-foreground group-hover:text-fd-accent-foreground">
-                  {d.name}
-                </p>
-                <p className="mt-0.5 text-xs leading-5 text-fd-muted-foreground">
-                  {d.desc}
-                </p>
-              </Link>
-            ))}
-          </div>
+          <LinkList items={paths} />
         </div>
       </section>
 
-      {/* ── Skill ────────────────────────────────── */}
+      <section className="w-full border-t border-fd-border">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
+          <h2 className="text-lg font-semibold text-fd-foreground">
+            Agent systems
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
+            These chapters cover the product and system design questions behind
+            agents: where they run, how they use tools, what memory they need,
+            how people supervise them, and how to prove they work.
+          </p>
+          <LinkList items={systemTopics} />
+        </div>
+      </section>
+
+      <section className="w-full border-t border-fd-border">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
+          <h2 className="text-lg font-semibold text-fd-foreground">
+            Agent-readable surfaces
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
+            These chapters make existing software easier for agents to inspect,
+            call, recover from, and keep within permission boundaries.
+          </p>
+          <LinkList items={surfaces} />
+        </div>
+      </section>
+
+      <section className="w-full border-t border-fd-border">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
+          <h2 className="text-lg font-semibold text-fd-foreground">
+            Evaluation and reference
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
+            Use these sections when you need to compare maturity, select a
+            standard, pick infrastructure, or turn a pattern into an
+            implementation plan.
+          </p>
+          <LinkList items={references} />
+        </div>
+      </section>
+
       <section id="skill" className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="grid gap-8 sm:grid-cols-[1fr_1fr]">
             <div>
-              <div className="flex items-baseline gap-3">
-                <h2 className="font-mono text-lg font-semibold text-fd-foreground">
-                  /surface
-                </h2>
-              </div>
+              <h2 className="font-mono text-lg font-semibold text-fd-foreground">
+                surface
+              </h2>
               <p className="mt-3 max-w-sm text-sm leading-6 text-fd-muted-foreground">
-                One skill that routes to the right workflow — audit your
-                codebase, scaffold agent infrastructure, generate MCP servers,
-                write context files, or fix specific gaps. It reads your project
-                and asks what you need.
+                The surface skill turns the guide into work on a repository.
+                It can explain a topic, audit readiness, write a transformation
+                plan, scaffold agent infrastructure, or delegate focused fixes
+                to specialist prompts.
               </p>
               <p className="mt-4 text-xs text-fd-muted-foreground">
-                Works with Claude Code, Codex, Cursor, and any agent that reads
+                Works with Codex, Claude Code, Cursor, and any agent that reads
                 markdown skill files.
               </p>
             </div>
@@ -262,40 +282,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Resources ────────────────────────────── */}
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
-          <h2 className="text-lg font-semibold text-fd-foreground">
-            Resources
-          </h2>
-          <div className="mt-4">
-            {resources.map((r) => (
-              <Link
-                key={r.title}
-                href={r.href}
-                className="grid gap-1 border-b border-fd-border py-4 transition-colors hover:text-fd-foreground sm:grid-cols-[11rem_1fr] sm:gap-2"
-              >
-                <span className="text-sm font-medium text-fd-foreground">
-                  {r.title}
-                </span>
-                <span className="text-sm leading-6 text-fd-muted-foreground">
-                  {r.desc}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Glossary teaser ──────────────────────── */}
-      <section className="w-full border-t border-fd-border" style={{ overflowX: "clip" }}>
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
+      <section
+        className="w-full border-t border-fd-border"
+        style={{ overflowX: "clip" }}
+      >
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 className="text-lg font-semibold text-fd-foreground">
               The language of agents
             </h2>
             <span className="text-xs text-fd-muted-foreground">
-              plain-language definitions for product & leadership teams
+              plain-language definitions for product and engineering teams
             </span>
           </div>
           <div className="mt-8">
@@ -307,13 +304,12 @@ export default function HomePage() {
               className="inline-flex items-center gap-1.5 text-sm font-medium text-fd-foreground transition-colors hover:text-fd-muted-foreground"
             >
               View all 24 terms
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true">-&gt;</span>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────── */}
       <footer className="w-full border-t border-fd-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-8 sm:px-10">
           <span className="text-xs text-fd-muted-foreground">

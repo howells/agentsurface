@@ -17,7 +17,7 @@ Choose the right pattern for your task sequence. Sequential for well-defined sta
 
 Multi-agent systems are not a single architecture. They are a family of patterns, each with different control flow, failure characteristics, and appropriate use cases. Choosing the wrong pattern is the most common source of multi-agent complexity — a sequential pipeline where concurrent fan-out was needed, or a swarm where a supervisor would have produced coherent output.
 
-This page covers the five primary patterns, how the major frameworks implement them, and the emerging 2026 consensus on when to use each.
+This page covers the five primary patterns, how the major frameworks implement them, and the decision rules for choosing between them.
 
 ## The Five Patterns
 
@@ -342,9 +342,9 @@ The manager updates the ledger after each task completes. If a task reveals the 
 | Open-ended complex goals | Dynamic orchestration |
 | Mixed structured + open-ended | Deterministic backbone + AI at decision nodes |
 
-## The 2026 Consensus: Deterministic Backbone + AI at Decision Nodes
+## Reliable Default: Deterministic Backbone + AI at Decision Nodes
 
-The pattern that has proven most reliable in production is a hybrid: a deterministic workflow graph handles control flow, error recovery, and state transitions, while AI agents are invoked only at specific decision points where judgment is required.
+A reliable production default is a hybrid: a deterministic workflow graph handles control flow, error recovery, and state transitions, while AI agents are invoked only at specific decision points where judgment is required.
 
 The key insight is that most steps in an agentic workflow are not judgment calls — they are mechanical transformations, validations, and routing decisions that should not be delegated to a language model. Reserve LLM invocations for the steps that genuinely require language understanding or generation.
 

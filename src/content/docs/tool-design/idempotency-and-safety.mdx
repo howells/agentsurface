@@ -297,11 +297,11 @@ async (params) => {
 | Annotation | Default | Meaning |
 |-----------|---------|---------|
 | `readOnlyHint` | false | Tool does not modify server state |
-| `destructiveHint` | false | Tool may delete or irreversibly modify data |
+| `destructiveHint` | true | Tool may delete or irreversibly modify data |
 | `idempotentHint` | false | Calling multiple times with same inputs has same effect |
-| `openWorldHint` | false | Tool interacts with external systems beyond the server |
+| `openWorldHint` | true | Tool interacts with external systems beyond the server |
 
-All annotations default to false (worst-case assumption). Set to true only when the property is **guaranteed**.
+MCP defaults are conservative: tools are assumed writable, potentially destructive, non-idempotent, and open-world unless you say otherwise. Set hints only when the property is accurate for the implementation.
 
 ## See also
 

@@ -71,7 +71,7 @@ for (let k = 1; k <= 10; k++) {
 // pass^10: 0 (many later trials failed)
 ```
 
-For production agents, aim for pass@1 close to pass@k. A gap between these means the agent is "lucky" on some runs — reliable systems have consistent success, not just possible success.
+For production agents, aim for pass@1 close to pass@k. A gap between these means the agent is "lucky" on some runs — reliable systems have consistent success rather than only possible success.
 
 ### Tool-routing accuracy
 
@@ -297,7 +297,7 @@ See [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/spe
 
 ## References
 
-- Cite [Anthropic's demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) for pass@k / pass^k definitions
+- [Anthropic, "Demystifying evals for AI agents"](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) covers pass@k and pass^k definitions for agent evals
 - [OpenAI HumanEval](https://github.com/openai/human-eval) introduced pass@k as the standard metric for code generation
 
 ## See also

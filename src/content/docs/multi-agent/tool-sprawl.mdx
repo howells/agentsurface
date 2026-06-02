@@ -15,7 +15,7 @@ Tool selection accuracy degrades above 20 tools per context. Name collisions, ov
 - Namespacing: billing__get_invoice avoids collision
 - Never keep deprecated tools out of fear of breakage
 
-Tool sprawl is the condition where an agent system accumulates more tools than any agent can use effectively. The tools exist, they are registered, but no one knows which ones are current, which overlap with others, or which are actually being called. According to a 2024 survey, 94% of IT leaders report that tool sprawl is increasing in their organizations, and only 12% have centralized management for their AI tool ecosystems.
+Tool sprawl is the condition where an agent system accumulates more tools than any agent can use effectively. The tools exist, they are registered, but no one knows which ones are current, which overlap with others, or which are actually being called. Treat this as both an interface problem and an ownership problem: every tool needs a namespace, an owner, usage data, and a removal path.
 
 The performance consequence is concrete: agents selecting from large unmanaged tool sets show measurably worse routing accuracy. When a tool list contains 40 tools and three of them do roughly the same thing under different names, the agent may call the wrong one, call all three, or fail to call any of them confidently.
 
@@ -34,7 +34,7 @@ The result is a tool namespace that grows monotonically and is never pruned.
 
 ## The Performance Impact
 
-Tool selection accuracy degrades with set size. This is not a hypothetical concern — it is measurable. OpenAI's function calling documentation notes the degradation begins around 10 tools per context. Research from Anthropic and others places the practical ceiling at 20 before selection errors become significant.
+Tool selection accuracy degrades with set size. This is not a hypothetical concern — it is measurable. OpenAI's function calling documentation notes degradation around 10 tools per context. Use 20 tools as a review threshold: above that, introduce namespacing, per-turn selection, or plugin-level loading.
 
 The degradation mechanisms:
 

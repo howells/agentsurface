@@ -5,7 +5,7 @@ description: Repository context files that tell AI coding agents how to work in 
 
 ## Summary
 
-AGENTS.md is the Linux Foundation open standard for repository context files (appearing in 60,000+ repos). It answers key questions agents have before writing code: how to build, test, lint, and run the project. The file is discovered by walking up the directory tree and supports precedence (closer files override farther ones). Maximum size: 32 KiB.
+AGENTS.md is a tool-neutral repository context file for coding agents. It answers key questions agents have before writing code: how to build, test, lint, and run the project. The file is discovered by walking up the directory tree and supports precedence (closer files override farther ones). Maximum size: 32 KiB.
 
 - Lead with commands: build, test, lint, type check
 - Declare agent boundaries: what it can and cannot modify
@@ -17,7 +17,7 @@ When an AI coding agent opens your repository, it needs to answer several questi
 
 ## AGENTS.md
 
-`AGENTS.md` is the Linux Foundation open standard for repository context files. As of early 2025, it appears in over 60,000 repositories. Unlike vendor-specific formats, `AGENTS.md` is tool-neutral — any agent that reads context files should recognize it.
+`AGENTS.md` is a tool-neutral convention for repository context files. Unlike vendor-specific formats, it gives any agent that reads project files a predictable place to find commands, boundaries, and working notes.
 
 ### Discovery and Precedence
 

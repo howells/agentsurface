@@ -143,7 +143,7 @@ Work through each axis methodically. For each one:
 
 1. **Test the zero case.** Does the feature exist at all? If not, score 0.
 2. **Test coverage.** If it exists, is it consistent across all commands or only some?
-3. **Test the edge cases.** Does JSON output work for errors, not just successes? Does `--dry-run` exist for delete, not just create?
+3. **Test the edge cases.** Does JSON output work for errors and successes? Does `--dry-run` exist for delete and create?
 
 A useful shortcut: run the CLI in a pipe and observe its behavior.
 
@@ -190,13 +190,13 @@ Reaching Agent-ready (11–15) would require: automatic JSON output in piped con
 
 ## Using the Scale to Prioritize Work
 
-Not all axes have equal leverage. The ordering below reflects which improvements deliver the most agent-reliability per unit of implementation effort:
+Not all axes have equal impact. The ordering below reflects which improvements deliver the most agent-reliability per unit of implementation effort:
 
 1. **Machine-Readable Output (Axis 1)** — without this, nothing else works. Implement first.
 2. **Safety Rails (Axis 6)** — `--dry-run` prevents irreversible errors. High impact, relatively simple.
-3. **Schema Introspection (Axis 3)** — enables agents to self-discover without pre-loaded docs. Medium effort, high leverage.
+3. **Schema Introspection (Axis 3)** — enables agents to self-discover without pre-loaded docs. Medium effort, high impact.
 4. **Context Window Discipline (Axis 4)** — `--fields` is low effort; streaming takes more work.
-5. **Raw Payload Input (Axis 2)** — high leverage for API-backed CLIs; relatively simple to add.
+5. **Raw Payload Input (Axis 2)** — high impact for API-backed CLIs; relatively simple to add.
 6. **Agent Knowledge Packaging (Axis 7)** — AGENTS.md is fast; full SKILL.md takes more writing.
 7. **Input Hardening (Axis 5)** — comprehensive hardening takes the most careful implementation.
 

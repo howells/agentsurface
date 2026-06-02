@@ -14,7 +14,7 @@ Naive OpenAPI-to-MCP generation produces bad servers: 50-300 tools that overwhel
 - Target: 10-30 tools per domain (not 50-300)
 - Humans handle intent layer; generation handles mechanical mapping
 
-Every OpenAPI spec is a potential MCP server. The mapping is mechanical: each operation becomes a tool, each parameter becomes a schema field, each response becomes a return type. Tooling exists to perform this transformation automatically. The problem is that a mechanical 1:1 mapping produces a bad MCP server, not just a mediocre one.
+Every OpenAPI spec is a potential MCP server. The mapping is mechanical: each operation becomes a tool, each parameter becomes a schema field, each response becomes a return type. Tooling exists to perform this transformation automatically. The problem is that a mechanical 1:1 mapping produces a bad MCP server.
 
 ## Why Naive Generation Fails
 

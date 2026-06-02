@@ -9,7 +9,7 @@ Freshness note: last reviewed 2026-06-02. Graph RAG libraries, database status, 
 
 ## Summary
 
-**April 2026:** LightRAG (2025) is preferred over GraphRAG for cost efficiency (6,000x cheaper: $0.15 vs $4–7 per document). Use graphs when relationships are explicit and queried often. Neo4j dominates enterprises; KuzuDB archived (Apple acquisition, Oct 2025); Memgraph is open-source alternative.
+LightRAG can be cheaper than traditional GraphRAG in token-heavy workflows, but it is not a universal replacement. Use graphs when relationships are explicit and queried often. Neo4j is common in enterprise graph deployments; Memgraph is an open-source alternative. Verify the current status of KuzuDB and graph RAG libraries before choosing an implementation.
 
 **Decision:**
 - **Vector-only:** `` `<100K` `` docs, dense semantic matching, cost-sensitive

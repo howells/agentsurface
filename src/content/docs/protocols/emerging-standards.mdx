@@ -88,7 +88,7 @@ AGENTS.md is a Linux Foundation convention for documenting agent-accessible capa
 Do not modify production database directly. All writes route through MCP servers.
 ```
 
-Adoption is high: Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, and others read AGENTS.md. It costs nothing to maintain and immediately improves agent context. Over 60,000 public repositories already include it.
+AGENTS.md is read by several coding-agent and IDE tools, including Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, and others. It costs little to maintain and gives agents a predictable place to find project commands, boundaries, and context.
 
 **Homepage:** [agents.md](https://agents.md)
 
@@ -153,7 +153,7 @@ Relevant schema.org types: `SoftwareApplication`, `WebAPI`, `APIReference`, `Ser
 
 ### Discovery Fragmentation & IETF Drafts
 
-The IETF has multiple competing drafts for agent discovery (11+ as of April 2026). Three approaches dominate:
+The IETF and adjacent standards groups have multiple drafts for agent discovery. Three approaches are worth tracking:
 
 1. **Well-known URI approach** — Capability documents at `/.well-known/agent.json` or `/.well-known/acp.json`. Already adopted by A2A and ACP.
 2. **DNS-based discovery** — Agent capabilities via DNS TXT or SRV records (no HTTP required).

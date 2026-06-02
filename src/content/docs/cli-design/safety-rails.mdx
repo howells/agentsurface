@@ -226,7 +226,7 @@ function sanitizeRecord(
 }
 ```
 
-For higher-assurance contexts, use Google's Model Armor API or equivalent to scan response content for injection patterns before returning it to the agent.
+For higher-assurance contexts, run returned text through your approved prompt-injection or content-filtering layer before returning it to the agent. Document the scanner, policy version, and action taken on failure.
 
 The full request→response loop defense covers:
 
@@ -279,7 +279,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 | 0 | No dry-run mode. No response sanitization. |
 | 1 | `--dry-run` exists for some mutating commands. |
 | 2 | `--dry-run` for all mutating commands. Agent can validate requests without side effects. |
-| 3 | Dry-run plus response sanitization (e.g., via Model Armor) to defend against prompt injection embedded in API data. The full request→response loop is defended. |
+| 3 | Dry-run plus response sanitization to defend against prompt injection embedded in API data. The full request→response loop is defended. |
 
 ## Checklist
 

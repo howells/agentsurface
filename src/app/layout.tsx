@@ -11,7 +11,7 @@ const jsonLd = {
   "@type": "SoftwareApplication",
   name: "Agent Surface",
   description:
-    "A practical resource for making software legible to AI agents. Covers API surface, CLI design, MCP servers, discovery, authentication, error handling, tool design, context files, data retrievability, multi-agent patterns, and testing.",
+    "A guide and implementation kit for agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and operational skills.",
   url: BASE_URL,
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any",
@@ -36,20 +36,20 @@ export const metadata: Metadata = {
     template: "%s — Agent Surface",
   },
   description:
-    "A practical resource for designing codebases, APIs, CLIs, docs, tools, and skills that AI agents can understand and use.",
+    "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
   openGraph: {
     type: "website",
     siteName: "Agent Surface",
     title: "Agent Surface — Make Software Legible to Agents",
     description:
-      "A practical resource for designing codebases, APIs, CLIs, docs, tools, and skills that AI agents can understand and use.",
+      "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
     images: [{ url: "/og/Agent%20Surface", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Agent Surface — Make Software Legible to Agents",
     description:
-      "A practical resource for designing codebases, APIs, CLIs, docs, tools, and skills that AI agents can understand and use.",
+      "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
     images: ["/og/Agent%20Surface"],
   },
 };

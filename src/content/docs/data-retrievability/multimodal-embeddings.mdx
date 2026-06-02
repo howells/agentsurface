@@ -9,10 +9,10 @@ Freshness note: last reviewed 2026-06-02. Multimodal model coverage, modality su
 
 ## Summary
 
-**April 2026 state:** Multimodal embeddings are production-ready. Use when documents include images (PDFs, slides, charts), video archives, or you need cross-modal queries (e.g., "find documents with charts like this image"). **Gemini Embedding 2** (March 2026) is the only model supporting all five modalities. Voyage Multimodal 3.5 handles text, images, and video. Cohere Embed v4 supports text + images.
+Use multimodal embeddings when documents include images (PDFs, slides, charts), video archives, or cross-modal queries such as "find documents with charts like this image." Verify current modality support before choosing a model: Gemini embedding models, Voyage Multimodal, Cohere Embed, CLIP, and SigLIP move at different speeds across text, image, video, audio, and code.
 
 **Key takeaways:**
-- **Gemini Embedding 2:** All-modality leader (text, image, video, audio, code); top MTEB score (68.3).
+- **Gemini embedding models:** Check current Google model docs for modality support and benchmark claims.
 - **Voyage Multimodal 3.5:** Text + images + video; unified 1,024-dim space.
 - **ColPali pattern:** Treat PDFs as images; late-interaction retrieval; no OCR needed.
 - **CLIP/SigLIP:** Open-source, text + image, widely integrated.
@@ -21,7 +21,7 @@ Freshness note: last reviewed 2026-06-02. Multimodal model coverage, modality su
 
 | Model | Modalities | Dims | Cost | Quality | Notes |
 |-------|-----------|------|------|---------|-------|
-| **Gemini Embedding 2** | Text, image, video, audio, code | 768 | ~$0.02/1M | 68.3 MTEB | **Top leaderboard**; all-modality; Google API |
+| **Gemini Embedding 2** | Verify current docs | 768 | ~$0.02/1M | Verify current benchmark | Google API |
 | **Voyage Multimodal 3.5** | Text, image, video | 1,024 | $0.01/1M | 63.5 | Latest Voyage; MongoDB-owned |
 | **Cohere Embed v4** | Text, image | 1,536 (Matryoshka) | $0.12/1M text, $0.47/1M image | 64.2 | Multimodal; enterprise |
 | **CLIP ViT-L/14** | Text, image | 768 | Free | 59.5 | Open-source; widely integrated |

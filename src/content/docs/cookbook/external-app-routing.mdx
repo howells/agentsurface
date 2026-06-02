@@ -10,7 +10,7 @@ Instead of pre-registering 500 Composio tools, expose two meta-tools: `search_to
 - **search_tools**: "I want to send an email" → returns matching actions from connected apps.
 - **multi_execute_tool**: Execute a discovered action with parameters.
 - **Dynamic discovery**: Works with any external app added post-deployment; no code changes.
-- **Composio pattern**: Composio uses this; proven at scale with 200+ apps.
+- **Composio pattern**: Useful when the external-action catalog is too large to preload.
 
 ---
 
@@ -220,7 +220,7 @@ that the user has connected.
 **Rules**:
 - Always call \`search_tools\` first; don't assume action IDs
 - If \`search_tools\` returns no results, the app may not be connected or the action may not exist
-- Include app name in the search query when possible (e.g., "send email via Gmail", not just "send email")
+- Include app name in the search query when possible (e.g., "send email via Gmail" instead of "send email")
 `;
 ```
 
@@ -399,4 +399,3 @@ server.registerTool("search_tools", ..., async (params) => {
 - [Agentic Loop](/docs/cookbook/agentic-loop) — where tools are called.
 - [Tool Design](/docs/tool-design) — tool schema and descriptions.
 - [Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — another scaling pattern for large tool counts.
-

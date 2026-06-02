@@ -20,7 +20,7 @@ A well-structured MCP server is not simply a file with tools registered in seque
 
 Each MCP server should own one clear domain. A server for your billing system exposes billing tools. A server for your document store exposes document tools. They do not share a codebase.
 
-This is not just organizational tidiness — it has practical consequences for agents:
+This has practical consequences for agents:
 
 - Agents connecting to a billing server get a tool list that is entirely relevant to billing. There is no noise from unrelated domains.
 - Smaller tool lists mean less token overhead in the agent's context window when the server's capabilities are described.

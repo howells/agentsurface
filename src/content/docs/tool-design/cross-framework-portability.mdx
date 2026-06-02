@@ -5,14 +5,14 @@ description: Defining tools once and exporting adapters for MCP, Claude Code SDK
 
 ## Summary
 
-Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Code SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). Keeps logic centralized, ensures consistency across platforms, reduces duplication. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations). Single source of truth for tool behavior means updates flow everywhere.
+Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Code SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). This reduces drift and duplication, but each adapter still needs framework-specific tests. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations).
 
 - **Shared registry**: Tool metadata, handler, schema (Zod)
 - **MCP adapter**: server.tool() registration
 - **Claude Code SDK adapter**: expose the registry as MCP or allowed SDK tools
 - **OpenAI adapter**: FunctionDeclaration with handler wrapper
 - **Vercel AI SDK adapter**: tools object
-- **Benefits**: Single source of truth, reduced duplication, consistent behavior
+- **Benefits**: Reduced duplication, lower drift, adapter-specific tests
 
 ---
 

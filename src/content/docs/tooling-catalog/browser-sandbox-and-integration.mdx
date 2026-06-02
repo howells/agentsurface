@@ -22,9 +22,9 @@ Use these when agents need to run code, execute untrusted workloads, or access G
 | [Amazon Bedrock AgentCore Code Interpreter](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter.html) | docs.aws.amazon.com | Managed code interpreter for Bedrock AgentCore agents | Conditional | Good fit when agent execution, browser, and code interpretation are intentionally AWS-native. |
 | [Azure Container Apps dynamic sessions](https://learn.microsoft.com/azure/container-apps/sessions-code-interpreter) | learn.microsoft.com | Session-based sandboxed code interpreter backed by Azure Container Apps | Conditional | Good Azure-native route for Python execution and uploaded-file analysis. |
 | [Riza Code Interpreter](https://docs.riza.io/) | docs.riza.io | Hosted and self-hostable code interpreter for model-generated code | Watch | Surfaced in LangChain integrations; evaluate if language coverage or self-hosting is important. |
-| [bash-tool](https://github.com/vercel/bash-tool) | github.com/vercel | AI SDK-compatible bash tool intended for sandboxed execution | Watch | Useful pattern for controlled shell execution; never expose it without a sandbox and policy layer. |
+| [bash-tool](https://github.com/vercel-labs/bash-tool) | github.com/vercel-labs | AI SDK-compatible bash tool intended for sandboxed execution | Watch | Useful pattern for controlled shell execution; never expose it without a sandbox and policy layer. |
 | [ctx-zip](https://github.com/karthikscale3/ctx-zip/blob/main/README.md) | github.com/karthikscale3 | Converts MCP and AI SDK tools into code-mode tools that run through Vercel Sandbox | Watch | Interesting for large tool sets and code-mode execution, but keep it behind strict permissions. |
-| [Morph](https://docs.morph.so/) | docs.morph.so | Fast code editing and apply-patch infrastructure for AI coding workflows | Watch | Useful for coding agents that need reliable patch application rather than raw text replacement. |
+| [Morph](https://docs.morphllm.com/introduction) | docs.morphllm.com | Fast code editing and apply-patch infrastructure for AI coding workflows | Watch | Useful for coding agents that need reliable patch application rather than raw text replacement. |
 
 ## Agent Web Access and Automation
 
@@ -58,8 +58,8 @@ These are included because their primary use is giving agents live web context, 
 | [Brave Search API](https://api.search.brave.com/) | api.search.brave.com | Independent web search API | Conditional | Good alternative search source when avoiding Google-dependent SERP APIs matters. |
 | [Linkup](https://docs.linkup.so/) | docs.linkup.so | Search and retrieval API for AI agents | Watch | Track as part of the agent-native web search category. |
 | [Jina Reader](https://jina.ai/reader/) | jina.ai | URL-to-Markdown and web content extraction service | Conditional | Useful as a simple reader tool before adding a full crawler or browser stack. |
-| [Jina Search](https://jina.ai/search/) | jina.ai | Search API returning web results and page content for AI workflows | Conditional | Surfaced in LangChain search-tool integrations and pairs naturally with Jina Reader. |
-| [SearchApi](https://www.searchapi.io/docs) | searchapi.io | Search engine results API | Conditional | Another SERP-style option; use only when its engine coverage and pricing fit. |
+| [Jina Search](https://search.jina.ai/) | search.jina.ai | Search API returning web results and page content for AI workflows | Conditional | Surfaced in LangChain search-tool integrations and pairs naturally with Jina Reader. |
+| [SearchApi](https://searchapi.net/docs/endpoints) | searchapi.net | Search engine results API | Conditional | Another SERP-style option; use only when its engine coverage and pricing fit. |
 | [SearxNG](https://docs.searxng.org/) | docs.searxng.org | Self-hostable metasearch engine | Conditional | Good when search should be self-hosted or privacy-sensitive. |
 | [DuckDuckGo Search](https://duckduckgo.com/) | duckduckgo.com | General web search source used by several toolkits | Conditional | Useful as a low-friction tool in prototypes; production use needs reliability checks. |
 | [You.com Search API](https://docs.you.com/) | docs.you.com | Search API for AI applications | Watch | Appears in LangChain search integrations; evaluate against Exa/Tavily/Firecrawl/Brave. |

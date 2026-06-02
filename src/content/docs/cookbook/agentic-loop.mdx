@@ -79,7 +79,7 @@ export async function streamAssistant(params: {
 **Key features**:
 
 - **`tools`**: Flat object of tool definitions (`{ [name]: Tool }`). Merge MCP tools with built-in provider tools (e.g., `openai.tools.webSearch`).
-- **`stopWhen`**: Predicate that receives step count; return `true` to halt. 10 steps is a proven default for multi-tool workflows.
+- **`stopWhen`**: Predicate that receives step count; return `true` to halt. Start with a small cap such as 5-10 steps, then tune from traces.
 - **`prepareStep`**: Hook to select which tools are exposed per turn (enables semantic selection).
 - **`onFinish`**: Guaranteed cleanup callback — runs whether the agent succeeds or fails. See [Resource Lifecycle](#resource-lifecycle) below.
 - **`experimental_transform`**: Smooths token emission for better UX.

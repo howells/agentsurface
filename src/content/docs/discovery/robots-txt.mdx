@@ -5,7 +5,7 @@ description: Configuring robots.txt to control training crawler access while kee
 
 ## Summary
 
-robots.txt now controls two distinct bot types: training crawlers (index for model training) and retrieval bots (fetch during inference). Blocking GPTBot does not prevent ChatGPT-User from reading your docs. This two-decision model lets you appear in AI answers while opting out of training data. Recommended: block training crawlers, allow retrieval bots.
+robots.txt now controls two distinct bot types: training crawlers (index for model training) and retrieval bots (fetch during inference). Blocking GPTBot does not prevent ChatGPT-User from reading your docs. This two-decision model lets retrieval bots fetch public docs while disallowing listed training crawlers that honor robots.txt. Recommended: block training crawlers, allow retrieval bots.
 
 ```
 Training Crawlers       Retrieval Bots

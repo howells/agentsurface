@@ -5,7 +5,7 @@ description: When and how to use LLM judges; biases, calibration, and hybrid app
 
 ## Summary
 
-Model-based grading for open-ended outputs with no deterministic ground truth (plan quality, semantic correctness, summary coherence). Critical insight: LLM judges are systematically biased—they prefer outputs from themselves or similar models, exhibit position bias (prefer first/last), and suffer from verbose-text preference. Mitigations: use stronger indifferent judge models, hybrid grading (code + model), and calibration against human-labeled baselines. Use code-based graders for deterministic outputs (tool routing, DB state verification).
+Model-based grading for open-ended outputs with no deterministic ground truth (plan quality, semantic correctness, summary coherence). LLM judges can prefer outputs from themselves or similar models, exhibit position bias (prefer first/last), and reward verbosity. Mitigations: use a judge from a different model family, hybrid grading (code + model), and calibration against human-labeled baselines. Use code-based graders for deterministic outputs (tool routing, DB state verification).
 
 - **When to use**: Open-ended outputs, semantic correctness, plan quality
 - **When NOT to use**: Deterministic outputs, tool routing, end-state verification
@@ -36,7 +36,7 @@ Research from Zheng et al. (MT-Bench) and Anthropic's evaluation posts identifie
 
 A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.4 to judge outputs from Claude Opus 4.7, the judge may systematically overrate outputs that look like GPT-style reasoning.
 
-**Mitigation:** Use a stronger judge model that is indifferent between systems. Opus 4.7 is less biased than Haiku 4.5. Or use a different provider entirely (GPT-5.4 judging Claude outputs, Claude judging GPT outputs).
+**Mitigation:** Use a judge from a different model family and calibrate it against human-labeled examples. For pairwise comparisons, run at least some cross-provider checks so style similarity does not become a hidden scoring advantage.
 
 ### Position bias
 

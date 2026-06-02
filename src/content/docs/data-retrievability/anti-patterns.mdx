@@ -54,7 +54,7 @@ Retrieval quality fails silently. Measure obsessively and avoid these pitfalls.
 
 **Problem:** Chunks isolated from document context. "Revenue grew 3%" loses company/timeframe.
 
-**Fix:** Use Anthropic Contextual Retrieval (prepend summaries via Haiku). 49–67% failure reduction.
+**Fix:** Use contextual retrieval where chunks lose meaning outside the parent document. Anthropic reported a 49–67% reduction in top-20 retrieval failure on its benchmark; validate against your corpus.
 
 ### 6. Stale embeddings
 

@@ -86,7 +86,7 @@ Scores without evidence drift high. Here's why:
 2. **Wishful thinking**: You score toward what the team *intended* rather than what exists.
 3. **No calibration**: Without evidence, each rater uses a different mental bar.
 
-When you score a dimension 2 without inspecting the code, you're guessing. The team's guess is usually "we're doing pretty well." Actual audits show the opposite: most codebases score 0–1 because implementations are incomplete.
+When you score a dimension 2 without inspecting the code, you're guessing. Without evidence, score conservatively; incomplete implementations should stay at 0–1 until verified.
 
 **Example of drift:**
 
@@ -210,7 +210,7 @@ When documenting a dimension score, use this template:
 
 **Be specific.** "The API is well-documented" is not evidence. "`openapi.yaml` has descriptions on 100% of operations, with examples on 95% of parameters" is.
 
-**Check multiple files.** Don't assume one file represents the whole project. Sample representative surfaces (OpenAPI, CLI, MCP, errors, tests).
+**Check multiple files.** Don't assume one file describes the whole project. Sample representative surfaces (OpenAPI, CLI, MCP, errors, tests).
 
 **Cite line numbers.** "`src/api/index.ts:234: operationId missing`" is better than "`somewhere in the API code, operationId is missing`".
 

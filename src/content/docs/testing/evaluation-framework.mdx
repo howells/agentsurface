@@ -5,7 +5,7 @@ description: A three-layer framework for measuring agent reasoning, action accur
 
 ## Summary
 
-Measure multi-step system performance, not single-turn model accuracy. Three-layer framework: (1) Reasoning – plan quality and adherence (correct tools, order, deviations), (2) Action – tool selection accuracy (F1 score) and parameter correctness (all args valid), (3) Outcome – final artifact matches success criteria (code correct, summary faithful). Each layer can fail independently; binary success/fail metric hides which layer broke. Critical insight: LLM reasoning 90% ≠ agent task completion 40%.
+Measure multi-step system performance, not single-turn model accuracy. Three-layer framework: (1) Reasoning – plan quality and adherence (correct tools, order, deviations), (2) Action – tool selection accuracy (F1 score) and parameter correctness (all args valid), (3) Outcome – final artifact matches success criteria (code correct, summary faithful). Each layer can fail independently; binary success/fail hides which layer broke.
 
 ```
 Layer 1: Reasoning (Plan)
@@ -349,9 +349,9 @@ This discipline prevents the common pattern where evals are written after the sy
 
 - [ ] Evaluations are organized into three layers: reasoning, action, execution
 - [ ] Tool routing accuracy and parameter correctness are measured separately
-- [ ] End state is verified for task completion, not just the final tool call
+- [ ] End state is verified for task completion, instead of only the final tool call
 - [ ] Grader type matches the output type (code-based for deterministic outputs, model-based for open-ended)
-- [ ] pass@k and pass^k are both measured — not just success rate
+- [ ] pass@k and pass^k are both measured alongside success rate
 - [ ] Regression eval set starts with at least 20 real production failures
 - [ ] Graders check outcomes, not paths (unless path is a requirement)
 - [ ] Evals are written before the capability is implemented

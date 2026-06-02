@@ -5,11 +5,11 @@ description: Estimating tool-call token cost and designing lean responses
 
 ## Summary
 
-Every tool definition, parameter, and response consumes context tokens. Over many calls in a long session, cost compounds exponentially. Minimize tool-definition tokens: descriptions `` `<100` `` tokens first paragraph (link detailed docs for edge cases), parameter descriptions `` `<5` `` tokens, avoid redundancy. Minimize response tokens: use toModelOutput to strip noise, paginate results (return top-5 not top-1000), avoid embedding full nested objects. A response 5x larger than necessary is 5x more expensive and may cause context truncation.
+Every tool definition, parameter, and response consumes context tokens. Over many calls in a long session, cost compounds exponentially. Minimize tool-definition tokens: descriptions `` `<100` `` tokens first paragraph (link detailed docs for edge cases), parameter descriptions `` `<5` `` tokens, avoid redundancy. Minimize response tokens with concise summaries, pagination (return top-5 not top-1000), and shallow objects. A response 5x larger than necessary is 5x more expensive and may cause context truncation.
 
 - **Description cost**: First paragraph `` `<100` `` tokens, link docs for details
 - **Parameter descriptions**: `` `<5` `` tokens each, no redundancy with tool description
-- **Response design**: toModelOutput for token efficiency
+- **Response design**: concise model-facing summaries
 - **Pagination**: Return top-k, use cursor for continuation
 - **Nested objects**: Strip unused fields, return IDs not full objects
 - **Test early**: Calculate tokens per tool + response, per call
@@ -147,9 +147,9 @@ async (params) => {
 
 Never return all 1000 results at once. Cap at 50, return `has_more: true`, and include `next_offset` for the agent to fetch more.
 
-## Anthropic toModelOutput
+## Model-facing summaries
 
-For large payloads, Anthropic supports `toModelOutput` to compress responses before feeding to the model:
+For large payloads, return a concise model-facing summary plus structured references. Use framework-specific response-shaping hooks where available, but keep the same design rule: the model sees what it needs to choose the next action, not the full backing payload.
 
 ```typescript
 // Instead of returning 50 full objects:
@@ -297,10 +297,10 @@ async function callTool(toolName: string, params: object) {
 | Parameter descriptions | `` `<30` `` tokens combined | Paragraphs (condense or split schema) |
 | Response size | `` `<500` `` tokens per result | `` `>2000` `` tokens (paginate, compress, or split) |
 | Tool count | `` `<15` `` per agent session | `` `>25` `` tools without dynamic selection |
-| Single response | `` `<1000` `` tokens | `` `>5000` `` tokens (use pagination or toModelOutput) |
+| Single response | `` `<1000` `` tokens | `` `>5000` `` tokens (use pagination or summaries) |
 
 ## See also
 
 - `/docs/api-surface/openapi` — pagination patterns in specs
-- ([Anthropic toModelOutput](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([Anthropic tool-writing guidance](https://www.anthropic.com/engineering/writing-tools-for-agents))
 - ([Prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching))

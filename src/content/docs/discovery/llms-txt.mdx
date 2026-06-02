@@ -5,7 +5,7 @@ description: The llms.txt specification for giving AI agents a curated, token-ef
 
 ## Summary
 
-llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation (costly in tokens), llms.txt lets you declare upfront what matters most. As of mid-2025, over 844,000 sites serve llms.txt. Primary consumers are IDE integrations like Cursor and Claude Code.
+llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation, llms.txt lets you declare upfront what matters most. Primary consumers include IDE and coding-agent workflows that index documentation during project setup or on demand.
 
 - Served at /llms.txt as text/plain; charset=utf-8
 - Required: H1 with product/site name
@@ -20,7 +20,7 @@ The `llms.txt` specification, proposed by Jeremy Howard in September 2024 at [ll
 
 An AI agent trying to use your API or understand your product faces a practical constraint: context windows are finite. Crawling your entire documentation site could cost hundreds of thousands of tokens before the agent answers a single question. `llms.txt` moves the curation work to the publisher, letting you declare in advance what an AI needs to know and where to find it.
 
-As of mid-2025, over 844,000 sites serve an `llms.txt` file. The primary confirmed consumers are IDE integrations — Cursor, Claude Code, and similar tools that index `llms.txt` during project setup or on demand.
+Adoption is broad enough that documentation platforms and agent tools now treat `llms.txt` as a normal publishing target. The primary confirmed consumers are IDE and coding-agent workflows — Cursor, Claude Code, and similar tools that index `llms.txt` during project setup or on demand.
 
 ## Canonical Format
 

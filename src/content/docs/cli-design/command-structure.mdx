@@ -250,7 +250,7 @@ async function runCommand(flags: Flags, required: FlagDefinition[]) {
 
 ## `--help --json` Structured Help
 
-Every command — not just command groups — must support `--help --json` returning structured schema output. This is the foundation of agent schema introspection (see [Schema Introspection](./schema-introspection)).
+Every command, including leaf commands, must support `--help --json` returning structured schema output. This is the foundation of agent schema introspection (see [Schema Introspection](./schema-introspection)).
 
 The structured help output must include:
 
