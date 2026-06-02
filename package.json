@@ -7,11 +7,14 @@
   "scripts": {
     "dev": "next dev --port 3900",
     "docs:check": "node scripts/check-docs-integrity.mjs",
+    "env:check": "envy check local --schema ./src/config/env-schema.ts --from .env --mode all",
+    "deploy:preview": "envy run local --schema ./src/config/env-schema.ts --from .env -- vercel deploy . -y",
     "build": "next build",
     "start": "next start",
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
+    "@howells/envy": "^0.3.7",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@tailwindcss/postcss": "^4.2.4",
