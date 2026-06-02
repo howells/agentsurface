@@ -5,10 +5,10 @@ description: Arazzo workflows, OpenTelemetry GenAI semconv, AGENTS.md, llms.txt,
 
 ## Summary
 
-Complementary standards address workflows (Arazzo), observability (OpenTelemetry GenAI), and discovery (AGENTS.md, llms.txt, JSON-LD). Arazzo is stable (1.0.1); OpenTelemetry GenAI semconv is stable; others are emerging. Publish discovery docs at well-known paths and use standards-based formats to avoid vendor lock-in.
+Complementary standards address workflows (Arazzo), observability (OpenTelemetry GenAI), and discovery (AGENTS.md, llms.txt, JSON-LD). Arazzo is stable at v1.1.0; OpenTelemetry GenAI semconv is useful but still marked Development. Publish discovery docs at well-known paths and use standards-based formats to avoid vendor lock-in.
 
-- Arazzo 1.0.1: machine-readable multi-step workflows on OpenAPI 3.1
-- OpenTelemetry GenAI: stable semantic conventions for agent observability
+- Arazzo 1.1.0: machine-readable multi-step workflows on OpenAPI and AsyncAPI descriptions
+- OpenTelemetry GenAI: Development semantic conventions for agent observability
 - AGENTS.md: markdown describing agent context and capabilities
 - llms.txt / llms-full.txt: LLM-friendly API documentation
 - JSON-LD + schema.org: semantic markup for auto-discovery
@@ -18,9 +18,9 @@ Beyond MCP, A2A, and ACP, a complementary tier of standards addresses workflows,
 
 ## Stable Complementary Standards
 
-### Arazzo 1.0.1 (Jan 2026) — Multi-Step Workflow Orchestration
+### Arazzo 1.1.0 (May 2026) — Multi-Step Workflow Orchestration
 
-Arazzo defines machine-readable multi-step workflows layered on OpenAPI 3.1. Where OpenAPI describes individual operations, Arazzo describes the correct sequence of calls, conditional branching, error handling, and success/failure paths.
+Arazzo defines machine-readable multi-step workflows layered on API descriptions such as OpenAPI and AsyncAPI. Where OpenAPI describes individual operations, Arazzo describes the correct sequence of calls, conditional branching, error handling, and success/failure paths.
 
 ```yaml
 workflows:
@@ -46,13 +46,13 @@ workflows:
             operationId: audit_log_event
 ```
 
-Use Arazzo when your API involves sequences that agents should follow predictably. It reduces agent reasoning load and improves determinism. Version 1.1.0 is in progress with AsyncAPI support.
+Use Arazzo when your API involves sequences that agents should follow predictably. It reduces agent reasoning load and improves determinism. Version 1.1.0 adds AsyncAPI source description support and tighter reference-resolution guidance.
 
-**Spec:** [Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)
+**Spec:** [Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html)
 
-### OpenTelemetry GenAI Semantic Conventions (Stable)
+### OpenTelemetry GenAI Semantic Conventions (Development)
 
-OpenTelemetry's GenAI semantic conventions standardize how to instrument LLM calls and agentic workflows. Metrics include request model, token counts, input/output content, system instructions, and tool call traces. Adoption by Traceloop, Langfuse, Datadog, and others makes this the baseline for observability.
+OpenTelemetry's GenAI semantic conventions standardize how to instrument LLM calls and agentic workflows, but the current OpenTelemetry docs mark them Development. Metrics include request model, token counts, input/output content, system instructions, and tool call traces. Adoption by Traceloop, Langfuse, Datadog, and others makes this a practical observability baseline, but pin emitted versions and expect migration work before stable.
 
 Key attributes for agent spans:
 - `gen_ai.provider.name` — "openai", "anthropic", "google"
@@ -263,16 +263,9 @@ NLWeb is a Microsoft initiative to make any web page or API natively accessible 
 
 NLWeb is tool-driven by teams at Microsoft and will be relevant for teams publishing APIs with schema.org markup.
 
-## Practical Strategy
-
-1. **Adopt stable standards now:** AGENTS.md, llms.txt, schema.org JSON-LD, Arazzo workflows, OpenTelemetry GenAI semconv.
-2. **Build translation layers:** Your agent logic should not parse any single discovery format directly. Abstract it.
-3. **Publish well-known URIs:** For your services, publish `/.well-known/agent.json` (A2A), `/.well-known/acp.json` (commerce), and AGENTS.md (context).
-4. **Monitor draft standards:** Track ANP, OASF, and IETF discovery work, but do not build hard dependencies yet.
-
 ## Spec References
 
-- [Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)
+- [Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html)
 - [OpenTelemetry GenAI Semconv](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
 - [AGENTS.md](https://agents.md)
 - [llms.txt](https://llmstxt.org)
@@ -280,6 +273,8 @@ NLWeb is tool-driven by teams at Microsoft and will be relevant for teams publis
 - [NLWeb](https://github.com/microsoft/NLWeb)
 
 ## Practical Strategy
+
+**Adopt production-useful standards now.** Use AGENTS.md, llms.txt, schema.org JSON-LD, and Arazzo workflows. Use OpenTelemetry GenAI semconv for observability, but track emitted convention versions while the spec remains Development.
 
 Given the fragmentation, three practices reduce migration risk:
 

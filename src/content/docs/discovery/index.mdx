@@ -5,23 +5,28 @@ description: Making your capabilities findable by AI agents through structured d
 
 ## Summary
 
-Agent Engine Optimization (AEO) makes capabilities discoverable to AI systems. This section covers llms.txt (token-efficient site index), AGENTS.md (repo context), structured data (JSON-LD), Markdown content negotiation, well-known capability metadata, robots.txt, Content Signals, Web Bot Auth, and content structure best practices. Together these patterns ensure agents find, understand, accurately cite, and safely use your documentation and APIs.
+Discovery covers public, web-facing signals that help agents find, read, cite, and govern access to your docs, APIs, and capability metadata. Use it for sites, hosted documentation, public API catalogs, and crawler-facing policy.
 
-- llms.txt: curated index at /llms.txt for token efficiency
-- AGENTS.md: repository context standard for AI coding agents
-- Structured data (JSON-LD): enables AI Overview inclusion
-- Content negotiation: serve Markdown to agents, HTML to browsers
-- Well-known endpoints: API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth keys
-- robots.txt and Content Signals: control training, retrieval, and search access
+- **Owns:** `llms.txt`, structured data, Markdown content negotiation, `robots.txt`, Content Signals, `.well-known` metadata, and public content structure.
+- **Does not own:** repository/editor operating instructions; see [Context Files](/docs/context-files). MCP implementation details; see [MCP Servers](/docs/mcp-servers).
+- **Agent-ready means:** agents can find canonical docs and machine-readable contracts, retrieve token-efficient content, and respect explicit access policy.
 
-Before an agent can use your API, it has to find it. Agent Engine Optimization (AEO) is the practice of making your capabilities discoverable by AI systems — the agent equivalent of SEO.
+## Start Here
 
-## What This Section Covers
+- [llms.txt](/docs/discovery/llms-txt) — publish a compact index for agent retrieval.
+- [AGENTS.md for Discovery](/docs/discovery/agents-md) — expose public repository context where it belongs on the web.
+- [Agent Skills](/docs/discovery/agent-skills) — make reusable procedural capabilities findable.
+- [Structured Data](/docs/discovery/structured-data) — add JSON-LD and semantic page signals.
+- [Content Negotiation](/docs/discovery/content-negotiation) — serve clean Markdown to agents and HTML to browsers.
+- [Well-Known Endpoints](/docs/discovery/well-known-endpoints) — advertise API catalogs, MCP metadata, auth metadata, and keys.
+- [robots.txt](/docs/discovery/robots-txt) — declare crawler and AI access policy.
+- [Content Structure](/docs/discovery/content-structure) — write pages agents can retrieve and cite accurately.
+- [AEO Checklist](/docs/discovery/aeo-checklist) — audit the whole public discovery surface.
 
-- **llms.txt** — the emerging standard for telling AI agents what your site offers, how to use it, and where to find machine-readable specs
-- **AGENTS.md** — a structured file that describes your repository's agent-facing capabilities, tool locations, and integration patterns
-- **Structured data** — JSON-LD, Schema.org markup, and OpenAPI links that search-augmented agents can parse
-- **Content negotiation** — serving different response formats (HTML for browsers, JSON for agents) based on Accept headers
-- **robots.txt for agents** — controlling which parts of your site agents can access and index, with Content Signals when you need more granular AI policy
-- **Well-known URIs** — using `/.well-known/` endpoints to advertise API catalogs, MCP server cards, Agent Skills indexes, OAuth protected-resource metadata, Web Bot Auth keys, and commerce manifests
-- **SEO as AEO** — how traditional SEO practices (clean URLs, semantic HTML, meta descriptions) directly improve agent discoverability
+## Related
+
+- [Context Files](/docs/context-files) — repo-local instructions for coding agents.
+- [API Surface](/docs/api-surface) — machine-readable HTTP contracts linked from discovery pages.
+- [MCP Servers](/docs/mcp-servers) — servers that can be advertised through well-known metadata.
+- [Authentication: Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — OAuth metadata for protected APIs.
+- [Reference Links](/docs/reference-links) — standards and external sources behind the discovery guidance.

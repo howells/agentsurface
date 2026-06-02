@@ -5,18 +5,20 @@ description: How your codebase makes data searchable, retrievable, and understan
 
 import { Card, Cards } from 'fumadocs-ui/components/card';
 
-Data Retrievability is how effectively your codebase enables agents to find, understand, and retrieve information. This includes RAG pattern selection, vector embeddings (dense and multimodal), vector databases, hybrid search combining keyword and semantic matching, reranking for precision, intelligent chunking strategies, knowledge graphs for complex reasoning, agentic RAG patterns with query planning, and evaluation frameworks that measure retrieval quality.
+Data Retrievability is how effectively your codebase enables agents to find, understand, and retrieve information. This includes RAG pattern selection, embeddings, vector stores, hybrid retrieval, reranking, chunking, knowledge graphs, agentic query planning, and evaluation loops.
 
 ## Summary
 
-In April 2026, the consensus is clear: naive dense-only vector search is outdated. Production systems use hybrid retrieval (BM25 sparse + dense vectors + reranking), agentic RAG with query planning beats single-stage pipelines, and Anthropic's Contextual Retrieval pattern (prepending summaries to chunks) reduces retrieval failures by 49–67%. pgvector + pgvectorscale now matches Pinecone's performance at 75% lower cost, and LightRAG achieves 6,000x token efficiency over traditional GraphRAG.
+Freshness note: last reviewed 2026-06-02. Retrieval model names, vendor pricing, benchmark ranks, and managed database features move quickly; verify current provider docs before treating any model or product mention as current.
+
+The durable pattern is stable: production systems should usually combine sparse keyword retrieval, dense semantic retrieval, metadata filters, reranking, bounded context assembly, and evaluation. Dense-only vector search is a useful prototype baseline, but it is rarely enough for agent workflows that depend on exact identifiers, permissions, citations, and multi-step reasoning.
 
 **Key takeaways:**
-- **Hybrid > Dense:** Always combine keyword (BM25) + semantic (dense vectors) + reranking. Fusion (RRF) beats either alone.
-- **Contextual > Raw:** Prepend chunk-specific summaries via Claude before embedding. Prompt caching keeps costs low.
-- **Agentic RAG:** Query planning, multi-hop retrieval, and reflection loops outperform naive embed-retrieve-generate.
-- **LightRAG > GraphRAG:** 6,000x cheaper, retrieves entities/relations directly, not community traversal.
-- **Evaluate obsessively:** RAGAS metrics (faithfulness, context recall) + MTEB benchmarks + domain-specific metrics in CI/CD.
+- **Hybrid beats dense-only for mixed corpora:** Combine keyword signals, dense vectors, filters, and fusion unless labelled evals prove one retriever is enough.
+- **Chunking is product logic:** Preserve source, section, tenant, version, and citation metadata; do not index anonymous text blobs.
+- **Reranking improves precision:** Retrieve broad, rerank narrow, then assemble only the context an answer can cite.
+- **Agentic retrieval is an escalation path:** Use planning and reflection for multi-hop or multi-source questions, not for every search.
+- **Evaluation is part of retrieval:** Track recall@k, nDCG, faithfulness, latency, cost, and drift before and after indexing changes.
 
 ## Decision tree: When to use what
 
@@ -37,36 +39,36 @@ graph TD
     E -->|No| K[GraphRAG with Neo4j]
     
     G -->|Many images/PDFs| L[Multimodal embeddings]
-    G -->|Text-only| M[text-embedding-3-large or Voyage]
+    G -->|Text-only| M[Text embedding model]
     
     H -->|Use Weaviate| N[Weaviate hybrid native]
     H -->|DIY pipeline| O[Qdrant + OpenSearch + RRF]
     
-    I -->|Use LangGraph| P[LangGraph + Claude agents]
-    I -->|Use LlamaIndex| Q[LlamaIndex agentic]
+    I -->|Graph workflow| P[LangGraph or similar]
+    I -->|Index framework| Q[LlamaIndex or similar]
     
     F -->|Managed| R[Pinecone serverless]
     F -->|Self-hosted| S[pgvector + pgvectorscale]
     
-    L -->|All modalities| T[Gemini Embedding 2]
-    L -->|Text + images| U[Voyage Multimodal 3.5 or Cohere v4]
+    L -->|All modalities| T[Provider multimodal model]
+    L -->|Text + images| U[Open or hosted multimodal model]
 ```
 
-## The 2026 retrieval stack (recommended)
+## Reference retrieval stack
 
 For most TypeScript/Node teams:
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| **Embeddings** | OpenAI text-embedding-3-large or Voyage 3 | Mature, integrated APIs; Voyage cheaper |
-| **Multimodal** | Voyage Multimodal 3.5 or Gemini 2 | Handle PDFs, slides, images natively |
-| **Vector DB** | pgvector + pgvectorscale (cost) OR Pinecone serverless (managed) | pgvector 75% cheaper; Pinecone hands-off |
-| **Hybrid layer** | Weaviate (native) OR Qdrant + OpenSearch (flexible) | Weaviate has BM25 built-in; Qdrant more control |
-| **Reranking** | Cohere Rerank 3.5 or Voyage Rerank 2.5 | Two-stage always beats one-stage |
-| **Chunking** | Anthropic Contextual Retrieval | 49–67% failure reduction; prompt caching = low cost |
-| **Knowledge Graph** | LightRAG (efficient) OR Neo4j (enterprise) | LightRAG 6,000x cheaper; Neo4j if schema-heavy |
-| **Agentic RAG** | LangGraph (LangChain) or LlamaIndex agents | Reflection + dynamic tool selection |
-| **Evaluation** | RAGAS + MTEB + domain metrics in CI/CD | Measure faithfulness, context recall, recall@k |
+| **Embeddings** | Hosted or open model matched to language, modality, and data policy | Provider rankings and prices change; your eval set should decide. |
+| **Multimodal** | Use only when source documents include images, diagrams, slides, audio, or video | Text-only corpora do not need multimodal cost or complexity. |
+| **Vector DB** | Managed service, Postgres extension, or open-source vector store | Choose by ops burden, filtering, scale, and tenancy model. |
+| **Hybrid layer** | Native hybrid search or dense store plus full-text index | Exact identifiers and semantic questions both matter. |
+| **Reranking** | Hosted or self-hosted reranker over broad candidates | Improves precision when first-stage retrieval is noisy. |
+| **Chunking** | Structural chunking plus metadata; contextual summaries when needed | Chunks need enough source context to be cited safely. |
+| **Knowledge graph** | Add only when relationships are explicit and queried often | Graphs are maintenance commitments, not default retrieval. |
+| **Agentic RAG** | Bounded query planning and validation for complex queries | Planning costs more; reserve it for multi-hop or multi-source work. |
+| **Evaluation** | Recall, ranking, faithfulness, latency, cost, and drift gates | Retrieval changes need measurable regression checks. |
 
 ## Dimensions & pages
 
@@ -92,34 +94,14 @@ For most TypeScript/Node teams:
     href="/docs/data-retrievability/vector-databases"
   />
   <Card
-    title="Hybrid Search"
-    description="BM25 + dense + RRF fusion. Why hybrid beats dense-only. TypeScript examples with Qdrant + OpenSearch."
-    href="/docs/data-retrievability/hybrid-search"
-  />
-  <Card
-    title="Reranking"
-    description="Two-stage retrieval. Cohere Rerank 3.5/4.0, Voyage Rerank 2.5, BGE. Cost vs. quality trade-offs."
-    href="/docs/data-retrievability/reranking"
-  />
-  <Card
-    title="Chunking Strategies"
-    description="Fixed, semantic, late, contextual (Anthropic). Overlap, anti-patterns, prompt caching."
-    href="/docs/data-retrievability/chunking"
+    title="Retrieval Pipeline"
+    description="Chunking, hybrid retrieval, fusion, reranking, agentic planning, and evaluation as one practical loop."
+    href="/docs/data-retrievability/retrieval-pipeline"
   />
   <Card
     title="Knowledge Graphs"
     description="Neo4j, KuzuDB, GraphRAG, LightRAG. When graph retrieval beats vectors. Hybrid graph+vector."
     href="/docs/data-retrievability/knowledge-graphs"
-  />
-  <Card
-    title="Agentic RAG"
-    description="Query planning, multi-hop retrieval, self-RAG, reflection loops. LangGraph, LlamaIndex."
-    href="/docs/data-retrievability/agentic-rag"
-  />
-  <Card
-    title="Evaluation Frameworks"
-    description="RAGAS (faithfulness, context recall), MTEB, BEIR, recall@k, nDCG. TypeScript eval loops."
-    href="/docs/data-retrievability/evaluation"
   />
   <Card
     title="Anti-Patterns"
@@ -132,39 +114,37 @@ For most TypeScript/Node teams:
 
 AI agents cannot "just figure out" where information lives or how to retrieve it. They depend entirely on what the system exposes:
 
-- **Dense-only retrieval fails on rare terms.** Agents asking about niche features need exact keyword matches + semantic understanding. Hybrid search provides both.
+- **Dense-only retrieval fails on rare terms.** Agents asking about niche features need exact keyword matches plus semantic understanding. Hybrid search provides both.
 - **Single-stage retrieval misses multi-hop reasoning.** Complex questions (e.g., "which vendors supply my manufacturer, and who are their competitors?") need agentic query decomposition and iteration.
-- **Raw chunks without context lose meaning.** A chunk saying "revenue grew 3%" is useless without company, time period, and baseline. Contextual Retrieval prepends this.
-- **Opaque retrieval quality kills reliability.** Without RAGAS metrics and domain evals, agents hallucinate based on poor retrievals. Measure everything.
-- **Token efficiency at scale is non-negotiable.** Agents iterating over 10+ retrievals need LightRAG ($0.15 per doc) not GraphRAG ($4–7 per doc).
+- **Raw chunks without context lose meaning.** A chunk saying "revenue grew 3%" is useless without company, time period, and baseline. Add source metadata and, where needed, contextual summaries.
+- **Opaque retrieval quality kills reliability.** Without retrieval metrics and domain evals, agents hallucinate based on poor context. Measure the pipeline.
+- **Token efficiency at scale is non-negotiable.** Agents that iterate over retrieval need budgets, candidate caps, and measured cost per workflow.
 
 ## Implementation flow
 
-1. **Choose embedding model** → OpenAI, Voyage, or open-source based on cost/latency/modality
-2. **Pick vector DB** → Pinecone (managed), pgvector (cheap), Qdrant (flexible), or Weaviate (hybrid-native)
-3. **Add hybrid layer** → BM25 index (Elasticsearch, Typesense) + fusion (RRF) if not Weaviate
-4. **Implement chunking** → Fixed-size baseline; upgrade to Contextual Retrieval (Anthropic pattern)
-5. **Add reranking** → Cohere or Voyage two-stage retrieval (retrieve top-50, rerank to top-5)
-6. **Build agentic RAG** → Query planning + reflection loops (LangGraph or LlamaIndex)
-7. **Evaluate constantly** → RAGAS metrics in CI/CD, MTEB for embeddings, domain-specific tests
-8. **Monitor drift** → Re-embed samples monthly; track embedding similarity distribution
+1. **Choose embedding model** -> based on cost, latency, modality, language, and data policy
+2. **Pick vector DB** -> managed, Postgres-native, open-source, or hybrid-native based on operational constraints
+3. **Design the pipeline** -> chunking, metadata, sparse index, dense index, fusion, reranking, and context assembly
+4. **Add agentic retrieval only where needed** -> query planning, multi-hop retrieval, SQL or graph tools, and validation loops
+5. **Evaluate constantly** -> recall@k, nDCG, faithfulness, latency, cost, and domain-specific tests
+6. **Monitor drift** -> track chunker, model, index, and nearest-neighbor changes after reindexing
 
 ## Common questions
 
 **Q: Do I need a vector database?**  
-A: Yes, if you want agent-driven search. BM25 alone (keyword-only) fails on synonyms and paraphrasing. Vector DBs are table stakes.
+A: Usually, if you want semantic search over non-trivial corpora. BM25 alone fails on synonyms and paraphrasing, but vector search alone fails on exact identifiers. Most agent workflows need both signals.
 
 **Q: Dense or hybrid?**  
-A: **Hybrid always.** Dense alone misses exact-match signals. Hybrid (BM25 + dense + RRF) beats either alone by 20–40% on MTEB-style benchmarks.
+A: Start hybrid unless your own evaluation set proves dense-only is good enough. Exact terms, rare names, API symbols, and filenames are common failure cases for dense-only retrieval.
 
 **Q: How much does reranking cost?**  
-A: ~$0.01 per 1M tokens (negligible). Retrieve broad (top-50 dense), rerank narrow (top-5 rerank). Saves downstream generation costs by filtering irrelevant docs.
+A: It depends on provider, model, batching, and candidate size. The practical test is whether reranking reduces generation context enough to improve quality, latency, or total cost.
 
 **Q: Contextual Retrieval sounds expensive.**  
-A: Not with prompt caching. Cache the full document once (~50 tokens), reference it for chunk summaries. Cost amortizes to `<<1%` of embedding cost.
+A: It can be. Use it where chunks lose meaning without document-level context, then measure whether the added indexing cost improves recall and answer quality.
 
 **Q: GraphRAG or LightRAG?**  
-A: LightRAG (2025). GraphRAG is 6,000x more expensive ($4–7 vs $0.15 per document). Use GraphRAG only if you need explicit community-traversal reasoning and budget allows.
+A: Use graphs when relationships are explicit, queried often, and worth maintaining. Prefer simpler vector or hybrid retrieval until relationship queries are a real product requirement.
 
 **Q: When do I need agents in RAG?**  
-A: Simple queries (single-stage) work fine. Multi-hop (e.g., find all vendors), schema-driven (SQL + vector), or reflection-needing (rewrite, refine) queries need agentic RAG.
+A: Simple queries usually do not need agentic retrieval. Multi-hop, schema-driven, multi-source, or validation-heavy queries may need planning, tool selection, and bounded reflection.

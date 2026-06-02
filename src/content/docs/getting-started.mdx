@@ -1,42 +1,57 @@
 ---
 title: Getting Started
-description: Quick start guide for making your codebase agent-ready
+description: "Choose the right path through Agent Surface: learn concepts, build agents, expose capabilities, evaluate readiness, or track standards."
 ---
 
 ## Summary
 
-A quick assessment and prioritized roadmap for making any codebase agent-ready in weeks, not months. Evaluate seven key questions about discovery, APIs, CLI output, authentication, error handling, and testing. Then implement in priority order, starting with low-effort high-impact items like AGENTS.md and --json output.
+Agent Surface is organized as a dense guide, not a linear tutorial. Start by choosing the job you have: learn the concepts, build an agent system, expose an existing product to agents, evaluate readiness, or track the standards and tooling landscape.
 
-- Discovery (llms.txt, AGENTS.md)
-- CLI JSON output and machine-readable formats
-- Structured error handling (RFC 9457)
-- OAuth 2.1 Client Credentials authentication
-- MCP server exposure
-- Workflow definitions (Arazzo)
-- Evaluation suite (evals, metrics, red-teaming)
+- New to the topic: start with fundamentals.
+- Building agents: start with runtime boundaries and agent scaffolding.
+- Making software usable by agents: start with surfaces.
+- Comparing maturity: use scoring after you understand the surface.
+- Tracking the ecosystem: use protocols, references, and the catalog.
 
-## Quick Assessment
+## Choose Your Path
 
-Before diving into specific dimensions, assess where your codebase stands:
+| Goal | Start with | Then read |
+| --- | --- | --- |
+| Understand agent systems | [Agent Design Principles](/docs/agents/design-principles) | [Runtime Boundaries](/docs/runtime-boundaries), [Protocols](/docs/protocols), [Tool Design](/docs/tool-design) |
+| Build a production agent | [Agent Scaffolding](/docs/agents) | [Framework Selection](/docs/agents/framework-selection), [Agentic UI](/docs/agentic-ui), [Testing](/docs/testing) |
+| Expose a service to agents | [API Surface](/docs/api-surface) | [Tool Design](/docs/tool-design), [MCP Servers](/docs/mcp-servers), [Authentication](/docs/authentication) |
+| Make a repository easier for coding agents | [Context Files](/docs/context-files) | [Discovery](/docs/discovery), [CLI Design](/docs/cli-design), [Error Handling](/docs/error-handling) |
+| Improve retrieval and memory | [Data Retrievability](/docs/data-retrievability) | [RAG Patterns](/docs/data-retrievability/rag-patterns), [Testing](/docs/testing) |
+| Evaluate readiness | [Scoring Framework](/docs/scoring) | [Rubric](/docs/scoring/rubric), [Evidence](/docs/scoring/evidence), [Delta Scorecard](/docs/scoring/delta-scorecard) |
+| Track standards and tools | [Protocols](/docs/protocols) | [Reference Links](/docs/reference-links), [Tooling Catalog](/docs/tooling-catalog) |
 
-1. **Can an AI agent discover your capabilities?** (Discovery & AEO)
-2. **Can an AI agent call your APIs programmatically?** (API Surface)
-3. **Does your CLI produce machine-readable output?** (CLI Design)
-4. **Do you expose an MCP server?** (MCP Servers)
-5. **Can agents authenticate without browser flows?** (Authentication)
-6. **Do your errors tell agents how to recover?** (Error Handling)
-7. **Can you verify agent interactions work?** (Testing)
+## The Core Map
 
-## Priority Order
+Agent Surface has five main subject areas:
 
-If you're starting from zero, implement in this order:
+1. **Agent fundamentals:** design principles, runtime boundaries, frameworks, UI, and protocols.
+2. **Agent systems:** agents, workflows, multi-agent patterns, retrieval, memory, testing, and production patterns.
+3. **Agent-readable surfaces:** APIs, CLIs, MCP servers, discovery, context files, auth, errors, and tool definitions.
+4. **Evaluation:** scorecards, rubrics, evidence, deltas, clustering, and calibration.
+5. **Reference:** standards, source links, and tooling.
 
-1. Write an `AGENTS.md` and `llms.txt` file
-2. Add `--json` output to your CLI
-3. Implement RFC 9457 structured errors
-4. Switch to OAuth 2.1 Client Credentials for M2M auth
-5. Expose an MCP server for your API
-6. Add Arazzo workflow definitions
-7. Build an evaluation suite
+## If You Are Starting From Zero
 
-Each subsequent section of this reference covers one dimension in depth.
+Use this implementation order for an existing product:
+
+1. Write accurate context files: `AGENTS.md`, tool-specific overlays, and repository boundaries.
+2. Make docs discoverable: `llms.txt`, structured data, sitemap, and stable Markdown routes.
+3. Make command output parseable: JSON, NDJSON, stable exit codes, and strict validation.
+4. Publish machine-readable contracts: OpenAPI, schema metadata, and tool definitions.
+5. Add recovery paths: RFC 9457 errors, retry guidance, idempotency, and trace IDs.
+6. Secure programmatic access: scoped credentials, OAuth metadata, DPoP where needed.
+7. Expose tools intentionally: MCP server, curated tool sets, resources, prompts, and annotations.
+8. Test real workflows: eval cases, traces, red-team suites, CI gates, and score deltas.
+
+## Related
+
+- [What is Agent Surface?](/docs)
+- [Agent Scaffolding](/docs/agents)
+- [Agent-Readable API Surface](/docs/api-surface)
+- [Scoring Framework](/docs/scoring)
+- [Protocols and Standards](/docs/protocols)

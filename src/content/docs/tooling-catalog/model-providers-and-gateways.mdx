@@ -1,0 +1,78 @@
+---
+title: Model Providers and Gateways
+description: Model APIs, routing layers, gateway controls, realtime, voice, and multimodal providers
+---
+
+Keep model choice behind policy when possible. These tools matter when provider routing, latency, modality, governance, or hosted model tools become product infrastructure.
+
+Last curated: May 16, 2026.
+
+## Model Providers and Gateways
+
+Keep model choice behind a routing layer when possible. Prefer providers with strong tool calling, structured output, embeddings, or multimodal support.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [OpenAI](https://platform.openai.com/docs) | platform.openai.com | Frontier models, Responses API, tools, embeddings, realtime, image, speech, and evals | Core | Core provider for agentic tool use, structured output, hosted tools, and OpenAI-native workflows. |
+| [Anthropic](https://docs.anthropic.com) | docs.anthropic.com | Claude models, tool use, long context, coding agents | Core | Strong reasoning and coding-agent ecosystem. |
+| [Google Gemini](https://ai.google.dev) | ai.google.dev | Gemini models, multimodal inputs, long context | Core | Strong multimodal option, especially when Google Cloud alignment matters. |
+| [Google Vertex AI](https://cloud.google.com/vertex-ai/docs) | cloud.google.com | Enterprise model hosting and Gemini on GCP | Conditional | Use when governance, service accounts, regions, or GCP data access matter. |
+| [Azure AI Foundry](https://learn.microsoft.com/azure/ai-foundry/) | learn.microsoft.com | Azure-hosted model platform and enterprise AI tooling | Conditional | Best when Microsoft enterprise controls are required. |
+| [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) | docs.aws.amazon.com | AWS-hosted foundation models and agent services | Conditional | Best when the app and data already live in AWS. |
+| [Mistral AI](https://docs.mistral.ai) | docs.mistral.ai | European model provider with language, coding, and embedding models | Core | Durable independent provider with strong SDK ecosystem support. |
+| [Cohere](https://docs.cohere.com) | docs.cohere.com | Reranking, embeddings, and language models | Conditional | Especially relevant for retrieval quality. |
+| [Groq](https://console.groq.com/docs) | console.groq.com | Low-latency inference | Conditional | Useful for fast open-model serving. |
+| [xAI](https://docs.x.ai) | docs.x.ai | Grok models | Conditional | Use when model behavior, latency, or pricing fits a specific product need. |
+| [OpenRouter](https://openrouter.ai/docs) | openrouter.ai | Multi-provider model routing gateway | Core | Strong for experimentation and model optionality, but keep production policy explicit. |
+| [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) | vercel.com | Managed model gateway for AI SDK apps | Core | Best fit when deploying AI SDK apps on Vercel. |
+| [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) | developers.cloudflare.com | Managed model gateway with caching, rate limiting, guardrails, observability, key storage, retries, and dynamic routing | Conditional | Strong when model policy should sit near Workers, edge services, or Cloudflare-managed AI infrastructure. |
+| [LiteLLM](https://docs.litellm.ai) | docs.litellm.ai | OpenAI-compatible gateway and proxy across many providers | Conditional | Useful for self-hosted routing, budgets, logging, and provider abstraction. |
+| [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) | developers.cloudflare.com | Serverless inference for open models on Cloudflare's global network | Conditional | Strong for Cloudflare-native apps, edge workloads, and models colocated with Workers. |
+| [Hugging Face Inference](https://huggingface.co/docs/inference-providers) | huggingface.co | Hosted open-model inference | Conditional | Good for breadth of open models and quick experiments. |
+| [Together AI](https://docs.together.ai) | docs.together.ai | Hosted open-model inference | Conditional | Common OpenAI-compatible provider for open models. |
+| [Fireworks AI](https://docs.fireworks.ai) | docs.fireworks.ai | Fast hosted open-model inference | Conditional | Use when a supported open model and latency profile fit. |
+| [DeepInfra](https://deepinfra.com/docs) | deepinfra.com | Hosted open-model inference | Conditional | Cost-effective OpenAI-compatible option for many workloads. |
+| [Perplexity](https://docs.perplexity.ai) | docs.perplexity.ai | Search-grounded model API | Conditional | Use for answer-with-current-web-context flows, not as a general default. |
+| [Ollama](https://ollama.com) | ollama.com | Local model serving | Conditional | Durable local development and privacy path. |
+| [LM Studio](https://lmstudio.ai) | lmstudio.ai | Local model serving and OpenAI-compatible endpoint | Conditional | Good for local testing, demos, and offline workflows. |
+
+## Gateway and Runtime Controls
+
+Use these capabilities when model access becomes production infrastructure rather than a single SDK call.
+
+| Purpose | Tools and capabilities | Tier | Notes |
+|---|---|---|---|
+| Provider routing and failover | OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, LiteLLM, provider routing, model fallbacks, provider allowlists, latency/throughput sorting | Core | Keep production model choice behind a policy layer when reliability, cost, or data controls matter. |
+| Tool-call quality routing | Auto Exacto, Exacto model variants, tool-support filters, provider performance signals | Conditional | Useful when the agent depends on reliable function calling rather than simple text generation. |
+| Gateway SDKs and compatibility | `@openrouter/sdk`, OpenAI SDK, Anthropic SDK, OpenAI-compatible providers, provider registries | Core | Lets apps switch models or gateways without rewriting every model call. |
+| Hosted server tools | `openrouter:web_search`, `openrouter:datetime`, `openrouter:image_generation`, OpenAI hosted tools | Conditional | Useful when the model should call managed tools directly and the app should not execute that tool itself. |
+| Request transforms and repair | Context Compression, Response Healing, PDF Inputs, structured output enforcement | Conditional | Helpful for long prompts, typed outputs, PDF-heavy inputs, and fragile JSON workflows. |
+| Gateway observability | Cloudflare AI Gateway, Broadcast traces, OpenTelemetry Collector, Langfuse, Braintrust, Arize, LangSmith, Opik, Weave, Helicone | Core/Conditional | Prefer AI-native tracing and eval backends; use generic destinations as sinks, not as the system of record. |
+| Governance | Cloudflare AI Gateway, Guardrails, ZDR requirements, input/output logging controls, app attribution, API-key budgets, key rotation | Core/Conditional | Needed for team, tenant, or enterprise use where spend and data handling must be enforceable. |
+
+## Multimodal and Voice AI
+
+Only include these when media or voice is part of the agent product.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [OpenAI Realtime](https://platform.openai.com/docs/guides/realtime) | platform.openai.com | Realtime speech, audio, and multimodal interaction | Conditional | Strong for voice agents in OpenAI-centric systems. |
+| [Vapi](https://vapi.ai/) | vapi.ai | Platform for building and deploying voice AI agents | Conditional | Strong option when the product needs phone/web voice agents quickly. |
+| [OpenAI Image Generation](https://platform.openai.com/docs/guides/image-generation) | platform.openai.com | Image generation and editing | Conditional | Good default when already using OpenAI. |
+| [Google Gemini Live API](https://ai.google.dev/gemini-api/docs/live-guide) | ai.google.dev | Low-latency bidirectional Gemini audio and video interactions | Conditional | Good when the agent stack is Gemini/Google-aligned; note that Google AI docs still mark Live API capabilities as preview. |
+| [ElevenLabs](https://elevenlabs.io/docs) | elevenlabs.io | Text-to-speech, voice cloning, and conversational voice agents | Conditional | Strong specialized voice provider. |
+| [Deepgram](https://developers.deepgram.com/docs) | deepgram.com | Speech-to-text and voice AI APIs | Conditional | Strong transcription and voice-agent infrastructure. |
+| [AssemblyAI](https://www.assemblyai.com/docs) | assemblyai.com | Speech-to-text and audio intelligence | Conditional | Useful for transcription-heavy systems. |
+| [Azure AI Speech](https://learn.microsoft.com/azure/ai-services/speech-service/) | learn.microsoft.com | Enterprise speech services | Conditional | Best when Azure compliance and enterprise controls matter. |
+| [Google Speech-to-Text](https://cloud.google.com/speech-to-text/docs) | cloud.google.com | Speech recognition | Conditional | Best when aligned with Google Cloud. |
+| [PlayAI](https://docs.play.ai/) | docs.play.ai | Text-to-speech, voice agents, and document-to-podcast workflows | Watch | Useful signal for voice-agent APIs, but evaluate latency, telephony needs, and model quality against ElevenLabs, OpenAI, Deepgram, and Vapi. |
+| [Speechify API](https://docs.speechify.ai/) | docs.speechify.ai | Text-to-speech, voice cloning, and real-time voice agents | Watch | Consider for consumer-facing voice and narration workflows; verify language, latency, and licensing requirements per product. |
+| [Sarvam AI](https://docs.sarvam.ai/api-reference-docs/introduction) | docs.sarvam.ai | Indian-language chat, translation, speech-to-text, text-to-speech, transliteration, and language identification APIs | Conditional | Strong regional option when Indic language coverage is a product requirement. |
+| [Murf API](https://murf.ai/api/docs/) | murf.ai | Text-to-speech and streaming voice generation APIs | Watch | Consider for voiceover and conversational audio, but validate real-time performance and licensing before making it core. |
+| [Agora Conversational AI](https://www.agora.io/en/products/conversational-ai-engine/) | agora.io | Realtime communications infrastructure for voice AI experiences | Conditional | Relevant when voice agents need WebRTC, telephony, and low-latency media infrastructure. |
+| [Replicate](https://replicate.com/docs) | replicate.com | Hosted model inference for image, video, audio, and open models | Conditional | Good for quick access to creative and open-source models. |
+| [fal](https://fal.ai/docs) | fal.ai | Fast media model inference | Conditional | Strong for image/video generation workloads. |
+| [Runway](https://docs.dev.runwayml.com) | docs.dev.runwayml.com | Video generation APIs | Watch | Use only when video generation is core to the product. |
+| [Luma AI](https://docs.lumalabs.ai) | docs.lumalabs.ai | Image and video generation APIs | Watch | Track for media-agent workflows. |
+
+<small>Sources are linked inline.</small>

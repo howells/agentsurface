@@ -5,7 +5,7 @@ description: Vendor-neutral protocol for task delegation between AI agents acros
 
 ## Summary
 
-A2A is horizontal (agent-to-agent) vs. MCP which is vertical (agent-to-tools). One agent discovers a peer's capabilities via AgentCard at `/.well-known/agent.json`, hands off a task with context, and receives results asynchronously. Works across organizational boundaries without pre-shared secrets. Spec: v1.0 RC (March 2026), governed by Linux Foundation AAIF.
+A2A is horizontal (agent-to-agent) vs. MCP which is vertical (agent-to-tools). One agent discovers a peer's capabilities via AgentCard at `/.well-known/agent.json`, hands off a task with context, and receives results asynchronously. Works across organizational boundaries without pre-shared secrets. Spec: v1.0, governed by Linux Foundation AAIF.
 
 ```
 Orchestrator        Specialist
@@ -20,13 +20,13 @@ Orchestrator        Specialist
 - Task-based: async, long-lived, with streaming/callback progress
 - OAuth 2.1 + DPoP for authentication between agents
 - Works across org boundaries, different infrastructure
-- v1.0 RC: fully stabilized, production-ready
+- v1.0: stable, production-ready, with broad cloud and enterprise support
 
 A2A solves a different problem than MCP. Where MCP connects an agent to tools and data sources, A2A connects agents to other agents. It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back — across organizational and deployment boundaries.
 
 ## Origin and Governance
 
-Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. In June 2025, governance transferred to the Linux Foundation's AI & Data Foundation (AAIF) alongside MCP, making A2A a vendor-neutral standard. The v1.0 RC (Release Candidate) specification was finalized in March 2026. Major backers include AWS, Cisco, Google, IBM, Microsoft, Salesforce, SAP, and ServiceNow.
+Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. In June 2025, governance transferred to the Linux Foundation's AI & Data Foundation (AAIF) alongside MCP, making A2A a vendor-neutral standard. Version 1.0 moved A2A from release-candidate tracking into production-relevant use, with 150+ supporting organizations and active deployments across major cloud and enterprise platforms. Major backers include AWS, Cisco, Google, IBM, Microsoft, Salesforce, SAP, and ServiceNow.
 
 ## Purpose
 
@@ -321,7 +321,7 @@ The `skills` array in an AgentCard describes discrete capabilities the agent exp
 
 ## Spec & References
 
-- [A2A v1.0 RC Specification](https://a2a-protocol.org/latest/specification/) — official A2A specification from the Linux Foundation
+- [A2A v1.0 Specification](https://a2a-protocol.org/latest/specification/) — official A2A specification from the Linux Foundation
 - [A2A Project Homepage](https://a2aproject.github.io/) — documentation and resources
 
 ## Related Pages

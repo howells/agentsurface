@@ -1,0 +1,63 @@
+---
+title: Capability Map
+description: Source crawl notes, cross-category capability index, and watchlist for AI tooling
+---
+
+Use this page as the source-oriented map for deciding which catalog category to inspect next. It keeps broad inventory and watchlist context out of the concise router.
+
+Last curated: May 16, 2026.
+
+## Source-Driven Crawl Notes
+
+This catalog favors tools that appear in current agent-framework docs, tutorials, registries, or integration indexes. The goal is not to list every SaaS product that could be called by an agent; it is to track the tools framework authors repeatedly treat as agent-ready building blocks.
+
+| Source crawled | High-signal tools and integrations surfaced | What to take from it |
+|---|---|---|
+| [Vercel AI SDK tool registry](https://ai-sdk.dev/llms.txt) | Vercel Sandbox code execution, Exa, Parallel, ctx-zip, Perplexity Search, Tavily, Firecrawl, Amazon Bedrock AgentCore, Superagent, Tako Search, Valyu, Airweave, bash-tool, Browserbase | The AI SDK ecosystem is converging on packaged tools for web search/extraction, browser automation, sandboxed execution, RAG connectors, and guardrails. |
+| [Mastra docs and reference](https://mastra.ai/llms.txt) | Firecrawl tutorial, Tavily tools, Stagehand browser, Vercel Sandbox workspace, AI SDK UI, CopilotKit, assistant-ui, Inngest, Arize, Braintrust, Langfuse, LangSmith, OpenTelemetry, MLflow, PostHog, Sentry, Datadog, New Relic, SigNoz, Auth0, Clerk, Firebase, Okta, Supabase, WorkOS, Klavis AI, Smithery, mcp.run, Ampersand, Pinecone, Qdrant, Chroma, LanceDB, MongoDB, Elasticsearch, OpenSearch, pgvector, Turbopuffer, Upstash, Turso/libSQL, Couchbase, DuckDB, S3 Vectors, Cloudflare Vectorize, OpenAI Realtime, Gemini Live, ElevenLabs, Deepgram, PlayAI, Speechify, Sarvam AI, Murf | Mastra is useful as a discovery source for production-adjacent integrations. Do not make the catalog Mastra-centric; promote only tools that remain useful outside Mastra. |
+| [LangChain Python tool integrations](https://docs.langchain.com/oss/python/integrations/tools/index.md) | Bing, Brave, DuckDuckGo, Exa, Google Search, Google Serper, Jina Search, Linkup, Parallel, SearchApi, SearxNG, SerpApi, Tavily, Apify, You.com, Amazon Bedrock AgentCore Code Interpreter, Azure Container Apps dynamic sessions, Bearly, Riza, GitHub, GitLab, Gmail, Jira, Office365, Slack, Twilio, AgentQL, Hyperbrowser, MultiOn, Oxylabs, Playwright, SQLDatabase, Spark SQL, Drasi, Stardog, Composio | LangChain remains the widest source for practical prebuilt tools. Treat it as an inventory, then curate aggressively before giving tools to an agent. |
+| [LangChain JavaScript tool integrations](https://docs.langchain.com/oss/javascript/integrations/tools/index.md) | Composio, Azure dynamic sessions, DuckDuckGo, Exa, Gmail, Google Calendar, Google Places, Google Routes, Google Scholar, Google Trends, JigsawStack, AWS Lambda, SearchApi, SearxNG, SerpApi, Stagehand, Tavily Crawl/Extract/Map/Search, Web Browser Tool, Wikipedia, WolframAlpha | The JS side overlaps heavily with search, browser, Google productivity APIs, and composable integration platforms. |
+| [LangSmith Fleet tools](https://docs.langchain.com/langsmith/fleet/tools.md) | Gmail, Google BigQuery, Google Calendar, Google Docs, Google Sheets, Excel, Outlook, PowerPoint, SharePoint, Teams, Word, Exa, GitHub, Linear, LinkedIn, Pylon, Slack, Tavily, X, remote MCP servers, Arcade integration | Fleet highlights what business users expect: email, calendar, docs, sheets, chat, project management, code hosting, social, CRM/support, search, and MCP. |
+| [LlamaIndex / LlamaCloud docs](https://developers.llamaindex.ai/llms.txt) | LlamaParse, LlamaExtract, LlamaClassify, LlamaSheets, Split, LlamaCloud Index, LlamaHub data connectors, MCP tools, data sources for S3, Azure Blob, Box, Confluence, Google Drive, Jira, OneDrive, SharePoint; data sinks for Astra DB, Azure AI Search, Milvus, MongoDB Atlas Vector Search, Pinecone, Postgres, Qdrant | LlamaIndex is strongest evidence for document ingestion, RAG indexing, data connectors, vector sinks, and retrieval-oriented agent workflows. |
+
+## Capability Map
+
+Use this as the working index for deciding what to learn next. Tools can appear in more than one capability when they play different roles.
+
+| Purpose | Tools to know | Tier | Use when |
+|---|---|---|---|
+| Agent application runtime | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph, Pydantic AI, Google ADK, Semantic Kernel, Cloudflare Agents, Agentuity | Core/Conditional | Building agents with tools, model calls, memory, workflow state, structured output, or deployable endpoints. |
+| Model access and routing | OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, LiteLLM, OpenAI-compatible endpoints, `@openrouter/sdk`, OpenAI SDK, Anthropic SDK, provider registries | Core | You need provider optionality, fallback chains, budget control, model experiments, or one API over many models. |
+| Tool calling and hosted tools | MCP, `@mastra/mcp`, `@ai-sdk/mcp`, `createMCPClient`, MCPServer, Klavis AI, Smithery, mcp.run, Ampersand, `openrouter:web_search`, `openrouter:datetime`, `openrouter:image_generation`, OpenAI hosted tools | Core | Agents need to call external tools safely, expose their own tools, or use model-callable server tools without custom execution code. |
+| Structured output and bounded LLM tasks | JSON Schema, OpenAPI 3.1, Arazzo, AI SDK `Output.object`, OpenRouter structured outputs, Response Healing, Workers AI JSON Mode | Core/Conditional | You need parseable responses, workflow steps with schemas, API-derived tools, or small deterministic model substeps. |
+| Context and memory | Honcho, QMD, Cloudflare Agent Memory, Letta, Zep, Graphiti, Mem0, Supermemory, Hindsight, semantic recall, working memory, memory processors, context compression | Core/Conditional | Agents need cross-session continuity, local document recall, user modeling, temporal knowledge graphs, or context-window management. |
+| Retrieval and RAG | Cloudflare AI Search, Vectorize, pgvector, Pinecone, Qdrant, Weaviate, Chroma, LanceDB, Milvus, Elasticsearch, OpenSearch, Turso/libSQL, Couchbase, DuckDB VSS, S3 Vectors, ClickHouse, Convex, Haystack, Ragie, Voyage AI, Jina AI, BGE, rerank APIs | Core/Conditional | The agent needs to find relevant knowledge from documents, code, user data, or search indexes before answering. |
+| Workflow orchestration | Mastra workflows, LangGraph graphs, OpenProse, Trigger.dev, Temporal, Inngest, Hatchet, durable task flows, subagents, ToolLoopAgent patterns | Core/Conditional | Work must be inspectable, resumable, multi-step, parallel, or safe around side effects. |
+| Coding agents and local development | Codex, Claude Code, Claude Code SDK, OpenHands SDK, Aider, Cline, Augment Code, Factory, CodeRabbit, Greptile, Macroscope, Roo Code, Kilo Code, Deep Agents CLI | Conditional/Watch | The target workflow is software development, repo navigation, code editing, testing, review, or issue-to-PR automation. |
+| Agent sandboxes and compute | Daytona, Modal, Cloudflare Sandbox SDK, Vercel Sandbox, Agentuity Sandboxes | Conditional/Watch | Agents need to run code, execute untrusted workloads, preserve stateful dev environments, or burst into GPU/Python jobs. |
+| Browser and web access | Browserbase, Browser Use, Kernel, Stagehand, Browser Run, Firecrawl, Tavily, Exa, Apify, browserless, Bright Data, SerpAPI, Serper, Brave Search API, Linkup, Jina Reader | Core/Conditional | Agents need current web context, authenticated browsing, extraction, crawling, screenshots, or GUI automation. |
+| Document ingestion and OCR | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence, Google Document AI, AWS Textract, Chunkr, Marker, MinerU | Core/Conditional | Agents need to read PDFs, scans, tables, slides, forms, invoices, or mixed-layout documents reliably. |
+| Observability and evaluation | Agent Readiness, Braintrust, Langfuse, LangSmith, Arize Phoenix/AX, OpenTelemetry GenAI, Promptfoo, RAGAS, DeepEval, Opik, Weave, Helicone, PostHog LLM Observability, MLflow Tracing, New Relic AI Monitoring, SigNoz LLM Observability, AgentOps | Core/Conditional | You need traces, evals, regression tests, prompt experiments, cost tracking, RAG metrics, site-readiness audits, or production monitoring. |
+| AI UI and product surfaces | AI SDK UI, AI Elements, assistant-ui, CopilotKit, AG-UI, OpenAI Apps SDK, Mastra Client SDK | Core/Conditional | The agent needs chat, generative UI, tool-call rendering, human-in-the-loop flows, or host-app integration. |
+| AI app builders and design tools | v0, Bolt.new, Lovable, Chef, Rork, Magic Patterns | Conditional/Watch | You want quick prototypes, design-to-code loops, or generated app scaffolds that will still get engineering review. |
+| Voice and realtime agents | OpenAI Realtime, Google Gemini Live, Vapi, LiveKit Agents, Pipecat, ElevenLabs, Deepgram, AssemblyAI, Azure AI Speech, Google Speech-to-Text, PlayAI, Speechify, Sarvam AI, Murf, Agora Conversational AI, Hume, LMNT | Conditional | Voice, realtime turn-taking, transcription, text-to-speech, or conversational audio is part of the product. |
+| Image, video, and multimodal generation | OpenAI image generation, Replicate, fal, Runway, Luma, Black Forest Labs, video generation APIs | Conditional | Agents produce or interpret media rather than only text. |
+| Governance and gateway operations | AI Crawl Control, Content Signals, Web Bot Auth, Guardrails AI, NeMo Guardrails, Lakera, Llama Guard, Presidio, Pangea, provider/model allowlists, ZDR controls, app attribution, input/output logging, API-key budgets, management API keys, key rotation | Core/Conditional | Model use and agent access must be controlled across a team, tenant, product, content site, or production gateway. |
+| Discovery and packaging | AGENTS.md, Agent Skills, llms.txt, Markdown content negotiation, API Catalog, MCP Server Cards, MCP Registry, AI SDK Tools Registry, plugin bundles | Core/Conditional | You want agents to discover project instructions, reusable skills, public docs, API contracts, MCP endpoints, or vetted tool packages. |
+
+## Watch, Do Not Default
+
+These are worth knowing about but should not become defaults without a concrete reason.
+
+| Area | Examples | Why not default |
+|---|---|---|
+| Long-tail model hosts | AIHubMix, Chutes, FastRouter, Kilo Gateway, MiniMax, Moonshot/Kimi, Nebius, Requesty, Scaleway, Synthetic, Venice, Volcengine, Z.AI, Zhipu | Provider lists churn quickly. Keep them behind OpenRouter, AI Gateway, LiteLLM, or another router. |
+| MCP directories | Smithery, Glama, mcp.so, assorted MCP finder sites | Useful for discovery, but server quality, security, and maintenance vary widely. Prefer official registries and vendor-maintained servers. |
+| Tool hubs | Composio, Metorial, Arcade-style tool layers | Useful for breadth, but can hide product semantics and permission boundaries. Evaluate before adopting. |
+| Novel agent frameworks | Small orchestration frameworks without clear production adoption | Track ideas, but build foundations around Mastra, AI SDK, OpenAI Agents SDK, LangGraph, MCP, or plain code. |
+| Generic SaaS integrations | GitHub, Notion, Linear, Slack, Figma, Stripe, HubSpot, Salesforce | They can be agent tools, but the AI-specific question is how they are exposed: MCP server, OpenAPI tool, official agent connector, or bespoke integration. |
+| Messaging channel plugins | DingTalk, QQbot, WeCom, Matrix, Zalo, Microsoft Teams | These are agent surfaces, but the tooling lesson is the plugin/channel pattern. Do not turn the AI tooling catalog into a messaging directory. |
+
+<small>Sources are linked inline.</small>
+
+<small>Sources are linked inline.</small>

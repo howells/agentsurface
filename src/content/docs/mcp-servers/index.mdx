@@ -5,30 +5,29 @@ description: Implementing Model Context Protocol servers that expose your capabi
 
 ## Summary
 
-MCP is the standard protocol for agents to discover and invoke external tools. This section covers server architecture, tool design, resource and prompt templates, transport selection, authentication, testing patterns, MCP Apps, Agent Skills, and real-world examples from GitHub, Stripe, and Vercel. MCP enables agents to use your APIs safely with proper error handling and granular control.
+MCP Servers covers protocol-specific implementation for exposing tools, resources, and prompts through the Model Context Protocol. Use it when you are building, hosting, testing, authenticating, or distributing an MCP endpoint.
 
-- Architecture: single-responsibility servers, testable factories
-- Tool design: clear names, descriptions as prompts, JSON Schema
-- Resources and prompts: contextual data and reusable patterns
-- Transports: stdio (simplest), SSE, HTTP with proper lifecycle
-- Authentication: bearer tokens, OAuth 2.1 for public servers
-- Testing: unit tests, in-memory integration, MCP Inspector
-- Distribution: registry entries, server cards, app surfaces, and skill packages
+- **Owns:** MCP architecture, transports, lifecycle, tool/resource/prompt exposure, annotations, auth integration, testing, Next.js hosting, generation, and examples.
+- **Does not own:** general tool definition quality; see [Tool Design](/docs/tool-design). HTTP/OpenAPI design before wrapping it in MCP; see [API Surface](/docs/api-surface).
+- **Agent-ready means:** clients can connect, inspect capabilities, call tools with schemas, receive structured results/errors, and enforce auth and safety at the server boundary.
 
-The Model Context Protocol (MCP) is becoming the standard way for AI agents to discover and invoke external tools. An MCP server wraps your existing API or functionality into a protocol that agents can connect to natively.
+## Start Here
 
-## What This Section Covers
+- [Architecture](/docs/mcp-servers/architecture) — design focused, testable MCP servers.
+- [Tool Best Practices](/docs/mcp-servers/tool-best-practices) — implement MCP tools with clear schemas and recoverable output.
+- [Resources and Prompts](/docs/mcp-servers/resources-prompts) — expose context and reusable prompt templates.
+- [Transports](/docs/mcp-servers/transports) — choose stdio, SSE, or streamable HTTP.
+- [Authentication](/docs/mcp-servers/authentication) — protect remote servers and validate callers.
+- [Annotations](/docs/mcp-servers/annotations) — declare read-only, destructive, and idempotent hints.
+- [Testing](/docs/mcp-servers/testing) — validate server behavior before shipping.
+- [Next.js Integration](/docs/mcp-servers/nextjs-integration) — host MCP from a Next.js app.
+- [Auto-Generation](/docs/mcp-servers/auto-generation) — generate servers from existing contracts where appropriate.
+- [Real-World Examples](/docs/mcp-servers/real-world-examples) — study production server patterns.
 
-- **MCP fundamentals** — the protocol architecture, transport layers (stdio, SSE, streamable HTTP), and capability negotiation
-- **Tool design** — defining tools with precise names, descriptions, and JSON Schema input parameters that agents can reason about
-- **Resource exposure** — serving contextual data (files, database records, configurations) that agents can read to inform their decisions
-- **Prompt templates** — pre-built prompt patterns that help agents use your tools effectively
-- **Server lifecycle** — initialization, capability declaration, graceful shutdown, and connection management
-- **Error semantics** — returning structured errors through MCP that give agents enough information to recover or report clearly
-- **Testing MCP servers** — validating tool definitions, input handling, and response shapes with automated tests
-- **Distribution and packaging** — publishing MCP endpoints, advertising metadata, and pairing servers with Agent Skills where procedural guidance matters
+## Related
 
-## See also
-
-- **[Cookbook: MCP as External API](/docs/cookbook/mcp-as-external-api)** — publishing your MCP server with OAuth 2.1 so external AIs can connect
-- **[Cookbook: Tool Annotations](/docs/cookbook/tool-annotations)** — declaring tool intent (READ_ONLY, WRITE, DESTRUCTIVE) in MCP
+- [Cookbook: MCP as External API](/docs/cookbook/mcp-as-external-api) — publish MCP as a public integration surface.
+- [Tool Design](/docs/tool-design) — framework-neutral tool naming, schemas, and curation.
+- [Authentication: MCP Authorization](/docs/authentication/mcp-auth-model) — OAuth discovery and client identity model.
+- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) — advertise MCP metadata publicly.
+- [API Surface](/docs/api-surface) — design the underlying HTTP contract before wrapping it.

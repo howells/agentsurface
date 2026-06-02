@@ -5,7 +5,7 @@ description: OpenTelemetry GenAI semantic conventions, trace export, Langfuse, P
 
 ## Summary
 
-The ability to inspect agent execution: which tools called, in order, with what arguments, and what they returned. Traces are source of truth for debugging. OpenTelemetry GenAI semantic conventions standardize instrumentation across providers (Anthropic, OpenAI, Google). Key spans: LLM completion (model, tokens, input/output messages), tool calls (tool name, input, output, duration), errors (type, message, stack). Export to Langfuse, Arize Phoenix, Datadog, or Grafana Cloud for visualization and alerting.
+The ability to inspect agent execution: which tools called, in order, with what arguments, and what they returned. Traces are source of truth for debugging. OpenTelemetry GenAI semantic conventions standardize instrumentation across providers (Anthropic, OpenAI, Google), but the current conventions are marked Development. Key spans: LLM completion (model, tokens, input/output messages), tool calls (tool name, input, output, duration), errors (type, message, stack). Export to Langfuse, Arize Phoenix, Datadog, or Grafana Cloud for visualization and alerting.
 
 ```
 Root span: llm.completion
@@ -18,11 +18,11 @@ Root span: llm.completion
 
 ---
 
-Agent observability is the ability to inspect what happened: which tools were called, in what order, with what arguments, and what did they return? Traces are the source of truth for debugging. Use OpenTelemetry GenAI semantic conventions to standardize instrumentation across providers.
+Agent observability is the ability to inspect what happened: which tools were called, in what order, with what arguments, and what did they return? Traces are the source of truth for debugging. Use OpenTelemetry GenAI semantic conventions to standardize instrumentation across providers, while pinning emitted convention versions because the GenAI conventions are still marked Development.
 
 ## OpenTelemetry GenAI semantic conventions
 
-The spec (https://opentelemetry.io/docs/specs/semconv/gen-ai/) defines standard attributes for LLM and agent spans.
+The spec (https://opentelemetry.io/docs/specs/semconv/gen-ai/) defines standard attributes for LLM and agent spans. Its current status is Development, so expect compatibility work before the conventions are marked stable.
 
 ### Root span: LLM completion
 

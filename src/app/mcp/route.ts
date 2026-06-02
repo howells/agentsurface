@@ -9,9 +9,18 @@ export const dynamic = 'force-dynamic';
 
 type DocsPage = {
   content: string;
+  markdownUrl: string;
   slug: string;
   url: string;
 };
+
+function buildDocsUrl(slug: string): string {
+  return `https://agentsurface.dev/docs${slug === 'index' ? '' : `/${slug}`}`;
+}
+
+function buildMarkdownUrl(slug: string): string {
+  return `https://agentsurface.dev/api/md/${slug}`;
+}
 
 function normalizeSlug(slug: string): string | null {
   let decoded: string;
@@ -54,10 +63,9 @@ function readDocsPage(slug: string): DocsPage | null {
     try {
       return {
         content: readFileSync(candidate, 'utf-8'),
+        markdownUrl: buildMarkdownUrl(normalized),
         slug: normalized,
-        url: `https://agentsurface.dev/docs${
-          normalized === 'index' ? '' : `/${normalized}`
-        }`,
+        url: buildDocsUrl(normalized),
       };
     } catch {
       // Try the next candidate.
@@ -79,7 +87,7 @@ function buildServer(): McpServer {
       description:
         'Search Agent Surface documentation by keyword. Use when you need to find documentation pages about a specific topic (e.g. \'llms.txt\', \'OAuth\', \'MCP server\', \'tool design\'). Returns matching page titles, descriptions, and URLs. Do not use for retrieving full page content — use get_page for that.',
       inputSchema: {
-        query: z.string().describe('Search term — any keyword or phrase'),
+        query: z.string().min(2).describe('Search term — any keyword or phrase'),
         limit: z
           .number()
           .int()
@@ -97,6 +105,7 @@ function buildServer(): McpServer {
             title: z.string(),
             description: z.string(),
             url: z.string().url(),
+            markdownUrl: z.string().url(),
             slug: z.string(),
           })
         ),
@@ -118,6 +127,7 @@ function buildServer(): McpServer {
           title: page.data.title,
           description: page.data.description || '',
           url: `https://agentsurface.dev${page.url}`,
+          markdownUrl: buildMarkdownUrl(page.slugs.join('/') || 'index'),
           slug: page.slugs.join('/'),
         }));
 
@@ -150,6 +160,7 @@ function buildServer(): McpServer {
       outputSchema: {
         slug: z.string(),
         url: z.string().url(),
+        markdownUrl: z.string().url(),
         content: z.string(),
       },
       annotations: { readOnlyHint: true },

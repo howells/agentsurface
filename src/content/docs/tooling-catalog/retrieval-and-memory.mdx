@@ -1,0 +1,69 @@
+---
+title: Retrieval and Memory
+description: RAG stores, search systems, rerankers, memory layers, document parsing, and OCR
+---
+
+Use these when agent quality depends on retrieving durable knowledge, assembling user or business memory, or turning messy source files into structured context.
+
+Last curated: May 16, 2026.
+
+## Retrieval, RAG, and Memory
+
+This section keeps only retrieval tools that directly support RAG, semantic search, reranking, or long-term agent context. Generic databases are intentionally omitted.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [QMD](https://github.com/tobi/qmd) | github.com/tobi/qmd | Local-first document and Markdown search with BM25, vectors, reranking, and MCP | Core | Strong fit for local search, extra paths, Markdown memory, and session transcript recall. |
+| [Honcho](https://docs.honcho.dev/) | docs.honcho.dev | AI-native memory, cross-session continuity, and user/agent modeling | Core | Relevant when memory should model users, agents, and relationships rather than only retrieved chunks. |
+| [Cloudflare Agent Memory](https://blog.cloudflare.com/introducing-agent-memory/) | blog.cloudflare.com | Managed persistent memory for agents with ingestion, recall, explicit remember/forget operations, and exportability | Watch | Private beta, but the shape is important: memory is treated as a constrained agent tool rather than raw database access. |
+| [Cloudflare AI Search](https://developers.cloudflare.com/ai-search/) | developers.cloudflare.com | Managed search for applications and agents with automated indexing, hybrid search, MCP endpoints, and UI snippets | Conditional | Good when a docs site, product corpus, or per-tenant file set should become an agent-searchable tool quickly. |
+| [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) | developers.cloudflare.com | Vector database for semantic search, recommendations, and context retrieval | Conditional | Include for Cloudflare-native RAG rather than as generic database hosting. |
+| [pgvector](https://github.com/pgvector/pgvector) | github.com/pgvector | Vector search inside Postgres | Core | Included as vector retrieval substrate, not as a reason to list every Postgres platform. |
+| [Turso / libSQL Vector Search](https://docs.turso.tech/features) | docs.turso.tech | SQLite-compatible vector similarity search built into Turso and libSQL | Conditional | Good for embedded, local-first, or serverless SQLite-style retrieval; do not choose it only because it is convenient for prototypes. |
+| [Pinecone](https://docs.pinecone.io) | pinecone.io | Managed vector database | Conditional | Mature managed vector option. |
+| [Qdrant](https://qdrant.tech/documentation/) | qdrant.tech | Vector database with strong filtering | Conditional | Good open-source and managed vector option. |
+| [Weaviate](https://docs.weaviate.io) | weaviate.io | Vector database with hybrid search | Conditional | Strong for schema-rich and hybrid retrieval. |
+| [Chroma](https://docs.trychroma.com) | trychroma.com | Embedding database for local and application RAG | Conditional | Useful for prototyping and smaller RAG systems. |
+| [LanceDB](https://lancedb.github.io/lancedb/) | lancedb.github.io | Embedded and serverless vector database | Conditional | Good for local, multimodal, and file-backed vector workflows. |
+| [DuckDB VSS](https://duckdb.org/docs/current/core_extensions/vss.html) | duckdb.org | Experimental DuckDB extension for vector similarity indexes | Watch | Best for local analytics, offline evals, and retrieval experiments where DuckDB already holds the data; mind the experimental and memory constraints. |
+| [Milvus](https://milvus.io/docs) | milvus.io | Open-source vector database | Conditional | Good when vector scale and self-hosting are central requirements. |
+| [Astra DB Vector](https://docs.datastax.com/en/astra-db-serverless/databases/vector-search.html) | docs.datastax.com | Managed Cassandra-compatible database with vector search | Conditional | Appears in Mastra and LlamaCloud vector sink docs; use when DataStax/Astra is already in the stack. |
+| [MongoDB Atlas Vector Search](https://www.mongodb.com/docs/atlas/atlas-vector-search/) | mongodb.com | Vector search inside MongoDB Atlas | Conditional | Good when operational data and retrieval data already live in MongoDB. |
+| [Convex Vector Search](https://docs.convex.dev/search/vector-search) | docs.convex.dev | Vector search inside Convex actions | Watch | Useful when Convex owns the app data model; avoid treating it as a standalone vector database replacement. |
+| [Couchbase Vector Search](https://docs.couchbase.com/server/current/vector-search/vector-search.html) | docs.couchbase.com | Vector indexes inside Couchbase Search Service | Conditional | Consider when Couchbase already stores the product data and hybrid operational/vector retrieval should stay together. |
+| [Azure AI Search](https://learn.microsoft.com/azure/search/vector-search-overview) | learn.microsoft.com | Hybrid search, vector search, semantic ranking, and enterprise search on Azure | Conditional | Strong Azure-native retrieval option and a LlamaCloud Index data sink. |
+| [Elasticsearch Vector Search](https://www.elastic.co/guide/en/elasticsearch/reference/current/semantic-search.html) | elastic.co | Hybrid lexical and vector search | Conditional | Include when search is already Elastic-based or hybrid retrieval matters. |
+| [OpenSearch Vector Search](https://opensearch.org/docs/latest/vector-search/) | opensearch.org | Open-source hybrid search and vector search | Conditional | Include when OpenSearch is already the search platform. |
+| [Upstash Vector](https://upstash.com/docs/vector) | upstash.com | Serverless vector database | Conditional | Appears in Mastra vector/storage references; good for lightweight serverless retrieval. |
+| [Turbopuffer](https://turbopuffer.com/docs) | turbopuffer.com | Object-storage-backed vector and full-text search | Watch | Appears in Mastra vector stores; track for high-scale, cost-sensitive retrieval. |
+| [Amazon S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html) | docs.aws.amazon.com | Native S3 vector buckets and vector indexes for storage-backed semantic retrieval | Conditional | Good for AWS-native, large, lower-query-frequency vector stores; pair with OpenSearch or another low-latency path when QPS is high. |
+| [ClickHouse Vector Search](https://clickhouse.com/blog/qbit-vector-search) | clickhouse.com | Vector search inside ClickHouse analytics workloads | Conditional | Consider when embeddings should be queried alongside large analytical tables and metadata filters, not as a first-choice general vector DB. |
+| [Haystack](https://docs.haystack.deepset.ai/) | docs.haystack.deepset.ai | RAG pipelines, retrieval, readers, generators, and evals | Conditional | Strong Python RAG framework, especially for explicit pipelines. |
+| [Ragie](https://www.ragie.ai/) | ragie.ai | Managed ingestion, connectors, and retrieval for AI applications | Conditional | Useful when RAG needs many data connectors without building ingestion plumbing. |
+| [Voyage AI](https://docs.voyageai.com) | voyageai.com | Embeddings and reranking | Conditional | Retrieval-specialized model provider. |
+| [Jina AI](https://jina.ai) | jina.ai | Embeddings, reranking, classifiers, and neural search tooling | Conditional | Useful for retrieval quality and multilingual embeddings. |
+| [FlagEmbedding / BGE](https://github.com/FlagOpen/FlagEmbedding) | github.com/FlagOpen | Open embedding and reranking models | Conditional | Good when self-hosted retrieval quality matters. |
+| [Letta](https://docs.letta.com/guides/agents/memory) | docs.letta.com | Stateful agents and explicit memory systems | Conditional | Use when agent memory is a product requirement, not just RAG. |
+| [Zep](https://help.getzep.com/quick-start-guide) | help.getzep.com | Context engineering and temporal knowledge graph memory for agents | Conditional | Strong for personalized context and user/business-memory assembly. |
+| [Graphiti](https://help.getzep.com/graphiti/getting-started/overview) | help.getzep.com | Temporal knowledge graph engine for dynamic agent memory | Conditional | Good when relationships and time matter more than flat vector chunks. |
+| [Mem0](https://docs.mem0.ai/introduction) | docs.mem0.ai | Long-term memory layer for LLM applications | Watch | Good signal in memory tooling; evaluate quality and control per product. |
+
+## Document Ingestion, OCR, and Parsing
+
+Use these when agent quality depends on reading messy source material rather than clean Markdown. Document tooling is often the hidden difference between a decent RAG demo and a useful production agent.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [LlamaParse](https://docs.cloud.llamaindex.ai/llamaparse) | docs.cloud.llamaindex.ai | Document parsing service from LlamaIndex for PDFs, tables, layouts, and multimodal documents | Core | Strong default for RAG projects already using LlamaIndex or needing high-quality PDF-to-structured-text conversion. |
+| [Unstructured](https://docs.unstructured.io/) | docs.unstructured.io | Ingestion and partitioning for PDFs, Office docs, HTML, images, and enterprise files | Core | Good when the ingestion problem spans many file types and connectors. |
+| [Docling](https://ds4sd.github.io/docling/) | ds4sd.github.io | Open-source document conversion, parsing, OCR, layout, table, and multimodal extraction | Conditional | Strong local/open-source path when teams want control over document processing. |
+| [Reducto](https://docs.reducto.ai/) | docs.reducto.ai | Document ingestion and extraction API for complex PDFs and structured outputs | Conditional | Worth evaluating for finance, legal, healthcare, and other layout-heavy document workflows. |
+| [Mistral OCR](https://docs.mistral.ai/capabilities/document_ai) | docs.mistral.ai | OCR and document AI through Mistral's Document AI stack | Conditional | Good when Mistral is already in the model/provider mix or OCR quality is central. |
+| [Azure AI Document Intelligence](https://learn.microsoft.com/azure/ai-services/document-intelligence/) | learn.microsoft.com | Enterprise document extraction for forms, invoices, receipts, layout, and custom models | Conditional | Strong when compliance, Azure integration, and existing enterprise document flows matter. |
+| [Google Document AI](https://cloud.google.com/document-ai/docs) | cloud.google.com | Document processors for OCR, forms, invoices, layout, and custom extraction | Conditional | Best when the app and data are already on Google Cloud. |
+| [AWS Textract](https://docs.aws.amazon.com/textract/) | docs.aws.amazon.com | AWS document text, table, form, and layout extraction | Conditional | Best when documents already live in S3 or the system is AWS-native. |
+| [Chunkr](https://docs.chunkr.ai/) | docs.chunkr.ai | Document parsing API for layout-aware extraction and chunking | Watch | Track for document-heavy RAG where chunk quality is a bottleneck. |
+| [Marker](https://github.com/datalab-to/marker) | github.com/datalab-to | Open-source document conversion to Markdown, JSON, and HTML | Conditional | Useful local option for PDF-to-Markdown pipelines and batch ingestion. |
+| [MinerU](https://github.com/opendatalab/MinerU) | github.com/opendatalab | Open-source document extraction and conversion toolkit | Watch | Track for open document parsing, especially PDFs with tables, formulas, and layout needs. |
+
+<small>Sources are linked inline.</small>

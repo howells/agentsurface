@@ -5,22 +5,27 @@ description: Building CLIs that AI agents can operate as effectively as human us
 
 ## Summary
 
-Well-designed CLIs are agent-operable when they produce structured output, support schema introspection, enforce strict validation, and provide safety mechanisms like dry-run and confirmation bypass. This section covers the gaps that make standard CLIs unsuitable for agents and the patterns to close them: machine-readable output, raw payload input, exit codes, and command structure.
+CLI Design covers command-line surfaces that agents can script without scraping terminal prose. Use it when a product exposes capabilities through commands, local automation, package scripts, or developer tools.
 
-- Structured --json output that agents can parse without heuristics
-- Schema introspection via --schema or --help --json
-- Meaningful exit codes mapping to specific failure categories
-- Strict input validation with actionable error messages
-- Dry-run and --yes flags for safe automation
+- **Owns:** command structure, JSON output, raw payload input, schema introspection, exit codes, input hardening, safety flags, and packaging CLI knowledge for agents.
+- **Does not own:** model-callable tool schemas in general; see [Tool Design](/docs/tool-design). HTTP service contracts; see [API Surface](/docs/api-surface).
+- **Agent-ready means:** every command can be discovered, invoked non-interactively, parsed structurally, retried safely, and diagnosed from exit status plus error body.
 
-A well-designed CLI is one of the easiest interfaces for an agent to use — if it produces structured output. Most CLIs fail at agent-readiness because they were designed exclusively for human-readable terminal output.
+## Start Here
 
-## What This Section Covers
+- [Command Structure](/docs/cli-design/command-structure) — shape commands around stable resources and verbs.
+- [Machine-Readable Output](/docs/cli-design/machine-readable-output) — return parseable JSON, not terminal-only formatting.
+- [Raw Payload Input](/docs/cli-design/raw-payload-input) — accept files or stdin for complex structured input.
+- [Schema Introspection](/docs/cli-design/schema-introspection) — let agents discover commands and options programmatically.
+- [Context Window Discipline](/docs/cli-design/context-window-discipline) — keep help, logs, and results compact.
+- [Input Hardening](/docs/cli-design/input-hardening) — reject malformed arguments with actionable errors.
+- [Safety Rails](/docs/cli-design/safety-rails) — support dry runs, confirmations, and non-interactive execution.
+- [Agent Knowledge Packaging](/docs/cli-design/agent-knowledge-packaging) — ship command guidance agents can retrieve.
+- [CLI Scale](/docs/cli-design/cli-scale) — keep large command sets navigable.
 
-- **Structured output** — `--json` and `--output json` flags that return machine-parseable responses for every command
-- **Schema introspection** — `--schema` flags or subcommands that let agents discover available commands, arguments, and options programmatically
-- **Exit codes** — consistent, meaningful exit codes that map to specific failure categories
-- **Input hardening** — strict validation with actionable error messages when arguments are malformed
-- **Confirmation bypassing** — `--yes` / `--no-input` flags that let agents skip interactive prompts
-- **Progress and streaming** — structured progress output that agents can parse without regex
-- **Completions and discoverability** — machine-readable help output that goes beyond human-formatted `--help` text
+## Related
+
+- [Error Handling: CLI Errors](/docs/error-handling/cli-errors) — structured failures and stable exit codes.
+- [Tool Design](/docs/tool-design) — use when commands become model-callable tools.
+- [Context Files](/docs/context-files) — document canonical commands for coding agents.
+- [Testing](/docs/testing) — add contract tests for CLI output and failure modes.

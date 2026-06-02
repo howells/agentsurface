@@ -3,6 +3,10 @@ import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+function buildMarkdownUrl(slug: string): string {
+  return `https://agentsurface.dev/api/md/${slug || 'index'}`;
+}
+
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q') || '';
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '10'), 50);
@@ -26,6 +30,7 @@ export async function GET(request: NextRequest) {
       description: page.data.description || '',
       url: `https://agentsurface.dev${page.url}`,
       slug: page.slugs.join('/'),
+      markdownUrl: buildMarkdownUrl(page.slugs.join('/')),
     }));
 
   return Response.json(

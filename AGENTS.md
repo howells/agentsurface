@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Agent Surface is a monorepo for auditing and improving how well a codebase works with AI agents, and for scaffolding production-grade AI agent systems.
+Agent Surface is a guide and implementation kit for making software legible to AI agents, and for building production-grade agent systems.
 
-The repository provides a single skill, `surface`, that routes to the right workflow: audit, scaffold, transform, or generate.
+The repository provides published documentation, reusable templates, a Next.js docs site, and a single operational skill, `surface`, that routes to the right workflow: guide, audit, scaffold, transform, or generate.
 
-This repository also includes templates and a Next.js documentation site.
+The site should read as the go-to guide for agent-readable software: concepts, standards, patterns, tooling, evaluation, and concrete implementation paths.
 
 ## Primary Capabilities
 
@@ -14,6 +14,8 @@ This repository also includes templates and a Next.js documentation site.
 
 Use [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md) when the task is to:
 
+- explain, compare, or organize information about AI agents
+- guide a developer through agent-readable software, agent systems, or agent infrastructure
 - audit agent readiness
 - score a codebase across agent-consumption dimensions
 - identify gaps in API, CLI, MCP, discovery, auth, testing, or retrievability
@@ -27,6 +29,7 @@ Use [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md) when the task is to
 
 Core characteristics:
 
+- guide-first documentation for agent systems, agent-readable surfaces, standards, tooling, and evaluation
 - 11 scored dimensions, `0-3` each, for a maximum raw score of `33`, scaled to `30` for ratings
 - clustered findings with concrete fixes
 - prioritized transformation planning
@@ -89,12 +92,13 @@ If you are an agent entering this repository cold, the usual read order is:
 
 1. Read this file for the repo overview and working constraints.
 2. Read [`./skills/surface/SKILL.md`](./skills/surface/SKILL.md) for the operative workflow.
-3. Read the relevant reference files under [`./skills/surface/references/`](./skills/surface/references/) for scoring details.
-4. Read the matching files in [`./skills/surface/agents/`](./skills/surface/agents/), [`./templates/`](./templates/), or [`./src/content/docs/`](./src/content/docs/) depending on the task.
+3. For content or site-structure work, read the relevant source pages under [`./src/content/docs/`](./src/content/docs/).
+4. For audits or scoring, read the relevant reference files under [`./skills/surface/references/`](./skills/surface/references/).
+5. For implementation work, read the matching specialist prompts in [`./skills/surface/agents/`](./skills/surface/agents/) or templates in [`./templates/`](./templates/).
 
 ## Skills
 
-- [`surface`](./skills/surface/SKILL.md) - audit, transform, scaffold, and generate for AI agent systems
+- [`surface`](./skills/surface/SKILL.md) - guide, audit, evaluate, transform, scaffold, and generate for AI agent systems
 
 ## Cross-Runtime Compatibility
 

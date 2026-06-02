@@ -5,6 +5,8 @@ description: Model selection, Matryoshka embeddings, cost/quality/latency trade-
 
 Embeddings are dense vectors (1,024–3,072 dimensions) that represent text semantically. They power vector similarity search: the model converts queries and documents into vectors, and nearest-neighbor search returns semantically similar results.
 
+Freshness note: last reviewed 2026-06-02. Embedding model names, pricing, dimensions, and leaderboard positions change quickly; verify current provider docs and run your own eval set before making a vendor decision.
+
 ## Summary
 
 Dense embeddings transform text into fixed-length vectors suitable for nearest-neighbor search. April 2026: **open-source models now match or exceed commercial APIs on MTEB leaderboard.** Choose based on cost sensitivity, latency SLA (API calls slower than self-hosted), and specialized domains (legal, code, medical models exist). **Matryoshka embeddings** (supported by OpenAI 3-large and Cohere v4) let you store full dimensions but truncate to 256–512 at query time for cost savings without recomputing.

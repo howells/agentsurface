@@ -1,11 +1,11 @@
 ---
 title: Agentic Commerce Protocol (ACP)
-description: The joint OpenAI and Stripe specification for commerce between AI agents, buyers, and merchants
+description: Open commerce standard from Stripe, OpenAI, and Meta for transactions between AI agents, buyers, and merchants
 ---
 
 ## Summary
 
-ACP defines how agents complete purchases on behalf of users with explicit payment delegation boundaries. Merchants publish capabilities at `/.well-known/acp.json`; agents and merchants negotiate what is available before attempting any payment. Spec: beta (2025). Joint OpenAI + Stripe specification.
+ACP defines how agents complete purchases on behalf of users with explicit payment delegation boundaries. Merchants publish capabilities at `/.well-known/acp.json`; agents and merchants negotiate what is available before attempting any payment. It is an open standard created by Stripe, OpenAI, and Meta; current public spec assets live under `spec/2026-04-17`.
 
 ```
 Agent → discovers capabilities → negotiates → pays → receipt
@@ -18,9 +18,9 @@ Buyer    (merchant declares      (what merchant  (from agent)
 - Protocol negotiates intersection before payment
 - Payment delegation: explicit boundaries, user can revoke
 - Supported methods: card, ACH, crypto_USDC
-- Currently in beta; moving toward production
+- New and emerging; evaluate merchant support, tooling, and payment-risk controls before rollout
 
-ACP defines how an AI agent completes a purchase on behalf of a user. It is a joint specification from OpenAI and Stripe, currently in beta, covering discovery, capability negotiation, payment delegation, and completion — from the first discovery request through the final receipt.
+ACP defines how an AI agent completes a purchase on behalf of a user. It is an open standard from Stripe, OpenAI, and Meta, covering discovery, capability negotiation, payment delegation, and completion — from the first discovery request through the final receipt.
 
 The problem ACP solves is not technical — HTTP and JSON are sufficient to call any payment API. The problem is behavioral: an agent acting autonomously on a user's behalf needs a protocol that makes the spending boundary explicit, verifiable, and revocable. ACP formalizes that boundary.
 
@@ -369,7 +369,12 @@ Generate idempotency keys from the conversation context — for example, a hash 
 
 ## When to Use ACP
 
-ACP is appropriate for controlled pilots and production deployments where agent-initiated commerce requires explicit payment boundaries and audit trails. It is currently in beta — the spec may evolve. For exploration, use it; for mission-critical payments, evaluate maturity and tooling support carefully.
+ACP is appropriate for controlled pilots and production deployments where agent-initiated commerce requires explicit payment boundaries and audit trails. Treat it as emerging: for mission-critical payments, evaluate current merchant support, tooling maturity, and your risk controls carefully.
+
+## Spec References
+
+- [ACP specification and documentation](https://agenticcommerce.dev)
+- [OpenAPI specs under `spec/2026-04-17`](https://github.com/agentic-commerce-protocol/agentic-commerce-protocol/tree/main/spec/2026-04-17/openapi)
 
 ## Related Pages
 

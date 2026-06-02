@@ -7,6 +7,7 @@ description: Agentic registration discovery for user-bound credentials
 
 `auth.md` is an emerging open protocol, authored by WorkOS, for helping agents register with an application on behalf of a user. An application publishes a Markdown file at `https://service.com/auth.md` and pairs it with OAuth protected-resource metadata so agents can discover registration flows, supported scopes, endpoints, and credential shapes without scraping an interactive sign-up form.
 
+- New/emerging WorkOS protocol; do not treat it as a mature authentication baseline yet.
 - `auth.md` is the prose walkthrough for agents and humans.
 - `/.well-known/oauth-protected-resource` remains the machine-readable resource metadata.
 - `/.well-known/oauth-authorization-server` can advertise an `agent_auth` block with registration endpoints and supported identity types.

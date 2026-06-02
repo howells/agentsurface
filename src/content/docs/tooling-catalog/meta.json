@@ -1,4 +1,13 @@
 {
   "title": "Tooling Catalog",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "standards-and-protocols",
+    "frameworks-and-runtimes",
+    "model-providers-and-gateways",
+    "retrieval-and-memory",
+    "evaluation-and-observability",
+    "browser-sandbox-and-integration",
+    "capability-map"
+  ]
 }

@@ -3,11 +3,14 @@
   "pages": [
     "index",
     "getting-started",
-    "reference-links",
-    "tooling-catalog",
+    "---",
     "agents",
     "runtime-boundaries",
     "agentic-ui",
+    "multi-agent",
+    "data-retrievability",
+    "testing",
+    "cookbook",
     "---",
     "api-surface",
     "tool-design",
@@ -15,13 +18,13 @@
     "mcp-servers",
     "discovery",
     "context-files",
-    "data-retrievability",
-    "protocols",
     "authentication",
     "error-handling",
-    "testing",
-    "multi-agent",
-    "cookbook",
-    "scoring"
+    "---",
+    "scoring",
+    "---",
+    "protocols",
+    "reference-links",
+    "tooling-catalog"
   ]
 }

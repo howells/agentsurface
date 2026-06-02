@@ -1,26 +1,29 @@
 ---
 title: API Surface
-description: Designing APIs that AI agents can discover, understand, and call reliably
+description: HTTP, OpenAPI, and service contracts that agents can discover and call reliably
 ---
 
 ## Summary
 
-This section covers the foundational design patterns for APIs that agents can operate reliably. It addresses OpenAPI specifications as executable contracts, tool definition best practices, idempotency, pagination, versioning strategies, and webhook design. These practices prevent silent failures and ensure agents understand API semantics without guessing.
+API Surface is the contract layer for HTTP services: OpenAPI, operation semantics, workflow descriptions, extensions, versioning, and event delivery. Use it when agents need to discover or generate calls against a web API without guessing from prose.
 
-- Complete, accurate OpenAPI specs as single source of truth
-- Clear tool definitions with descriptions that serve as prompts
-- Idempotency and safety markers for retry-safe operations
-- Consistent pagination, filtering, and error structures
-- Versioning strategies that protect against breaking changes
+- **Owns:** HTTP APIs, OpenAPI 3.1, Arazzo workflows, webhooks, API versioning, and machine-readable service contracts.
+- **Does not own:** cross-framework tool registry design; see [Tool Design](/docs/tool-design). MCP protocol servers; see [MCP Servers](/docs/mcp-servers).
+- **Agent-ready means:** complete schemas, stable operation IDs, explicit safety/idempotency semantics, structured errors, and versioned behavior.
 
-Your API surface is the primary interface agents use to interact with your system. An agent-ready API goes beyond "has documentation" — it must be fully machine-negotiable, self-describing, and unambiguous at every level.
+## Start Here
 
-## What This Section Covers
+- [OpenAPI for Agents](/docs/api-surface/openapi-for-agents) — make the API spec the source of truth for agent calls.
+- [Tool Definitions](/docs/api-surface/tool-definitions) — translate HTTP operations into clear generated tools.
+- [Arazzo Workflows](/docs/api-surface/arazzo-workflows) — document multi-step API sequences agents should not infer.
+- [OpenAPI Extensions](/docs/api-surface/openapi-extensions) — add agent-facing metadata without breaking the base contract.
+- [API Versioning](/docs/api-surface/api-versioning) — keep agents pinned to stable behavior.
+- [Webhooks and Events](/docs/api-surface/webhooks-events) — expose asynchronous state changes agents can react to.
 
-- **OpenAPI 3.1 specifications** — complete, accurate specs that serve as the single source of truth for agent tool generation
-- **Schema design** — using JSON Schema effectively so agents understand input constraints, output shapes, and edge cases without guessing
-- **Tool definitions** — structuring your API operations as discrete tools with clear names, descriptions, and parameter semantics
-- **Idempotency and safety** — marking operations correctly so agents know which calls are safe to retry
-- **Pagination and filtering** — cursor-based pagination and consistent query patterns that agents can navigate programmatically
-- **Content negotiation** — supporting `application/json` responses by default with structured error bodies
-- **Versioning** — strategies that let agents pin to stable contracts without silent breaking changes
+## Related
+
+- [Tool Design](/docs/tool-design) — hand-authored or framework-portable tool definitions.
+- [MCP Servers](/docs/mcp-servers) — protocol-specific exposure of tools, resources, and prompts.
+- [Error Handling](/docs/error-handling) — Problem Details and retry guidance for API failures.
+- [Authentication](/docs/authentication) — credentials, scopes, and delegated access for agent callers.
+- [Discovery](/docs/discovery) — public routes that help agents find API specs and catalogs.

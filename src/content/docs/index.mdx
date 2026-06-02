@@ -1,77 +1,69 @@
 ---
 title: What is Agent Surface?
-description: A resource for making software legible to AI agents
+description: A dense guide to agent-readable software, production agent systems, standards, tooling, and evaluation
 ---
 
-Agent Surface is a practical resource for designing software that AI agents can understand and use.
+Agent Surface is a practical guide to software built for agents: systems agents can understand, operate, evaluate, and safely extend.
 
-The core idea is that agents do not interact with a product through one neat interface. They read repository instructions, follow documentation, call APIs, run CLIs, inspect schemas, use MCP tools, parse errors, retrieve context, and coordinate work across tools. Each of those contact points is a surface. If the surfaces are ambiguous, agents improvise. If the surfaces are explicit, agents can work reliably.
+The core idea is that agents do not interact with software through one neat interface. They read repository instructions, follow documentation, call APIs, run CLIs, inspect schemas, use MCP tools, parse errors, retrieve context, ask for approval, and coordinate across tools. Each contact point is a surface. If the surfaces are ambiguous, agents improvise. If the surfaces are explicit, agents can work reliably.
 
-Agent Surface exists to make those surfaces intentional.
+Agent Surface exists to make those surfaces intentional, and to connect them to the larger body of agent architecture, protocols, testing, tooling, and product design.
 
 ## The Story
 
 Most software was built for human operators. A person can scan a docs page, infer missing context, recover from vague errors, and ask another person what a field means.
 
-Agents are less forgiving. They need contracts, schemas, examples, recovery paths, permission boundaries, and machine-readable context. They can be powerful when the system gives them clear handles. They become brittle when every step depends on guessing.
+Agents are less forgiving. They need contracts, schemas, examples, recovery paths, permission boundaries, stable tool descriptions, and machine-readable context. They can be powerful when a system gives them clear handles. They become brittle when every step depends on guessing.
 
-Agent Surface treats agent readiness as an engineering discipline:
+Agent Surface treats agent-readable software as an engineering discipline:
 
 1. Name the surfaces agents touch.
 2. Define what good looks like for each surface.
-3. Score a codebase against those expectations.
-4. Fix the highest-impact gaps first.
-5. Keep the surfaces current as the product changes.
+3. Choose the right runtime, protocol, tool, and data boundary.
+4. Design recovery, approval, and evaluation paths up front.
+5. Keep the surfaces current as products, models, and standards change.
 
 ## What This Includes
 
-### Documentation
+### Agent Systems
 
-The docs are the field guide. They explain the surfaces that matter:
+The system design chapters cover how to build agents that survive production constraints:
 
-- API surface and OpenAPI design
-- CLI design for automation
-- MCP servers and tool definitions
-- discovery files such as `AGENTS.md` and `llms.txt`
-- authentication for machine-to-machine access
-- structured errors and recovery hints
-- testing, evaluations, and observability
-- retrievability, RAG, and knowledge access
-- multi-agent orchestration patterns
-- protocol choices and tradeoffs
+- [Agent scaffolding](/docs/agents)
+- [Runtime boundaries](/docs/runtime-boundaries)
+- [Agentic UI](/docs/agentic-ui)
+- [Multi-agent patterns](/docs/multi-agent)
+- [Data retrievability](/docs/data-retrievability)
+- [Testing and observability](/docs/testing)
+- [Production patterns](/docs/cookbook)
 
-### Approaches
+### Agent-Readable Surfaces
 
-The approaches are the reusable patterns behind the docs. They cover how to make existing software agent-friendly without rebuilding it around an agent framework.
+The surface chapters explain how to make existing products, APIs, CLIs, repositories, and data sources usable by agents:
 
-Examples include:
+- [API Surface](/docs/api-surface) for HTTP and OpenAPI contracts
+- [Tool Design](/docs/tool-design) for cross-framework tools
+- [CLI Design](/docs/cli-design) for automation-friendly commands
+- [MCP Servers](/docs/mcp-servers) for protocol-native tool exposure
+- [Discovery and AEO](/docs/discovery) for public web discovery
+- [Context Files](/docs/context-files) for repository and editor instructions
+- [Authentication](/docs/authentication) for machine and delegated access
+- [Error Handling](/docs/error-handling) for recovery-oriented failures
 
-- publish machine-readable contracts before adding new orchestration
-- make CLIs predictable before making them conversational
-- design errors as recovery instructions
-- expose tools with narrow, typed, idempotent operations
-- separate human UX from agent-operable surfaces
-- measure readiness before transforming a codebase
+### Standards, Tools, And Evaluation
+
+The reference chapters track the moving landscape:
+
+- [Protocols and Standards](/docs/protocols) for MCP, A2A, ACP, Arazzo, and related specs
+- [Reference Links](/docs/reference-links) for canonical source material
+- [Tooling Catalog](/docs/tooling-catalog) for respected agent infrastructure
+- [Scoring](/docs/scoring) for evaluating and improving agent-readiness
 
 ### The `surface` Skill
 
-`surface` is the operational part of Agent Surface. It reads your project and routes to the right workflow — auditing, scoring, scaffolding, or transforming.
+`surface` is the operational part of Agent Surface. It can inspect a project, score agent-readiness, create a transformation plan, or scaffold agent infrastructure. Use it when you want the guide translated into concrete changes for a specific repository.
 
-In audit mode, it scores a codebase across 11 dimensions, each rated `0` to `3`, and produces evidence-backed findings:
-
-1. API Surface
-2. CLI Design
-3. MCP Server
-4. Discovery and AEO
-5. Authentication
-6. Error Handling
-7. Tool Design
-8. Context Files
-9. Data Retrievability
-10. Multi-Agent and Orchestration
-11. Testing and Evaluation
-
-It can stop at a scorecard, produce a transformation plan, delegate focused improvements to specialist agents, or scaffold new agent infrastructure shaped to the existing project.
+Scoring is useful, but it is not the whole site. The guide is broader: it explains the concepts, implementation patterns, standards, and evaluation methods behind agent-ready software.
 
 ### Resources
 
@@ -86,9 +78,13 @@ The repo also carries reusable resources:
 
 ## How to Use It
 
-Use the documentation when you are designing an agent-facing surface.
+Use the documentation when you are learning agent architecture, designing an agent-facing surface, or comparing standards and tools.
 
-Use the scoring rubric when you need to compare projects or prioritize work.
+Use the system design chapters when you are building agents.
+
+Use the surface chapters when you are making an existing product usable by agents.
+
+Use the scoring rubric when you need to evaluate a project or prioritize work.
 
 Use `surface` when you want an evidence-backed audit, a concrete transformation plan, or to scaffold and update agent infrastructure in the shape of the existing project.
 
@@ -96,10 +92,11 @@ Use the templates when you are implementing a specific surface and want a starti
 
 ## Where to Start
 
-- [Getting Started](/docs/getting-started) for a quick assessment
-- [Reference Links](/docs/reference-links) for canonical standards, specs, and official docs
-- [Scoring](/docs/scoring) for the readiness model
-- [API Surface](/docs/api-surface) for machine-readable API design
-- [CLI Design](/docs/cli-design) for automation-friendly commands
-- [MCP Servers](/docs/mcp-servers) for tool exposure
-- [Tooling Catalog](/docs/tooling-catalog) for the broader AI tooling landscape
+- [Getting Started](/docs/getting-started) to choose a route through the guide
+- [Agent Scaffolding](/docs/agents) if you are building an agent system
+- [API Surface](/docs/api-surface) if agents need to operate your service
+- [MCP Servers](/docs/mcp-servers) if you need protocol-native tool exposure
+- [Discovery and AEO](/docs/discovery) if agents need to find your capabilities
+- [Testing](/docs/testing) if you need to prove an agent workflow works
+- [Protocols](/docs/protocols) if you are choosing standards
+- [Tooling Catalog](/docs/tooling-catalog) if you are surveying the ecosystem

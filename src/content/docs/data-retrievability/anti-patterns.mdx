@@ -5,6 +5,8 @@ description: What NOT to do; common failures and pitfalls
 
 ## Summary
 
+Freshness note: last reviewed 2026-06-02. Provider-specific model, pricing, benchmark, and cost-ratio claims age quickly; use the anti-patterns as design checks and validate figures against current docs before procurement or architecture decisions.
+
 Ten retrieval anti-patterns that degrade quality silently (without visible signals): dense-only retrieval (fails on keywords), no chunking strategy (poor recall), single embedding for all domains (underperforms specialized), no reranking (noisy top-k), no evaluation metrics (flying blind), stale embeddings (drift undetected), giant chunks (lose granularity), no metadata filtering (mixed contexts), skipping contextual retrieval (Anthropic pattern misses 49–67% of answers), and GraphRAG without cost constraints (6000x more expensive than LightRAG). Each anti-pattern includes specific fix.
 
 - **1. Dense-only**: Add BM25 + RRF fusion

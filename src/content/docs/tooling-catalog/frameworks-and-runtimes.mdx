@@ -1,0 +1,94 @@
+---
+title: Frameworks and Runtimes
+description: Agent frameworks, workflow engines, coding agents, and AI product surface libraries
+---
+
+Use these when the product needs agents, tools, memory, workflow state, coding workflows, or user-facing AI interfaces.
+
+Last curated: May 16, 2026.
+
+## Agent Frameworks and Runtimes
+
+Use these when the product needs agents, tools, memory, workflows, or structured orchestration.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Mastra](https://mastra.ai/docs) | mastra.ai | TypeScript agents, workflows, memory, RAG, MCP, evals, voice, and observability | Core | Best fit for this repo's `agents` skill and local TypeScript agent scaffolding. |
+| [Vercel AI SDK](https://ai-sdk.dev/docs) | ai-sdk.dev | Provider-neutral model calls, streaming, tools, structured output, and AI UI | Core | Strong default for TypeScript AI apps, especially with React and Next.js. |
+| [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk) | platform.openai.com | OpenAI-native agents, tools, handoffs, guardrails, tracing, evaluation, and hosted tools | Core | Important for OpenAI-centric agents and MCP-backed tool use. |
+| [LangGraph](https://langchain-ai.github.io/langgraph/) | langchain-ai.github.io | Stateful graph orchestration for agents | Core | Strong when the control flow must be explicit, inspectable, and durable. |
+| [LangChain](https://docs.langchain.com) | docs.langchain.com | LLM application framework with broad integrations | Conditional | Huge integration surface; use selectively where connector breadth outweighs abstraction cost. |
+| [LlamaIndex](https://docs.llamaindex.ai) | docs.llamaindex.ai | Data connectors, indexing, RAG, and knowledge-agent workflows | Conditional | Strong for document-heavy RAG and enterprise knowledge systems. |
+| [Pydantic AI](https://ai.pydantic.dev/agent/) | ai.pydantic.dev | Python agent framework built around Pydantic typing and validation | Conditional | Good Python choice when schema safety and FastAPI-style ergonomics matter. |
+| [Semantic Kernel](https://learn.microsoft.com/semantic-kernel/) | learn.microsoft.com | Microsoft-backed agent and orchestration SDK | Conditional | Strongest in .NET and Azure-heavy enterprise environments. |
+| [Google ADK](https://adk.dev/) | adk.dev | Google's agent development kit for building and deploying agents | Conditional | Use when a system is already aligned with Gemini, Vertex AI, or Google Cloud. |
+| [Agno](https://docs.agno.com/agents/introduction) | docs.agno.com | Python agent framework with tools, memory, knowledge, storage, sessions, metrics, and guardrails | Conditional | Good when Python owns the agent runtime and the team wants a compact framework with built-in memory and knowledge primitives. |
+| [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) | learn.microsoft.com | Microsoft framework for agents, tools, memory, persistence, workflows, hosting, and Azure integrations | Conditional | Use for Azure/.NET/Python enterprise systems; it is the successor direction for Semantic Kernel and AutoGen-style work. |
+| [Strands Agents](https://strandsagents.com/docs/) | strandsagents.com | Open-source agent SDK for model-driven tool use and production deployment | Watch | Worth tracking for AWS/Bedrock-aligned teams and lightweight Python agent loops. |
+| [smolagents](https://huggingface.co/docs/smolagents) | huggingface.co | Hugging Face agent framework focused on concise code agents and tool use | Watch | Useful for small Python agents and open-model experiments; evaluate before using for complex production workflows. |
+| [Cloudflare Agents](https://developers.cloudflare.com/agents/) | developers.cloudflare.com | Durable Object-backed TypeScript agents with state, scheduling, tools, MCP, chat, and browser access | Conditional | Strong when the agent should live close to Workers, Durable Objects, AI Gateway, or edge-hosted tool surfaces. |
+| [Agentuity](https://agentuity.com/) | agentuity.com | Cloud platform for deploying, running, observing, and scaling AI agents | Watch | Promising agent-native infrastructure; evaluate maturity before treating it as foundational. |
+| [CrewAI](https://docs.crewai.com/) | docs.crewai.com | Multi-agent crews, tasks, flows, memory, and tools | Conditional | Useful for role-based multi-agent prototypes; review security and observability before production use. |
+| [OpenHands SDK](https://docs.openhands.dev/sdk/index) | docs.openhands.dev | Software-development agent SDK with Python and REST APIs | Watch | Interesting for coding-agent products, but keep separate from general product agents. |
+
+## Agent Workflow and Context Tools
+
+These are not always full agent frameworks. They are worth tracking because they give agents safer orchestration, repeatable workflows, context compression, or bounded LLM substeps.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [OpenProse](https://www.prose.md) | prose.md | Markdown-first multi-agent workflow programs with explicit parallelism and reusable `.prose` files | Watch | Promising for portable, reviewable agent workflow recipes. |
+| [Trigger.dev](https://trigger.dev/) | trigger.dev | TypeScript workflows, background tasks, retries, checkpointing, and AI agent jobs | Conditional | Strong when agent work needs durable execution rather than an in-request loop. |
+| [Temporal](https://docs.temporal.io/) | docs.temporal.io | Durable workflow engine with retries, timers, signals, queries, and long-running execution | Conditional | Use when agent work must survive process restarts, human delays, retries, and multi-day workflows. |
+| [Inngest](https://www.inngest.com/docs) | inngest.com | Durable serverless functions, background jobs, retries, and event-driven workflows | Conditional | Good TypeScript path for event-driven agent tasks that should not run inside a request lifecycle. |
+| [Hatchet](https://docs.hatchet.run/) | docs.hatchet.run | Open-source task queue and durable workflow engine | Watch | Useful when teams want self-hostable workflows with retries, concurrency, and observability. |
+| [Prefect](https://docs.prefect.io/) | docs.prefect.io | Python workflow orchestration for data and AI pipelines | Conditional | Relevant when agent workflows are coupled to Python data processing or scheduled RAG pipelines. |
+
+## Coding Agents and Developer Workflows
+
+Use these when the agent is working inside a codebase, editor, terminal, or issue-to-PR workflow.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Codex](https://openai.com/codex/) | openai.com | Coding agent across terminal, desktop, IDE, and cloud workflows | Core | Closely aligned with this repo's audience and skill format work. |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | docs.anthropic.com | Terminal and SDK coding agent with MCP, skills, hooks, and tool permissions | Core | Important for cross-runtime agent instructions and tool permission patterns. |
+| [Claude Code SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) | docs.anthropic.com | Programmatic agent harness built on Claude Code concepts | Conditional | Relevant when building custom coding agents rather than using the CLI directly. |
+| [OpenHands SDK](https://docs.openhands.dev/sdk/index) | docs.openhands.dev | Software-development agent SDK with Python and REST APIs | Watch | Interesting for products that embed code-editing agents. |
+| [Aider](https://aider.chat/docs/) | aider.chat | Terminal coding assistant focused on editing files with LLMs | Conditional | Useful reference point for repo-aware editing workflows. |
+| [Cline](https://docs.cline.bot/) | docs.cline.bot | VS Code coding agent with tool use and MCP support | Conditional | Useful for editor-native agent workflows and MCP ergonomics. |
+| [Augment Code](https://www.augmentcode.com/) | augmentcode.com | AI coding assistant and code review across large codebases | Conditional | Worth tracking for enterprise-scale codebase context and IDE/CLI/review coverage. |
+| [Factory](https://factory.ai/) | factory.ai | Software development agents for IDE, CLI, web, Slack, Linear, and CI/CD workflows | Watch | Strong signal for agent-native software development, but still a fast-moving category. |
+| [CodeRabbit](https://www.coderabbit.ai/) | coderabbit.ai | AI pull request reviews and agent-readable review output | Conditional | Useful as a review layer for AI-generated code and PR workflows. |
+| [Greptile](https://www.greptile.com/) | greptile.com | AI code review and codebase-aware developer tooling | Watch | Track for code-review quality and repository-context patterns. |
+| [Macroscope](https://macroscope.com/) | macroscope.com | AI code review, bug finding, status updates, and codebase analysis | Watch | Interesting for code review that reasons across a broader codebase. |
+| [Roo Code](https://docs.roocode.com/) | docs.roocode.com | VS Code agentic coding assistant | Watch | Track for editor-agent workflow patterns. |
+| [Kilo Code](https://kilocode.ai/) | kilocode.ai | Agentic coding assistant | Watch | Track as part of the coding-agent surface rather than core product-agent infrastructure. |
+| [Deep Agents CLI](https://docs.langchain.com/oss/python/deepagents/overview) | docs.langchain.com | Terminal-oriented deep agent workflow | Watch | Relevant for long-running coding or research agents. |
+
+## AI UI and Product Surfaces
+
+Use these when the AI experience itself needs chat, copilot UX, generative UI, or host-app integration.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [AI SDK UI](https://ai-sdk.dev/docs/ai-sdk-ui) | ai-sdk.dev | Framework hooks and primitives for chat and generative UI | Core | Best default for TypeScript AI apps already using AI SDK. |
+| [AI Elements](https://ai-sdk.dev/elements) | ai-sdk.dev | Prebuilt components for AI interfaces | Conditional | Good when a project wants conventional chat/tool-call UI quickly. |
+| [assistant-ui](https://www.assistant-ui.com/docs) | assistant-ui.com | React, React Native, and terminal chat UI for AI apps | Conditional | Good headless/chat-focused UI layer. |
+| [CopilotKit](https://docs.copilotkit.ai) | docs.copilotkit.ai | In-app copilots, generative UI, shared state, and human-in-the-loop flows | Conditional | Strong when the product needs an embedded copilot rather than a separate chat page. |
+| [OpenAI Apps SDK](https://developers.openai.com/apps-sdk/) | developers.openai.com | Build apps that run inside ChatGPT with MCP-backed tools and UI | Watch | Important platform direction; keep privacy, policy, and review constraints visible. |
+| [AG-UI](https://docs.ag-ui.com) | docs.ag-ui.com | Event protocol between agent backends and user-facing apps | Watch | Worth tracking as a possible interoperability layer for agent frontends. |
+
+## AI App Builders and Design Tools
+
+Use these for prototypes, product exploration, design-to-code workflows, and short feedback loops. Treat generated code as a draft that still needs engineering review.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [v0](https://v0.dev/) | v0.dev | AI UI generation and React component/app prototyping | Conditional | Strong for interface drafts and shadcn-style React output. |
+| [Bolt.new](https://bolt.new/) | bolt.new | Browser-based AI app builder and coding environment | Watch | Useful for rapid web prototypes; review architecture before productionizing. |
+| [Lovable](https://lovable.dev/) | lovable.dev | Prompt-to-app builder for full-stack web applications | Watch | Good market signal for AI app builders, but treat output as prototype code. |
+| [Chef](https://docs.convex.dev/chef) | docs.convex.dev | AI app builder built around Convex-backed full-stack apps | Watch | Interesting because it couples generation with a real backend model. |
+| [Rork](https://rork.com/) | rork.com | AI app builder focused on React Native/mobile apps | Watch | Track for mobile prototyping; verify native quality before serious use. |
+| [Magic Patterns](https://www.magicpatterns.com/) | magicpatterns.com | AI design and prototype generation for product teams | Conditional | Useful when the artifact is an interactive prototype rather than production code. |
+
+<small>Sources are linked inline.</small>

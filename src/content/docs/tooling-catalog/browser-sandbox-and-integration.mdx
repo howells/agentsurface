@@ -1,0 +1,84 @@
+---
+title: Browser, Sandbox, and Integration
+description: Browser agents, web extraction, sandboxed execution, and external app tool hubs
+---
+
+Use these when agents need live web context, GUI automation, isolated code execution, or scoped actions across SaaS systems.
+
+Last curated: May 16, 2026.
+
+## Agent Sandboxes and Compute
+
+Use these when agents need to run code, execute untrusted workloads, or access GPUs without turning the main app server into an execution environment.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Daytona](https://www.daytona.io/) | daytona.io | Secure, stateful sandboxes for AI-generated code and agent workflows | Conditional | Good fit when agents need isolated code execution with resumable environments. |
+| [Modal](https://modal.com/) | modal.com | Serverless compute, GPUs, sandboxes, and batch jobs for AI workloads | Conditional | Useful for agent tasks that need elastic Python/GPU execution. |
+| [Cloudflare Sandbox SDK](https://developers.cloudflare.com/sandbox/) | developers.cloudflare.com | Isolated container sandboxes for command execution, files, terminals, and code interpreter workflows from Workers | Conditional | Strong fit when code execution should be controlled by a Worker and stay close to edge-hosted agents. |
+| [Agentuity Sandboxes](https://agentuity.com/) | agentuity.com | Isolated containers inside an agent deployment platform | Watch | Track as part of agent-native infrastructure rather than generic cloud hosting. |
+| [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) | vercel.com | Ephemeral microVMs for running generated or untrusted code | Conditional | Relevant when AI code execution should stay isolated from the app runtime. |
+| [E2B](https://e2b.dev/docs) | e2b.dev | Secure sandboxes and code interpreter infrastructure for AI agents | Conditional | Strong fit for data analysis, generated-code execution, and code-interpreter features. |
+| [Amazon Bedrock AgentCore Code Interpreter](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter.html) | docs.aws.amazon.com | Managed code interpreter for Bedrock AgentCore agents | Conditional | Good fit when agent execution, browser, and code interpretation are intentionally AWS-native. |
+| [Azure Container Apps dynamic sessions](https://learn.microsoft.com/azure/container-apps/sessions-code-interpreter) | learn.microsoft.com | Session-based sandboxed code interpreter backed by Azure Container Apps | Conditional | Good Azure-native route for Python execution and uploaded-file analysis. |
+| [Riza Code Interpreter](https://docs.riza.io/) | docs.riza.io | Hosted and self-hostable code interpreter for model-generated code | Watch | Surfaced in LangChain integrations; evaluate if language coverage or self-hosting is important. |
+| [bash-tool](https://github.com/vercel/bash-tool) | github.com/vercel | AI SDK-compatible bash tool intended for sandboxed execution | Watch | Useful pattern for controlled shell execution; never expose it without a sandbox and policy layer. |
+| [ctx-zip](https://github.com/karthikscale3/ctx-zip/blob/main/README.md) | github.com/karthikscale3 | Converts MCP and AI SDK tools into code-mode tools that run through Vercel Sandbox | Watch | Interesting for large tool sets and code-mode execution, but keep it behind strict permissions. |
+| [Morph](https://docs.morph.so/) | docs.morph.so | Fast code editing and apply-patch infrastructure for AI coding workflows | Watch | Useful for coding agents that need reliable patch application rather than raw text replacement. |
+
+## Agent Web Access and Automation
+
+These are included because their primary use is giving agents live web context, browser control, or automation. Generic automation platforms only stay if they expose AI-agent-specific nodes or tool surfaces.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Browserbase](https://docs.browserbase.com/welcome/what-is-browserbase) | docs.browserbase.com | Cloud browsers, sessions, identity, observability, and infrastructure for web agents | Core | Strong choice when agents must browse authenticated, JavaScript-heavy, or interactive sites. |
+| [Browser Use](https://docs.browser-use.com) | docs.browser-use.com | Open-source and managed AI browser automation for task-level web agents | Conditional | Useful when a Python or hosted browser agent should plan, browse, extract, and recover across multi-step web tasks. |
+| [Kernel](https://www.kernel.sh/) | kernel.sh | Fast browser infrastructure for web agents and browser automation | Conditional | Good signal for production browser-agent infrastructure. |
+| [Stagehand](https://docs.browserbase.com/introduction/stagehand) | docs.browserbase.com | AI-native browser automation built around Playwright plus `act`, `extract`, and `observe` | Core | Good bridge between deterministic browser automation and LLM-driven page interaction. |
+| [Browser Run](https://developers.cloudflare.com/browser-run/) | developers.cloudflare.com | Headless browser automation with screenshots, PDFs, Markdown extraction, crawling, Playwright, CDP, Stagehand, and MCP options | Conditional | Strong fit when browser execution should be available as managed infrastructure near edge agents. |
+| [Amazon Bedrock AgentCore Browser](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-tool.html) | docs.aws.amazon.com | Managed browser automation capability for Bedrock AgentCore | Conditional | Use when the agent stack is already AWS/Bedrock-native and browser control needs to stay inside AWS boundaries. |
+| [Firecrawl](https://docs.firecrawl.dev/introduction) | docs.firecrawl.dev | Search, scrape, crawl, extract, and interact APIs with LLM-ready output and MCP support | Core | Good for docs ingestion, web research, and RAG pipelines. |
+| [Tavily](https://docs.tavily.com/welcome) | docs.tavily.com | Search, extract, crawl, map, and research API for AI applications | Conditional | Good for web-aware agents that need current search results. |
+| [Exa](https://exa.ai/docs/reference/search-api-guide) | exa.ai | AI-oriented web search, contents extraction, and structured web research | Conditional | Good for semantic web retrieval and research agents. |
+| [Parallel](https://parallel.ai) | parallel.ai | Web search and extraction tools for agents with token-efficient context | Watch | Surfaced by the AI SDK tool registry; evaluate where compressed web results matter. |
+| [Perplexity Search API](https://docs.perplexity.ai/guides/search-quickstart) | docs.perplexity.ai | Search API for current web answers and source-backed search results | Conditional | Useful when a workflow wants search-backed synthesis rather than raw crawler output. |
+| [Valyu](https://docs.valyu.ai/integrations/vercel-ai-sdk) | docs.valyu.ai | Domain-focused search tooling for AI agents | Watch | Surfaced by the AI SDK tool registry; evaluate for specialized research domains. |
+| [Airweave](https://docs.airweave.ai) | docs.airweave.ai | Semantic search and RAG data-source tooling for AI apps | Watch | Useful signal for connector-backed semantic search, especially when search spans app data sources. |
+| [Tako Search](https://github.com/TakoData/ai-sdk#readme) | github.com/TakoData | Search/data/visualization tool package for AI SDK workflows | Watch | Track for data-rich research and visualization workflows. |
+| [Apify](https://docs.apify.com/) | docs.apify.com | Web scraping, crawling, browser automation, and actor marketplace | Conditional | Useful when agents need durable crawlers or a marketplace of maintained extractors. |
+| [browserless](https://docs.browserless.io/) | docs.browserless.io | Hosted Chrome automation over CDP, Playwright, Puppeteer, and REST APIs | Conditional | Practical browser infrastructure when the app already owns deterministic automation code. |
+| [AgentQL](https://docs.agentql.com/) | docs.agentql.com | Query-like web interaction and extraction for agent/browser workflows | Watch | Surfaced in LangChain browser-tool integrations; useful when selectors are brittle. |
+| [Hyperbrowser](https://docs.hyperbrowser.ai/) | docs.hyperbrowser.ai | Browser automation and web scraping infrastructure for AI agents | Watch | Appears in LangChain browser integrations; evaluate against Browserbase/Stagehand. |
+| [MultiOn](https://docs.multion.ai/) | docs.multion.ai | Browser-agent automation API | Watch | Interesting for delegated web tasks, but validate reliability and control boundaries carefully. |
+| [Bright Data](https://docs.brightdata.com/) | docs.brightdata.com | Web data, scraping browsers, datasets, proxies, and unlocker infrastructure | Conditional | Consider for difficult extraction at scale; keep compliance and site terms explicit. |
+| [Oxylabs Web Scraper API](https://developers.oxylabs.io/) | developers.oxylabs.io | Web scraping and SERP extraction infrastructure | Conditional | Consider for scale and difficult extraction where proxy/compliance operations are already understood. |
+| [SerpAPI](https://serpapi.com/search-api) | serpapi.com | Search engine results API | Conditional | Useful for search-result pages when you need structured SERP data rather than semantic search. |
+| [Serper](https://serper.dev/) | serper.dev | Google Search API for AI apps and automation | Conditional | Lightweight option for web-search tools where raw search results are enough. |
+| [Brave Search API](https://api.search.brave.com/) | api.search.brave.com | Independent web search API | Conditional | Good alternative search source when avoiding Google-dependent SERP APIs matters. |
+| [Linkup](https://docs.linkup.so/) | docs.linkup.so | Search and retrieval API for AI agents | Watch | Track as part of the agent-native web search category. |
+| [Jina Reader](https://jina.ai/reader/) | jina.ai | URL-to-Markdown and web content extraction service | Conditional | Useful as a simple reader tool before adding a full crawler or browser stack. |
+| [Jina Search](https://jina.ai/search/) | jina.ai | Search API returning web results and page content for AI workflows | Conditional | Surfaced in LangChain search-tool integrations and pairs naturally with Jina Reader. |
+| [SearchApi](https://www.searchapi.io/docs) | searchapi.io | Search engine results API | Conditional | Another SERP-style option; use only when its engine coverage and pricing fit. |
+| [SearxNG](https://docs.searxng.org/) | docs.searxng.org | Self-hostable metasearch engine | Conditional | Good when search should be self-hosted or privacy-sensitive. |
+| [DuckDuckGo Search](https://duckduckgo.com/) | duckduckgo.com | General web search source used by several toolkits | Conditional | Useful as a low-friction tool in prototypes; production use needs reliability checks. |
+| [You.com Search API](https://docs.you.com/) | docs.you.com | Search API for AI applications | Watch | Appears in LangChain search integrations; evaluate against Exa/Tavily/Firecrawl/Brave. |
+| [Composio](https://docs.composio.dev) | docs.composio.dev | Tool integrations for AI agents | Watch | Useful breadth, but avoid outsourcing core product semantics without evaluation. |
+| [n8n AI Agent](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/) | docs.n8n.io | No-code/low-code AI agent node with tools and workflow automation | Conditional | It straddles the line. Include for AI automation workflows, not as the default code-first agent runtime. |
+
+## External App Integration and Tool Hubs
+
+Use these when the value of the agent is acting across SaaS systems. Prefer scoped, auditable tool access over dumping every possible integration into the model context.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Composio](https://docs.composio.dev) | docs.composio.dev | Managed integrations and tools for AI agents across SaaS apps | Conditional | Good for breadth and fast prototypes; keep permissions, user connection state, and tool curation explicit. |
+| [Arcade](https://docs.arcade.dev/) | docs.arcade.dev | Authenticated tools and integrations for AI agents | Watch | Useful direction for delegated app actions where auth and user consent matter. |
+| [Pipedream Connect](https://pipedream.com/docs/connect/) | pipedream.com | User-authenticated integrations and workflows that apps can expose to AI features | Conditional | Good when agent tools need many SaaS connectors plus managed OAuth. |
+| [Zapier AI Actions](https://actions.zapier.com/docs/) | actions.zapier.com | Zapier actions exposed to AI assistants and agent workflows | Conditional | Good for long-tail SaaS actions, especially non-engineering workflows. |
+| [n8n](https://docs.n8n.io/advanced-ai/) | docs.n8n.io | Workflow automation with AI nodes, tools, agents, and human-in-the-loop steps | Conditional | Useful for operations teams and internal workflows; use code-first runtimes for core product logic. |
+| [Paragon](https://docs.useparagon.com/) | docs.useparagon.com | Embedded integrations platform with managed auth and sync | Conditional | Useful when integrations are a product feature rather than only an agent convenience. |
+| [Merge](https://docs.merge.dev/) | docs.merge.dev | Unified APIs for categories such as HRIS, CRM, ticketing, accounting, and file storage | Conditional | Good when agents need normalized access to business systems through category APIs. |
+| [Metorial](https://metorial.com/docs) | metorial.com | Tool and MCP infrastructure for connecting agents to external services | Watch | Track in the agent-tool hub category; evaluate security and connector quality before adoption. |
+
+<small>Sources are linked inline.</small>

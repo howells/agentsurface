@@ -18,33 +18,33 @@ Orchestrator (uses A2A)
 ```
 
 - MCP 2025-11-25: tools, resources, prompts, async tasks
-- A2A v1.0 RC: task delegation across organizational boundaries
-- ACP beta: agent-initiated commerce with payment delegation
+- A2A v1.0: production-ready task delegation across organizational boundaries
+- ACP emerging: agent-initiated commerce with payment delegation
 - Publish: /.well-known/agent.json, /.well-known/acp.json, /AGENTS.md, /llms.txt
 - Transport: stdio (local), Streamable HTTP (remote)
 
-Three mature protocols and several complementary standards define how agents discover capabilities, execute work, and integrate across organizational boundaries.
+These protocols and complementary standards define how agents discover capabilities, execute work, and integrate across organizational boundaries.
 
 ## Quick Start
 
 **Does your agent need tools?** → Use [MCP](/docs/protocols/mcp) (spec 2025-11-25). This is the baseline.
 
-**Multiple agents delegating work?** → Add [A2A](/docs/protocols/a2a) (v1.0 RC) for peer-to-peer task delegation.
+**Multiple agents delegating work?** → Add [A2A](/docs/protocols/a2a) (v1.0) for peer-to-peer task delegation.
 
-**Agent initiating purchases?** → Add [ACP](/docs/protocols/acp) (beta) for commerce with payment boundaries.
+**Agent initiating purchases?** → Add [ACP](/docs/protocols/acp) for commerce with payment boundaries.
 
 **Complex multi-step workflows?** → Use [Arazzo](/docs/protocols/comparison#arazzo--here-is-the-workflow-sequence) to choreograph API sequences.
 
-**Need observability?** → Instrument with [OpenTelemetry GenAI semconv](/docs/protocols/emerging-standards#opentelemetry-genai-semantic-conventions-stable) — stable and widely adopted.
+**Need observability?** → Instrument with [OpenTelemetry GenAI semconv](/docs/protocols/emerging-standards#opentelemetry-genai-semantic-conventions-development) — widely adopted, but still marked Development.
 
 ## The Protocols
 
 | Protocol | Purpose | Learn More |
 |----------|---------|-----------|
 | **MCP 2025-11-25** | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp) |
-| **A2A v1.0 RC** | Agent-to-agent delegation (horizontal) | [A2A docs](/docs/protocols/a2a) |
-| **ACP beta** | Agent-initiated commerce | [ACP docs](/docs/protocols/acp) |
-| **Arazzo 1.0.1** | Multi-step API workflow sequences | [Comparison page](/docs/protocols/comparison) |
+| **A2A v1.0** | Agent-to-agent delegation (horizontal) | [A2A docs](/docs/protocols/a2a) |
+| **ACP emerging** | Agent-initiated commerce | [ACP docs](/docs/protocols/acp) |
+| **Arazzo 1.1.0** | Multi-step API workflow sequences | [Comparison page](/docs/protocols/comparison) |
 | **OpenTelemetry GenAI** | Observability & tracing | [Emerging standards](/docs/protocols/emerging-standards) |
 | **AGENTS.md** | Agent context documentation | [Emerging standards](/docs/protocols/emerging-standards) |
 | **llms.txt** | LLM-friendly API docs | [Emerging standards](/docs/protocols/emerging-standards) |

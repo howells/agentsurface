@@ -5,46 +5,30 @@ description: Machine-to-machine and delegated authorization for agents
 
 ## Summary
 
-Agent authentication has two jobs: issue the right credential, then validate it on every request. Runtime API access should be programmatic: no login pages, CAPTCHAs, or session cookies in the request path. Registration can still include explicit human consent or an OTP claim ceremony when the goal is a user-bound credential. This section covers OAuth 2.1 Client Credentials for M2M, token exchange for delegation, DPoP for token binding, first-class agent identity for auditability, and emerging `auth.md` registration discovery.
+Authentication covers how agents receive credentials, prove identity, narrow authority, and call protected APIs or MCP servers without borrowing a human browser session.
 
-- OAuth 2.1 Client Credentials with token caching for M2M auth
-- Token Exchange (RFC 8693) for narrowing scope and delegation
-- DPoP (RFC 9449) for sender-constrained tokens and replay protection
-- Agent Identity: first-class principals, audit trails, and actor chains
-- auth.md: agentic registration discovery for provider assertions and OTP claim flows
-- Idempotency and replay protection: nonce stores and DPoP jti uniqueness
+- **Owns:** API keys, OAuth for agents, token exchange, DPoP, agent identity, MCP auth metadata, `auth.md`, and replay protection.
+- **Does not own:** tool safety semantics; see [Tool Design](/docs/tool-design). Public discovery broadly; see [Discovery](/docs/discovery).
+- **Agent-ready means:** credentials are scoped, short-lived where possible, machine-usable at runtime, validated on every request, and auditable by agent/user/delegation chain.
 
-The key distinction is request path versus registration path. Agents should call APIs with bearer credentials, validated scopes, audience checks, and structured errors. If a user needs to approve or claim a delegation, keep that interaction bounded to registration and return a credential the agent can use programmatically afterward.
+Registration can still involve human consent or an OTP claim ceremony. The runtime request path should stay programmatic: no CAPTCHA, login page, or ambient session cookie dependency.
 
-## Decision Tree
+## Choose A Path
 
-Start here: what kind of credential do you need?
+- [API Keys](/docs/authentication/api-keys) — only when keys are scoped, rotatable, and not exposed to models.
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — default for standalone agent services and machine-to-machine access.
+- [Agent Identity](/docs/authentication/agent-identity) — model agents as first-class principals for audit trails.
+- [Token Exchange](/docs/authentication/token-exchange) — narrow authority for delegation and sub-agents.
+- [DPoP](/docs/authentication/dpop) — bind tokens to client keys to reduce replay risk.
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — publish OAuth metadata for protected APIs.
+- [MCP Authorization](/docs/authentication/mcp-auth-model) — apply OAuth discovery and client identity to MCP.
+- [auth.md](/docs/authentication/auth-md) — describe agentic registration and credential-claim flows.
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — defend write operations from duplicated or replayed requests.
+- [Auth Anti-Patterns](/docs/authentication/anti-patterns) — avoid browser sessions, unscoped tokens, and hidden delegation.
 
-- **I'm building a standalone agent service that calls APIs.** Use [OAuth 2.1 Client Credentials](/docs/authentication/oauth-for-agents). Short-lived tokens, narrow scopes, cached and refreshed proactively.
+## Related
 
-- **I have a simple third-party API and don't want OAuth complexity.** Use [API Keys](/docs/authentication/api-keys), but only if the key can be scoped, rotated, and short-lived.
-
-- **An agent already has authority and needs to act on behalf of a user or delegate to a sub-agent.** Use [Token Exchange](/docs/authentication/token-exchange) (RFC 8693) to narrow scope and audience.
-
-- **I need to prevent stolen tokens from being replayed.** Use [DPoP](/docs/authentication/dpop) (RFC 9449) to bind tokens to a client keypair.
-
-- **My agents need to call multiple services and I need to audit who did what.** Use [Agent Identity](/docs/authentication/agent-identity) with distinct principals per agent.
-
-- **I'm building an MCP server.** Publish [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) at `/.well-known/oauth-protected-resource` and validate inbound JWTs.
-
-- **I'm integrating with MCP's auth model.** See [MCP Authorization](/docs/authentication/mcp-auth-model) for OAuth protected-resource metadata, authorization-server discovery, and Client ID Metadata Documents.
-
-- **An agent needs to register or claim a user-bound credential.** Publish [auth.md](/docs/authentication/auth-md), pair it with protected-resource metadata, and choose provider-attested or OTP-backed registration.
-
-## What You'll Find Here
-
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — Client Credentials grant, PKCE, token caching, JWT validation
-- [API Keys](/docs/authentication/api-keys) — when they're OK, scoping, rotation, and never-appear rules
-- [Agent Identity](/docs/authentication/agent-identity) — first-class agent principals, audit trails, `sub` + `act` claims
-- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 narrowing, delegated access, audience restriction
-- [DPoP](/docs/authentication/dpop) — RFC 9449 sender-constrained tokens, preventing replay attacks
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — RFC 9728, `.well-known/oauth-protected-resource`, client discovery
-- [MCP Authorization](/docs/authentication/mcp-auth-model) — protected-resource metadata, authorization-server discovery, and Client ID Metadata Documents
-- [auth.md](/docs/authentication/auth-md) — agentic registration discovery, ID-JAG, and user-claimed OTP flows
-- [Auth Anti-Patterns](/docs/authentication/anti-patterns) — what silently breaks agents, and the fixes
-- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — nonce stores, DPoP `jti` uniqueness, preventing double-submission
+- [API Surface](/docs/api-surface) — contracts that declare which authenticated operations exist.
+- [MCP Servers: Authentication](/docs/mcp-servers/authentication) — implementing auth inside MCP servers.
+- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) — publish metadata endpoints agents can discover.
+- [Error Handling](/docs/error-handling) — return structured auth failures agents can interpret.

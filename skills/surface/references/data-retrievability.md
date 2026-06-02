@@ -450,13 +450,9 @@ Use the docs pages below for the broader implementation patterns rather than ass
 - `/docs/data-retrievability/rag-patterns.mdx` — RAG taxonomy and when each pattern is worth using
 - `/docs/data-retrievability/embeddings.mdx` — Model selection (OpenAI, Voyage, Cohere, open-source)
 - `/docs/data-retrievability/multimodal-embeddings.mdx` — Image/video/audio (Voyage Multimodal, Gemini)
+- `/docs/data-retrievability/retrieval-pipeline.mdx` — Chunking, hybrid retrieval, reranking, agentic retrieval, and evaluation in one loop
 - `/docs/data-retrievability/vector-databases.mdx` — Pinecone vs. Qdrant vs. Weaviate vs. pgvector
-- `/docs/data-retrievability/hybrid-search.mdx` — BM25 + dense + RRF
-- `/docs/data-retrievability/reranking.mdx` — Two-stage retrieval (Cohere, Voyage, BGE)
-- `/docs/data-retrievability/chunking.mdx` — Fixed, semantic, late, contextual (Anthropic)
 - `/docs/data-retrievability/knowledge-graphs.mdx` — Neo4j, KuzuDB, GraphRAG, LightRAG
-- `/docs/data-retrievability/agentic-rag.mdx` — Query planning, reflection, tool selection
-- `/docs/data-retrievability/evaluation.mdx` — RAGAS, MTEB, custom metrics
 - `/docs/data-retrievability/anti-patterns.mdx` — What not to do
 - `/docs/tooling-catalog/index.mdx` — current tooling shortlist for vector stores, observability, MCP hubs, and voice/realtime tools
 - [Anthropic Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)

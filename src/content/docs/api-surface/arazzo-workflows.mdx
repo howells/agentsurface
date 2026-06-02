@@ -7,6 +7,7 @@ description: Using the OpenAPI Arazzo specification to define multi-step agent w
 
 Arazzo defines multi-step workflows as executable specifications, preventing agents from inventing their own order. A workflow document declares the sequence of operations, runtime expressions for data flow between steps, and success/failure handlers. This ensures deterministic behavior and prevents hallucinated steps or omitted operations in complex tasks like flight booking or payment processing.
 
+- Latest published specification: Arazzo 1.1.0.
 - Arazzo references one or many OpenAPI specs and maps them into workflows
 - Each step binds to an operationId and passes data between steps via runtime expressions
 - Control flow primitives: continue, retry, goto recovery step, end
@@ -34,7 +35,7 @@ A workflow definition includes:
 An Arazzo document has three top-level fields: `arazzo`, `info`, and the core content split between `sourceDescriptions`, `workflows`, and `components`.
 
 ```yaml
-arazzo: "1.0.0"
+arazzo: "1.1.0"
 info:
   title: Flight Booking Workflows
   version: "1.0.0"

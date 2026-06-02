@@ -1,0 +1,47 @@
+---
+title: Evaluation and Observability
+description: AI evals, traces, monitoring, guardrails, policy, and security tooling
+---
+
+Use these when agent behavior must be measurable, regressions must be caught, or untrusted inputs and sensitive data need explicit controls.
+
+Last curated: May 16, 2026.
+
+## Evaluation and Observability
+
+Keep this category AI-specific. General monitoring tools are only relevant as trace backends when paired with GenAI instrumentation.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Agent Readiness](https://isitagentready.com/) | isitagentready.com | Public-site scanner for agent-readiness signals | Core | Useful as an external audit target for Agent Surface's own discovery, content, policy, and capability docs. |
+| [Braintrust](https://www.braintrust.dev/docs) | braintrust.dev | AI observability, evals, datasets, experiments, prompts, and production monitoring | Core | Strong default for serious eval loops and regression testing. |
+| [Langfuse](https://langfuse.com/docs) | langfuse.com | LLM tracing, prompt management, evals, datasets, and analytics | Core | Strong open-source option with broad framework integrations. |
+| [LangSmith](https://docs.smith.langchain.com) | docs.smith.langchain.com | LangChain and LangGraph tracing, evals, datasets, and deployment feedback | Conditional | Strong when using LangChain or LangGraph. |
+| [Arize Phoenix](https://arize.com/docs/phoenix/) | arize.com | Open-source LLM observability, tracing, evals, and prompt experiments | Core | Strong OpenTelemetry/OpenInference-aligned option. |
+| [Promptfoo](https://www.promptfoo.dev/docs) | promptfoo.dev | CLI-first prompt, model, RAG, agent, and red-team evaluations | Core | Good for CI-friendly evals and adversarial testing. |
+| [RAGAS](https://docs.ragas.io/en/stable/) | docs.ragas.io | RAG and agent evaluation metrics | Conditional | Useful for retrieval quality loops; avoid treating metrics as absolute truth. |
+| [DeepEval](https://deepeval.com/docs/getting-started) | deepeval.com | LLM eval framework for RAG, agents, chatbots, safety, and CI tests | Conditional | Good Python option for test-like evals and synthetic data. |
+| [Opik](https://www.comet.com/docs/opik) | comet.com | Open-source LLM observability, evaluation, prompt tracking, and agent optimization | Conditional | Good open-source option alongside Langfuse and Phoenix. |
+| [Weights & Biases Weave](https://weave-docs.wandb.ai/) | weave-docs.wandb.ai | LLM traces, evals, datasets, and experiment tracking | Conditional | Good if the team already uses W&B. |
+| [Helicone](https://docs.helicone.ai) | docs.helicone.ai | LLM gateway observability, caching, costs, and logs | Conditional | Useful when lightweight model-call logging and cost visibility are enough. |
+| [PostHog LLM Observability](https://posthog.com/docs/llm-analytics) | posthog.com | LLM analytics, cost tracking, and product-level observability | Conditional | Relevant when LLM telemetry should sit next to product analytics and feature flags. |
+| [MLflow Tracing](https://mlflow.org/docs/latest/genai/tracing/) | mlflow.org | OpenTelemetry-compatible tracing for LLM and agent applications | Conditional | Good if the team already uses MLflow or wants self-hosted GenAI traces that can feed eval datasets. |
+| [New Relic AI Monitoring](https://docs.newrelic.com/docs/ai-monitoring/intro-to-ai-monitoring/) | docs.newrelic.com | APM-backed AI monitoring for LLM calls, vector stores, latency, tokens, cost, and feedback | Conditional | Use when New Relic is already the production observability system; keep AI evals in a dedicated eval loop. |
+| [SigNoz LLM Observability](https://signoz.io/docs/llm-community-integrations) | signoz.io | OpenTelemetry-native LLM observability integrations and dashboards | Conditional | Good for open-source or self-hosted teams that want GenAI telemetry beside traces, logs, and metrics. |
+| [AgentOps](https://docs.agentops.ai) | docs.agentops.ai | Agent session tracing, replay, and analytics | Watch | Relevant for agent-specific debugging; evaluate ecosystem fit. |
+
+## Guardrails, Security, and Policy Tools
+
+Use these when agents read untrusted content, handle user data, call write tools, or operate in regulated environments. These tools do not replace product-level permission design; they help enforce and observe it.
+
+| Tool | Website | What it is for | Tier | Notes |
+|---|---|---|---|---|
+| [Guardrails AI](https://www.guardrailsai.com/docs) | guardrailsai.com | Validation, structured-output checks, and guardrail orchestration for LLM apps | Conditional | Good when output shape, policy checks, or validation failures need first-class handling. |
+| [NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/) | docs.nvidia.com | Programmable guardrails and dialog controls for LLM applications | Conditional | Useful in enterprise/NVIDIA-aligned stacks or policy-heavy conversational systems. |
+| [Lakera](https://docs.lakera.ai/) | docs.lakera.ai | Prompt-injection and LLM security protection | Conditional | Consider for agents browsing or ingesting hostile/untrusted web content. |
+| [Llama Guard](https://www.llama.com/docs/model-cards-and-prompt-formats/llama-guard-4/) | llama.com | Safety classification model family | Conditional | Useful as a self-hostable or model-based safety classifier, depending on deployment needs. |
+| [Microsoft Presidio](https://microsoft.github.io/presidio/) | microsoft.github.io | PII detection, redaction, and anonymization | Conditional | Practical for logs, traces, eval datasets, and tool outputs that may contain sensitive data. |
+| [Pangea AI Guard](https://pangea.cloud/docs/ai-guard/) | pangea.cloud | AI security guardrail API for prompt, response, and data protection | Watch | Track for teams already using Pangea security services. |
+| [Superagent](https://docs.superagent.sh) | docs.superagent.sh | Guardrails, PII, prompt-injection, and verification tooling surfaced by the AI SDK registry | Watch | Worth evaluating as the AI SDK ecosystem adds packaged security tools. |
+
+<small>Sources are linked inline.</small>

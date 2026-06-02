@@ -1,14 +1,15 @@
 ---
 name: surface
-description: Make software legible to agents. Use when asked to audit or score agent readiness, make a codebase agentic, improve agent DX, add or assess AGENTS.md/llms.txt/MCP/OpenAPI/CLI/tooling surfaces, generate an agent-readiness plan, scaffold agent infrastructure, create agents/tools/workflows/memory/model routing/browser/sandbox capabilities, or improve agent consumability across APIs, CLIs, docs, auth, errors, tests, retrieval, and multi-agent systems.
+description: Make software legible to agents and guide production agent-system design. Use when asked for Agent Surface guidance, agent-readable software, agent readiness, AGENTS.md/llms.txt/MCP/OpenAPI/CLI/tool surfaces, agent protocols or tooling, audits or scorecards, transformation plans, or scaffolding agents/tools/workflows/memory/model routing/browser/sandbox capabilities across APIs, CLIs, docs, auth, errors, tests, retrieval, and multi-agent systems.
 ---
 
 # Surface
 
-Make software easier for agents to discover, understand, call, test, and safely modify.
+Make software easier for agents to discover, understand, call, test, safely modify, and build upon.
 
-Surface has two main workflows:
+Surface has three main workflows:
 
+- **Guide**: explain agent concepts, standards, tool choices, and implementation patterns.
 - **Audit**: detect project surfaces, score agent readiness, produce findings, and write improvement plans.
 - **Scaffold**: add or extend agent infrastructure such as agents, tools, workflows, model routing, retrieval/RAG, memory, browser access, sandbox execution, and MCP.
 
@@ -18,6 +19,7 @@ Use the existing project shape first. Read files before making claims or generat
 
 | User asks for | Route |
 | --- | --- |
+| explain, compare, choose, best practice, reference, guide, standards, tooling | Guide |
 | audit, score, assess, agent-ready, agent-readiness | Audit |
 | plan, transform, improve, fix agent DX | Audit, then optionally execute |
 | add MCP, create llms.txt, write AGENTS.md, improve discovery | Audit single-area transform unless they ask for direct generation |
@@ -28,6 +30,12 @@ Use the existing project shape first. Read files before making claims or generat
 If the user explicitly wants a direct artifact, do not force a full audit. Do a narrow detection pass, create the artifact, and explain the skipped audit scope.
 
 ## Modes
+
+Guide modes:
+
+- `concept`: explain an agent surface, protocol, pattern, or tradeoff.
+- `decision`: recommend a stack, protocol, runtime, or surface design.
+- `reference`: point to canonical docs, standards, and Agent Surface pages.
 
 Audit modes:
 
@@ -57,6 +65,29 @@ Scaffold modes:
 4. Prefer project-native conventions over generic templates.
 5. Treat destructive, authenticated, browser, sandbox, and production operations as high-risk. Require clear confirmation before executing them.
 6. Preserve user edits. Do not overwrite existing AGENTS.md, CLAUDE.md, llms.txt, MCP servers, or agent files without reading and merging.
+
+## Guide Workflow
+
+Use guide mode when the user wants agent information, architecture guidance, standards context, or tool selection without asking to modify a project.
+
+1. Identify whether the user needs concepts, a decision, or implementation guidance.
+2. Prefer the docs site when available: `src/content/docs/` is the canonical Agent Surface guide.
+3. Read only the relevant docs pages. Start with section indexes, then load leaf pages as needed.
+4. Keep answers dense and decision-oriented. Name tradeoffs, failure modes, and adjacent surfaces.
+5. For fast-moving standards, tools, models, and vendor platforms, verify current primary sources before making "latest", "current", or "recommended" claims.
+
+High-signal guide entry points:
+
+| Need | Docs path |
+| --- | --- |
+| Start or route through the guide | `src/content/docs/getting-started.mdx` |
+| Build agents | `src/content/docs/agents/`, `runtime-boundaries/`, `multi-agent/` |
+| Expose capabilities to agents | `api-surface/`, `tool-design/`, `cli-design/`, `mcp-servers/` |
+| Make software discoverable | `discovery/`, `context-files/` |
+| Secure and recover | `authentication/`, `error-handling/` |
+| Retrieval and memory | `data-retrievability/` |
+| Verify behavior | `testing/`, `scoring/` |
+| Standards and tools | `protocols/`, `reference-links/`, `tooling-catalog/` |
 
 ## Audit Workflow
 
@@ -102,7 +133,7 @@ Gather these surfaces before scoring:
 - Derive the final rating from the scaled score out of 30, not the raw score.
 - Score current implementation, not intent or roadmap.
 - Be conservative when evidence is partial.
-- If delegation is available and appropriate, score independent dimensions in parallel. If not, score locally with the same output format.
+- If delegation is available and appropriate, score independent dimensions in parallel using the specialist scoring prompts in `agents/score-*.md`. If not, score locally with the same output format.
 
 For the exact scorecard, finding, plan, and delta formats, use `references/audit-workflow.md`.
 
@@ -132,6 +163,8 @@ Load additional scaffold references only as needed:
 7. **Eval hooks ship with scaffolds**: note the first tests/evals that should verify routing, recovery, and guardrails.
 8. **High-risk tools need policy**: browser, sandbox, write, auth, and production tools need allowlists, quotas, audit logs, timeouts, and confirmation gates.
 
+When execution would benefit from focused specialist instructions, load only the matching prompt from `agents/*.md`. These files are task resources, not required context for ordinary guide, audit, or scaffold routing.
+
 ## Framework Guidance
 
 - Prefer the project's existing deliberate agent framework first.
@@ -145,6 +178,12 @@ Load additional scaffold references only as needed:
 - Do not generate Node-only APIs in Workers-native projects.
 
 ## Interaction Pattern
+
+For guide requests:
+
+1. Present the relevant concept, decision rule, or comparison.
+2. Link the answer to the right Agent Surface section or primary standard.
+3. Mention what would change if the user moves from learning to implementation.
 
 For audits:
 
@@ -210,3 +249,10 @@ Use these defaults unless the project already has a better convention:
 - OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html
 - Agent Surface RAG patterns: /docs/data-retrievability/rag-patterns
 - Agent Surface tooling catalog: /docs/tooling-catalog
+
+## Skill Folder Structure
+
+- `SKILL.md`: trigger metadata and core routing workflow.
+- `references/`: detailed audit and scaffold references. Load only the relevant file.
+- `agents/openai.yaml`: UI metadata generated for skill listings.
+- `agents/*.md`: specialist task prompts for scoring and targeted transformations. Load only when delegating or executing that specialty.

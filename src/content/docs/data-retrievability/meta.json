@@ -5,13 +5,9 @@
     "rag-patterns",
     "embeddings",
     "multimodal-embeddings",
-    "chunking",
+    "retrieval-pipeline",
     "vector-databases",
-    "hybrid-search",
-    "reranking",
     "knowledge-graphs",
-    "agentic-rag",
-    "evaluation",
     "anti-patterns"
   ]
 }
