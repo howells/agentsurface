@@ -412,43 +412,27 @@ bunx drizzle-kit push  # Apply pending migrations
 
 ---
 
-## Linting & Formatting: Biome
+## Linting & Formatting: Oxlint/Oxfmt
 
 ### Config
 
-Single `biome.json` at repo root:
-
-```json
-{
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "a11y": { "useKeyWithClickEvents": "off" },
-      "style": { "noNonNullAssertion": "off" },
-      "correctness": { "noUnusedVariables": "warn" }
-    }
-  },
-  "formatter": { "indentStyle": "space", "lineWidth": 100 },
-  "organizeImports": { "enabled": true }
-}
-```
+Root lint and format configuration lives in `oxlint.config.ts` and `oxfmt.config.ts`.
 
 ### Commands
 
 ```bash
-biome check .                     # Lint + format check
-biome check --write .             # Apply fixes
-biome format --write .            # Format only (no lint)
+pnpm lint                         # Lint + format check
+pnpm lint:fix                     # Apply safe fixes
+pnpm format                       # Format only (no lint)
 ```
 
 Integrate with editor:
-- VS Code: Install Biome extension; set as default formatter
+- VS Code: Use Oxlint/Oxfmt integrations if available
 - Configure on save: `"editor.formatOnSave": true`
 
-### No Prettier, No ESLint
+### No Prettier, No ESLint, No Biome
 
-Biome replaces both. It's unified, fast, and opinionated.
+Oxlint and Oxfmt provide the repository linting and formatting surface.
 
 ---
 

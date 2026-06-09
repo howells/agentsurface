@@ -26,47 +26,47 @@ A tool registry is a centralized collection of all available tools with metadata
 
 ```typescript
 // tools/registry.ts
-import { z } from 'zod';
+import { z } from "zod";
 
 interface ToolMetadata {
   name: string;
   description: string;
   schema: z.ZodSchema;
   handler: (params: any) => Promise<any>;
-  category: 'read' | 'write' | 'admin' | 'dangerous';
+  category: "read" | "write" | "admin" | "dangerous";
   requiresAuth: boolean;
   rateLimit?: { requestsPerMinute: number };
 }
 
 const toolRegistry: Record<string, ToolMetadata> = {
   search_issues: {
-    name: 'search_issues',
-    description: 'Search for issues by text, assignee, or status...',
+    name: "search_issues",
+    description: "Search for issues by text, assignee, or status...",
     schema: searchIssuesSchema,
     handler: searchIssuesHandler,
-    category: 'read',
+    category: "read",
     requiresAuth: false,
   },
-  
+
   create_issue: {
-    name: 'create_issue',
-    description: 'Create a new issue in the tracker...',
+    name: "create_issue",
+    description: "Create a new issue in the tracker...",
     schema: createIssueSchema,
     handler: createIssueHandler,
-    category: 'write',
+    category: "write",
     requiresAuth: true,
   },
-  
+
   delete_issue: {
-    name: 'delete_issue',
-    description: 'Permanently delete an issue (cannot be undone)...',
+    name: "delete_issue",
+    description: "Permanently delete an issue (cannot be undone)...",
     schema: deleteIssueSchema,
     handler: deleteIssueHandler,
-    category: 'dangerous',
+    category: "dangerous",
     requiresAuth: true,
     rateLimit: { requestsPerMinute: 1 },
   },
-  
+
   // ... more tools
 };
 
@@ -77,12 +77,12 @@ export const getAllTools = () => Object.values(toolRegistry);
 
 ```typescript
 export function getToolsByCategory(category: string): ToolMetadata[] {
-  return Object.values(toolRegistry).filter(t => t.category === category);
+  return Object.values(toolRegistry).filter((t) => t.category === category);
 }
 
 // Usage
-const readOnlyTools = getToolsByCategory('read');
-const adminTools = getToolsByCategory('admin');
+const readOnlyTools = getToolsByCategory("read");
+const adminTools = getToolsByCategory("admin");
 ```
 
 ### Filtering by Permission
@@ -90,11 +90,11 @@ const adminTools = getToolsByCategory('admin');
 ```typescript
 export function getToolsForUser(userId: string): ToolMetadata[] {
   const user = await getUserPermissions(userId);
-  
-  return Object.values(toolRegistry).filter(tool => {
+
+  return Object.values(toolRegistry).filter((tool) => {
     if (tool.requiresAuth && !user.authenticated) return false;
-    if (tool.category === 'admin' && !user.isAdmin) return false;
-    if (tool.category === 'dangerous' && !user.isDangerousActionsAllowed) return false;
+    if (tool.category === "admin" && !user.isAdmin) return false;
+    if (tool.category === "dangerous" && !user.isDangerousActionsAllowed) return false;
     return true;
   });
 }
@@ -107,31 +107,25 @@ Different roles need different tools. Create curated kits per role:
 ```typescript
 const toolKits = {
   auditor: {
-    description: 'Read-only access for compliance audits',
-    tools: [
-      'search_issues',
-      'get_issue',
-      'list_users',
-      'get_user',
-      'search_audit_logs',
-    ],
+    description: "Read-only access for compliance audits",
+    tools: ["search_issues", "get_issue", "list_users", "get_user", "search_audit_logs"],
   },
-  
+
   developer: {
-    description: 'Create and update issues, code review workflows',
+    description: "Create and update issues, code review workflows",
     tools: [
-      'search_issues',
-      'create_issue',
-      'update_issue',
-      'search_pull_requests',
-      'create_pull_request',
-      'approve_pull_request',
-      'search_docs',
+      "search_issues",
+      "create_issue",
+      "update_issue",
+      "search_pull_requests",
+      "create_pull_request",
+      "approve_pull_request",
+      "search_docs",
     ],
   },
-  
+
   admin: {
-    description: 'Full access including dangerous operations',
+    description: "Full access including dangerous operations",
     tools: [
       // All tools
       ...Object.keys(toolRegistry),
@@ -142,10 +136,8 @@ const toolKits = {
 export function getToolKitForRole(role: string): ToolMetadata[] {
   const kit = toolKits[role];
   if (!kit) throw new Error(`Unknown role: ${role}`);
-  
-  return kit.tools
-    .map(name => toolRegistry[name])
-    .filter(t => t !== undefined);
+
+  return kit.tools.map((name) => toolRegistry[name]).filter((t) => t !== undefined);
 }
 ```
 
@@ -156,31 +148,31 @@ When a tool registry has >20 tools, do not load all tools into context at once. 
 ### BM25 Search (Anthropic Pattern)
 
 ```typescript
-import { bm25Search } from '@anthropic-ai/sdk/utils';
+import { bm25Search } from "@anthropic-ai/sdk/utils";
 
 async function selectRelevantTools(
   userQuery: string,
   allTools: ToolMetadata[],
-  topK: number = 5
+  topK: number = 5,
 ): Promise<ToolMetadata[]> {
   const scored = bm25Search(userQuery, allTools, {
     topK,
     fields: {
-      name: { boost: 2 },      // Tool name is most important
+      name: { boost: 2 }, // Tool name is most important
       description: { boost: 1 },
     },
   });
-  
+
   return scored;
 }
 
 // Usage
-const userQuery = 'Find all open bugs assigned to alice';
+const userQuery = "Find all open bugs assigned to alice";
 const relevant = await selectRelevantTools(userQuery, getAllTools());
 
 const response = await query({
   prompt: userQuery,
-  tools: relevant.map(t => ({
+  tools: relevant.map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: zodToJsonSchema(t.schema),
@@ -194,15 +186,12 @@ const response = await query({
 Simple approach for explicit categories:
 
 ```typescript
-function selectToolsByKeywords(
-  userQuery: string,
-  allTools: ToolMetadata[]
-): ToolMetadata[] {
+function selectToolsByKeywords(userQuery: string, allTools: ToolMetadata[]): ToolMetadata[] {
   const keywords = userQuery.toLowerCase().split(/\s+/);
-  
-  return allTools.filter(tool => {
+
+  return allTools.filter((tool) => {
     const toolText = `${tool.name} ${tool.description}`.toLowerCase();
-    return keywords.some(kw => toolText.includes(kw));
+    return keywords.some((kw) => toolText.includes(kw));
   });
 }
 ```
@@ -226,21 +215,21 @@ Distinguish safe (read) from risky (write) tools:
 
 ```typescript
 export const readOnlyKit = {
-  description: 'Safe read operations for audit and discovery',
+  description: "Safe read operations for audit and discovery",
   tools: Object.values(toolRegistry)
-    .filter(t => t.category === 'read')
-    .map(t => t.name),
+    .filter((t) => t.category === "read")
+    .map((t) => t.name),
 };
 
 export const mutatingKit = {
-  description: 'All read and write operations',
+  description: "All read and write operations",
   tools: Object.values(toolRegistry)
-    .filter(t => ['read', 'write'].includes(t.category))
-    .map(t => t.name),
+    .filter((t) => ["read", "write"].includes(t.category))
+    .map((t) => t.name),
 };
 
 export const dangerousKit = {
-  description: 'Full access including destructive operations',
+  description: "Full access including destructive operations",
   tools: Object.keys(toolRegistry),
 };
 ```
@@ -250,23 +239,22 @@ Usage:
 ```typescript
 // Audit agent — read-only
 const auditAgent = agent({
-  tools: readOnlyKit.tools.map(name => toolRegistry[name]),
-  model: 'claude-sonnet-4-6',
+  tools: readOnlyKit.tools.map((name) => toolRegistry[name]),
+  model: "claude-sonnet-4-6",
 });
 
 // Data migration — read + write
 const migrationAgent = agent({
-  tools: mutatingKit.tools.map(name => toolRegistry[name]),
-  model: 'claude-opus-4-7',
+  tools: mutatingKit.tools.map((name) => toolRegistry[name]),
+  model: "claude-opus-4-7",
   requiresHumanApproval: true,
 });
 
 // Admin — dangerous operations (requires approval)
 const adminAgent = agent({
-  tools: dangerousKit.tools.map(name => toolRegistry[name]),
-  model: 'claude-opus-4-7',
-  requiresHumanApproval: (toolName) => 
-    toolRegistry[toolName].category === 'dangerous',
+  tools: dangerousKit.tools.map((name) => toolRegistry[name]),
+  model: "claude-opus-4-7",
+  requiresHumanApproval: (toolName) => toolRegistry[toolName].category === "dangerous",
 });
 ```
 
@@ -278,23 +266,17 @@ Tag tools with stability metadata:
 interface ToolMetadata {
   name: string;
   // ... other fields
-  stability: 'stable' | 'beta' | 'deprecated';
+  stability: "stable" | "beta" | "deprecated";
   deprecatedAt?: Date;
-  replacedBy?: string;  // Name of successor tool
+  replacedBy?: string; // Name of successor tool
 }
 
-export function selectToolsForProduction(
-  allTools: ToolMetadata[]
-): ToolMetadata[] {
-  return allTools.filter(t => t.stability === 'stable');
+export function selectToolsForProduction(allTools: ToolMetadata[]): ToolMetadata[] {
+  return allTools.filter((t) => t.stability === "stable");
 }
 
-export function selectToolsForBeta(
-  allTools: ToolMetadata[]
-): ToolMetadata[] {
-  return allTools.filter(t => 
-    t.stability === 'stable' || t.stability === 'beta'
-  );
+export function selectToolsForBeta(allTools: ToolMetadata[]): ToolMetadata[] {
+  return allTools.filter((t) => t.stability === "stable" || t.stability === "beta");
 }
 ```
 
@@ -315,18 +297,16 @@ Help users find the right tool:
 ```typescript
 export function listToolsByPurpose(purpose: string): ToolMetadata[] {
   const descriptions = Object.values(toolRegistry)
-    .map(t => ({ ...t, relevance: t.description.includes(purpose) ? 1 : 0 }))
+    .map((t) => ({ ...t, relevance: t.description.includes(purpose) ? 1 : 0 }))
     .sort((a, b) => b.relevance - a.relevance);
-  
-  return descriptions
-    .filter(t => t.relevance > 0)
-    .map(({ relevance, ...t }) => t);
+
+  return descriptions.filter((t) => t.relevance > 0).map(({ relevance, ...t }) => t);
 }
 
 // Usage
-listToolsByPurpose('search')      // Returns search_* tools
-listToolsByPurpose('delete')      // Returns delete_* tools
-listToolsByPurpose('notification') // Returns notify_* tools
+listToolsByPurpose("search"); // Returns search_* tools
+listToolsByPurpose("delete"); // Returns delete_* tools
+listToolsByPurpose("notification"); // Returns notify_* tools
 ```
 
 ## Rate Limiting at the Registry Level
@@ -341,27 +321,26 @@ setInterval(() => {
   toolCallCounts.clear();
 }, resetInterval);
 
-async function executeToolWithRateLimit(
-  toolName: string,
-  params: any
-): Promise<any> {
+async function executeToolWithRateLimit(toolName: string, params: any): Promise<any> {
   const tool = toolRegistry[toolName];
   if (!tool) throw new Error(`Unknown tool: ${toolName}`);
-  
+
   if (tool.rateLimit) {
     const count = toolCallCounts.get(toolName) || 0;
     if (count >= tool.rateLimit.requestsPerMinute) {
       return {
         isError: true,
-        content: [{
-          type: 'text',
-          text: `Rate limit exceeded: ${tool.rateLimit.requestsPerMinute} calls per minute max.`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Rate limit exceeded: ${tool.rateLimit.requestsPerMinute} calls per minute max.`,
+          },
+        ],
       };
     }
     toolCallCounts.set(toolName, count + 1);
   }
-  
+
   return await tool.handler(params);
 }
 ```

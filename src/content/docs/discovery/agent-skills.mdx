@@ -53,11 +53,11 @@ Skills work because agents can index a lightweight catalog first, then load the 
 
 That means descriptions matter. Write them as routing instructions:
 
-| Weak | Better |
-|---|---|
-| API tokens | Use when an agent needs to create, validate, or rotate scoped API tokens for automation. |
-| Design review | Use when reviewing a rendered web page for visual, responsive, and interaction issues. |
-| Migration | Use when preparing a database migration PR with schema diff, rollback notes, and verification steps. |
+| Weak          | Better                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| API tokens    | Use when an agent needs to create, validate, or rotate scoped API tokens for automation.             |
+| Design review | Use when reviewing a rendered web page for visual, responsive, and interaction issues.               |
+| Migration     | Use when preparing a database migration PR with schema diff, rollback notes, and verification steps. |
 
 Do not inline every workflow into a catalog file. Point to the skill and let the agent load details only when the task calls for it.
 
@@ -89,13 +89,13 @@ Only publish skills that are real, reviewed, and kept current with the product.
 
 ## Skills Vs Other Files
 
-| File | Role |
-|---|---|
-| `AGENTS.md` | Repository-level operating instructions for coding agents. |
-| `llms.txt` | Site/docs index for retrieval. |
-| `SKILL.md` | Task-specific instructions, scripts, references, and assets. |
-| MCP server card | Connection metadata for a tool server. |
-| OpenAPI | HTTP API contract. |
+| File            | Role                                                         |
+| --------------- | ------------------------------------------------------------ |
+| `AGENTS.md`     | Repository-level operating instructions for coding agents.   |
+| `llms.txt`      | Site/docs index for retrieval.                               |
+| `SKILL.md`      | Task-specific instructions, scripts, references, and assets. |
+| MCP server card | Connection metadata for a tool server.                       |
+| OpenAPI         | HTTP API contract.                                           |
 
 Skills complement MCP. MCP exposes callable tools; skills teach an agent when and how to use a workflow.
 

@@ -1,8 +1,8 @@
 <!--
 monorepo-AGENTS.md — Hierarchical context file pattern for pnpm/Turbo monorepos.
 
-What: A template showing how to structure AGENTS.md across multiple packages while avoiding 
-duplication. Root AGENTS.md provides commands + global boundaries; per-package AGENTS.md files 
+What: A template showing how to structure AGENTS.md across multiple packages while avoiding
+duplication. Root AGENTS.md provides commands + global boundaries; per-package AGENTS.md files
 add scoped detail.
 
 When to use: Any monorepo with 3+ packages that need independent agent guidance.
@@ -12,7 +12,7 @@ What to customize:
 2. Per-package: Copy the pattern to each packages/X/AGENTS.md, customize per package
 3. Update package.json entries and filter examples to match your workspace
 
-Principle: "Nearest wins" — an agent reading packages/api/AGENTS.md will prioritize 
+Principle: "Nearest wins" — an agent reading packages/api/AGENTS.md will prioritize
 its commands over the root file. Avoid duplication; link from per-package back to root.
 
 Citation: https://claude.code.com/docs/en/claude-code
@@ -20,28 +20,32 @@ Citation: https://claude.code.com/docs/en/claude-code
 
 # ROOT: packages/AGENTS.md
 
-```markdown
+````markdown
 # Acme Agent Tools — Monorepo
 
-Pnpm workspaces. Three packages: @acme/sdk (client library), @acme/api (Fastify backend), 
+Pnpm workspaces. Three packages: @acme/sdk (client library), @acme/api (Fastify backend),
 @acme/dashboard (Next.js frontend).
 
 ## Quick start (all packages)
 
 **Development:**
+
 ```sh
 pnpm dev          # All packages (SDK playground + API + dashboard)
 pnpm test         # All tests
 pnpm lint && pnpm type-check
 ```
+````
 
 **Build:**
+
 ```sh
 pnpm build                    # All packages in dependency order
 changeset add && pnpm publish # Version bump + npm release
 ```
 
 **By package (faster for focused work):**
+
 ```sh
 pnpm --filter=@acme/sdk dev          # http://localhost:5173
 pnpm --filter=@acme/api dev          # http://localhost:3001
@@ -71,6 +75,7 @@ Root AGENTS.md covers shared commands, monorepo conventions, turbo setup, change
 ## Global commands
 
 Build + test must pass before merge:
+
 ```sh
 turbo run test      # All packages in parallel
 turbo run lint      # All packages in parallel
@@ -79,6 +84,7 @@ turbo run build     # Dependency order
 ```
 
 Full example (filters + parallelism):
+
 ```sh
 turbo run build --filter=@acme/api -- --minify    # Single package
 turbo run test --parallel -- --coverage            # Parallel, all packages
@@ -87,13 +93,16 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 ## Global boundaries
 
 **Always:**
+
 - Read files, run tests, open draft PRs
 
 **Ask first:**
+
 - `pnpm add` (installs to root or single package?)
 - `changeset add` (required before version bump)
 
 **Never:**
+
 - `pnpm publish` without changesets
 - Deploy to production
 - Rotate secrets
@@ -111,7 +120,8 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 - [pnpm workspaces](https://pnpm.io/workspaces)
 - [Turbo documentation](https://turbo.build)
 - [Changesets CLI](https://github.com/changesets/changesets)
-```
+
+````
 
 ---
 
@@ -120,7 +130,7 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 ```markdown
 # @acme/sdk (Client Library)
 
-TypeScript client library for agent integration. Exports via pkg.json `exports` field 
+TypeScript client library for agent integration. Exports via pkg.json `exports` field
 (ESM + CommonJS, TypeScript `.d.ts` in both).
 
 See `AGENTS.md` in repo root for global commands and boundaries.
@@ -138,9 +148,10 @@ pnpm --filter=@acme/sdk test     # Vitest
 pnpm --filter=@acme/sdk test:watch
 pnpm --filter=@acme/sdk lint
 pnpm --filter=@acme/sdk type-check
-```
+````
 
 **Build:**
+
 ```sh
 pnpm --filter=@acme/sdk build    # Outputs dist/ (ESM + CJS + .d.ts)
 pnpm --filter=@acme/sdk preview  # Test bundle locally
@@ -193,14 +204,17 @@ Integration tests mock the MCP server. See `src/__tests__/integration/` for setu
 ## Boundaries (SDK-specific)
 
 **Always:**
+
 - Modify `src/` (types, implementations, tests)
 - Update `package.json` `version` via changesets (never by hand)
 
 **Ask first:**
+
 - Add new export (may break downstream consumers)
 - Change `exports` field structure
 
 **Never:**
+
 - Publish directly (`npm publish`; use `pnpm publish` from root after changesets)
 
 ## Key dependency: @acme/shared
@@ -213,7 +227,8 @@ Test with: `pnpm --filter=@acme/sdk test` after shared updates.
 - Root AGENTS.md (global commands, version workflow)
 - `docs/api/sdk.md` — Public API reference
 - `src/agent.ts` — Agent class implementation
-```
+
+````
 
 ---
 
@@ -233,11 +248,12 @@ Requirements: Node 20, PostgreSQL 14+ (local dev: docker-compose up -d).
 ```sh
 pnpm --filter=@acme/api install
 # Copy .env.example to .env.local and fill in DATABASE_URL
-```
+````
 
 ## Commands (API-specific)
 
 **Development:**
+
 ```sh
 pnpm --filter=@acme/api dev       # http://localhost:3001
 pnpm --filter=@acme/api test      # Vitest
@@ -247,6 +263,7 @@ pnpm --filter=@acme/api db:seed     # Populate test data
 ```
 
 **Database:**
+
 ```sh
 pnpm --filter=@acme/api db:create      # Create database
 pnpm --filter=@acme/api db:migrate     # Apply migrations (always idempotent)
@@ -299,22 +316,25 @@ Rollback only in dev; production requires data migration support.
 ## Boundaries (API-specific)
 
 **Always:**
+
 - Modify `src/routes/`, `src/middleware/`, tests
 - Run `pnpm --filter=@acme/api test`
 
 **Ask first:**
+
 - `pnpm --filter=@acme/api db:migrate` (modifies database schema)
 - Modify `src/db/schema.ts` (requires migration)
 - Change environment variables in `.env`
 
 **Never:**
+
 - Modify `.env` in git
 - Rotate database credentials
 - Delete migration files (append-only)
 
 ## Key dependency: @acme/shared
 
-API validates request bodies with Zod schemas from `@acme/shared/schemas/`. Breaking schema 
+API validates request bodies with Zod schemas from `@acme/shared/schemas/`. Breaking schema
 changes require coordination with dashboard team.
 
 ## See also
@@ -322,7 +342,8 @@ changes require coordination with dashboard team.
 - Root AGENTS.md
 - `docs/api/routes.md` — REST endpoint reference
 - `docs/ARCHITECTURE.md` — API dataflow + agent integration points
-```
+
+````
 
 ---
 
@@ -343,9 +364,10 @@ pnpm --filter=@acme/dashboard dev       # http://localhost:3000
 pnpm --filter=@acme/dashboard test      # Vitest
 pnpm --filter=@acme/dashboard test:watch
 pnpm --filter=@acme/dashboard lint
-```
+````
 
 **Build:**
+
 ```sh
 pnpm --filter=@acme/dashboard build     # Static export to out/
 pnpm --filter=@acme/dashboard start     # Local preview of build
@@ -400,6 +422,7 @@ Implemented in `app/docs/[slug]/page.tsx` via `headers()` API.
 ## JSON-LD schemas
 
 Root layout generates:
+
 - `SoftwareApplication` (project identity)
 - `WebAPI` (API reference)
 - `FAQPage` (docs structure)
@@ -409,15 +432,18 @@ See `app/layout.tsx` for implementation pattern.
 ## Boundaries (Dashboard-specific)
 
 **Always:**
+
 - Modify `app/` routes, components, tests
 - Update JSON-LD schemas in metadata
 
 **Ask first:**
+
 - Install new dependencies (affects bundle size)
 - Modify `next.config.ts`
 - Change environment variable names
 
 **Never:**
+
 - Deploy without passing `pnpm build`
 - Commit `.env` or `.env.local`
 
@@ -437,6 +463,7 @@ See `app/layout.tsx` for implementation pattern.
 - `docs/api/dashboard.md` — Routes + endpoints
 - `app/layout.tsx` — JSON-LD implementation
 - `app/docs/[slug]/page.tsx` — Content negotiation pattern
+
 ```
 
 ---
@@ -465,3 +492,4 @@ This scales: each package can override without repeating root guidance.
 - [Changesets CLI](https://github.com/changesets/changesets)
 - Root `AGENTS.md` (global context)
 - Root `CONTRIBUTING.md` (pull request workflow with changesets)
+```

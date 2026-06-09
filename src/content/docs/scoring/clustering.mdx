@@ -22,6 +22,7 @@ A scorecard can contain dozens of findings across multiple dimensions. Raw findi
 **Group by action, not by category.**
 
 Bad clustering:
+
 ```
 "API findings" (3 findings)
 "MCP findings" (2 findings)
@@ -29,6 +30,7 @@ Bad clustering:
 ```
 
 Good clustering:
+
 ```
 "Agent tool discoverability" (3 findings: weak API descriptions + no MCP + missing llms.txt)
 ```
@@ -39,13 +41,13 @@ The cluster name answers: "What would I fix together, and why?"
 
 Each cluster contains:
 
-| Field | Purpose |
-|-------|---------|
-| **Name** | Short, action-oriented title |
-| **Rationale** | 1 sentence: why these findings belong together |
-| **Findings** | Table: severity, dimension, issue, fix impact |
-| **Suggested approach** | 1–2 sentences on how to tackle the cluster |
-| **Dependencies** | Other clusters that must complete first |
+| Field                  | Purpose                                        |
+| ---------------------- | ---------------------------------------------- |
+| **Name**               | Short, action-oriented title                   |
+| **Rationale**          | 1 sentence: why these findings belong together |
+| **Findings**           | Table: severity, dimension, issue, fix impact  |
+| **Suggested approach** | 1–2 sentences on how to tackle the cluster     |
+| **Dependencies**       | Other clusters that must complete first        |
 
 ## Worked Example: 3 Findings → 1 Cluster
 
@@ -216,6 +218,7 @@ Testing:             0/3 (no agent tests)
 ### Clustered (Prioritized by Impact-to-Effort)
 
 **Cluster 1: Agent tool discoverability**
+
 - Tool descriptions (↑Tool Design 1→2)
 - API descriptions (↑API Surface 1→2)
 - MCP server (↑MCP Server 0→2)
@@ -223,18 +226,21 @@ Testing:             0/3 (no agent tests)
 - Effort: 6 hours | Impact: +4 dimensions | Ratio: Excellent
 
 **Cluster 2: Machine-readable auth**
+
 - OAuth 2.1 Client Credentials (↑Authentication 1→3)
 - Scoped tokens (↑Authentication 1→3)
 - JWT validation (↑Authentication 1→3)
 - Effort: 4 hours | Impact: +1 dimension (fully) | Ratio: Good
 
 **Cluster 3: Error recovery**
+
 - RFC 9457 Problem Details (↑Error Handling 0→2)
 - is_retriable field (↑Error Handling 0→2)
 - Error recovery tests (↑Testing 0→1)
 - Effort: 3 hours | Impact: +2 dimensions | Ratio: Excellent
 
 **Cluster 4: Context & conventions**
+
 - Curate AGENTS.md (↑Context Files 1→2)
 - Add permission boundaries (↑Context Files 1→2)
 - Document commands (↑Context Files 1→2)
@@ -278,6 +284,7 @@ If a cluster has >7 findings, split it into two.
 **3. Document dependencies explicitly.**
 
 Example:
+
 ```
 Cluster: CLI enhancements
 Depends on: None (independent)
@@ -299,6 +306,7 @@ Ratio (impact/effort):  0.7 0.75 0.67 0.5
 **5. Show which agent specializes in each cluster.**
 
 Example:
+
 ```
 Cluster: Agent tool discoverability
 Agent assigned: api-optimizer (API descriptions) + mcp-builder (MCP) + discovery-writer (llms.txt)
@@ -310,6 +318,7 @@ Effort estimate: 6 hours
 **Anti-pattern 1: Dimension-based clustering**
 
 Bad:
+
 ```
 "API Surface cluster" (all API Surface findings)
 "MCP Server cluster" (all MCP findings)
@@ -320,6 +329,7 @@ This leads to working on things that don't create user value.
 **Anti-pattern 2: Mixing effort levels**
 
 Bad:
+
 ```
 Cluster: Error resilience
 ├─ Add RFC 9457 (1 hour) ✓ Easy

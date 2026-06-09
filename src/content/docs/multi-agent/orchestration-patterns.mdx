@@ -7,13 +7,13 @@ description: The five primary patterns for coordinating multiple AI agents, when
 
 Choose the right pattern for your task sequence. Sequential for well-defined stages, concurrent for independent work, handoff for specialist domains, group chat for collaborative refinement, dynamic orchestration for open-ended discovery. Combining patterns is common: deterministic backbone handles routing and validation, AI agents handle judgment.
 
-| Pattern | Control | Best for | Risk |
-|---------|---------|----------|------|
-| Sequential | Forward through stages | Research → draft → edit → review | Context dilution, error propagation |
-| Concurrent | Fan-out/fan-in aggregation | Diverse perspectives, parallel work | Inconsistent schemas, partial failure |
-| Handoff | Transfer to specialist | Distinct non-overlapping domains | Ambiguous boundaries, lost context |
-| Group chat | Shared thread, manager orders | Collaborative refinement | Sycophantic convergence, token growth |
-| Dynamic | Runtime task ledger | Open-ended complex goals | Hallucinated completion, circular planning |
+| Pattern    | Control                       | Best for                            | Risk                                       |
+| ---------- | ----------------------------- | ----------------------------------- | ------------------------------------------ |
+| Sequential | Forward through stages        | Research → draft → edit → review    | Context dilution, error propagation        |
+| Concurrent | Fan-out/fan-in aggregation    | Diverse perspectives, parallel work | Inconsistent schemas, partial failure      |
+| Handoff    | Transfer to specialist        | Distinct non-overlapping domains    | Ambiguous boundaries, lost context         |
+| Group chat | Shared thread, manager orders | Collaborative refinement            | Sycophantic convergence, token growth      |
+| Dynamic    | Runtime task ledger           | Open-ended complex goals            | Hallucinated completion, circular planning |
 
 Multi-agent systems are not a single architecture. They are a family of patterns, each with different control flow, failure characteristics, and appropriate use cases. Choosing the wrong pattern is the most common source of multi-agent complexity — a sequential pipeline where concurrent fan-out was needed, or a swarm where a supervisor would have produced coherent output.
 
@@ -32,12 +32,14 @@ Input → Agent A → Agent B → Agent C → Output
 Each agent transforms the artifact in a predictable way: extract, then enrich, then validate, then format. No agent needs to know about the others — only about its own input contract and output contract.
 
 **When to use sequential:**
+
 - Tasks with a natural stage progression (research → draft → edit → review)
 - When each stage requires specialized context or a different system prompt
 - When intermediate outputs need to be inspectable or auditable
 - When a failure in any stage should halt the pipeline rather than produce partial results
 
 **Failure modes:**
+
 - **Context dilution:** By stage three, the agent's context window contains the accumulated output of every prior stage. Long pipelines degrade quality as early context competes with recent additions.
 - **Error propagation:** An error in stage two produces garbage for stage three. If stage three succeeds anyway and produces plausible output, the garbage is invisible until output review.
 - **No parallelism:** Sequential pipelines are strictly slower than their most time-consuming stage. There is no way to recover latency.
@@ -45,18 +47,18 @@ Each agent transforms the artifact in a predictable way: extract, then enrich, t
 **Framework implementation (Mastra):**
 
 ```typescript
-import { createWorkflow, createStep } from "@mastra/core/workflows"
-import { z } from "zod"
+import { createWorkflow, createStep } from "@mastra/core/workflows";
+import { z } from "zod";
 
 const researchStep = createStep({
   id: "research",
   inputSchema: z.object({ topic: z.string() }),
   outputSchema: z.object({ sources: z.array(z.string()), summary: z.string() }),
   execute: async ({ inputData }) => {
-    const result = await researchAgent.generate(inputData.topic)
-    return { sources: result.sources, summary: result.text }
-  }
-})
+    const result = await researchAgent.generate(inputData.topic);
+    return { sources: result.sources, summary: result.text };
+  },
+});
 
 const draftStep = createStep({
   id: "draft",
@@ -64,21 +66,21 @@ const draftStep = createStep({
   outputSchema: z.object({ draft: z.string() }),
   execute: async ({ inputData }) => {
     const result = await writerAgent.generate(
-      `Based on these sources: ${inputData.sources.join(", ")}\n\nSummary: ${inputData.summary}\n\nWrite a draft article.`
-    )
-    return { draft: result.text }
-  }
-})
+      `Based on these sources: ${inputData.sources.join(", ")}\n\nSummary: ${inputData.summary}\n\nWrite a draft article.`,
+    );
+    return { draft: result.text };
+  },
+});
 
 const editStep = createStep({
   id: "edit",
   inputSchema: z.object({ draft: z.string() }),
   outputSchema: z.object({ article: z.string() }),
   execute: async ({ inputData }) => {
-    const result = await editorAgent.generate(inputData.draft)
-    return { article: result.text }
-  }
-})
+    const result = await editorAgent.generate(inputData.draft);
+    return { article: result.text };
+  },
+});
 
 export const contentPipeline = createWorkflow({
   id: "content-pipeline",
@@ -88,7 +90,7 @@ export const contentPipeline = createWorkflow({
   .then(researchStep)
   .then(draftStep)
   .then(editStep)
-  .commit()
+  .commit();
 ```
 
 ### 2. Concurrent (Fan-Out / Fan-In)
@@ -102,18 +104,19 @@ Input ────┼→ Agent B ─┼→ Aggregator → Output
 ```
 
 **When to use concurrent:**
+
 - Independent sub-tasks that do not depend on each other's results
 - Tasks that benefit from multiple perspectives (adversarial review, diverse generation, multi-model voting)
 - When total latency is bounded by the slowest agent rather than the sum of all agents
 
 **Aggregation strategies:**
 
-| Strategy | When to use | Trade-off |
-|----------|------------|-----------|
-| Majority vote | Binary or categorical decisions | Requires odd number of agents; does not handle nuance |
-| Weighted merge | Structured outputs with confidence scores | Requires agents to produce comparable schemas |
-| LLM synthesis | Prose or complex outputs | Adds a synthesis step with its own latency and cost |
-| Best-of-N | When one answer is clearly correct | Requires a scoring function to select the winner |
+| Strategy       | When to use                               | Trade-off                                             |
+| -------------- | ----------------------------------------- | ----------------------------------------------------- |
+| Majority vote  | Binary or categorical decisions           | Requires odd number of agents; does not handle nuance |
+| Weighted merge | Structured outputs with confidence scores | Requires agents to produce comparable schemas         |
+| LLM synthesis  | Prose or complex outputs                  | Adds a synthesis step with its own latency and cost   |
+| Best-of-N      | When one answer is clearly correct        | Requires a scoring function to select the winner      |
 
 **LLM synthesis example (LangGraph):**
 
@@ -167,6 +170,7 @@ graph = builder.compile()
 ```
 
 **Failure modes:**
+
 - **Inconsistent schemas:** If parallel agents return different structures, the aggregator cannot merge them reliably. Define shared output schemas before building fan-out.
 - **Partial failure:** If one of three concurrent agents fails, does the aggregator proceed with two results or block waiting for the third? Build explicit timeout and partial-result policies.
 - **Aggregation cost:** LLM synthesis adds a full generation step. For simple decisions, majority vote is faster and cheaper.
@@ -182,6 +186,7 @@ Input → Router → [Agent A | Agent B | Agent C]
 ```
 
 **When to use handoff routing:**
+
 - Clearly distinct domains that do not overlap (billing vs. technical support vs. onboarding)
 - When the routing decision can be made reliably from the input alone
 - When specialist agents should not know they are part of a routing system
@@ -222,6 +227,7 @@ result = await Runner.run(triage_agent, user_message)
 ```
 
 **Failure modes:**
+
 - **Routing boundary ambiguity:** A user message about "why was I charged for a feature that doesn't work" spans both billing and technical support. Routing agents struggle with cross-domain queries. Add an explicit fallback agent for these cases.
 - **Lost context on handoff:** The specialist receives the original user message but not the routing agent's reasoning. Pass routing metadata through context or system prompt injection.
 
@@ -240,6 +246,7 @@ Manager decides: done
 ```
 
 **When to use group chat:**
+
 - Collaborative document creation (one agent drafts, another critiques, the first revises)
 - Iterative refinement with adversarial pressure
 - Tasks where the correct output emerges through dialogue rather than from a single agent
@@ -286,6 +293,7 @@ writer.initiate_chat(manager, message="Write a product announcement for our new 
 ```
 
 **Failure modes:**
+
 - **Sycophantic convergence:** Agents agree with each other rather than maintaining their assigned perspective. A critic that agrees with the writer after one revision round has not performed its function. Add explicit role enforcement: "You must find at least one substantive problem or explain why the draft is already complete."
 - **Runaway conversations:** Without a clear termination condition, group chats can oscillate indefinitely. Always set a maximum round count and a termination agent that can declare the conversation complete.
 - **Token accumulation:** Each round appends to the shared message history. By round 8, early context is being truncated in most models. Group chats work best when kept short — 4–6 rounds maximum.
@@ -309,6 +317,7 @@ Goal → Manager builds task ledger
 ```
 
 **When to use dynamic orchestration:**
+
 - Complex goals whose subtasks cannot be defined in advance
 - Tasks where intermediate results change what needs to be done next
 - Research and planning workflows where discovery is part of the task
@@ -327,20 +336,21 @@ Goal:           The original objective (never changes)
 The manager updates the ledger after each task completes. If a task reveals the original plan was wrong, the manager replans from the current state rather than continuing with the stale plan.
 
 **Failure modes:**
+
 - **Hallucinated completion:** The manager decides the goal is achieved when it is not. Add a verification step where the manager checks each claim in the final output against the evidence in the task ledger.
 - **Circular planning:** The manager assigns a task, receives a result, re-evaluates the plan, and assigns the same task again. Implement loop detection by tracking which (agent, task, input) triples have already been executed.
 - **Unbounded cost:** Dynamic orchestration can spawn unlimited sub-tasks. Set explicit budgets: maximum task count, maximum total tokens, maximum wall time.
 
 ## Choosing a Pattern
 
-| Situation | Recommended pattern |
-|-----------|-------------------|
-| Well-defined sequential stages | Sequential pipeline |
-| Independent parallel work | Concurrent fan-out |
-| Distinct specialist domains | Handoff routing |
-| Iterative collaborative refinement | Group chat |
-| Open-ended complex goals | Dynamic orchestration |
-| Mixed structured + open-ended | Deterministic backbone + AI at decision nodes |
+| Situation                          | Recommended pattern                           |
+| ---------------------------------- | --------------------------------------------- |
+| Well-defined sequential stages     | Sequential pipeline                           |
+| Independent parallel work          | Concurrent fan-out                            |
+| Distinct specialist domains        | Handoff routing                               |
+| Iterative collaborative refinement | Group chat                                    |
+| Open-ended complex goals           | Dynamic orchestration                         |
+| Mixed structured + open-ended      | Deterministic backbone + AI at decision nodes |
 
 ## Reliable Default: Deterministic Backbone + AI at Decision Nodes
 
@@ -371,7 +381,9 @@ Output
 This pattern has lower cost, faster execution, and more predictable failure modes than fully AI-driven orchestration. The AI is doing what it is good at (judgment, generation, understanding) while the infrastructure handles what it is bad at (reliable routing, error recovery, schema validation).
 
 <Callout type="info">
-Fumadocs and other framework docs use a similar pattern: static routing for well-known paths, dynamic generation only where the content cannot be predetermined. The same principle applies to agent orchestration.
+  Fumadocs and other framework docs use a similar pattern: static routing for well-known paths,
+  dynamic generation only where the content cannot be predetermined. The same principle applies to
+  agent orchestration.
 </Callout>
 
 ## Combining Patterns

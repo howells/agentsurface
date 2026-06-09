@@ -11,40 +11,40 @@ Last curated: May 16, 2026.
 
 If you only need a practical shortlist, start here. These are not universal defaults; they are the tools that repeatedly show up as useful building blocks for production agent workflows.
 
-| Job | Strong starting points | Why |
-|---|---|---|
-| Agent runtime | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph | Covers TypeScript apps, OpenAI-native agents, and explicit graph workflows. |
-| Tool interoperability | MCP, JSON Schema, OpenAPI, Arazzo | Keeps tools inspectable, portable, and less prompt-dependent. |
-| Web search and extraction | Firecrawl, Tavily, Exa, Browserbase, Browser Use, Stagehand, Apify | Covers search, crawling, extraction, JavaScript-heavy browsing, and repeatable browser automation. |
-| RAG and retrieval | pgvector, Qdrant, Pinecone, Weaviate, Cloudflare AI Search, Voyage AI, Cohere, Jina AI | Covers vector storage, hybrid search, embeddings, and reranking. |
-| Document ingestion | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence | Turns messy PDFs, docs, tables, and scanned content into retrievable structure. |
-| Memory | Honcho, Zep, Letta, Mem0, Supermemory, Graphiti | Covers explicit agent memory, temporal graphs, user memory, and recall layers. |
-| External app actions | Composio, Arcade, Pipedream, Zapier, n8n, Paragon | Gives agents controlled access to SaaS actions without writing every connector from scratch. |
-| Sandboxed execution | E2B, Daytona, Vercel Sandbox, Cloudflare Sandbox, Modal | Lets agents run code or generated artifacts away from production systems. |
-| Durable workflows | Temporal, Trigger.dev, Inngest, Hatchet, LangGraph, Mastra workflows | Keeps multi-step agent work resumable, observable, and retryable. |
-| Observability and evals | Braintrust, Langfuse, Arize Phoenix, LangSmith, Promptfoo, RAGAS, DeepEval, OpenTelemetry GenAI | Gives traces, datasets, evaluations, and regression gates. |
-| Guardrails and security | Guardrails AI, NeMo Guardrails, Lakera, Llama Guard, Presidio, Pangea | Helps with validation, policy checks, PII handling, prompt-injection risk, and auditability. |
+| Job                       | Strong starting points                                                                          | Why                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Agent runtime             | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph                                             | Covers TypeScript apps, OpenAI-native agents, and explicit graph workflows.                        |
+| Tool interoperability     | MCP, JSON Schema, OpenAPI, Arazzo                                                               | Keeps tools inspectable, portable, and less prompt-dependent.                                      |
+| Web search and extraction | Firecrawl, Tavily, Exa, Browserbase, Browser Use, Stagehand, Apify                              | Covers search, crawling, extraction, JavaScript-heavy browsing, and repeatable browser automation. |
+| RAG and retrieval         | pgvector, Qdrant, Pinecone, Weaviate, Cloudflare AI Search, Voyage AI, Cohere, Jina AI          | Covers vector storage, hybrid search, embeddings, and reranking.                                   |
+| Document ingestion        | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence         | Turns messy PDFs, docs, tables, and scanned content into retrievable structure.                    |
+| Memory                    | Honcho, Zep, Letta, Mem0, Supermemory, Graphiti                                                 | Covers explicit agent memory, temporal graphs, user memory, and recall layers.                     |
+| External app actions      | Composio, Arcade, Pipedream, Zapier, n8n, Paragon                                               | Gives agents controlled access to SaaS actions without writing every connector from scratch.       |
+| Sandboxed execution       | E2B, Daytona, Vercel Sandbox, Cloudflare Sandbox, Modal                                         | Lets agents run code or generated artifacts away from production systems.                          |
+| Durable workflows         | Temporal, Trigger.dev, Inngest, Hatchet, LangGraph, Mastra workflows                            | Keeps multi-step agent work resumable, observable, and retryable.                                  |
+| Observability and evals   | Braintrust, Langfuse, Arize Phoenix, LangSmith, Promptfoo, RAGAS, DeepEval, OpenTelemetry GenAI | Gives traces, datasets, evaluations, and regression gates.                                         |
+| Guardrails and security   | Guardrails AI, NeMo Guardrails, Lakera, Llama Guard, Presidio, Pangea                           | Helps with validation, policy checks, PII handling, prompt-injection risk, and auditability.       |
 
 ## Catalog Pages
 
-| Page | Use it for | Start with |
-|---|---|---|
-| [Standards and protocols](/docs/tooling-catalog/standards-and-protocols) | Portable agent surfaces, discovery, MCP, API contracts, and crawler policy | MCP, AGENTS.md, JSON Schema, OpenAPI, OpenTelemetry GenAI |
-| [Frameworks and runtimes](/docs/tooling-catalog/frameworks-and-runtimes) | Agent runtimes, workflows, coding agents, AI UI, and app builders | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph |
-| [Model providers and gateways](/docs/tooling-catalog/model-providers-and-gateways) | Model APIs, routing, gateway controls, realtime, voice, and multimodal generation | OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway |
-| [Retrieval and memory](/docs/tooling-catalog/retrieval-and-memory) | RAG, vector stores, search, reranking, agent memory, document ingestion, and OCR | pgvector, Qdrant, Pinecone, LlamaParse, Unstructured, Honcho, Zep |
-| [Evaluation and observability](/docs/tooling-catalog/evaluation-and-observability) | Evals, traces, datasets, regression gates, guardrails, and policy checks | Braintrust, Langfuse, Arize Phoenix, Promptfoo, OpenTelemetry GenAI |
-| [Browser, sandbox, and integration](/docs/tooling-catalog/browser-sandbox-and-integration) | Browser automation, web extraction, code sandboxes, and SaaS tool hubs | Browserbase, Stagehand, Firecrawl, E2B, Vercel Sandbox, Composio |
-| [Capability map](/docs/tooling-catalog/capability-map) | Source crawl notes, cross-category use-case mapping, and watch-only tooling | Source tables, capability rows, watchlist |
+| Page                                                                                       | Use it for                                                                        | Start with                                                                      |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [Standards and protocols](/docs/tooling-catalog/standards-and-protocols)                   | Portable agent surfaces, discovery, MCP, API contracts, and crawler policy        | MCP, AGENTS.md, JSON Schema, OpenAPI, OpenTelemetry GenAI                       |
+| [Frameworks and runtimes](/docs/tooling-catalog/frameworks-and-runtimes)                   | Agent runtimes, workflows, coding agents, AI UI, and app builders                 | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph                             |
+| [Model providers and gateways](/docs/tooling-catalog/model-providers-and-gateways)         | Model APIs, routing, gateway controls, realtime, voice, and multimodal generation | OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway |
+| [Retrieval and memory](/docs/tooling-catalog/retrieval-and-memory)                         | RAG, vector stores, search, reranking, agent memory, document ingestion, and OCR  | pgvector, Qdrant, Pinecone, LlamaParse, Unstructured, Honcho, Zep               |
+| [Evaluation and observability](/docs/tooling-catalog/evaluation-and-observability)         | Evals, traces, datasets, regression gates, guardrails, and policy checks          | Braintrust, Langfuse, Arize Phoenix, Promptfoo, OpenTelemetry GenAI             |
+| [Browser, sandbox, and integration](/docs/tooling-catalog/browser-sandbox-and-integration) | Browser automation, web extraction, code sandboxes, and SaaS tool hubs            | Browserbase, Stagehand, Firecrawl, E2B, Vercel Sandbox, Composio                |
+| [Capability map](/docs/tooling-catalog/capability-map)                                     | Source crawl notes, cross-category use-case mapping, and watch-only tooling       | Source tables, capability rows, watchlist                                       |
 
 ## Selection Rules
 
-| Situation | Prefer | Avoid |
-|---|---|---|
-| Building a product agent | Existing project runtime first, then the smallest framework that owns tools, state, and eval hooks | Adding a second orchestration framework only for one feature |
-| Exposing tools to multiple clients | MCP, JSON Schema, OpenAPI, OAuth metadata, and explicit scopes | Prompt-only tool descriptions or browser-session borrowing |
-| Adding retrieval | Data-shape driven retrieval: hybrid plus rerank for most production knowledge search | Picking a vector database before deciding query patterns and metadata needs |
-| Letting agents browse or execute code | Managed browser/sandbox infrastructure with allowlists, timeouts, logs, and approvals | Direct shell or browser access from the app server |
-| Shipping to production | Tracing, eval datasets, cost controls, model/provider policy, and regression gates | Treating evals and observability as post-launch cleanup |
+| Situation                             | Prefer                                                                                             | Avoid                                                                       |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Building a product agent              | Existing project runtime first, then the smallest framework that owns tools, state, and eval hooks | Adding a second orchestration framework only for one feature                |
+| Exposing tools to multiple clients    | MCP, JSON Schema, OpenAPI, OAuth metadata, and explicit scopes                                     | Prompt-only tool descriptions or browser-session borrowing                  |
+| Adding retrieval                      | Data-shape driven retrieval: hybrid plus rerank for most production knowledge search               | Picking a vector database before deciding query patterns and metadata needs |
+| Letting agents browse or execute code | Managed browser/sandbox infrastructure with allowlists, timeouts, logs, and approvals              | Direct shell or browser access from the app server                          |
+| Shipping to production                | Tracing, eval datasets, cost controls, model/provider policy, and regression gates                 | Treating evals and observability as post-launch cleanup                     |
 
 <small>Sources are linked inline from each catalog page.</small>

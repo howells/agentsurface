@@ -28,11 +28,11 @@
  * - Point handler to your actual backend
  */
 
-import { z } from 'zod';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { tool as createVercelTool } from 'ai';
-import { Tool as OpenAITool } from '@openai/agents';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from "zod";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { tool as createVercelTool } from "ai";
+import { Tool as OpenAITool } from "@openai/agents";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // ============================================================================
 // SHARED SCHEMA & METADATA (framework-neutral)
@@ -43,22 +43,38 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
  * Keep structure flat (1–2 levels max). Every field described + typed.
  * <CUSTOMISE> Replace with your actual parameters.
  */
-const searchDocsSchema = z.object({
-  query: z.string()
-    .describe(
-      'Free-text search query. Examples: "authentication", "rate limits", "error 429". ' +
-      'Supports quoted phrases ("exact match") and field filters (status:draft).'
-    ),
-  limit: z.number().int().min(1).max(100).default(10)
-    .describe('Max results to return. Default 10, maximum 100. Use lower values to reduce token spend.'),
-  offset: z.number().int().min(0).default(0)
-    .describe('Pagination offset for large result sets. Increment by limit to fetch next page.'),
-  response_format: z.enum(['concise', 'detailed']).default('concise')
-    .describe(
-      'concise: title + URL only (low tokens). ' +
-      'detailed: full snippet + metadata (higher tokens, better for analysis).'
-    ),
-}).strict(); // <CUSTOMISE> Ensure .strict() for OpenAI strict mode compatibility
+const searchDocsSchema = z
+  .object({
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(10)
+      .describe(
+        "Max results to return. Default 10, maximum 100. Use lower values to reduce token spend.",
+      ),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Pagination offset for large result sets. Increment by limit to fetch next page."),
+    query: z
+      .string()
+      .describe(
+        'Free-text search query. Examples: "authentication", "rate limits", "error 429". ' +
+          'Supports quoted phrases ("exact match") and field filters (status:draft).',
+      ),
+    response_format: z
+      .enum(["concise", "detailed"])
+      .default("concise")
+      .describe(
+        "concise: title + URL only (low tokens). " +
+          "detailed: full snippet + metadata (higher tokens, better for analysis).",
+      ),
+  })
+  .strict(); // <CUSTOMISE> Ensure .strict() for OpenAI strict mode compatibility
 
 type SearchDocsInput = z.infer<typeof searchDocsSchema>;
 
@@ -67,16 +83,18 @@ type SearchDocsInput = z.infer<typeof searchDocsSchema>;
  * but documents what callers should expect.
  */
 const searchDocsResponseSchema = z.object({
-  results: z.array(z.object({
-    id: z.string().describe('Semantic ID (not opaque)'),
-    title: z.string(),
-    url: z.string().describe('Full URL for direct access'),
-    snippet: z.string().optional().describe('Matching excerpt (only in detailed mode)'),
-    rank: z.number().describe('Relevance rank (0–100)'),
-  })),
-  has_more: z.boolean().describe('True if more results exist beyond limit'),
-  next_offset: z.number().optional().describe('Offset for next page query'),
-  total_count: z.number().describe('Total matching documents (estimate)'),
+  has_more: z.boolean().describe("True if more results exist beyond limit"),
+  next_offset: z.number().optional().describe("Offset for next page query"),
+  results: z.array(
+    z.object({
+      id: z.string().describe("Semantic ID (not opaque)"),
+      title: z.string(),
+      url: z.string().describe("Full URL for direct access"),
+      snippet: z.string().optional().describe("Matching excerpt (only in detailed mode)"),
+      rank: z.number().describe("Relevance rank (0–100)"),
+    }),
+  ),
+  total_count: z.number().describe("Total matching documents (estimate)"),
 });
 
 // ============================================================================
@@ -93,34 +111,34 @@ async function searchDocsHandler(input: SearchDocsInput) {
 
   try {
     // <CUSTOMISE> Call your actual search backend
-    const response = await fetch('https://api.example.com/docs/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DOCS_API_KEY}`,
-        'X-Trace-Id': crypto.randomUUID(), // Propagate trace for observability
-      },
+    const response = await fetch("https://api.example.com/docs/search", {
       body: JSON.stringify({
         query,
         limit: limit + 1, // Fetch one extra to detect has_more
         offset,
       }),
+      headers: {
+        Authorization: `Bearer ${process.env.DOCS_API_KEY}`,
+        "Content-Type": "application/json",
+        "X-Trace-Id": crypto.randomUUID(), // Propagate trace for observability
+      },
+      method: "POST",
     });
 
     if (!response.ok) {
       return {
-        success: false,
         error: {
-          message: `Search API returned ${response.status}`,
-          code: response.status === 401 ? 'AUTH_FAILED' : 'API_ERROR',
+          code: response.status === 401 ? "AUTH_FAILED" : "API_ERROR",
+          doc_uri: "https://docs.example.com/api-errors",
           is_retriable: response.status >= 500 || response.status === 429,
+          message: `Search API returned ${response.status}`,
           suggestions: [
             response.status === 401
-              ? 'Check DOCS_API_KEY environment variable and token expiry'
-              : 'Service temporarily unavailable; retry in 30 seconds',
+              ? "Check DOCS_API_KEY environment variable and token expiry"
+              : "Service temporarily unavailable; retry in 30 seconds",
           ],
-          doc_uri: 'https://docs.example.com/api-errors',
         },
+        success: false,
       };
     }
 
@@ -129,31 +147,31 @@ async function searchDocsHandler(input: SearchDocsInput) {
     const has_more = data.results.length > limit;
 
     return {
-      success: true,
+      has_more,
+      next_offset: has_more ? offset + limit : undefined,
       results: results.map((doc: any) => ({
         id: doc.id,
         title: doc.title,
         url: doc.url,
-        ...(response_format === 'detailed' && { snippet: doc.snippet }),
+        ...(response_format === "detailed" && { snippet: doc.snippet }),
         rank: doc.relevance_score,
       })),
-      has_more,
-      next_offset: has_more ? offset + limit : undefined,
+      success: true,
       total_count: data.total_count,
     };
-  } catch (err: any) {
+  } catch (error: any) {
     return {
       success: false,
       error: {
-        message: err.message || 'Unknown error during search',
-        code: 'SEARCH_ERROR',
+        message: error.message || "Unknown error during search",
+        code: "SEARCH_ERROR",
         is_retriable: true,
         suggestions: [
-          'Check network connectivity',
-          'Verify query syntax (no special chars, quoted phrases)',
-          'Try simpler query or reduce limit',
+          "Check network connectivity",
+          "Verify query syntax (no special chars, quoted phrases)",
+          "Try simpler query or reduce limit",
         ],
-        doc_uri: 'https://docs.example.com/search-guide',
+        doc_uri: "https://docs.example.com/search-guide",
       },
     };
   }
@@ -164,15 +182,18 @@ async function searchDocsHandler(input: SearchDocsInput) {
 // ============================================================================
 
 const toolMetadata = {
-  name: 'search_docs',
+  name: "search_docs",
   description: `Search internal documentation by keyword or phrase. Use this when the user asks to find setup guides, API references, troubleshooting steps, or any existing written knowledge. Do not use this for general web search (use web_search tool instead), to create new docs (use create_doc), or to modify existing docs (use update_doc). Returns results ranked by relevance. Requires DOCS_API_KEY environment variable.`,
 
   // Anthropic supports toModelOutput for token efficiency on large responses
   toModelOutput: (output: any) => {
-    if (!output.success) return JSON.stringify(output);
-    const summary = `Found ${output.total_count} matching docs. ` +
+    if (!output.success) {
+      return JSON.stringify(output);
+    }
+    const summary =
+      `Found ${output.total_count} matching docs. ` +
       `Top result: "${output.results[0]?.title}" (${output.results[0]?.url}). ` +
-      `Use results[].id to fetch full content. ${output.has_more ? `More pages available.` : 'No additional pages.'}`;
+      `Use results[].id to fetch full content. ${output.has_more ? `More pages available.` : "No additional pages."}`;
     return summary;
   },
 
@@ -191,22 +212,16 @@ const toolMetadata = {
 
 export function createMCPServer() {
   const server = new Server({
-    name: 'docs-search-mcp',
-    version: '1.0.0',
+    name: "docs-search-mcp",
+    version: "1.0.0",
   });
 
   // <CUSTOMISE> Connect your actual handler
-  server.tool(
-    toolMetadata.name,
-    toolMetadata.description,
-    searchDocsSchema,
-    searchDocsHandler,
-    {
-      readOnlyHint: true,          // Query-only, no mutations
-      idempotentHint: true,        // Safe to retry
-      openWorldHint: false,        // No side effects beyond this API
-    }
-  );
+  server.tool(toolMetadata.name, toolMetadata.description, searchDocsSchema, searchDocsHandler, {
+    idempotentHint: true, // Safe to retry
+    openWorldHint: false, // No side effects beyond this API
+    readOnlyHint: true, // Query-only, no mutations
+  });
 
   return server;
 }
@@ -216,11 +231,11 @@ export function createMCPServer() {
 // ============================================================================
 
 export const claudeSearchDocsTool = {
-  name: toolMetadata.name,
-  description: toolMetadata.description,
-  input_schema: searchDocsSchema,
-  handler: searchDocsHandler,
   _meta: toolMetadata._meta,
+  description: toolMetadata.description,
+  handler: searchDocsHandler,
+  input_schema: searchDocsSchema,
+  name: toolMetadata.name,
 };
 
 // For use with @anthropic-ai/claude-agent-sdk:
@@ -235,8 +250,8 @@ export const claudeSearchDocsTool = {
 
 export const vercelSearchDocsTool = createVercelTool({
   description: toolMetadata.description,
-  parameters: zodToJsonSchema(searchDocsSchema) as Record<string, unknown>,
   execute: searchDocsHandler,
+  parameters: zodToJsonSchema(searchDocsSchema) as Record<string, unknown>,
 });
 
 // For use with ai (Vercel):
@@ -284,11 +299,13 @@ export type ToolOutput = Awaited<ReturnType<typeof searchDocsHandler>>;
 /**
  * Validate input against schema. Useful in middleware or evals.
  */
-export function validateToolInput(input: unknown): { valid: true; data: ToolInput } | { valid: false; error: string } {
+export function validateToolInput(
+  input: unknown,
+): { valid: true; data: ToolInput } | { valid: false; error: string } {
   try {
     const data = searchDocsSchema.parse(input);
-    return { valid: true, data };
-  } catch (err: any) {
-    return { valid: false, error: err.message };
+    return { data, valid: true };
+  } catch (error: any) {
+    return { valid: false, error: error.message };
   }
 }

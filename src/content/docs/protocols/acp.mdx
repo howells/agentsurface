@@ -29,6 +29,7 @@ The problem ACP solves is not technical — HTTP and JSON are sufficient to call
 ACP treats commerce as a session with a defined beginning and end. There is no persistent cart carried across interactions. Each commerce session is stateless and scoped to a single intent: the agent starts a session, negotiates what it needs, pays if authorized, and the session completes.
 
 Three parties participate in every ACP interaction:
+
 - **Agent** — the AI acting on the user's behalf
 - **Buyer** — the user (or organization) whose payment method and allowance are used
 - **Merchant** — the service offering goods or services
@@ -52,12 +53,7 @@ GET /.well-known/acp.json
   "endpoints": {
     "checkout_sessions": "https://api.acme.com/acp/checkout_sessions"
   },
-  "supported_capabilities": [
-    "streaming_updates",
-    "cancellation",
-    "intent_tracing",
-    "idempotency"
-  ],
+  "supported_capabilities": ["streaming_updates", "cancellation", "intent_tracing", "idempotency"],
   "supported_payment_methods": ["card", "ach", "crypto_usdc"],
   "currencies": ["usd", "eur"],
   "authentication": {
@@ -165,13 +161,13 @@ Location: /acp/checkout_sessions/sess_01HV3K
 
 The `negotiated_capabilities` field in the session response is the intersection of what the agent declared and what the merchant supports. The agent must only rely on capabilities that appear in this list.
 
-| Capability | Meaning |
-|---|---|
-| `streaming_updates` | Merchant sends SSE updates during long-running operations |
-| `cancellation` | Sessions can be canceled after creation |
-| `intent_tracing` | Cancellations include structured reason codes |
-| `idempotency` | Duplicate requests with the same `Idempotency-Key` are safe |
-| `partial_fulfillment` | Merchant can fulfill a subset of requested items |
+| Capability            | Meaning                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `streaming_updates`   | Merchant sends SSE updates during long-running operations   |
+| `cancellation`        | Sessions can be canceled after creation                     |
+| `intent_tracing`      | Cancellations include structured reason codes               |
+| `idempotency`         | Duplicate requests with the same `Idempotency-Key` are safe |
+| `partial_fulfillment` | Merchant can fulfill a subset of requested items            |
 
 If a capability the agent requires is not in the negotiated list, the agent should abort the session with a cancel request rather than proceeding without the feature.
 
@@ -246,14 +242,14 @@ Content-Type: application/json
 
 Intent trace reason codes allow merchants to distinguish why sessions were abandoned — useful for pricing analysis, UX improvement, and fraud detection.
 
-| Reason Code | Meaning |
-|---|---|
-| `user_declined` | Buyer explicitly declined after review |
-| `budget_exceeded` | Total exceeded the buyer's declared budget |
-| `capability_mismatch` | Required capability not available after negotiation |
-| `timeout` | Session expired before completion |
-| `agent_error` | Agent encountered an internal error |
-| `merchant_unavailable` | Merchant service returned an error |
+| Reason Code            | Meaning                                             |
+| ---------------------- | --------------------------------------------------- |
+| `user_declined`        | Buyer explicitly declined after review              |
+| `budget_exceeded`      | Total exceeded the buyer's declared budget          |
+| `capability_mismatch`  | Required capability not available after negotiation |
+| `timeout`              | Session expired before completion                   |
+| `agent_error`          | Agent encountered an internal error                 |
+| `merchant_unavailable` | Merchant service returned an error                  |
 
 ## Error Handling
 
@@ -272,11 +268,11 @@ ACP error responses carry structured messages with severity and resolution guida
 }
 ```
 
-| Severity | Meaning | Agent behavior |
-|---|---|---|
-| `info` | Advisory — operation succeeded with notes | Log and continue |
-| `warning` | Partial success or degraded result | Inform user, continue if acceptable |
-| `error` | Operation failed | Stop, report to user, do not retry unless `retryable: true` |
+| Severity  | Meaning                                   | Agent behavior                                              |
+| --------- | ----------------------------------------- | ----------------------------------------------------------- |
+| `info`    | Advisory — operation succeeded with notes | Log and continue                                            |
+| `warning` | Partial success or degraded result        | Inform user, continue if acceptable                         |
+| `error`   | Operation failed                          | Stop, report to user, do not retry unless `retryable: true` |
 
 ## MCP Binding
 

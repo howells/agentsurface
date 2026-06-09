@@ -67,14 +67,14 @@ export async function ensureToolIndex(ctx: McpContext) {
     // its related tools are pre-loaded even if embeddings wouldn't
     // have picked them. Prevents mid-workflow discovery gaps.
     relatedTools: {
-      invoices_create: ["customers_list"],          // Need customer to invoice
+      invoices_create: ["customers_list"], // Need customer to invoice
       invoices_create_from_tracker: ["customers_list"],
       invoices_recurring_create: ["customers_list"],
       tracker_timer_start: ["tracker_projects_list"], // Need project to track time
       tracker_entries_create: ["tracker_projects_list"],
       tracker_entries_list: ["tracker_projects_list"],
       tracker_projects_list: ["tracker_entries_list"],
-      transactions_update: ["categories_list"],     // Need category to categorize
+      transactions_update: ["categories_list"], // Need category to categorize
     },
   });
 
@@ -184,6 +184,7 @@ Without `relatedTools`, the agent hits a common failure mode: it starts creating
 The `relatedTools` map is a **dependency injection for multi-step workflows**. When `invoices_create` is selected by embeddings, `customers_list` is automatically pre-loaded — even if the user's message ("create an invoice for $500") has zero semantic similarity to "list customers."
 
 **Guidelines for building the map**:
+
 - Map write tools to the read tools they depend on (create invoice → list customers)
 - Map bidirectional relationships where either side needs the other (`tracker_projects_list` ↔ `tracker_entries_list` above — listing projects often leads to listing entries, and vice versa)
 - Keep it minimal — only add dependencies you've observed agents needing in practice
@@ -194,14 +195,16 @@ The `relatedTools` map is a **dependency injection for multi-step workflows**. W
 ## Trade-offs
 
 ### Pros
+
 - **Token savings**: Tool list shrinks from ~500 tokens (50 tools) to ~120 tokens (12 tools) per request.
 - **Model clarity**: Model focuses on relevant tools; less distraction.
 - **Discovery**: Related tools are suggested via `relatedTools` config.
 
 ### Cons
+
 - **Embedding latency**: ~50–100ms per request (slight increase).
 - **Cold start**: First request after server restart pays embedding cost (~2–5s).
-- **Coverage**: If a tool isn't in the top 12, the model can't use it directly. Mitigation: `search_tools` meta-tool lets model *search* for tools dynamically.
+- **Coverage**: If a tool isn't in the top 12, the model can't use it directly. Mitigation: `search_tools` meta-tool lets model _search_ for tools dynamically.
 
 ---
 
@@ -214,38 +217,47 @@ server.registerTool(
   "search_tools",
   {
     title: "Search Available Tools",
-    description: "Search for a tool by name or capability. Use this when you can't find the tool you need.",
+    description:
+      "Search for a tool by name or capability. Use this when you can't find the tool you need.",
     inputSchema: z.object({
-      query: z.string().describe("What do you want to do? (e.g., 'list reports', 'send email', 'delete invoice')"),
+      query: z
+        .string()
+        .describe("What do you want to do? (e.g., 'list reports', 'send email', 'delete invoice')"),
     }),
     outputSchema: z.object({
-      tools: z.array(z.object({
-        name: z.string(),
-        description: z.string(),
-      })),
+      tools: z.array(
+        z.object({
+          name: z.string(),
+          description: z.string(),
+        }),
+      ),
     }),
   },
   async (params) => {
     // Search tool index by keyword + similarity
     const results = await cachedIndex.search(params.query, { maxResults: 5 });
     return {
-      content: [{
-        type: "text",
-        text: JSON.stringify(results),
-      }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(results),
+        },
+      ],
       structuredContent: { tools: results },
     };
-  }
+  },
 );
 ```
 
 **Pattern**:
+
 1. User asks for something the model doesn't immediately recognize.
 2. Model (before calling a tool) calls `search_tools` with the user's intent.
 3. `search_tools` returns matching tools.
 4. Model picks the best match and uses it.
 
 Example:
+
 - User: "Send an email to alice@example.com"
 - Model (not in top-12, doesn't see email tool) calls `search_tools` with "send email"
 - `search_tools` returns `[composio_gmail_send_message, composio_sendgrid_send_email]`
@@ -270,6 +282,7 @@ app.listen(3000, () => {
 ```
 
 **What the warm-up does**:
+
 1. Creates a stub MCP context.
 2. Calls `ensureToolIndex` to trigger embedding computation.
 3. If embeddings are cached, returns immediately (~10ms).
@@ -285,19 +298,20 @@ Different use cases have different optimal values:
 
 ```typescript
 // Simple assistant (few domains)
-buildPrepareStep({ maxTools: 8, alwaysActive: ["web_search"] })
+buildPrepareStep({ maxTools: 8, alwaysActive: ["web_search"] });
 
 // Moderate (internal + external tools)
-buildPrepareStep({ maxTools: 12, alwaysActive: ["web_search", "search_tools"] })
+buildPrepareStep({ maxTools: 12, alwaysActive: ["web_search", "search_tools"] });
 
 // Complex (internal + Composio + external + search)
-buildPrepareStep({ 
-  maxTools: 15, 
-  alwaysActive: ["web_search", "search_tools", "composio_search_tools", "composio_multi_execute"] 
-})
+buildPrepareStep({
+  maxTools: 15,
+  alwaysActive: ["web_search", "search_tools", "composio_search_tools", "composio_multi_execute"],
+});
 ```
 
 **Guidelines**:
+
 - **Too low** (5–8): Model misses relevant tools; forced to use search_tools repeatedly.
 - **Optimal** (10–15): Balance between context efficiency and coverage.
 - **Too high** (>20): Defeats the purpose; tokens saved are negligible.
@@ -320,6 +334,7 @@ The embedding cache is critical for performance:
 ```
 
 **Key points**:
+
 - Cache is built once; reused across requests and server restarts.
 - If you add/remove tools, `toolpick` automatically recomputes affected embeddings.
 - Cache is keyed by tool name; renaming a tool invalidates its embedding.
@@ -353,6 +368,7 @@ logger.debug("[toolpick] Selected tools", {
 ```
 
 **Metrics to track**:
+
 - Average tools selected per request.
 - Frequency of `search_tools` calls (high frequency = selection misses).
 - Token usage before/after (should drop significantly).

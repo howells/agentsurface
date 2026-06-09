@@ -15,15 +15,15 @@ Agent architecture starts with a runtime boundary. The main question is not "whi
 
 ## Boundary Types
 
-| Runtime | Best for | Avoid when | Design pressure |
-|---|---|---|---|
-| Request handler | Short chat turns, routing, simple tool calls | Work may exceed timeout or needs retries | Low latency, clear auth, streaming |
-| Long-running server | Rich agents, streaming, many tools, local queues | Scale-to-zero or edge locality is required | Process health, backpressure, deploys |
-| Serverless function | Stateless API tools, small LLM steps, webhooks | Stateful loops, large uploads, long workflows | Cold starts, timeout budgets, retries |
-| Edge runtime | Low-latency routing, lightweight model calls, content negotiation | Node-only packages, heavy compute, private network needs | Runtime limits, regional data policy |
-| Background worker | Batch jobs, scheduled agents, retries, approvals | User is waiting for immediate answer | Idempotency, durable state, notifications |
-| Browser session | Web navigation, screenshots, extraction, UI actions | Data is available through an API | Permissions, isolation, audit logs |
-| Code sandbox | Generated code, data transforms, notebooks, untrusted commands | App server can safely run the code itself | Secrets isolation, filesystem limits, teardown |
+| Runtime             | Best for                                                          | Avoid when                                               | Design pressure                                |
+| ------------------- | ----------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------- |
+| Request handler     | Short chat turns, routing, simple tool calls                      | Work may exceed timeout or needs retries                 | Low latency, clear auth, streaming             |
+| Long-running server | Rich agents, streaming, many tools, local queues                  | Scale-to-zero or edge locality is required               | Process health, backpressure, deploys          |
+| Serverless function | Stateless API tools, small LLM steps, webhooks                    | Stateful loops, large uploads, long workflows            | Cold starts, timeout budgets, retries          |
+| Edge runtime        | Low-latency routing, lightweight model calls, content negotiation | Node-only packages, heavy compute, private network needs | Runtime limits, regional data policy           |
+| Background worker   | Batch jobs, scheduled agents, retries, approvals                  | User is waiting for immediate answer                     | Idempotency, durable state, notifications      |
+| Browser session     | Web navigation, screenshots, extraction, UI actions               | Data is available through an API                         | Permissions, isolation, audit logs             |
+| Code sandbox        | Generated code, data transforms, notebooks, untrusted commands    | App server can safely run the code itself                | Secrets isolation, filesystem limits, teardown |
 
 ## Request-Bound Agents
 

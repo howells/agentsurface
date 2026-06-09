@@ -9,8 +9,9 @@
  * </CUSTOMISE>
  */
 
-import type { TextContent, ToolResultBlockParam } from '@modelcontextprotocol/sdk/types';
-import { ProblemDetails, problemDetails } from './problem-details';
+import type { TextContent, ToolResultBlockParam } from "@modelcontextprotocol/sdk/types";
+import type { ProblemDetails } from "./problem-details";
+import { problemDetails } from "./problem-details";
 
 /**
  * Tool result with error flag
@@ -47,37 +48,37 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
   const isAuth = message.match(/unauthorized|forbidden|auth/i);
 
   let statusCode = 500;
-  let code = 'ERR_INTERNAL';
-  let type = 'https://api.example.com/errors/internal_error';
+  let code = "ERR_INTERNAL";
+  let type = "https://api.example.com/errors/internal_error";
 
   if (isValidation) {
     statusCode = 422;
-    code = 'ERR_VALIDATION';
-    type = 'https://api.example.com/errors/ERR_VALIDATION';
+    code = "ERR_VALIDATION";
+    type = "https://api.example.com/errors/ERR_VALIDATION";
   } else if (isNotFound) {
     statusCode = 404;
-    code = 'ERR_NOT_FOUND';
-    type = 'https://api.example.com/errors/ERR_NOT_FOUND';
+    code = "ERR_NOT_FOUND";
+    type = "https://api.example.com/errors/ERR_NOT_FOUND";
   } else if (isAuth) {
     statusCode = 401;
-    code = 'ERR_UNAUTHORIZED';
-    type = 'https://api.example.com/errors/ERR_UNAUTHORIZED';
+    code = "ERR_UNAUTHORIZED";
+    type = "https://api.example.com/errors/ERR_UNAUTHORIZED";
   } else if (isNetwork) {
     statusCode = 503;
-    code = 'ERR_UNAVAILABLE';
-    type = 'https://api.example.com/errors/ERR_UNAVAILABLE';
+    code = "ERR_UNAVAILABLE";
+    type = "https://api.example.com/errors/ERR_UNAVAILABLE";
   }
 
   return problemDetails({
-    type,
-    title: code.replace('ERR_', '').replace(/_/g, ' '),
-    status: statusCode,
-    detail: message,
     code,
-    trace_id: traceId,
+    detail: message,
+    doc_uri: `https://api.example.com/docs/errors#${code}`,
     is_retriable: statusCode >= 500 || isNetwork,
     retry_after_ms: isNetwork ? 5000 : undefined,
-    doc_uri: `https://api.example.com/docs/errors#${code}`,
+    status: statusCode,
+    title: code.replace("ERR_", "").replace(/_/g, " "),
+    trace_id: traceId,
+    type,
   });
 }
 
@@ -102,21 +103,18 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
  * };
  * ```
  */
-export function toolError(opts: {
-  error: Error | unknown;
-  traceId?: string;
-}): MCPToolErrorResult {
+export function toolError(opts: { error: Error | unknown; traceId?: string }): MCPToolErrorResult {
   const traceId = opts.traceId || generateTraceId();
   const problemDetail = mapErrorToProblemDetails(opts.error, traceId);
 
   return {
-    isError: true,
     content: [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify(problemDetail),
       },
     ],
+    isError: true,
   };
 }
 
@@ -130,13 +128,13 @@ export function toolError(opts: {
  */
 export function toolOk(data: unknown, opts?: { traceId?: string }): MCPToolOkResult {
   return {
-    isError: false,
     content: [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify(data),
       },
     ],
+    isError: false,
   };
 }
 
@@ -153,15 +151,15 @@ export function toolOk(data: unknown, opts?: { traceId?: string }): MCPToolOkRes
  */
 export function withToolErrorHandling(
   handler: (input: any) => Promise<unknown> | unknown,
-  traceId?: string
+  traceId?: string,
 ): (input: any) => Promise<MCPToolResult> {
   return async (input: any) => {
     const id = traceId || generateTraceId();
     try {
       const result = await handler(input);
       return toolOk(result, { traceId: id });
-    } catch (err) {
-      return toolError({ error: err, traceId: id });
+    } catch (error) {
+      return toolError({ error, traceId: id });
     }
   };
 }

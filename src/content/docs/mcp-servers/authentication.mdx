@@ -52,10 +52,7 @@ export function bearerTokenAuth(requiredToken: string) {
     const expected = Buffer.from(requiredToken);
     const received = Buffer.from(token);
 
-    if (
-      expected.length !== received.length ||
-      !crypto.timingSafeEqual(expected, received)
-    ) {
+    if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
       res.status(401).json({
         error: "unauthorized",
         error_description: "Invalid token",
@@ -116,7 +113,9 @@ app.post("/mcp", (req, res, next) => {
 ```
 
 <Callout type="warn">
-Only accept identity headers from a trusted proxy IP range. If any client can send `X-User-Id: admin`, your authorization is meaningless. Configure your server to only accept these headers from the proxy's known IP addresses.
+  Only accept identity headers from a trusted proxy IP range. If any client can send `X-User-Id:
+  admin`, your authorization is meaningless. Configure your server to only accept these headers from
+  the proxy's known IP addresses.
 </Callout>
 
 ## Approach 3: OAuth 2.1 with PKCE
@@ -164,9 +163,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 function generatePKCE() {
   const codeVerifier = randomBytes(32).toString("base64url");
-  const codeChallenge = createHash("sha256")
-    .update(codeVerifier)
-    .digest("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
 
   return { codeVerifier, codeChallenge };
 }
@@ -191,15 +188,11 @@ Your MCP server validates the Bearer token on each request. For JWT tokens, vali
 ```typescript
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
-const JWKS = createRemoteJWKSet(
-  new URL("https://auth.example.com/.well-known/jwks.json")
-);
+const JWKS = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 
-export async function validateToken(
-  token: string
-): Promise<{ userId: string; scopes: string[] }> {
+export async function validateToken(token: string): Promise<{ userId: string; scopes: string[] }> {
   const { payload } = await jwtVerify(token, JWKS, {
-    issuer: "https://auth.example.com",     // Validates iss claim
+    issuer: "https://auth.example.com", // Validates iss claim
     audience: "https://billing-mcp.example.com", // Validates aud claim
     // exp claim is validated automatically by jose
   });
@@ -226,8 +219,8 @@ function requireScope(scopes: string[], required: string): void {
   if (!scopes.includes(required)) {
     throw new Error(
       `Insufficient scope. Required: ${required}. ` +
-      `Granted: ${scopes.join(", ") || "none"}. ` +
-      `Request a new token with the ${required} scope.`
+        `Granted: ${scopes.join(", ") || "none"}. ` +
+        `Request a new token with the ${required} scope.`,
     );
   }
 }
@@ -237,7 +230,7 @@ async (params, context) => {
   requireScope(context.scopes, "billing:write");
 
   // proceed with creating the invoice
-}
+};
 ```
 
 Throwing from a scope check causes the tool to return an MCP error. Return it as an `isError: true` response instead for better agent recovery:
@@ -247,16 +240,19 @@ async (params, context) => {
   if (!context.scopes.includes("billing:write")) {
     return {
       isError: true,
-      content: [{
-        type: "text",
-        text: "Insufficient permissions. The billing:write scope is required to create invoices. " +
-              "Request a new authorization token with the billing:write scope.",
-      }],
+      content: [
+        {
+          type: "text",
+          text:
+            "Insufficient permissions. The billing:write scope is required to create invoices. " +
+            "Request a new authorization token with the billing:write scope.",
+        },
+      ],
     };
   }
 
   // proceed
-}
+};
 ```
 
 ### On-Behalf-Of (OBO) Pattern
@@ -264,10 +260,7 @@ async (params, context) => {
 When your MCP server needs to call downstream APIs on behalf of the authenticated user, use the On-Behalf-Of flow to exchange the user's token for a token scoped to the downstream service:
 
 ```typescript
-async function getDownstreamToken(
-  userToken: string,
-  targetAudience: string
-): Promise<string> {
+async function getDownstreamToken(userToken: string, targetAudience: string): Promise<string> {
   const response = await fetch("https://auth.example.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -301,14 +294,14 @@ The `@vercel/mcp-adapter` package provides an `experimental_withMcpAuth` wrapper
 import { createMcpHandler, experimental_withMcpAuth } from "@vercel/mcp-adapter";
 import { createServer } from "@/lib/billing-mcp/server";
 
-const mcpHandler = createMcpHandler(
-  (req) => createServer({
+const mcpHandler = createMcpHandler((req) =>
+  createServer({
     stripeApiKey: process.env.STRIPE_API_KEY!,
     databaseUrl: process.env.DATABASE_URL!,
     // Pass the authenticated user from the request context
     userId: (req as any).mcpAuth?.userId,
     scopes: (req as any).mcpAuth?.scopes ?? [],
-  })
+  }),
 );
 
 async function validateAuth(token: string) {
@@ -316,10 +309,7 @@ async function validateAuth(token: string) {
   return result; // { userId, scopes }
 }
 
-export const { GET, POST, DELETE } = experimental_withMcpAuth(
-  mcpHandler,
-  validateAuth
-);
+export const { GET, POST, DELETE } = experimental_withMcpAuth(mcpHandler, validateAuth);
 
 export const maxDuration = 60;
 ```
@@ -345,5 +335,8 @@ console.error(`Received token: iss=${payload.iss} sub=${payload.sub} exp=${paylo
 ```
 
 <Callout type="warn">
-HTTPS is required for all OAuth flows. The `code_challenge` mechanism of PKCE protects the authorization code in transit, but the access token itself is a bearer credential — anyone who intercepts it can use it. Never run an OAuth-authenticated MCP server over plain HTTP in production.
+  HTTPS is required for all OAuth flows. The `code_challenge` mechanism of PKCE protects the
+  authorization code in transit, but the access token itself is a bearer credential — anyone who
+  intercepts it can use it. Never run an OAuth-authenticated MCP server over plain HTTP in
+  production.
 </Callout>

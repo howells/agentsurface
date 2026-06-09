@@ -74,10 +74,7 @@ In read-only mode, only tools annotated with `readOnlyHint: true` are registered
 The implementation checks the flag during registration:
 
 ```typescript
-export function registerCreateIssue(
-  server: McpServer,
-  config: Config
-): void {
+export function registerCreateIssue(server: McpServer, config: Config): void {
   if (config.readOnly) return; // Skip registration entirely
 
   server.tool(
@@ -85,7 +82,9 @@ export function registerCreateIssue(
     "Creates a new issue in a repository...",
     CreateIssueSchema,
     { annotations: { readOnlyHint: false, destructiveHint: false } },
-    async (params) => { /* ... */ }
+    async (params) => {
+      /* ... */
+    },
   );
 }
 ```
@@ -115,7 +114,7 @@ function loadAuth(): Auth {
 
   throw new Error(
     "No GitHub authentication configured. Set GITHUB_PERSONAL_ACCESS_TOKEN, " +
-    "GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY, or GITHUB_OAUTH_TOKEN."
+      "GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY, or GITHUB_OAUTH_TOKEN.",
   );
 }
 ```
@@ -213,7 +212,7 @@ Vercel's MCP server is built on `mcp-on-vercel`, a template that demonstrates th
 // Vercel's pattern: domain operations with auth-gated registration
 export function registerDeploymentTools(
   server: McpServer,
-  config: { token: string; teamId?: string }
+  config: { token: string; teamId?: string },
 ): void {
   server.tool(
     "vercel_list_deployments",
@@ -240,7 +239,7 @@ export function registerDeploymentTools(
             Authorization: `Bearer ${config.token}`,
             ...(config.teamId ? { "x-vercel-team-id": config.teamId } : {}),
           },
-        }
+        },
       );
 
       if (!res.ok) {
@@ -252,21 +251,23 @@ export function registerDeploymentTools(
 
       const data = await res.json();
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify(
-            data.deployments.map((d: any) => ({
-              id: d.uid,
-              url: d.url,
-              state: d.state,
-              created_at: d.created,
-              git_branch: d.meta?.githubCommitRef,
-              git_message: d.meta?.githubCommitMessage,
-            }))
-          ),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              data.deployments.map((d: any) => ({
+                id: d.uid,
+                url: d.url,
+                state: d.state,
+                created_at: d.created,
+                git_branch: d.meta?.githubCommitRef,
+                git_message: d.meta?.githubCommitMessage,
+              })),
+            ),
+          },
+        ],
       };
-    }
+    },
   );
 }
 ```

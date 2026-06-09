@@ -19,11 +19,13 @@ LLM-as-judge (also called model-based grading) evaluates outputs that have no de
 ## When to use LLM-as-judge
 
 Use when:
+
 - **Open-ended outputs** — agent was asked to write a summary, design a solution, or generate creative content. No single correct answer exists.
 - **Semantic correctness** — parameter value is well-formed JSON, but is it semantically valid? (e.g., is "next Tuesday" a reasonable due_date for this context?)
 - **Plan quality** — did the agent choose a reasonable sequence of tools, even if not the only correct sequence?
 
 Do NOT use when:
+
 - **Deterministic outputs** — agent was asked to retrieve a user by ID. Either it retrieved the right user or it did not. Use code-based graders.
 - **Tool routing** — "Did the agent call search or read_file?" This is binary and deterministic. Use code-based graders.
 - **End state verification** — "Is the database record now marked 'complete'?" Code-based graders are faster and more reliable.
@@ -72,10 +74,10 @@ interface JudgeScore {
 async function crossJudgeEval(
   task: string,
   output: string,
-  judges: string[]
+  judges: string[],
 ): Promise<JudgeScore[]> {
   const scores: JudgeScore[] = [];
-  
+
   for (const judge of judges) {
     const score = await callLLM({
       model: judge,
@@ -86,20 +88,20 @@ Output: ${output}
 Score this output on a scale of 0-1. Return JSON: {"score": number, "reasoning": string}
       `,
     });
-    
+
     scores.push({
       modelId: judge,
       score: score.score,
       reasoning: score.reasoning,
     });
   }
-  
+
   // High agreement = confident
   const mean = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
   const stdDev = Math.sqrt(
-    scores.reduce((sum, s) => sum + Math.pow(s.score - mean, 2), 0) / scores.length
+    scores.reduce((sum, s) => sum + Math.pow(s.score - mean, 2), 0) / scores.length,
   );
-  
+
   return scores;
 }
 
@@ -115,18 +117,17 @@ Calibrate a judge against 20–30 human-labelled examples before running at scal
 // Simplified Cohen's kappa
 function cohensKappa(humanLabels: number[], judgeLabels: number[]): number {
   const po = // Observed agreement
-    humanLabels.reduce((sum, h, i) => sum + (h === judgeLabels[i] ? 1 : 0), 0) /
-    humanLabels.length;
-  
+    humanLabels.reduce((sum, h, i) => sum + (h === judgeLabels[i] ? 1 : 0), 0) / humanLabels.length;
+
   // Expected agreement (assuming chance)
   const uniqueLabels = new Set([...humanLabels, ...judgeLabels]);
   let pe = 0;
   for (const label of uniqueLabels) {
-    const humanPct = humanLabels.filter(l => l === label).length / humanLabels.length;
-    const judgePct = judgeLabels.filter(l => l === label).length / judgeLabels.length;
+    const humanPct = humanLabels.filter((l) => l === label).length / humanLabels.length;
+    const judgePct = judgeLabels.filter((l) => l === label).length / judgeLabels.length;
     pe += humanPct * judgePct;
   }
-  
+
   return (po - pe) / (1 - pe);
 }
 
@@ -142,12 +143,12 @@ Include a few human-labelled examples in the judge prompt to set expectations.
 async function calibratedJudge(
   task: string,
   output: string,
-  examples: Array<{ output: string; score: number; explanation: string }>
+  examples: Array<{ output: string; score: number; explanation: string }>,
 ): Promise<number> {
   const exampleText = examples
-    .map(e => `Example output: "${e.output}"\nScore: ${e.score}\nWhy: ${e.explanation}`)
+    .map((e) => `Example output: "${e.output}"\nScore: ${e.score}\nWhy: ${e.explanation}`)
     .join("\n\n");
-  
+
   const score = await callLLM({
     model: "claude-opus-4-7",
     prompt: `
@@ -165,7 +166,7 @@ Output: ${output}
 Return JSON: {"score": number, "reasoning": string}
     `,
   });
-  
+
   return score.score;
 }
 ```
@@ -181,22 +182,20 @@ Use code-based checks first; only invoke LLM judge if heuristics are inconclusiv
 ```typescript
 async function hybridGrader(
   toolCall: ToolCall,
-  schema: ToolSchema
+  schema: ToolSchema,
 ): Promise<{ score: number; confidence: "high" | "low" }> {
   // Fast heuristic checks
-  const hasRequiredFields = schema.required.every(f => toolCall.arguments[f] !== undefined);
-  const typesCorrect = Object.entries(toolCall.arguments).every(
-    ([key, value]) => {
-      const spec = schema.properties[key];
-      return spec?.type === typeof value || spec?.type === "number";
-    }
-  );
-  
+  const hasRequiredFields = schema.required.every((f) => toolCall.arguments[f] !== undefined);
+  const typesCorrect = Object.entries(toolCall.arguments).every(([key, value]) => {
+    const spec = schema.properties[key];
+    return spec?.type === typeof value || spec?.type === "number";
+  });
+
   // If heuristics pass, high confidence — no LLM needed
   if (hasRequiredFields && typesCorrect) {
     return { score: 1.0, confidence: "high" };
   }
-  
+
   // If heuristics fail, use LLM to determine severity
   const llmScore = await callLLM({
     model: "claude-haiku-4-5",
@@ -208,7 +207,7 @@ Schema: ${JSON.stringify(schema)}
 Is this a fatal error or a minor issue? Score 0-1.
     `,
   });
-  
+
   return { score: llmScore, confidence: "low" };
 }
 ```
@@ -222,17 +221,17 @@ async function pairwiseRank(
   task: string,
   outputA: string,
   outputB: string,
-  numJudges = 3
+  numJudges = 3,
 ): Promise<{ winner: "A" | "B" | "tie"; confidence: number }> {
   const results: ("A" | "B" | "tie")[] = [];
-  
+
   for (let i = 0; i < numJudges; i++) {
     // Randomize order: sometimes A first, sometimes B first
     const aFirst = Math.random() > 0.5;
     const [first, second, firstLabel, secondLabel] = aFirst
       ? [outputA, outputB, "A", "B"]
       : [outputB, outputA, "B", "A"];
-    
+
     const result = await callLLM({
       model: "claude-opus-4-7",
       prompt: `
@@ -244,14 +243,14 @@ Output 2: ${second}
 Which is better? Respond with only "1", "2", or "tie".
       `,
     });
-    
+
     const winner = result === "1" ? firstLabel : result === "2" ? secondLabel : "tie";
     results.push(winner);
   }
-  
-  const aWins = results.filter(r => r === "A").length;
-  const confidence = Math.abs(aWins - (numJudges / 2)) / (numJudges / 2);
-  
+
+  const aWins = results.filter((r) => r === "A").length;
+  const confidence = Math.abs(aWins - numJudges / 2) / (numJudges / 2);
+
   return {
     winner: aWins > numJudges / 2 ? "A" : aWins < numJudges / 2 ? "B" : "tie",
     confidence,

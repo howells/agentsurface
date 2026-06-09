@@ -9,11 +9,11 @@ import type { GlossaryTerm } from "@/data/glossary";
 // ── Line patterns by category (pure CSS, zero DOM elements) ─────────────────
 
 const LINE_ANGLES: Record<string, number> = {
-  "Foundation": 0,
-  "Memory & Knowledge": 90,
   "Agent Infrastructure": 45,
-  "Data & Integration": -45,
   "Agent Readiness": 30,
+  "Data & Integration": -45,
+  Foundation: 0,
+  "Memory & Knowledge": 90,
   "Ops & Lifecycle": -60,
 };
 
@@ -30,18 +30,33 @@ function CardPattern({ category }: { category: string }) {
   );
 }
 
-const SPRING = { type: "spring" as const, stiffness: 340, damping: 30 };
+const SPRING = { damping: 30, stiffness: 340, type: "spring" as const };
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 
-function GlossaryCard({ term, onOpen, active }: { term: GlossaryTerm; onOpen: (id: string) => void; active: boolean }) {
+function GlossaryCard({
+  term,
+  onOpen,
+  active,
+}: {
+  term: GlossaryTerm;
+  onOpen: (id: string) => void;
+  active: boolean;
+}) {
   return (
     <motion.button
       layoutId={`card-${term.id}`}
       onClick={() => onOpen(term.id)}
       className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
-      style={{ boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)", opacity: active ? 0 : 1 }}
-      whileHover={active ? undefined : { y: -6, boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)" }}
+      style={{
+        boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)",
+        opacity: active ? 0 : 1,
+      }}
+      whileHover={
+        active
+          ? undefined
+          : { boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)", y: -6 }
+      }
       transition={SPRING}
     >
       <div className="flex-1 flex items-center justify-center overflow-hidden">
@@ -54,9 +69,7 @@ function GlossaryCard({ term, onOpen, active }: { term: GlossaryTerm; onOpen: (i
         <p className="mt-0.5 text-[1.6rem] font-semibold tracking-tight leading-none text-fd-foreground">
           {term.acronym}
         </p>
-        <p className="mt-0.5 text-[0.65rem] leading-4 text-fd-muted-foreground">
-          {term.name}
-        </p>
+        <p className="mt-0.5 text-[0.65rem] leading-4 text-fd-muted-foreground">{term.name}</p>
       </div>
     </motion.button>
   );
@@ -66,7 +79,11 @@ function GlossaryCard({ term, onOpen, active }: { term: GlossaryTerm; onOpen: (i
 
 function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -104,7 +121,16 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.18, duration: 0.2 }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </motion.button>
@@ -162,7 +188,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
         </motion.div>
       </div>
     </>,
-    document.body
+    document.body,
   );
 }
 
@@ -170,7 +196,11 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
 
 const ALL = "All";
 
-function FilterPills({ categories, active, onChange }: {
+function FilterPills({
+  categories,
+  active,
+  onChange,
+}: {
   categories: string[];
   active: string;
   onChange: (cat: string) => void;
@@ -178,7 +208,9 @@ function FilterPills({ categories, active, onChange }: {
   return (
     <div className="flex flex-wrap gap-2">
       {[ALL, ...categories].map((cat) => (
-        <button key={cat} onClick={() => onChange(cat)}
+        <button
+          key={cat}
+          onClick={() => onChange(cat)}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             active === cat
               ? "border-fd-foreground bg-fd-foreground text-fd-background"
@@ -194,7 +226,11 @@ function FilterPills({ categories, active, onChange }: {
 
 // ── Public export ─────────────────────────────────────────────────────────────
 
-export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
+export function GlossaryGrid({
+  terms,
+  showFilters = true,
+  layout = "scroll",
+}: {
   terms: GlossaryTerm[];
   showFilters?: boolean;
   layout?: "scroll" | "grid";
@@ -202,13 +238,15 @@ export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState(ALL);
 
-  const categories = Array.from(new Set(terms.map((t) => t.category)));
+  const categories = [...new Set(terms.map((t) => t.category))];
   const visible = filter === ALL ? terms : terms.filter((t) => t.category === filter);
   const activeTerm = terms.find((t) => t.id === activeId) ?? null;
 
   useEffect(() => {
     document.body.style.overflow = activeId ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [activeId]);
 
   return (
@@ -221,7 +259,12 @@ export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <AnimatePresence mode="popLayout" initial={false}>
             {visible.map((term) => (
-              <GlossaryCard key={term.id} term={term} onOpen={setActiveId} active={term.id === activeId} />
+              <GlossaryCard
+                key={term.id}
+                term={term}
+                onOpen={setActiveId}
+                active={term.id === activeId}
+              />
             ))}
           </AnimatePresence>
         </div>
@@ -238,16 +281,18 @@ export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
                 />
                 <AnimatePresence mode="popLayout" initial={false}>
                   {visible.map((term) => (
-                    <GlossaryCard key={term.id} term={term} onOpen={setActiveId} active={term.id === activeId} />
+                    <GlossaryCard
+                      key={term.id}
+                      term={term}
+                      onOpen={setActiveId}
+                      active={term.id === activeId}
+                    />
                   ))}
                 </AnimatePresence>
                 <div className="w-6 shrink-0" aria-hidden="true" />
               </div>
             </ScrollAreaPrimitive.Viewport>
-            <ScrollAreaPrimitive.Scrollbar
-              orientation="horizontal"
-              className="hidden"
-            >
+            <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="hidden">
               <ScrollAreaPrimitive.Thumb />
             </ScrollAreaPrimitive.Scrollbar>
           </ScrollAreaPrimitive.Root>
@@ -255,9 +300,7 @@ export function GlossaryGrid({ terms, showFilters = true, layout = "scroll" }: {
       )}
 
       <AnimatePresence>
-        {activeTerm && (
-          <GlossaryOverlay term={activeTerm} onClose={() => setActiveId(null)} />
-        )}
+        {activeTerm && <GlossaryOverlay term={activeTerm} onClose={() => setActiveId(null)} />}
       </AnimatePresence>
     </>
   );

@@ -9,14 +9,14 @@ RAG is not one architecture. It is a family of retrieval, ranking, context assem
 
 The useful taxonomy is based on where the system improves the pipeline:
 
-| Stage | Pattern family | Use when |
-|-------|----------------|----------|
-| Query | HyDE, query rewriting, multi-query, RAG-Fusion | User queries are short, vague, or phrased differently from source docs |
-| Retrieval | Dense, hybrid, graph, multimodal, structured | Corpus contains different data shapes or exact terms matter |
-| Ranking | Reranked, late-interaction, ColBERT/ColPali | Top-k retrieval is noisy or documents are visually complex |
-| Context | Parent-child, contextual, hierarchical, RAPTOR | Chunks lose document-level meaning |
-| Control | Agentic, Self-RAG, Corrective RAG | Retrieval may need planning, validation, or repair |
-| Optimization | Compiled RAG | You have eval data and want the pipeline tuned against a metric |
+| Stage        | Pattern family                                 | Use when                                                               |
+| ------------ | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Query        | HyDE, query rewriting, multi-query, RAG-Fusion | User queries are short, vague, or phrased differently from source docs |
+| Retrieval    | Dense, hybrid, graph, multimodal, structured   | Corpus contains different data shapes or exact terms matter            |
+| Ranking      | Reranked, late-interaction, ColBERT/ColPali    | Top-k retrieval is noisy or documents are visually complex             |
+| Context      | Parent-child, contextual, hierarchical, RAPTOR | Chunks lose document-level meaning                                     |
+| Control      | Agentic, Self-RAG, Corrective RAG              | Retrieval may need planning, validation, or repair                     |
+| Optimization | Compiled RAG                                   | You have eval data and want the pipeline tuned against a metric        |
 
 ## The baseline: naive RAG
 
@@ -257,20 +257,20 @@ This is still RAG if the retrieved result grounds generation. The retrieval laye
 
 ## Choosing a pattern
 
-| Problem | Start with |
-|---------|------------|
-| Dense retrieval misses exact terms | Hybrid RAG |
-| Top-k results are noisy | Reranked RAG |
-| Chunks lose meaning | Contextual RAG or parent-child RAG |
-| User query is vague | HyDE or multi-query RAG |
-| Long docs need synthesis | Parent-child or RAPTOR |
-| Relationships matter | GraphRAG or LightRAG |
-| Query needs planning | Agentic RAG |
-| Retrieved docs may be wrong | Corrective RAG |
-| Answer must critique itself | Self-RAG or faithfulness checks |
-| Pipeline needs metric-driven tuning | Compiled RAG |
-| PDFs and visual documents dominate | Multimodal RAG |
-| Facts live in databases or APIs | Structured/tool-backed RAG |
+| Problem                             | Start with                         |
+| ----------------------------------- | ---------------------------------- |
+| Dense retrieval misses exact terms  | Hybrid RAG                         |
+| Top-k results are noisy             | Reranked RAG                       |
+| Chunks lose meaning                 | Contextual RAG or parent-child RAG |
+| User query is vague                 | HyDE or multi-query RAG            |
+| Long docs need synthesis            | Parent-child or RAPTOR             |
+| Relationships matter                | GraphRAG or LightRAG               |
+| Query needs planning                | Agentic RAG                        |
+| Retrieved docs may be wrong         | Corrective RAG                     |
+| Answer must critique itself         | Self-RAG or faithfulness checks    |
+| Pipeline needs metric-driven tuning | Compiled RAG                       |
+| PDFs and visual documents dominate  | Multimodal RAG                     |
+| Facts live in databases or APIs     | Structured/tool-backed RAG         |
 
 ## Production default
 

@@ -25,8 +25,8 @@
  * - Extend selectToolsByRole() for your app's role hierarchy
  */
 
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // ============================================================================
 // TOOL DEFINITION TYPE
@@ -37,7 +37,7 @@ export interface ToolDefinition {
   description: string;
   schema: z.ZodType;
   handler: (input: unknown) => Promise<unknown>;
-  kit: 'read_only' | 'mutating' | 'dangerous' | 'experimental';
+  kit: "read_only" | "mutating" | "dangerous" | "experimental";
   idempotent: boolean;
   minContextWindow?: number; // If tool requires large context, set this
   costEstimate?: {
@@ -50,32 +50,38 @@ export interface ToolDefinition {
 // TOOL DEFINITIONS (CUSTOMISE: Add your tools here)
 // ============================================================================
 
-const searchDocsSchema = z.object({
-  query: z.string().describe('Search query'),
-  limit: z.number().int().min(1).max(100).default(10).describe('Max results'),
-}).strict();
+const searchDocsSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).default(10).describe("Max results"),
+    query: z.string().describe("Search query"),
+  })
+  .strict();
 
 async function searchDocsHandler(input: unknown) {
   const parsed = searchDocsSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { success: true, results: [] };
+  return { results: [], success: true };
 }
 
-const createIssueSchema = z.object({
-  title: z.string().describe('Issue title'),
-  body: z.string().describe('Issue description'),
-  labels: z.array(z.string()).optional().describe('Labels'),
-}).strict();
+const createIssueSchema = z
+  .object({
+    body: z.string().describe("Issue description"),
+    labels: z.array(z.string()).optional().describe("Labels"),
+    title: z.string().describe("Issue title"),
+  })
+  .strict();
 
 async function createIssueHandler(input: unknown) {
   const parsed = createIssueSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { success: true, id: 'issue-123' };
+  return { id: "issue-123", success: true };
 }
 
-const deleteIssueSchema = z.object({
-  id: z.string().describe('Issue ID to delete'),
-}).strict();
+const deleteIssueSchema = z
+  .object({
+    id: z.string().describe("Issue ID to delete"),
+  })
+  .strict();
 
 async function deleteIssueHandler(input: unknown) {
   const parsed = deleteIssueSchema.parse(input);
@@ -83,23 +89,27 @@ async function deleteIssueHandler(input: unknown) {
   return { success: true };
 }
 
-const listEnvironmentsSchema = z.object({
-  filter: z.enum(['prod', 'staging', 'dev']).optional(),
-}).strict();
+const listEnvironmentsSchema = z
+  .object({
+    filter: z.enum(["prod", "staging", "dev"]).optional(),
+  })
+  .strict();
 
 async function listEnvironmentsHandler(input: unknown) {
   // <CUSTOMISE> Your actual implementation
-  return { success: true, environments: [] };
+  return { environments: [], success: true };
 }
 
-const deployToProductionSchema = z.object({
-  version: z.string().describe('Version to deploy'),
-  wait_for_approval: z.boolean().default(false).describe('Block until approved'),
-}).strict();
+const deployToProductionSchema = z
+  .object({
+    version: z.string().describe("Version to deploy"),
+    wait_for_approval: z.boolean().default(false).describe("Block until approved"),
+  })
+  .strict();
 
 async function deployToProductionHandler(input: unknown) {
   // <CUSTOMISE> Your actual implementation
-  return { success: true, deployment_id: 'deploy-456' };
+  return { deployment_id: "deploy-456", success: true };
 }
 
 // ============================================================================
@@ -107,7 +117,7 @@ async function deployToProductionHandler(input: unknown) {
 // ============================================================================
 
 export class ToolRegistry {
-  private tools: Map<string, ToolDefinition> = new Map();
+  private tools = new Map<string, ToolDefinition>();
 
   /**
    * Register a tool. Validates unique naming.
@@ -118,9 +128,9 @@ export class ToolRegistry {
       throw new Error(`Tool "${tool.name}" already registered. Tool names must be unique.`);
     }
     // Validate verb_noun naming convention
-    if (!tool.name.match(/^[a-z_]+$/)) {
+    if (!/^[a-z_]+$/.test(tool.name)) {
       throw new Error(
-        `Tool name "${tool.name}" violates naming. Use lowercase + underscores (e.g. search_docs, create_issue)`
+        `Tool name "${tool.name}" violates naming. Use lowercase + underscores (e.g. search_docs, create_issue)`,
       );
     }
     this.tools.set(tool.name, tool);
@@ -130,7 +140,7 @@ export class ToolRegistry {
    * Register multiple tools at once.
    */
   registerBatch(tools: ToolDefinition[]) {
-    tools.forEach(t => this.register(t));
+    tools.forEach((t) => this.register(t));
   }
 
   /**
@@ -146,18 +156,18 @@ export class ToolRegistry {
    * denyNames: Exclude specific tool names.
    */
   listTools(options?: {
-    allowedKits?: Array<'read_only' | 'mutating' | 'dangerous' | 'experimental'>;
+    allowedKits?: ("read_only" | "mutating" | "dangerous" | "experimental")[];
     denyNames?: string[];
   }): ToolDefinition[] {
-    let result = Array.from(this.tools.values());
+    let result = [...this.tools.values()];
 
     if (options?.allowedKits) {
-      result = result.filter(t => options.allowedKits!.includes(t.kit));
+      result = result.filter((t) => options.allowedKits!.includes(t.kit));
     }
 
     if (options?.denyNames) {
       const deny = new Set(options.denyNames);
-      result = result.filter(t => !deny.has(t.name));
+      result = result.filter((t) => !deny.has(t.name));
     }
 
     return result;
@@ -167,47 +177,54 @@ export class ToolRegistry {
    * Get all tools in a specific kit (read_only, mutating, dangerous, etc.)
    */
   getKit(kit: string): ToolDefinition[] {
-    return Array.from(this.tools.values()).filter(t => t.kit === kit);
+    return [...this.tools.values()].filter((t) => t.kit === kit);
   }
 
   /**
    * Select tools for a given role. Encodes permission model.
    * <CUSTOMISE> Extend this for your role hierarchy.
    */
-  selectToolsByRole(role: 'viewer' | 'developer' | 'admin'): ToolDefinition[] {
+  selectToolsByRole(role: "viewer" | "developer" | "admin"): ToolDefinition[] {
     switch (role) {
-      case 'viewer':
+      case "viewer": {
         // Read-only access only
-        return this.listTools({ allowedKits: ['read_only'] });
+        return this.listTools({ allowedKits: ["read_only"] });
+      }
 
-      case 'developer':
+      case "developer": {
         // Read + create/update, but not delete
         return this.listTools({
-          allowedKits: ['read_only', 'mutating'],
-          denyNames: ['delete_issue', 'deploy_to_production'],
+          allowedKits: ["read_only", "mutating"],
+          denyNames: ["delete_issue", "deploy_to_production"],
         });
+      }
 
-      case 'admin':
+      case "admin": {
         // All tools except experimental
         return this.listTools({
-          allowedKits: ['read_only', 'mutating', 'dangerous'],
+          allowedKits: ["read_only", "mutating", "dangerous"],
         });
+      }
 
-      default:
+      default: {
         return [];
+      }
     }
   }
 
   /**
    * Validate runtime tool access. Use in middleware before calling a tool.
    */
-  validateAccess(toolName: string, role: 'viewer' | 'developer' | 'admin'): { allowed: boolean; reason?: string } {
+  validateAccess(
+    toolName: string,
+    role: "viewer" | "developer" | "admin",
+  ): { allowed: boolean; reason?: string } {
     const tool = this.get(toolName);
     if (!tool) {
       return { allowed: false, reason: `Tool "${toolName}" not found` };
     }
 
-    const allowed = this.selectToolsByRole(role).some(t => t.name === toolName);
+    const allowed = this.selectToolsByRole(role).some((t) => t.name === toolName);
     if (!allowed) {
       return { allowed: false, reason: `Role "${role}" cannot access "${toolName}"` };
     }
@@ -219,10 +236,10 @@ export class ToolRegistry {
    * Convert all tools to OpenAI format (strict mode compatible).
    * Useful for passing to @openai/agents or other frameworks.
    */
-  toOpenAIFormat(tools: ToolDefinition[] = Array.from(this.tools.values())) {
-    return tools.map(tool => ({
-      name: tool.name,
+  toOpenAIFormat(tools: ToolDefinition[] = [...this.tools.values()]) {
+    return tools.map((tool) => ({
       description: tool.description,
+      name: tool.name,
       parameters: zodToJsonSchema(tool.schema),
     }));
   }
@@ -232,7 +249,7 @@ export class ToolRegistry {
    */
   stats() {
     const stats: Record<string, number> = {};
-    this.tools.forEach(tool => {
+    this.tools.forEach((tool) => {
       stats[tool.kit] = (stats[tool.kit] || 0) + 1;
     });
     return stats;
@@ -248,45 +265,45 @@ export const registry = new ToolRegistry();
 // <CUSTOMISE> Register all your tools here
 registry.registerBatch([
   {
-    name: 'search_docs',
-    description: 'Search internal documentation by keyword.',
-    schema: searchDocsSchema,
-    handler: searchDocsHandler,
-    kit: 'read_only',
-    idempotent: true,
     costEstimate: { inputTokens: 200, outputTokens: 100 },
-  },
-  {
-    name: 'create_issue',
-    description: 'Create a new issue in the tracker.',
-    schema: createIssueSchema,
-    handler: createIssueHandler,
-    kit: 'mutating',
-    idempotent: false,
-  },
-  {
-    name: 'delete_issue',
-    description: 'Delete an existing issue. Irreversible.',
-    schema: deleteIssueSchema,
-    handler: deleteIssueHandler,
-    kit: 'dangerous',
-    idempotent: false,
-  },
-  {
-    name: 'list_environments',
-    description: 'List deployment environments.',
-    schema: listEnvironmentsSchema,
-    handler: listEnvironmentsHandler,
-    kit: 'read_only',
+    description: "Search internal documentation by keyword.",
+    handler: searchDocsHandler,
     idempotent: true,
+    kit: "read_only",
+    name: "search_docs",
+    schema: searchDocsSchema,
   },
   {
-    name: 'deploy_to_production',
-    description: 'Deploy a version to production. Requires careful handling.',
-    schema: deployToProductionSchema,
-    handler: deployToProductionHandler,
-    kit: 'dangerous',
+    description: "Create a new issue in the tracker.",
+    handler: createIssueHandler,
     idempotent: false,
+    kit: "mutating",
+    name: "create_issue",
+    schema: createIssueSchema,
+  },
+  {
+    description: "Delete an existing issue. Irreversible.",
+    handler: deleteIssueHandler,
+    idempotent: false,
+    kit: "dangerous",
+    name: "delete_issue",
+    schema: deleteIssueSchema,
+  },
+  {
+    description: "List deployment environments.",
+    handler: listEnvironmentsHandler,
+    idempotent: true,
+    kit: "read_only",
+    name: "list_environments",
+    schema: listEnvironmentsSchema,
+  },
+  {
+    description: "Deploy a version to production. Requires careful handling.",
+    handler: deployToProductionHandler,
+    idempotent: false,
+    kit: "dangerous",
+    name: "deploy_to_production",
+    schema: deployToProductionSchema,
   },
 ]);
 
@@ -304,7 +321,7 @@ registry.registerBatch([
  */
 export function toolGateMiddleware(
   toolName: string,
-  userRole: 'viewer' | 'developer' | 'admin'
+  userRole: "viewer" | "developer" | "admin",
 ): boolean {
   const { allowed } = registry.validateAccess(toolName, userRole);
   return allowed;
@@ -314,8 +331,8 @@ export function toolGateMiddleware(
  * Build a filtered tool list for an agent based on role + context.
  * Pass the result to your agent's allowedTools parameter.
  */
-export function getAgentToolsForRole(role: 'viewer' | 'developer' | 'admin'): string[] {
-  return registry.selectToolsByRole(role).map(t => t.name);
+export function getAgentToolsForRole(role: "viewer" | "developer" | "admin"): string[] {
+  return registry.selectToolsByRole(role).map((t) => t.name);
 }
 
 // ============================================================================
@@ -326,13 +343,13 @@ export function getAgentToolsForRole(role: 'viewer' | 'developer' | 'admin'): st
  * Log all registered tools and their kits. Useful for debugging.
  */
 export function debugRegistry() {
-  console.log('=== Tool Registry ===');
-  registry.listTools().forEach(tool => {
+  console.log("=== Tool Registry ===");
+  registry.listTools().forEach((tool) => {
     console.log(
-      `${tool.name.padEnd(30)} [${tool.kit.padEnd(15)}] ${tool.idempotent ? '(idempotent)' : '(has side-effects)'}`
+      `${tool.name.padEnd(30)} [${tool.kit.padEnd(15)}] ${tool.idempotent ? "(idempotent)" : "(has side-effects)"}`,
     );
   });
-  console.log('\n=== Stats ===');
+  console.log("\n=== Stats ===");
   console.log(registry.stats());
 }
 
@@ -341,10 +358,10 @@ export function debugRegistry() {
  */
 export function createMockRegistry(): ToolRegistry {
   const mock = new ToolRegistry();
-  registry.listTools().forEach(tool => {
+  registry.listTools().forEach((tool) => {
     mock.register({
       ...tool,
-      handler: async () => ({ success: true, _mock: true }),
+      handler: async () => ({ _mock: true, success: true }),
     });
   });
   return mock;

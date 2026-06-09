@@ -23,7 +23,7 @@ Agent knowledge packaging is the practice of bundling the right information in t
 
 A general-purpose context file that most agent frameworks will load automatically when it appears in the project root or the directory from which the CLI is run. It provides high-level orientation: what the tool does, what credentials are needed, and the most important invariants.
 
-````markdown
+```markdown
 # mytool Context
 
 mytool is the CLI for the Example Platform API. It manages users, DNS records,
@@ -46,7 +46,7 @@ Obtain an API key at: https://app.example.com/settings/api-keys
 ## Getting the Schema
 
 Run `mytool describe --json` to get the full command schema for any command group.
-````
+```
 
 CONTEXT.md is intentionally lightweight. It orients the agent without overwhelming it. Deep workflow guidance goes in SKILL.md.
 
@@ -66,6 +66,7 @@ Structure AGENTS.md around three concerns:
 ## Setup
 
 Required environment variables:
+
 - `MYTOOL_API_KEY` — API key for authentication
 - `MYTOOL_BASE_URL` — Override the API base URL (optional, default: https://api.example.com)
 
@@ -74,33 +75,39 @@ Run `mytool auth status --json` to verify authentication before starting work.
 ## Capabilities
 
 ### User Management
+
 - Create, update, suspend, and delete users
 - Assign roles: admin, member, viewer
 - Bulk operations with --status filter
 
 ### DNS Records
+
 - Create A, AAAA, CNAME, MX, TXT records
 - Supports raw JSON payloads for full RFC 1035 compliance
 - Propagation takes 0–60 seconds
 
 ### Deployments
+
 - Trigger deployments, roll back to previous versions
 - Monitor deployment status with --watch
 
 ## Guardrails
 
 ### Before any DELETE operation
+
 1. Run with --dry-run first
 2. Inspect the `would_affect` count and `preview` array
 3. Check the `warnings` array for side effects
 4. Only then run without --dry-run
 
 ### Before bulk operations
+
 1. Always use --fields to limit response size
 2. Always use --all with --json for streaming output
 3. Verify the count with a dry-run or list operation first
 
 ### Never
+
 - Do not pass absolute paths to --output
 - Do not pass --yes without a preceding --dry-run
 - Do not retry on 422 (validation failure) — fix the input instead
@@ -204,13 +211,13 @@ EOF
 
 Use `--fields` to limit response size. Common useful field sets:
 
-| Task | Recommended --fields value |
-|------|---------------------------|
-| Count or existence check | `id` |
-| Display a list | `id,name,status` |
-| Find by email | `id,name,email,status` |
-| Role assignment | `id,name,role` |
-| Billing check | `id,name,billing.plan,billing.status` |
+| Task                     | Recommended --fields value            |
+| ------------------------ | ------------------------------------- |
+| Count or existence check | `id`                                  |
+| Display a list           | `id,name,status`                      |
+| Find by email            | `id,name,email,status`                |
+| Role assignment          | `id,name,role`                        |
+| Billing check            | `id,name,billing.plan,billing.status` |
 
 Avoid fetching `notification_preferences`, `feature_flags`, or `audit_log` unless specifically needed.
 ````
@@ -279,6 +286,7 @@ to check propagation status.
 ## Proxied vs Unproxied
 
 The `proxied` field routes traffic through the CDN. When true:
+
 - The record's actual IP is hidden
 - HTTP/HTTPS traffic is accelerated and protected
 - Non-HTTP protocols (e.g., mail, SIP) must use proxied: false
@@ -343,12 +351,12 @@ These invariants reduce the need for the agent to reason about safety on every c
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | Only `--help` and a docs site. No agent-specific context files. |
-| 1 | A `CONTEXT.md` or `AGENTS.md` with basic usage guidance. |
-| 2 | Agent Skills covering per-command or per-API-surface workflows and invariants. |
-| 3 | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow the public Agent Skills format. |
+| Score | Criteria                                                                                                                                                                                       |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Only `--help` and a docs site. No agent-specific context files.                                                                                                                                |
+| 1     | A `CONTEXT.md` or `AGENTS.md` with basic usage guidance.                                                                                                                                       |
+| 2     | Agent Skills covering per-command or per-API-surface workflows and invariants.                                                                                                                 |
+| 3     | Comprehensive skill library encoding agent-specific guardrails ("always use --dry-run", "always use --fields"). Skills are versioned, discoverable, and follow the public Agent Skills format. |
 
 ## Checklist
 

@@ -11,15 +11,15 @@ This is not the default for every TypeScript app. For most application-local age
 
 ## Capability Map
 
-| Need | Cloudflare Surface | Use It When |
-|------|--------------------|-------------|
-| Stateful agent runtime | Cloudflare Agents + Durable Objects | Each user, tenant, project, room, or persona needs a long-lived agent identity. |
-| Model governance | AI Gateway | You need provider routing, logging, caching, rate controls, or central policy. |
-| Edge inference | Workers AI | The agent already runs in Workers and low-latency platform inference matters. |
-| Long-term memory | Agent Memory, Vectorize, AI Search, AutoRAG | The agent needs durable recall or retrieval over docs, product data, or conversation history. |
-| Browser access | Browser Run | The agent needs a remote browser from a Workers-native environment. |
-| Code execution | Sandbox SDK | The agent needs isolated execution without running untrusted code in the app process. |
-| Background work | Cron Triggers, Queues, Workflows | The agent needs scheduled checks, fan-out, retries, or durable asynchronous steps. |
+| Need                   | Cloudflare Surface                          | Use It When                                                                                   |
+| ---------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Stateful agent runtime | Cloudflare Agents + Durable Objects         | Each user, tenant, project, room, or persona needs a long-lived agent identity.               |
+| Model governance       | AI Gateway                                  | You need provider routing, logging, caching, rate controls, or central policy.                |
+| Edge inference         | Workers AI                                  | The agent already runs in Workers and low-latency platform inference matters.                 |
+| Long-term memory       | Agent Memory, Vectorize, AI Search, AutoRAG | The agent needs durable recall or retrieval over docs, product data, or conversation history. |
+| Browser access         | Browser Run                                 | The agent needs a remote browser from a Workers-native environment.                           |
+| Code execution         | Sandbox SDK                                 | The agent needs isolated execution without running untrusted code in the app process.         |
+| Background work        | Cron Triggers, Queues, Workflows            | The agent needs scheduled checks, fan-out, retries, or durable asynchronous steps.            |
 
 ## Scaffolding Rules
 
@@ -53,12 +53,12 @@ Avoid `fs`, `child_process`, local Playwright browsers, or process-global state 
 
 Use Durable Objects for identity and active session state. Add retrieval when the agent needs knowledge beyond the current session:
 
-| Memory Need | Use |
-|-------------|-----|
-| Current agent state | Durable Object storage |
-| Conversation or entity recall | Agent Memory, if available to the project |
-| Documentation or product corpus | AI Search, AutoRAG, or Vectorize |
-| Existing app database recall | Postgres + pgvector, or the app's current vector store |
+| Memory Need                     | Use                                                    |
+| ------------------------------- | ------------------------------------------------------ |
+| Current agent state             | Durable Object storage                                 |
+| Conversation or entity recall   | Agent Memory, if available to the project              |
+| Documentation or product corpus | AI Search, AutoRAG, or Vectorize                       |
+| Existing app database recall    | Postgres + pgvector, or the app's current vector store |
 
 Keep user, tenant, project, and entity identifiers server-derived. Never let a model choose the memory resource key.
 

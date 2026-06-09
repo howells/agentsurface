@@ -185,13 +185,7 @@
       "period": "minute"
     }
   },
-  "supportedLanguages": [
-    "en",
-    "es",
-    "fr",
-    "de",
-    "zh"
-  ],
+  "supportedLanguages": ["en", "es", "fr", "de", "zh"],
   "securitySchemes": {
     "OAuth2": {
       "type": "oauth2",
@@ -216,11 +210,7 @@
   "modelSupport": [
     {
       "provider": "Anthropic",
-      "models": [
-        "claude-opus-4-7",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5-20251001"
-      ]
+      "models": ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
     },
     {
       "provider": "OpenAI",
@@ -228,10 +218,7 @@
     },
     {
       "provider": "Google",
-      "models": [
-        "gemini-3.1-pro",
-        "gemini-3-flash"
-      ]
+      "models": ["gemini-3.1-pro", "gemini-3-flash"]
     }
   ],
   "taskManagement": {
@@ -303,16 +290,7 @@
   "metadata": {
     "version": "1.0.0",
     "releaseDate": "2026-04-17",
-    "tags": [
-      "agent-management",
-      "workflow-orchestration",
-      "ai-powered",
-      "production"
-    ],
-    "certifications": [
-      "A2A-Compliant-1.0.0",
-      "OpenAPI-3.1.0",
-      "RFC9457-ErrorHandling"
-    ]
+    "tags": ["agent-management", "workflow-orchestration", "ai-powered", "production"],
+    "certifications": ["A2A-Compliant-1.0.0", "OpenAPI-3.1.0", "RFC9457-ErrorHandling"]
   }
 }

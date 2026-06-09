@@ -25,23 +25,20 @@
  */
 
 import type { Tool } from "ai";
-import type {
-  Tool as MCPTool,
-  ToolInputBase,
-} from "@modelcontextprotocol/sdk/shared/messages";
+import type { Tool as MCPTool, ToolInputBase } from "@modelcontextprotocol/sdk/shared/messages";
 import { z } from "zod";
 
 /**
  * Draft state: stored temporarily until user confirms.
  */
 export const DraftRecordSchema = z.object({
-  draftId: z.string().describe("Unique draft ID (ephemeral key)"),
-  kind: z.enum(["invoice", "email", "notification"]).describe("Record type"),
-  preview: z.record(z.string(), z.unknown()).describe("Human-readable preview"),
-  payload: z.record(z.string(), z.unknown()).describe("Full payload to execute"),
   createdAt: z.number().describe("Unix timestamp"),
-  expiresAt: z.number().describe("Unix timestamp (auto-expires after 24h)"),
   createdBy: z.string().describe("User ID of preparer"),
+  draftId: z.string().describe("Unique draft ID (ephemeral key)"),
+  expiresAt: z.number().describe("Unix timestamp (auto-expires after 24h)"),
+  kind: z.enum(["invoice", "email", "notification"]).describe("Record type"),
+  payload: z.record(z.string(), z.unknown()).describe("Full payload to execute"),
+  preview: z.record(z.string(), z.unknown()).describe("Human-readable preview"),
 });
 
 export type DraftRecord = z.infer<typeof DraftRecordSchema>;
@@ -50,7 +47,7 @@ export type DraftRecord = z.infer<typeof DraftRecordSchema>;
  * In-memory draft store (in production, use Redis with TTL).
  */
 export class DraftRecordStore {
-  private drafts: Map<string, DraftRecord> = new Map();
+  private drafts = new Map<string, DraftRecord>();
 
   /**
    * Save a draft and return its ID.
@@ -60,8 +57,8 @@ export class DraftRecordStore {
     const now = Date.now();
 
     const record: DraftRecord = {
-      draftId,
       createdAt: now,
+      draftId,
       expiresAt: now + 86400000, // 24 hours
       ...draft,
     };
@@ -118,9 +115,10 @@ export class DraftRecordStore {
  * Zod schema for prepare_draft_invoice input.
  */
 export const PrepareDraftInvoiceInputSchema = z.object({
-  customerId: z.string().describe("Customer ID"),
   amount: z.number().min(0.01).describe("Total amount in cents"),
   currency: z.string().default("USD").describe("Currency code"),
+  customerId: z.string().describe("Customer ID"),
+  dueDate: z.string().optional().describe("YYYY-MM-DD"),
   items: z
     .array(
       z.object({
@@ -130,28 +128,20 @@ export const PrepareDraftInvoiceInputSchema = z.object({
       }),
     )
     .describe("Line items"),
-  dueDate: z.string().optional().describe("YYYY-MM-DD"),
   notes: z.string().optional().describe("Invoice notes"),
 });
 
-export type PrepareDraftInvoiceInput = z.infer<
-  typeof PrepareDraftInvoiceInputSchema
->;
+export type PrepareDraftInvoiceInput = z.infer<typeof PrepareDraftInvoiceInputSchema>;
 
 /**
  * Zod schema for confirm_send_invoice input.
  */
 export const ConfirmSendInvoiceInputSchema = z.object({
   draftId: z.string().describe("Draft ID returned by prepare_draft_invoice"),
-  sendEmail: z
-    .boolean()
-    .default(true)
-    .describe("Send invoice to customer email"),
+  sendEmail: z.boolean().default(true).describe("Send invoice to customer email"),
 });
 
-export type ConfirmSendInvoiceInput = z.infer<
-  typeof ConfirmSendInvoiceInputSchema
->;
+export type ConfirmSendInvoiceInput = z.infer<typeof ConfirmSendInvoiceInputSchema>;
 
 /**
  * MCP-compatible prepare_draft_invoice tool.
@@ -163,49 +153,49 @@ export function createPrepareDraftInvoiceTool(
   onPrepare?: (input: PrepareDraftInvoiceInput) => Promise<Record<string, unknown>>,
 ): MCPTool {
   return {
-    name: "prepare_draft_invoice",
     description:
       "Create a draft invoice for review. Returns a preview and draft ID. " +
       "Call confirm_send_invoice with the draft ID to finalize and send.",
     inputSchema: {
-      type: "object" as const,
       properties: {
-        customerId: {
-          type: "string",
-          description: "Customer ID",
-        },
         amount: {
-          type: "number",
           description: "Total amount in cents",
+          type: "number",
         },
         currency: {
-          type: "string",
           description: "Currency code",
+          type: "string",
+        },
+        customerId: {
+          description: "Customer ID",
+          type: "string",
+        },
+        dueDate: {
+          description: "Due date (YYYY-MM-DD)",
+          type: "string",
         },
         items: {
-          type: "array",
+          description: "Line items",
           items: {
-            type: "object",
             properties: {
               description: { type: "string" },
               quantity: { type: "number" },
               unitPrice: { type: "number" },
             },
             required: ["description", "quantity", "unitPrice"],
+            type: "object",
           },
-          description: "Line items",
-        },
-        dueDate: {
-          type: "string",
-          description: "Due date (YYYY-MM-DD)",
+          type: "array",
         },
         notes: {
-          type: "string",
           description: "Notes",
+          type: "string",
         },
       },
       required: ["customerId", "amount", "currency", "items"],
+      type: "object" as const,
     },
+    name: "prepare_draft_invoice",
   };
 }
 
@@ -219,24 +209,24 @@ export function createConfirmSendInvoiceTool(
   onConfirm?: (draft: DraftRecord, sendEmail: boolean) => Promise<Record<string, unknown>>,
 ): MCPTool {
   return {
-    name: "confirm_send_invoice",
     description:
       "Finalize and send a draft invoice. DESTRUCTIVE: once sent, the invoice cannot be unsent. " +
       "Requires explicit approval via draft ID.",
     inputSchema: {
-      type: "object" as const,
       properties: {
         draftId: {
-          type: "string",
           description: "Draft ID from prepare_draft_invoice",
+          type: "string",
         },
         sendEmail: {
-          type: "boolean",
           description: "Send to customer email",
+          type: "boolean",
         },
       },
       required: ["draftId"],
+      type: "object" as const,
     },
+    name: "confirm_send_invoice",
   };
 }
 
@@ -252,26 +242,26 @@ export async function handlePrepareDraftInvoice(
   const previewUrl = `https://api.example.com/drafts/invoice-preview?id=temp-${Date.now()}`;
 
   const preview = {
-    customerName,
     amount: (input.amount / 100).toFixed(2),
     currency: input.currency,
-    items: input.items,
+    customerName,
     dueDate: input.dueDate || "not set",
+    items: input.items,
     previewUrl,
   };
 
   const draftId = store.saveDraft({
+    createdBy: "user-123", // <CUSTOMISE> Get from context
     kind: "invoice",
-    preview,
     payload: {
-      customerId: input.customerId,
       amount: input.amount,
       currency: input.currency,
-      items: input.items,
+      customerId: input.customerId,
       dueDate: input.dueDate,
+      items: input.items,
       notes: input.notes,
     },
-    createdBy: "user-123", // <CUSTOMISE> Get from context
+    preview,
   });
 
   return {
@@ -290,9 +280,7 @@ export async function handleConfirmSendInvoice(
   const draft = store.consumeDraft(input.draftId);
 
   if (!draft) {
-    throw new Error(
-      `Draft ${input.draftId} not found (may have expired or been used already)`,
-    );
+    throw new Error(`Draft ${input.draftId} not found (may have expired or been used already)`);
   }
 
   // <CUSTOMISE> Call your invoice API to create and send
@@ -303,8 +291,8 @@ export async function handleConfirmSendInvoice(
 
   return {
     invoiceId,
-    sent: input.sendEmail,
     message: `Invoice ${invoiceId} sent${input.sendEmail ? " to customer email" : ""}`,
+    sent: input.sendEmail,
   };
 }
 
@@ -312,15 +300,15 @@ export async function handleConfirmSendInvoice(
  * Annotation metadata (for Claude Desktop, etc.).
  */
 export const WRITE_ANNOTATIONS = {
-  readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: false,
+  readOnlyHint: false,
 } as const;
 
 export const DESTRUCTIVE_ANNOTATIONS = {
-  readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: true,
+  readOnlyHint: false,
 } as const;
 
 /**
@@ -335,8 +323,8 @@ export class DraftThenConfirmToolSet {
 
   getTools(): Record<string, MCPTool> {
     return {
-      prepare_draft_invoice: createPrepareDraftInvoiceTool(this.store),
       confirm_send_invoice: createConfirmSendInvoiceTool(this.store),
+      prepare_draft_invoice: createPrepareDraftInvoiceTool(this.store),
     };
   }
 
@@ -365,9 +353,10 @@ export async function exampleDraftWorkflow() {
 
   // Step 1: Agent prepares draft
   const prepareResult = await toolSet.prepare({
-    customerId: "cust-456",
     amount: 50000, // $500.00
     currency: "USD",
+    customerId: "cust-456",
+    dueDate: "2026-05-15",
     items: [
       {
         description: "Consulting services",
@@ -375,7 +364,6 @@ export async function exampleDraftWorkflow() {
         unitPrice: 50,
       },
     ],
-    dueDate: "2026-05-15",
   });
 
   console.log("Draft prepared:", prepareResult);

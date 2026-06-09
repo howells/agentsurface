@@ -42,7 +42,9 @@ const tools = {
   search_tools: {
     description: "Search for available external app actions",
     inputSchema: z.object({
-      query: z.string().describe("What do you want to do? e.g., 'send email', 'create Notion page'"),
+      query: z
+        .string()
+        .describe("What do you want to do? e.g., 'send email', 'create Notion page'"),
       app: z.string().optional().describe("Filter by app name (optional)"),
       limit: z.number().optional().default(5),
     }),
@@ -76,13 +78,15 @@ server.registerTool(
       limit: z.number().optional().default(5),
     }),
     outputSchema: z.object({
-      tools: z.array(z.object({
-        id: z.string(),
-        app: z.string(),
-        name: z.string(),
-        description: z.string(),
-        parameters: z.record(z.any()),
-      })),
+      tools: z.array(
+        z.object({
+          id: z.string(),
+          app: z.string(),
+          name: z.string(),
+          description: z.string(),
+          parameters: z.record(z.any()),
+        }),
+      ),
     }),
   },
   async (params) => {
@@ -95,15 +99,17 @@ server.registerTool(
 
     // Filter to only connected/enabled apps for this user
     const userApps = await db.getUserConnectedApps(ctx.userId);
-    const filtered = results.filter(r => userApps.includes(r.app));
+    const filtered = results.filter((r) => userApps.includes(r.app));
 
     return {
-      content: [{
-        type: "text",
-        text: `Found ${filtered.length} actions:\n${filtered.map(t => `- ${t.app}: ${t.name} - ${t.description}`).join("\n")}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Found ${filtered.length} actions:\n${filtered.map((t) => `- ${t.app}: ${t.name} - ${t.description}`).join("\n")}`,
+        },
+      ],
       structuredContent: {
-        tools: filtered.map(t => ({
+        tools: filtered.map((t) => ({
           id: t.id,
           app: t.app,
           name: t.name,
@@ -112,7 +118,7 @@ server.registerTool(
         })),
       },
     };
-  }
+  },
 );
 ```
 
@@ -164,10 +170,12 @@ server.registerTool(
       await db.logExternalAction(ctx.userId, params.actionId, params.parameters, result);
 
       return {
-        content: [{
-          type: "text",
-          text: `Action executed successfully.\n${JSON.stringify(result, null, 2)}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Action executed successfully.\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
         structuredContent: {
           success: true,
           result,
@@ -176,10 +184,12 @@ server.registerTool(
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       return {
-        content: [{
-          type: "text",
-          text: `Action failed: ${message}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Action failed: ${message}`,
+          },
+        ],
         structuredContent: {
           success: false,
           result: {},
@@ -188,7 +198,7 @@ server.registerTool(
         isError: true,
       };
     }
-  }
+  },
 );
 ```
 
@@ -228,15 +238,16 @@ that the user has connected.
 
 ## Comparison: Pre-Registered vs. Meta-Tools
 
-| Aspect | Pre-Registered (50+ tools) | Meta-Tools |
-|--------|---------------------------|-----------|
-| **Tokens per request** | 500–1000 (all tools listed) | 100 (just 2 meta-tools) |
-| **Discovery latency** | None (tools pre-loaded) | +100–200ms (search query) |
-| **Adding new apps** | Code change + redeploy | Works immediately |
-| **User clarity** | Many irrelevant tools visible | Curated results per query |
-| **Rate limit cost** | ~50 token calls per request | ~5 token calls per request |
+| Aspect                 | Pre-Registered (50+ tools)    | Meta-Tools                 |
+| ---------------------- | ----------------------------- | -------------------------- |
+| **Tokens per request** | 500–1000 (all tools listed)   | 100 (just 2 meta-tools)    |
+| **Discovery latency**  | None (tools pre-loaded)       | +100–200ms (search query)  |
+| **Adding new apps**    | Code change + redeploy        | Works immediately          |
+| **User clarity**       | Many irrelevant tools visible | Curated results per query  |
+| **Rate limit cost**    | ~50 token calls per request   | ~5 token calls per request |
 
 **When to use each**:
+
 - **Pre-registered**: `` `<10` `` critical external apps; high discovery frequency.
 - **Meta-tools**: >20 external apps OR frequent app additions (Slack workspaces, Zapier integrations).
 
@@ -268,7 +279,7 @@ const searchCache = new Map<string, { tools: ToolResult[]; timestamp: number }>(
 
 server.registerTool("search_tools", ..., async (params) => {
   const cacheKey = `${params.query}:${ctx.userId}`;
-  
+
   // Check cache (valid for 1 hour)
   if (searchCache.has(cacheKey)) {
     const cached = searchCache.get(cacheKey)!;
@@ -324,6 +335,7 @@ metrics.counter("external_action_executed", { app: result.app, success: result.s
 ```
 
 **Key metrics**:
+
 - Search-tool hit rate (how often results are used after discovery).
 - Execution success rate per app.
 - Most-used external apps.

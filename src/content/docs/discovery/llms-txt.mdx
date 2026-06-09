@@ -77,10 +77,12 @@ The Anthropic `llms.txt` is a useful reference point: their index file is approx
 ## Real Examples
 
 **Anthropic** publishes two files:
+
 - `/llms.txt` — 8,364-token index with sections for Claude models, APIs, and product features
 - `/llms-full.txt` — 481,349-token file with all documentation content inlined
 
 **Stripe** publishes three files across their domains:
+
 - `stripe.com/llms.txt` — product overview and marketing content
 - `docs.stripe.com/llms.txt` — full API and integration documentation
 - `support.stripe.com/llms.txt` — help center and troubleshooting content
@@ -88,6 +90,7 @@ The Anthropic `llms.txt` is a useful reference point: their index file is approx
 Stripe also uses an `## Instructions` section (see below) to give behavioral guidance to AI agents about how to handle Stripe-specific concepts.
 
 **Vercel** organizes sections by product area:
+
 - Deployment, Edge Functions, Storage, Observability, and CLI each appear as separate H2 sections
 - Each link includes a description that differentiates it from adjacent pages
 - The file is kept under 3,000 tokens despite covering dozens of products
@@ -183,34 +186,29 @@ Most documentation platforms now generate `llms.txt` automatically:
 
 ```typescript
 // app/llms.txt/route.ts
-import { source } from '@/lib/source'
+import { source } from "@/lib/source";
 
 export async function GET() {
-  const pages = source.getPages()
+  const pages = source.getPages();
 
-  const sections = groupPagesBySection(pages)
+  const sections = groupPagesBySection(pages);
 
-  const lines = [
-    '# Your Product Name',
-    '',
-    '> What your product does and who it serves.',
-    '',
-  ]
+  const lines = ["# Your Product Name", "", "> What your product does and who it serves.", ""];
 
   for (const [section, sectionPages] of Object.entries(sections)) {
-    lines.push(`## ${section}`, '')
+    lines.push(`## ${section}`, "");
     for (const page of sectionPages) {
-      lines.push(`- [${page.data.title}](${page.url}.md): ${page.data.description}`)
+      lines.push(`- [${page.data.title}](${page.url}.md): ${page.data.description}`);
     }
-    lines.push('')
+    lines.push("");
   }
 
-  return new Response(lines.join('\n'), {
+  return new Response(lines.join("\n"), {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=86400',
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=86400",
     },
-  })
+  });
 }
 ```
 

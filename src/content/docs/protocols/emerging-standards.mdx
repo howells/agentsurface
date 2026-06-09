@@ -55,6 +55,7 @@ Use Arazzo when your API involves sequences that agents should follow predictabl
 OpenTelemetry's GenAI semantic conventions standardize how to instrument LLM calls and agentic workflows, but the current OpenTelemetry docs mark them Development. Metrics include request model, token counts, input/output content, system instructions, and tool call traces. Adoption by Traceloop, Langfuse, Datadog, and others makes this a practical observability baseline, but pin emitted versions and expect migration work before stable.
 
 Key attributes for agent spans:
+
 - `gen_ai.provider.name` — "openai", "anthropic", "google"
 - `gen_ai.request.model` — model identifier
 - `gen_ai.input.messages` / `gen_ai.output.messages` — conversation content
@@ -125,27 +126,27 @@ Embed schema.org structured data in HTML as JSON-LD. Tools like NLWeb (Microsoft
 
 ```html
 <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebAPI",
-  "name": "Acme Billing API",
-  "description": "Invoice and payment management",
-  "url": "https://api.acme.com",
-  "documentation": "https://docs.acme.com",
-  "termsOfService": "https://acme.com/tos",
-  "potentialAction": [
-    {
-      "@type": "TradeAction",
-      "name": "Create Invoice",
-      "target": {
-        "@type": "EntryPoint",
-        "url": "https://api.acme.com/invoices",
-        "httpMethod": "POST",
-        "inputSchema": { "@type": "PropertyValueSpecification", "name": "customer_id" }
+  {
+    "@context": "https://schema.org",
+    "@type": "WebAPI",
+    "name": "Acme Billing API",
+    "description": "Invoice and payment management",
+    "url": "https://api.acme.com",
+    "documentation": "https://docs.acme.com",
+    "termsOfService": "https://acme.com/tos",
+    "potentialAction": [
+      {
+        "@type": "TradeAction",
+        "name": "Create Invoice",
+        "target": {
+          "@type": "EntryPoint",
+          "url": "https://api.acme.com/invoices",
+          "httpMethod": "POST",
+          "inputSchema": { "@type": "PropertyValueSpecification", "name": "customer_id" }
+        }
       }
-    }
-  ]
-}
+    ]
+  }
 </script>
 ```
 
@@ -250,8 +251,6 @@ OASF envisions capability marketplaces where orchestrators can search for tools 
 ### Current Status
 
 OASF schemas are actively being developed but have not converged on a stable version. The tooling ecosystem (search indexes, registry operators) is nascent. This is a specification to contribute to and monitor, not build production dependencies on.
-
-
 
 ### NLWeb — Microsoft's Natural Language Web
 

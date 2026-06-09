@@ -54,13 +54,15 @@ This file adds Claude Code-specific guidance only.
 Default: claude-opus-4-7 (best for complex analysis and coding)
 
 Use claude-sonnet-4-6 for:
-  - Fast iteration (cheaper, faster)
-  - Simple refactoring or formatting
-  - Large file reads (smaller context, faster processing)
+
+- Fast iteration (cheaper, faster)
+- Simple refactoring or formatting
+- Large file reads (smaller context, faster processing)
 
 Use claude-haiku-4-5 for:
-  - Code search or file summarization
-  - One-off tool invocations
+
+- Code search or file summarization
+- One-off tool invocations
 ```
 
 If no override, omit this section (Claude Code will use its default).
@@ -71,18 +73,21 @@ If no override, omit this section (Claude Code will use its default).
 ## Tools
 
 Always allowed:
-  - Read, Bash, Git
-  - File creation and editing
-  - Tool use (any MCP server in mcp-servers/)
+
+- Read, Bash, Git
+- File creation and editing
+- Tool use (any MCP server in mcp-servers/)
 
 Ask first:
-  - Database migrations (pnpm db:migrate)
-  - External API calls (e.g., curl to production)
+
+- Database migrations (pnpm db:migrate)
+- External API calls (e.g., curl to production)
 
 Never allowed:
-  - Production deployments
-  - Credential rotation
-  - Branch/tag deletion
+
+- Production deployments
+- Credential rotation
+- Branch/tag deletion
 ```
 
 If AGENTS.md boundaries suffice, omit this section.
@@ -95,12 +100,14 @@ Reference skills that should be auto-triggered for this codebase:
 ## Skills
 
 Auto-trigger these skills when relevant:
-  - /review — for pull request analysis
-  - /init — for new CLAUDE.md scaffolding
-  - /security-review — for auth/crypto changes
+
+- /review — for pull request analysis
+- /init — for new CLAUDE.md scaffolding
+- /security-review — for auth/crypto changes
 
 Disable:
-  - /schedule — not useful for this codebase
+
+- /schedule — not useful for this codebase
 ```
 
 See https://docs.anthropic.com/en/docs/claude-code/skills for the skill reference.
@@ -113,16 +120,18 @@ Claude Code's memory tool (beta `context-management-2025-06-27`) persists `/memo
 ## Memory Hints
 
 Store in memories/:
-  - pnpm install quirks (Node version, lockfile idiosyncrasies)
-  - Frequent build errors and their fixes
-  - Test flakiness and workarounds
-  - CI gate failures and how to resolve them
-  - Performance gotchas (slow tests, large bundles)
+
+- pnpm install quirks (Node version, lockfile idiosyncrasies)
+- Frequent build errors and their fixes
+- Test flakiness and workarounds
+- CI gate failures and how to resolve them
+- Performance gotchas (slow tests, large bundles)
 
 Example entry (memories/build-quirks.md):
-  - Turbo cache can get stale; run --force-all if build fails mysteriously
-  - Tailwind JIT fails if class names are not literal strings
-  - Next.js ISR requires revalidate export; no default export = error
+
+- Turbo cache can get stale; run --force-all if build fails mysteriously
+- Tailwind JIT fails if class names are not literal strings
+- Next.js ISR requires revalidate export; no default export = error
 ```
 
 ### 6. Extended Thinking
@@ -133,14 +142,16 @@ If extended thinking should be enabled for specific tasks:
 ## Extended Thinking
 
 Enable for:
-  - Architecture decisions (ARCHITECTURE.md changes)
-  - Complex refactorings affecting multiple packages
-  - Bug triage on production issues
-  - Security reviews
+
+- Architecture decisions (ARCHITECTURE.md changes)
+- Complex refactorings affecting multiple packages
+- Bug triage on production issues
+- Security reviews
 
 Disable for:
-  - Simple file edits or formatting
-  - Routine feature development
+
+- Simple file edits or formatting
+- Routine feature development
 ```
 
 ### 7. Permission Mode
@@ -153,12 +164,14 @@ Claude Code supports permission modes. If different from default:
 Default: plan (ask for approval on uncertain actions)
 
 Use bypassPermissions for:
-  - Automated refactoring tasks
-  - Lint fixes and formatting
+
+- Automated refactoring tasks
+- Lint fixes and formatting
 
 Use dontAsk for:
-  - Code exploration (reading, grepping)
-  - Draft PR creation
+
+- Code exploration (reading, grepping)
+- Draft PR creation
 ```
 
 See https://docs.anthropic.com/en/docs/claude-code/sdk for permission mode details.
@@ -192,8 +205,9 @@ Use claude-sonnet-4-6 for fast iteration on simple tasks.
 ## Skills
 
 Auto-trigger:
-  - /review for PR analysis
-  - /security-review for auth changes
+
+- /review for PR analysis
+- /security-review for auth changes
 
 ## Permissions
 
@@ -220,73 +234,83 @@ Use claude-haiku-4-5 for: code search, summarization
 ## Tools
 
 Always allowed:
-  - Read, Bash, Git
-  - File creation/editing
-  - MCP servers in mcp-servers/
-  - Database: pnpm db:migrate (non-prod only)
+
+- Read, Bash, Git
+- File creation/editing
+- MCP servers in mcp-servers/
+- Database: pnpm db:migrate (non-prod only)
 
 Ask first:
-  - Staging deployments
-  - External API calls to production
+
+- Staging deployments
+- External API calls to production
 
 Never:
-  - Production deployments
-  - Credential rotation
+
+- Production deployments
+- Credential rotation
 
 ## Skills
 
 Auto-trigger:
-  - /review for pull requests
-  - /security-review for auth/crypto
-  - /init for new CLAUDE.md scaffolding
+
+- /review for pull requests
+- /security-review for auth/crypto
+- /init for new CLAUDE.md scaffolding
 
 Disable:
-  - /schedule (N/A for this codebase)
+
+- /schedule (N/A for this codebase)
 
 ## Memory
 
 Store learned patterns:
-  - Node version quirks (from .nvmrc)
-  - Monorepo build oddities
-  - Test flakiness and workarounds
-  - CI gate failures
+
+- Node version quirks (from .nvmrc)
+- Monorepo build oddities
+- Test flakiness and workarounds
+- CI gate failures
 
 Example memory entries:
-  - Turbo cache stales; use --force-all if mysterious failures
-  - Prisma migrations are append-only; rollback only in dev
-  - Tailwind JIT requires literal class names
-  - pnpm install requires Node 18.12+; use .nvmrc
+
+- Turbo cache stales; use --force-all if mysterious failures
+- Prisma migrations are append-only; rollback only in dev
+- Tailwind JIT requires literal class names
+- pnpm install requires Node 18.12+; use .nvmrc
 
 ## Extended Thinking
 
 Enable for:
-  - Architecture decisions
-  - Complex refactorings
-  - Security reviews
+
+- Architecture decisions
+- Complex refactorings
+- Security reviews
 
 ## Session Hints
 
 - Load AGENTS.md first: /read AGENTS.md
 - Break complex tasks across sessions
 - Use /summary to compact history
-- For monorepo: /read packages/*/AGENTS.md
+- For monorepo: /read packages/\*/AGENTS.md
 
 ## Gotchas (Claude-Specific)
 
 - Extended thinking increases token cost 2–3×; use sparingly
 - Memory tool requires explicit `/read memories/` at session start
-- Skill auto-trigger only for *directly* matching files (new tests → auto /review doesn't fire on library changes)
+- Skill auto-trigger only for _directly_ matching files (new tests → auto /review doesn't fire on library changes)
 ```
 
 ## Do's and Don'ts
 
 **Do:**
+
 - Reference AGENTS.md instead of repeating
 - Document Claude-specific decisions (model, permissions, skills)
 - Use for learned friction patterns (memory hints)
 - Keep it concise (`` `<100` `` lines)
 
 **Don't:**
+
 - Duplicate AGENTS.md content
 - Explain general project conventions here (AGENTS.md)
 - Over-specify behavior (let Claude Code use its judgment)

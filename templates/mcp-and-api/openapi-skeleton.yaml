@@ -435,8 +435,7 @@ paths:
                     type: string
                     format: date-time
                     nullable: true
-                required:
-                  [execution_id, status, started_at, completed_at]
+                required: [execution_id, status, started_at, completed_at]
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -490,8 +489,7 @@ components:
         owner_id:
           type: string
           format: uuid
-      required:
-        [id, name, model, status, created_at, updated_at, owner_id]
+      required: [id, name, model, status, created_at, updated_at, owner_id]
 
     CreateAgentRequest:
       type: object

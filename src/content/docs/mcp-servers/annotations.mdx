@@ -40,7 +40,7 @@ server.tool(
   async (params) => {
     const invoice = await db.invoices.findById(params.invoice_id);
     // ...
-  }
+  },
 );
 ```
 
@@ -68,7 +68,7 @@ server.tool(
   },
   async (params) => {
     // ...
-  }
+  },
 );
 ```
 
@@ -83,7 +83,7 @@ Signals that calling the tool multiple times with the same parameters produces t
 server.tool(
   "billing_send_invoice_email",
   "Sends the invoice payment email to the customer. " +
-  "Idempotent: calling twice for the same invoice does not send duplicate emails.",
+    "Idempotent: calling twice for the same invoice does not send duplicate emails.",
   {
     invoice_id: z.string().uuid().describe("The invoice UUID to send"),
   },
@@ -102,7 +102,7 @@ server.tool(
       idempotencyKey: `invoice-email-${params.invoice_id}`,
     });
     // ...
-  }
+  },
 );
 ```
 
@@ -133,13 +133,13 @@ server.tool(
   async (params) => {
     // Makes HTTP requests to api.stripe.com
     // ...
-  }
+  },
 );
 
 server.tool(
   "billing_calculate_tax",
   "Calculates the applicable tax for an invoice using local tax tables. " +
-  "No external requests are made.",
+    "No external requests are made.",
   {
     amount_cents: z.number().int().positive(),
     jurisdiction: z.string().describe("ISO 3166-1 alpha-2 country code"),
@@ -153,7 +153,7 @@ server.tool(
   async (params) => {
     // Uses only local data, no network calls
     // ...
-  }
+  },
 );
 ```
 
@@ -161,12 +161,12 @@ server.tool(
 
 The default for every annotation is the most conservative possible value:
 
-| Annotation       | Default  | Meaning of default                              |
-| ---------------- | -------- | ----------------------------------------------- |
-| readOnlyHint     | `false`  | Assume the tool may modify state                |
-| destructiveHint  | `true`   | Assume the tool may permanently destroy data    |
-| idempotentHint   | `false`  | Assume repeated calls have compounding effects  |
-| openWorldHint    | `true`   | Assume the tool makes external requests         |
+| Annotation      | Default | Meaning of default                             |
+| --------------- | ------- | ---------------------------------------------- |
+| readOnlyHint    | `false` | Assume the tool may modify state               |
+| destructiveHint | `true`  | Assume the tool may permanently destroy data   |
+| idempotentHint  | `false` | Assume repeated calls have compounding effects |
+| openWorldHint   | `true`  | Assume the tool makes external requests        |
 
 This means that an unannotated tool gets the most restrictive behavior from clients. Annotating your tools is how you opt in to smoother experiences — fewer confirmation dialogs, safer automatic retries, unrestricted use in sandboxed environments.
 
@@ -272,5 +272,8 @@ For this reason:
 The value of annotations comes from the combination of correct implementation on the server side and appropriate trust calibration on the client side.
 
 <Callout type="info">
-Annotations are part of the tool definition and are returned in the `tools/list` response. Clients read them once during capability negotiation and cache them for the session. If you change an annotation on a running server, connected clients will not see the change until they re-fetch the tool list.
+  Annotations are part of the tool definition and are returned in the `tools/list` response. Clients
+  read them once during capability negotiation and cache them for the session. If you change an
+  annotation on a running server, connected clients will not see the change until they re-fetch the
+  tool list.
 </Callout>

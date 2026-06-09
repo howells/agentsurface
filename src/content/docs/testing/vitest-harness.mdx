@@ -26,6 +26,7 @@ Vitest evals run agents in-process within your test suite. They are faster for l
 - **Regression tests** — catch regressions in CI before deploying
 
 Do NOT use for:
+
 - **Open-ended evals** — if you need LLM-as-judge on every test case, external platforms are simpler
 - **Large-scale evaluation** — if you have 1000+ test cases, use Braintrust or LangSmith
 - **Human review** — if you need to manually review borderline cases, use a managed platform
@@ -40,7 +41,7 @@ import { MyAgent } from "../src/agent";
 
 describe("Agent Evals", () => {
   let agent: MyAgent;
-  
+
   beforeEach(() => {
     agent = new MyAgent({
       model: "claude-opus-4-7",
@@ -48,32 +49,32 @@ describe("Agent Evals", () => {
       maxRetries: 1,
     });
   });
-  
+
   it("should route to search tool for documentation queries", async () => {
     const result = await agent.run({
       prompt: "Find the authentication documentation for MCP",
     });
-    
+
     // Assert tool was selected
     expect(result.toolCalls).toHaveLength(1);
     expect(result.toolCalls[0].name).toBe("docs_search");
     expect(result.toolCalls[0].arguments.query).toMatch(/auth/i);
   });
-  
+
   it("should construct valid parameters", async () => {
     const result = await agent.run({
       prompt: "Send invoice inv_001 to customer@example.com",
     });
-    
-    const sendCall = result.toolCalls.find(c => c.name === "send_invoice");
+
+    const sendCall = result.toolCalls.find((c) => c.name === "send_invoice");
     expect(sendCall).toBeDefined();
-    
+
     // Validate schema
     const schema = z.object({
       invoice_id: z.string().regex(/^inv_/),
       recipient_email: z.string().email(),
     });
-    
+
     expect(() => schema.parse(sendCall.arguments)).not.toThrow();
   });
 });
@@ -98,15 +99,13 @@ it(
     const result = await agent.run({
       prompt: "Find files related to auth",
     });
-    
+
     // Could mean user authentication, OAuth, MCP OAuth, etc.
     // Any reasonable tool selection passes
     const toolName = result.toolCalls[0].name;
-    expect(
-      ["user_auth_search", "oauth_search", "docs_search"].includes(toolName)
-    ).toBe(true);
+    expect(["user_auth_search", "oauth_search", "docs_search"].includes(toolName)).toBe(true);
   },
-  { retry: 2 } // Retry up to 2 times; pass if any succeeds
+  { retry: 2 }, // Retry up to 2 times; pass if any succeeds
 );
 ```
 
@@ -129,7 +128,7 @@ it("should consistently route the same query", async () => {
     const result = await agent.run({ prompt: "Search for docs" });
     runs.push(result.toolCalls[0].name);
   }
-  
+
   // All runs use the same tool
   expect(new Set(runs).size).toBe(1);
 });
@@ -210,15 +209,15 @@ async function runNTrials(prompt: string, n = 5): Promise<boolean[]> {
 }
 
 function passAtK(results: boolean[], k: number): number {
-  return results.slice(0, k).some(r => r) ? 1 : 0;
+  return results.slice(0, k).some((r) => r) ? 1 : 0;
 }
 
 it("should have high pass@5 on ambiguous prompts", async () => {
   const results = await runNTrials("Find files related to auth", 5);
   expect(passAtK(results, 5)).toBe(1);
-  
+
   // Also report stats
-  const passRate = results.filter(r => r).length / results.length;
+  const passRate = results.filter((r) => r).length / results.length;
   console.log(`Pass@1: ${results[0] ? 1 : 0}, pass@5: ${passAtK(results, 5)}, rate: ${passRate}`);
 });
 ```
@@ -234,12 +233,12 @@ it("should execute consistent plan", async () => {
   const result = await agent.run({
     prompt: "Send invoice inv_001",
   });
-  
-  const trajectory = result.toolCalls.map(c => ({
+
+  const trajectory = result.toolCalls.map((c) => ({
     tool: c.name,
     args: c.arguments,
   }));
-  
+
   // Snapshot: first run saves trajectory, future runs compare
   expect(trajectory).toMatchSnapshot();
 });

@@ -10,9 +10,10 @@
  * </CUSTOMISE>
  */
 
-import { jwtVerify, createRemoteJWKSet, importSPKI } from 'jose';
-import type { JWTPayload } from 'jose';
-import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify, createRemoteJWKSet, importSPKI } from "jose";
+import type { JWTPayload } from "jose";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * JWT claims with agent-specific fields
@@ -53,8 +54,8 @@ export class JWTValidator {
     this.jwksUri = opts.jwksUri;
     this.expectedIssuer = opts.expectedIssuer;
     this.expectedAudience = opts.expectedAudience;
-    this.allowedAlgorithms = opts.allowedAlgorithms || ['RS256', 'ES256'];
-    this.jwksCacheTtlMs = opts.jwksCacheTtlMs || 3600000; // 1 hour
+    this.allowedAlgorithms = opts.allowedAlgorithms || ["RS256", "ES256"];
+    this.jwksCacheTtlMs = opts.jwksCacheTtlMs || 3_600_000; // 1 hour
   }
 
   /**
@@ -80,9 +81,9 @@ export class JWTValidator {
       const jwks = this.getJWKS();
 
       const verified = await jwtVerify(token, jwks, {
-        issuer: this.expectedIssuer,
-        audience: this.expectedAudience,
         algorithms: this.allowedAlgorithms,
+        audience: this.expectedAudience,
+        issuer: this.expectedIssuer,
       });
 
       const payload = verified.payload as AgentJWTPayload;
@@ -97,7 +98,7 @@ export class JWTValidator {
       }
 
       if (payload.exp < Math.floor(Date.now() / 1000)) {
-        throw new Error('JWT is expired');
+        throw new Error("JWT is expired");
       }
 
       if (payload.nbf && payload.nbf > Math.floor(Date.now() / 1000)) {
@@ -105,9 +106,9 @@ export class JWTValidator {
       }
 
       return payload;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`JWT validation failed: ${message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`JWT validation failed: ${message}`, { cause: error });
     }
   }
 }
@@ -124,9 +125,12 @@ export function getJWTValidator(opts?: {
 }): JWTValidator {
   if (!globalValidator) {
     globalValidator = new JWTValidator({
-      jwksUri: opts?.jwksUri || process.env.JWKS_URI || 'https://auth.example.com/.well-known/jwks.json',
-      expectedIssuer: opts?.expectedIssuer || process.env.EXPECTED_ISSUER || 'https://auth.example.com',
-      expectedAudience: opts?.expectedAudience || process.env.EXPECTED_AUDIENCE || 'https://api.example.com',
+      expectedAudience:
+        opts?.expectedAudience || process.env.EXPECTED_AUDIENCE || "https://api.example.com",
+      expectedIssuer:
+        opts?.expectedIssuer || process.env.EXPECTED_ISSUER || "https://auth.example.com",
+      jwksUri:
+        opts?.jwksUri || process.env.JWKS_URI || "https://auth.example.com/.well-known/jwks.json",
     });
   }
   return globalValidator;
@@ -145,26 +149,23 @@ export function getJWTValidator(opts?: {
  * };
  * ```
  */
-export async function jwtMiddleware(
-  req: NextRequest,
-  next: any
-): Promise<NextResponse> {
+export async function jwtMiddleware(req: NextRequest, next: any): Promise<NextResponse> {
   // Skip validation for public endpoints
-  if (req.nextUrl.pathname === '/api/health') {
+  if (req.nextUrl.pathname === "/api/health") {
     return next(req);
   }
 
-  const authHeader = req.headers.get('Authorization');
+  const authHeader = req.headers.get("Authorization");
 
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json(
       {
-        type: 'https://api.example.com/errors/ERR_UNAUTHORIZED',
-        title: 'Unauthorized',
+        detail: "Authorization header with Bearer token required",
         status: 401,
-        detail: 'Authorization header with Bearer token required',
+        title: "Unauthorized",
+        type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
       },
-      { status: 401, headers: { 'Content-Type': 'application/problem+json' } }
+      { headers: { "Content-Type": "application/problem+json" }, status: 401 },
     );
   }
 
@@ -176,25 +177,25 @@ export async function jwtMiddleware(
 
     // Attach validated claims to request headers for downstream routes
     const requestHeaders = new Headers(req.headers);
-    requestHeaders.set('x-user-claims', JSON.stringify(claims));
-    requestHeaders.set('x-user-id', claims.sub);
+    requestHeaders.set("x-user-claims", JSON.stringify(claims));
+    requestHeaders.set("x-user-id", claims.sub);
     if (claims.azp) {
-      requestHeaders.set('x-agent-id', claims.azp);
+      requestHeaders.set("x-agent-id", claims.azp);
     }
 
     return next(req, { request: { headers: requestHeaders } });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.warn(`[JWT] Validation error: ${message}`);
 
     return NextResponse.json(
       {
-        type: 'https://api.example.com/errors/ERR_UNAUTHORIZED',
-        title: 'Invalid Token',
-        status: 401,
         detail: message,
+        status: 401,
+        title: "Invalid Token",
+        type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
       },
-      { status: 401, headers: { 'Content-Type': 'application/problem+json' } }
+      { headers: { "Content-Type": "application/problem+json" }, status: 401 },
     );
   }
 }
@@ -214,20 +215,20 @@ export async function jwtMiddleware(
  * ```
  */
 export function withJWTValidation(
-  handler: (req: NextRequest, claims: AgentJWTPayload) => Promise<NextResponse>
+  handler: (req: NextRequest, claims: AgentJWTPayload) => Promise<NextResponse>,
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
 
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json(
         {
-          type: 'https://api.example.com/errors/ERR_UNAUTHORIZED',
-          title: 'Unauthorized',
+          detail: "Authorization header required",
           status: 401,
-          detail: 'Authorization header required',
+          title: "Unauthorized",
+          type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -237,17 +238,17 @@ export function withJWTValidation(
     try {
       const claims = await validator.validateToken(token);
       return handler(req, claims);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
 
       return NextResponse.json(
         {
-          type: 'https://api.example.com/errors/ERR_UNAUTHORIZED',
-          title: 'Invalid Token',
-          status: 401,
           detail: message,
+          status: 401,
+          title: "Invalid Token",
+          type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
   };

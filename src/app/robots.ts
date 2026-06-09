@@ -4,38 +4,38 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
-        userAgent: "*",
         allow: "/",
+        userAgent: "*",
       },
       // Allow retrieval and search bots to use public docs
       {
+        allow: "/",
         userAgent: "OAI-SearchBot",
-        allow: "/",
       },
       {
+        allow: "/",
         userAgent: "Claude-SearchBot",
-        allow: "/",
       },
       {
-        userAgent: "PerplexityBot",
         allow: "/",
+        userAgent: "PerplexityBot",
       },
       // Block model-training crawlers
       {
+        disallow: "/",
         userAgent: "GPTBot",
-        disallow: "/",
       },
       {
+        disallow: "/",
         userAgent: "ClaudeBot",
-        disallow: "/",
       },
       {
+        disallow: "/",
         userAgent: "Google-Extended",
-        disallow: "/",
       },
       {
-        userAgent: "Meta-ExternalAgent",
         disallow: "/",
+        userAgent: "Meta-ExternalAgent",
       },
     ],
     sitemap: "https://agentsurface.dev/sitemap.xml",

@@ -30,22 +30,24 @@ The supervisor pattern has a scaling problem: every delegation is a round-trip t
 
 Swarm addresses this by eliminating the supervisor bottleneck. Agents hand off directly based on local decisions, not global routing logic. The trade-off is that emergent behavior is harder to predict and debug.
 
-| | Supervisor | Swarm |
-|---|-----------|-------|
-| Control flow | Centralized through manager | Decentralized, peer-to-peer |
-| Routing logic | Supervisor's system prompt | Each agent's handoff conditions |
-| Context growth | Accumulates at supervisor | Stays local to current agent |
-| Predictability | High (supervisor controls sequence) | Lower (emergent from handoff rules) |
-| Best for | Well-defined task sequences | Open-ended multi-step tasks |
+|                 | Supervisor                            | Swarm                                           |
+| --------------- | ------------------------------------- | ----------------------------------------------- |
+| Control flow    | Centralized through manager           | Decentralized, peer-to-peer                     |
+| Routing logic   | Supervisor's system prompt            | Each agent's handoff conditions                 |
+| Context growth  | Accumulates at supervisor             | Stays local to current agent                    |
+| Predictability  | High (supervisor controls sequence)   | Lower (emergent from handoff rules)             |
+| Best for        | Well-defined task sequences           | Open-ended multi-step tasks                     |
 | Failure surface | Supervisor is single point of failure | No single point of failure; cycles are the risk |
 
 Use swarm when:
+
 - Tasks are long-running enough that supervisor context accumulation is a real cost
 - The handoff conditions can be stated clearly within each agent's instructions
 - You are comfortable with emergent routing behavior and have tracing in place
 - The task domain is relatively contained (swarms with 10+ agents become hard to reason about)
 
 Use supervisor when:
+
 - The task sequence is predictable and well-defined
 - You need guaranteed execution order
 - You need the supervisor to synthesize results from multiple agents before responding
@@ -185,11 +187,11 @@ from openai.agents import Agent, Runner
 billing_agent = Agent(
     name="BillingAgent",
     instructions="""You handle billing questions: invoices, charges, refunds, subscriptions.
-    
+
     Hand off to TechSupportAgent when:
     - The question is about product functionality, not payment
     - The user reports a technical error unrelated to billing
-    
+
     Do not attempt to diagnose technical issues yourself.""",
     tools=[get_invoice, process_refund, list_subscriptions],
     handoffs=["TechSupportAgent"]  # declared by name, resolved at runtime
@@ -198,10 +200,10 @@ billing_agent = Agent(
 support_agent = Agent(
     name="TechSupportAgent",
     instructions="""You handle technical support: troubleshooting, documentation, error logs.
-    
+
     Hand off to BillingAgent when:
     - The question involves a charge, invoice, or payment
-    
+
     Hand off to EscalationAgent when:
     - The issue requires engineering intervention
     - Standard troubleshooting has not resolved the problem""",
@@ -302,17 +304,20 @@ def check_cycle(state: SwarmState, target: str) -> bool:
 3. **Terminal agents:** Designate one or more agents as terminal — they cannot hand off. Escalation agents, fallback agents, and catch-all agents should be terminal.
 
 <Callout type="warn">
-Swarms without cycle prevention will loop indefinitely when handoff conditions overlap between agents. Always identify terminal agents before deploying a swarm.
+  Swarms without cycle prevention will loop indefinitely when handoff conditions overlap between
+  agents. Always identify terminal agents before deploying a swarm.
 </Callout>
 
 ## Swarm vs. Supervisor: Decision Guide
 
 **Choose swarm when the task is:**
+
 - Multi-domain and the domain boundaries are clear
 - Long enough that supervisor context accumulation is a real cost
 - Designed to handle novel inputs that do not fit a predetermined sequence
 
 **Choose supervisor when the task is:**
+
 - A known sequence of steps (research → analyze → write)
 - Producing a synthesized output that requires one agent to combine results from many
 - Sensitive enough that you need a single point of accountability in the execution trace

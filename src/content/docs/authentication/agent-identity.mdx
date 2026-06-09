@@ -49,21 +49,21 @@ async function exchangeTokenForSubAgent(
   orchestratorToken: string,
   subAgentId: string,
   audience: string,
-  scopes: string[]
+  scopes: string[],
 ): Promise<string> {
   const form = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: orchestratorToken,
-    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-    actor_token: subAgentId,  // or undefined if no actor token
-    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    actor_token: subAgentId, // or undefined if no actor token
+    requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
     audience: audience,
-    scope: scopes.join(' '),
+    scope: scopes.join(" "),
   });
 
-  const res = await fetch('https://auth.example.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await fetch("https://auth.example.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
@@ -74,6 +74,7 @@ async function exchangeTokenForSubAgent(
 ```
 
 The resulting token has:
+
 - Narrower scope (e.g., `invoices:read` only, not `*`)
 - Shorter lifetime (15 min vs 1 hour)
 - Audience-restricted (only accepted by the target service)
@@ -118,8 +119,8 @@ Log both `sub` (agent making the request) and `act` (if any) on every action:
 
 ```typescript
 async function logAction(req: Request, action: string) {
-  const token = await validateToken(req.headers.get('authorization'));
-  
+  const token = await validateToken(req.headers.get("authorization"));
+
   auditLog.write({
     timestamp: new Date().toISOString(),
     agent_id: token.sub,

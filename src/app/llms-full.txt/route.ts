@@ -1,27 +1,24 @@
-import { source } from '@/lib/source';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { NextResponse } from 'next/server';
+import { source } from "@/lib/source";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { NextResponse } from "next/server";
 
-export const dynamic = 'force-static';
+export const dynamic = "force-static";
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
 function readDocsPage(relativePath: string): string {
-  const docsRoot = join(process.cwd(), 'src', 'content', 'docs');
+  const docsRoot = join(process.cwd(), "src", "content", "docs");
   const candidates =
-    relativePath === '' || relativePath === 'index'
-      ? [join(docsRoot, 'index.mdx')]
-      : [
-          join(docsRoot, `${relativePath}.mdx`),
-          join(docsRoot, relativePath, 'index.mdx'),
-        ];
+    relativePath === "" || relativePath === "index"
+      ? [join(docsRoot, "index.mdx")]
+      : [join(docsRoot, `${relativePath}.mdx`), join(docsRoot, relativePath, "index.mdx")];
 
   for (const candidate of candidates) {
     try {
-      return readFileSync(candidate, 'utf-8');
+      return readFileSync(candidate, "utf-8");
     } catch {
       // Try the next candidate.
     }
@@ -36,7 +33,7 @@ export function GET() {
   const sections = pages.map((page) => {
     // page.url is like "/docs/discovery/llms-txt"
     // Strip the leading "/docs/" to get the relative path
-    const relativePath = page.url.replace(/^\/docs\/?/, '') || 'index';
+    const relativePath = page.url.replace(/^\/docs\/?/, "") || "index";
     const rawContent = readDocsPage(relativePath);
 
     const fullUrl = `https://agentsurface.dev${page.url}`;
@@ -44,15 +41,15 @@ export function GET() {
   });
 
   const header = `# Agent Surface — Full Documentation\n\n<!-- llms-full.txt generated from ${pages.length} pages -->\n\n`;
-  const body = sections.join('\n---\n');
+  const body = sections.join("\n---\n");
   const content = header + body;
 
   return new NextResponse(content, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
-      'x-markdown-tokens': String(estimateTokens(content)),
-      'Content-Signal': 'search=yes, ai-input=yes, ai-train=no',
+      "Cache-Control": "public, max-age=3600",
+      "Content-Signal": "search=yes, ai-input=yes, ai-train=no",
+      "Content-Type": "text/plain; charset=utf-8",
+      "x-markdown-tokens": String(estimateTokens(content)),
     },
   });
 }

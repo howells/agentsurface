@@ -161,13 +161,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateInvoiceRequest'
+              $ref: "#/components/schemas/CreateInvoiceRequest"
 
   /invoices/{id}/void:
     post:
       operationId: voidInvoice
       x-speakeasy-mcp:
-        include: false  # Exclude from MCP — too destructive for agents
+        include: false # Exclude from MCP — too destructive for agents
 ```
 
 Operations marked `include: false` are not generated. Start by setting `include: false` on everything, then enable the operations you want agents to use.
@@ -205,7 +205,10 @@ Operations marked `include: false` are not generated. Start by setting `include:
 ```
 
 <Callout type="warn">
-Auto-generation produces a starting point, not a finished MCP server. Shipping generated output without the pruning, rewriting, and composite-tool phases will result in a server that technically works but that agents use poorly — wrong tool selection, missing context, redundant calls. The quality of your MCP server is determined by the rewriting phase, not the generation phase.
+  Auto-generation produces a starting point, not a finished MCP server. Shipping generated output
+  without the pruning, rewriting, and composite-tool phases will result in a server that technically
+  works but that agents use poorly — wrong tool selection, missing context, redundant calls. The
+  quality of your MCP server is determined by the rewriting phase, not the generation phase.
 </Callout>
 
 ## Keeping Generated and Manual Code in Sync

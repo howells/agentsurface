@@ -39,15 +39,15 @@ Clients that support `.mcp.json` discovery (Claude Desktop, Cursor) will pick th
 
 **Tools exposed by next-devtools-mcp:**
 
-| Tool | Description |
-| ---|---|
-| `get_errors` | Returns current compilation errors and runtime errors from the dev server |
-| `get_routes` | Lists all App Router and Pages Router routes with their file paths |
-| `get_route_info` | Returns the source code and metadata for a specific route |
-| `get_components` | Lists React components defined in the project |
-| `get_environment_variables` | Returns public (non-secret) environment variable names |
-| `get_build_output` | Returns the most recent build output |
-| `run_build` | Triggers `next build` and returns the result |
+| Tool                        | Description                                                               |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `get_errors`                | Returns current compilation errors and runtime errors from the dev server |
+| `get_routes`                | Lists all App Router and Pages Router routes with their file paths        |
+| `get_route_info`            | Returns the source code and metadata for a specific route                 |
+| `get_components`            | Lists React components defined in the project                             |
+| `get_environment_variables` | Returns public (non-secret) environment variable names                    |
+| `get_build_output`          | Returns the most recent build output                                      |
+| `run_build`                 | Triggers `next build` and returns the result                              |
 
 These tools are intentionally development-only. `next-devtools-mcp` does not run in production and does not expose any of your application's business logic or data.
 
@@ -72,9 +72,7 @@ const handler = createMcpHandler((server) => {
     "get_project_status",
     "Returns the current status of a project by its slug.",
     {
-      project_slug: z
-        .string()
-        .describe("The URL slug of the project to look up"),
+      project_slug: z.string().describe("The URL slug of the project to look up"),
     },
     async ({ project_slug }) => {
       const project = await db.projects.findBySlug(project_slug);
@@ -87,17 +85,19 @@ const handler = createMcpHandler((server) => {
       }
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            id: project.id,
-            name: project.name,
-            status: project.status,
-            updated_at: project.updatedAt,
-          }),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              id: project.id,
+              name: project.name,
+              status: project.status,
+              updated_at: project.updatedAt,
+            }),
+          },
+        ],
       };
-    }
+    },
   );
 });
 
@@ -150,7 +150,7 @@ const mcpHandler = createMcpHandler(
     capabilities: {
       tools: {},
     },
-  }
+  },
 );
 
 async function authenticate(token: string) {
@@ -159,10 +159,7 @@ async function authenticate(token: string) {
 
 export const maxDuration = 60;
 
-export const { GET, POST, DELETE } = experimental_withMcpAuth(
-  mcpHandler,
-  authenticate
-);
+export const { GET, POST, DELETE } = experimental_withMcpAuth(mcpHandler, authenticate);
 ```
 
 The `experimental_withMcpAuth` wrapper calls `authenticate` on every request, attaches the result to the request as `req.mcpAuth`, and rejects unauthenticated requests with a 401 before the handler runs.
@@ -181,7 +178,7 @@ const handler = createMcpHandler((server) => {
   server.tool(
     "continue_analysis",
     "Continues a multi-step analysis started with start_analysis. " +
-    "Requires the session_id returned by start_analysis.",
+      "Requires the session_id returned by start_analysis.",
     {
       session_id: z.string().describe("Session ID from start_analysis"),
       next_step: z.enum(["summarize", "compare", "export"]),
@@ -192,10 +189,12 @@ const handler = createMcpHandler((server) => {
       if (!state) {
         return {
           isError: true,
-          content: [{
-            type: "text",
-            text: `Session ${session_id} not found or expired. Call start_analysis to begin a new analysis.`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Session ${session_id} not found or expired. Call start_analysis to begin a new analysis.`,
+            },
+          ],
         };
       }
 
@@ -208,7 +207,7 @@ const handler = createMcpHandler((server) => {
       return {
         content: [{ type: "text", text: JSON.stringify(result.output) }],
       };
-    }
+    },
   );
 });
 ```
@@ -238,7 +237,9 @@ For tools that may run longer than 60 seconds, or for servers handling concurren
 Fluid Compute keeps the function instance alive between requests and allows concurrent execution. This is what enables long-lived SSE connections on Vercel without the function timing out between SSE events.
 
 <Callout type="info">
-`maxDuration` of 300 seconds requires the Vercel Pro plan or higher. For tools that may run indefinitely, use a streaming response pattern to heartbeat the SSE connection while work proceeds in the background, rather than blocking the function for the full duration.
+  `maxDuration` of 300 seconds requires the Vercel Pro plan or higher. For tools that may run
+  indefinitely, use a streaming response pattern to heartbeat the SSE connection while work proceeds
+  in the background, rather than blocking the function for the full duration.
 </Callout>
 
 ## Environment Variables for MCP in Next.js

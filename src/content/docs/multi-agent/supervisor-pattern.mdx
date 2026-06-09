@@ -79,12 +79,12 @@ Vague descriptions create routing drift. If every worker says "helps with resear
 
 Delegation hooks are the policy boundary around sub-agent calls. They can be framework hooks, workflow steps, middleware, or plain functions, but the lifecycle is the same.
 
-| Hook | Purpose | Examples |
-|---|---|---|
-| Before delegation | Decide whether the call may proceed and shape the worker task | add recency constraints, remove unrelated context, enforce tenant policy |
-| After delegation | Validate the result and decide next action | retry with feedback, bail on error, ask another worker, continue synthesis |
-| Iteration complete | Monitor loop progress | record finish reason, token use, step count, response length |
-| Task complete | Decide whether the overall goal is satisfied | run scorers, verify required sections, check end state |
+| Hook               | Purpose                                                       | Examples                                                                   |
+| ------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Before delegation  | Decide whether the call may proceed and shape the worker task | add recency constraints, remove unrelated context, enforce tenant policy   |
+| After delegation   | Validate the result and decide next action                    | retry with feedback, bail on error, ask another worker, continue synthesis |
+| Iteration complete | Monitor loop progress                                         | record finish reason, token use, step count, response length               |
+| Task complete      | Decide whether the overall goal is satisfied                  | run scorers, verify required sections, check end state                     |
 
 These hooks keep supervisor behavior from becoming an uninspectable model loop. They also give tests stable points to assert against.
 
@@ -109,12 +109,12 @@ Supervisors fail when they stop too early. Add a task-completion check that runs
 
 Completion scorers can be deterministic or model-graded:
 
-| Scorer type | Use for |
-|---|---|
-| Rule-based | required sections, minimum citations, schema conformance, end-state checks |
-| Retrieval-backed | claims supported by sources, no missing required documents |
-| Model-graded | open-ended completeness, clarity, relevance, risk review |
-| Human review | high-impact or externally visible output |
+| Scorer type      | Use for                                                                    |
+| ---------------- | -------------------------------------------------------------------------- |
+| Rule-based       | required sections, minimum citations, schema conformance, end-state checks |
+| Retrieval-backed | claims supported by sources, no missing required documents                 |
+| Model-graded     | open-ended completeness, clarity, relevance, risk review                   |
+| Human review     | high-impact or externally visible output                                   |
 
 For a research coordinator, completion criteria might include:
 
@@ -135,12 +135,12 @@ Before choosing a framework or runtime, the most important conceptual distinctio
 
 **Agents-as-tools (return control):** The supervisor invokes a sub-agent as a tool call. The sub-agent runs to completion and returns a result. The supervisor receives that result, adds it to its context, and continues reasoning. The sub-agent never communicates directly with the user.
 
-| | Handoff | Agent-as-Tool |
-|---|---------|---------------|
-| Who talks to user | Sub-agent after transfer | Supervisor only |
-| Result flow | Back via return handoff | Returned as tool output |
+|                    | Handoff                                 | Agent-as-Tool                             |
+| ------------------ | --------------------------------------- | ----------------------------------------- |
+| Who talks to user  | Sub-agent after transfer                | Supervisor only                           |
+| Result flow        | Back via return handoff                 | Returned as tool output                   |
 | Context continuity | Sub-agent has full conversation history | Sub-agent has only what supervisor passes |
-| Use case | Deep specialist sessions | Quick delegated lookups |
+| Use case           | Deep specialist sessions                | Quick delegated lookups                   |
 
 Most production supervisor implementations use agents-as-tools for the orchestration layer, reserving handoffs for cases where the specialist needs extended back-and-forth with the user.
 
@@ -148,13 +148,13 @@ Most production supervisor implementations use agents-as-tools for the orchestra
 
 Different frameworks expose the supervisor pattern with different nouns, but the design questions are the same: who owns control, how workers are described, what context they receive, how results return, and where completion is checked.
 
-| Framework family | Common vocabulary | Guide-level concern |
-|---|---|---|
-| Mastra-style agents | supervisor agent, sub-agents, delegation hooks | Describe worker capabilities clearly, observe delegation lifecycle, and keep memory boundaries explicit. |
-| AI SDK-style apps | agents as tools, tool output transformation | Treat worker calls as typed tools and pass only decision-relevant summaries back to the supervisor. |
-| Graph runtimes | supervisor node, worker nodes, conditional routing | Keep state transitions inspectable and make termination a graph decision, not only a prose decision. |
-| Crew-style frameworks | manager, crew, tasks, expected outputs | Make task ownership and expected outputs explicit enough that the manager can route and verify work. |
-| Handoff-first SDKs | handoffs, agents as tools | Choose transfer-of-control for extended specialist sessions and return-control for bounded delegated work. |
+| Framework family      | Common vocabulary                                  | Guide-level concern                                                                                        |
+| --------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Mastra-style agents   | supervisor agent, sub-agents, delegation hooks     | Describe worker capabilities clearly, observe delegation lifecycle, and keep memory boundaries explicit.   |
+| AI SDK-style apps     | agents as tools, tool output transformation        | Treat worker calls as typed tools and pass only decision-relevant summaries back to the supervisor.        |
+| Graph runtimes        | supervisor node, worker nodes, conditional routing | Keep state transitions inspectable and make termination a graph decision, not only a prose decision.       |
+| Crew-style frameworks | manager, crew, tasks, expected outputs             | Make task ownership and expected outputs explicit enough that the manager can route and verify work.       |
+| Handoff-first SDKs    | handoffs, agents as tools                          | Choose transfer-of-control for extended specialist sessions and return-control for bounded delegated work. |
 
 Use framework docs for exact APIs. In Agent Surface, the durable reference is the control contract: worker descriptions, context filters, hooks, validation, completion scoring, and observability.
 

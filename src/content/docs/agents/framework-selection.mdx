@@ -7,17 +7,17 @@ description: Choosing between OpenAI Agents SDK, Claude Managed Agents and Claud
 
 Agent frameworks are deployment choices, not identities. Pick the smallest runtime that fits the product boundary already present in the repo. Prefer existing deliberate framework choices, then choose by where the agent runs, which platform owns the tools, and how much durability or UI integration is required.
 
-| Project Shape | Prefer | Why |
-|---|---|---|
-| OpenAI-native app, Responses API, OpenAI tracing/evals, hosted tools, remote MCP, realtime voice, files, or sandbox execution | OpenAI Agents SDK | Keeps OpenAI response items, traces, hosted tools, handoffs, and platform behavior intact. |
-| Claude-native autonomous work, managed sandboxes, Agent Skills, vault credentials, multiagent sessions, outcomes, webhooks, or Claude Platform on AWS | Claude Managed Agents | Anthropic owns the agent harness, sandbox, credential vaulting, events, and Claude-specific primitives. |
-| Claude Code-style coding agents, local repo work, file editing, shell tools, permission modes, or MCP from a code harness | Claude Code SDK | Reuses the Claude Code harness with tool permissions and MCP configuration. |
-| Next.js/Vercel app with streaming UI, route handlers, AI Gateway, provider routing, UI message persistence, or app-local tools | Vercel AI SDK | Best fit for product UI and server route integration. |
-| Vercel app where work must pause, resume, wait on approvals, sleep, retry, or span minutes to months | Vercel Workflow plus AI SDK | Adds durable workflow state, hooks, retries, and observability around AI steps. |
-| Workers-native app, Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Cloudflare Sandbox | Cloudflare Agents | Keeps stateful agents and supporting infra in the Worker runtime. |
-| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without stronger platform constraints | Mastra | Coherent app-owned framework for TypeScript agent infrastructure. |
-| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs, or existing LangChain stack | LangGraph | Mature graph model for stateful multi-step flows. |
-| The product mainly exposes tools, resources, prompts, or workflows to outside agents | MCP-first | Avoids building a private agent loop when the integration surface is the product. |
+| Project Shape                                                                                                                                               | Prefer                      | Why                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| OpenAI-native app, Responses API, OpenAI tracing/evals, hosted tools, remote MCP, realtime voice, files, or sandbox execution                               | OpenAI Agents SDK           | Keeps OpenAI response items, traces, hosted tools, handoffs, and platform behavior intact.              |
+| Claude-native autonomous work, managed sandboxes, Agent Skills, vault credentials, multiagent sessions, outcomes, webhooks, or Claude Platform on AWS       | Claude Managed Agents       | Anthropic owns the agent harness, sandbox, credential vaulting, events, and Claude-specific primitives. |
+| Claude Code-style coding agents, local repo work, file editing, shell tools, permission modes, or MCP from a code harness                                   | Claude Code SDK             | Reuses the Claude Code harness with tool permissions and MCP configuration.                             |
+| Next.js/Vercel app with streaming UI, route handlers, AI Gateway, provider routing, UI message persistence, or app-local tools                              | Vercel AI SDK               | Best fit for product UI and server route integration.                                                   |
+| Vercel app where work must pause, resume, wait on approvals, sleep, retry, or span minutes to months                                                        | Vercel Workflow plus AI SDK | Adds durable workflow state, hooks, retries, and observability around AI steps.                         |
+| Workers-native app, Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Cloudflare Sandbox | Cloudflare Agents           | Keeps stateful agents and supporting infra in the Worker runtime.                                       |
+| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without stronger platform constraints                                           | Mastra                      | Coherent app-owned framework for TypeScript agent infrastructure.                                       |
+| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs, or existing LangChain stack                                          | LangGraph                   | Mature graph model for stateful multi-step flows.                                                       |
+| The product mainly exposes tools, resources, prompts, or workflows to outside agents                                                                        | MCP-first                   | Avoids building a private agent loop when the integration surface is the product.                       |
 
 ## Selection Rules
 

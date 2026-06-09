@@ -36,26 +36,26 @@ import Redis from "redis";
 const redis = Redis.createClient();
 
 export interface NotificationContext {
-  eventType: string;              // e.g., "transaction", "invoice_paid", "invoice_overdue"
+  eventType: string; // e.g., "transaction", "invoice_paid", "invoice_overdue"
   type: "order" | "invoice" | "customer" | "record"; // Entity type
-  entityIds: string[];            // Support multiple entities (batch notifications)
-  summary: string;                // Short summary of what the notification was about
-  timestamp: number;              // When the notification was sent
-  action?: string;                // Suggested action: "approve", "review", "send"
-  sourcePlatform: string;         // Which platform received the notification
-  sourceMessageId?: string;       // Platform message ID for threading
-  suggestedPrompts?: string[];    // Follow-up suggestions shown to user
+  entityIds: string[]; // Support multiple entities (batch notifications)
+  summary: string; // Short summary of what the notification was about
+  timestamp: number; // When the notification was sent
+  action?: string; // Suggested action: "approve", "review", "send"
+  sourcePlatform: string; // Which platform received the notification
+  sourceMessageId?: string; // Platform message ID for threading
+  suggestedPrompts?: string[]; // Follow-up suggestions shown to user
 }
 
 export async function storeNotificationContext(
   userId: string,
-  context: NotificationContext
+  context: NotificationContext,
 ): Promise<void> {
   const key = `lastNotificationContext:${userId}`;
   await redis.setEx(
     key,
     24 * 60 * 60, // 24 hours TTL
-    JSON.stringify(context)
+    JSON.stringify(context),
   );
 }
 
@@ -77,20 +77,20 @@ export async function clearNotificationContext(userId: string): Promise<void> {
 
 Not all events are equally urgent. Use different batching windows by event type to balance responsiveness with noise:
 
-| Event Type | Batch Window | Rationale |
-|-----------|-------------|-----------|
-| Receipt/document match | Immediate | User just uploaded; wants confirmation now |
-| New transactions | 10 min | Frequent but not urgent; batch avoids spam |
-| Invoice paid | 10 min | Good news, not time-sensitive |
-| Invoice overdue | 30 min | Important but action isn't instant |
-| Recurring invoice upcoming | 60 min | Awareness only; no immediate action needed |
+| Event Type                 | Batch Window | Rationale                                  |
+| -------------------------- | ------------ | ------------------------------------------ |
+| Receipt/document match     | Immediate    | User just uploaded; wants confirmation now |
+| New transactions           | 10 min       | Frequent but not urgent; batch avoids spam |
+| Invoice paid               | 10 min       | Good news, not time-sensitive              |
+| Invoice overdue            | 30 min       | Important but action isn't instant         |
+| Recurring invoice upcoming | 60 min       | Awareness only; no immediate action needed |
 
 ```typescript
 const BATCH_WINDOWS_MS: Record<string, number> = {
-  document_match: 0,                       // Immediate
-  transaction: 10 * 60 * 1000,             // 10 minutes
-  invoice_paid: 10 * 60 * 1000,            // 10 minutes
-  invoice_overdue: 30 * 60 * 1000,         // 30 minutes
+  document_match: 0, // Immediate
+  transaction: 10 * 60 * 1000, // 10 minutes
+  invoice_paid: 10 * 60 * 1000, // 10 minutes
+  invoice_overdue: 30 * 60 * 1000, // 30 minutes
   recurring_invoice_upcoming: 60 * 60 * 1000, // 60 minutes
 };
 ```
@@ -110,11 +110,7 @@ await storeNotificationContext(userId, {
   entityIds: newTransactionIds,
   summary: `You have ${count} new transactions totaling ${total}`,
   timestamp: Date.now(),
-  suggestedPrompts: [
-    "Show me them",
-    "Which ones need receipts?",
-    "Categorize them",
-  ],
+  suggestedPrompts: ["Show me them", "Which ones need receipts?", "Categorize them"],
   sourcePlatform: "whatsapp",
 });
 ```
@@ -122,9 +118,7 @@ await storeNotificationContext(userId, {
 When injecting into the prompt:
 
 ```typescript
-function formatNotificationContextForPrompt(
-  context: NotificationContext | null
-): string {
+function formatNotificationContextForPrompt(context: NotificationContext | null): string {
   if (!context) return "";
   let result = `The user's latest notification: "${context.summary}".`;
   if (context.suggestedPrompts?.length) {
@@ -141,9 +135,7 @@ function formatNotificationContextForPrompt(
 Some platforms impose session windows. WhatsApp, for example, only allows free-form messages within 24 hours of the last user-initiated message. Outside this window, you must use pre-approved template messages:
 
 ```typescript
-function isWithinWhatsAppSessionWindow(
-  lastUserMessageAt: Date | null
-): boolean {
+function isWithinWhatsAppSessionWindow(lastUserMessageAt: Date | null): boolean {
   if (!lastUserMessageAt) return false;
   const elapsed = Date.now() - lastUserMessageAt.getTime();
   return elapsed < 24 * 60 * 60 * 1000; // 24 hours
@@ -189,7 +181,7 @@ export async function notifyOrderApprovalNeeded(userId: string, orderId: string)
 
 export async function notifyNewInvoices(userId: string, invoiceIds: string[]) {
   const invoices = await db.getInvoices(invoiceIds);
-  const summary = invoices.map(i => `${i.customerName}: ${i.amount}`).join(", ");
+  const summary = invoices.map((i) => `${i.customerName}: ${i.amount}`).join(", ");
 
   await storeNotificationContext(userId, {
     eventType: "invoice_created",
@@ -231,14 +223,14 @@ export async function streamAssistant(params: {
   // If reply-to-notification, inject context
   if (params.fromNotification) {
     const context = await getNotificationContext(params.userId);
-    
+
     if (context) {
       // Prepend a system note to the conversation
       const contextMessage: ModelMessage = {
         role: "user",
         content: `(Context: You previously sent a notification about "${context.summary}". The user is replying to that notification. Their message below is in response to: ${context.summary})`,
       };
-      
+
       messages = [
         ...messages.slice(0, -1), // All messages except the latest
         contextMessage,
@@ -277,7 +269,7 @@ Instead of adding a message, inject into the system prompt:
 // chat/prompt.ts
 export async function buildSystemPromptWithNotificationContext(
   userCtx: UserContext,
-  userId: string
+  userId: string,
 ): Promise<string> {
   const basePrompt = buildSystemPrompt(userCtx);
 
@@ -340,10 +332,7 @@ export async function handleWhatsAppReply(message: WhatsAppMessage) {
   const userCtx = await db.getUserContext(normalized.userId, normalized.teamId);
 
   // Build prompt WITH notification context
-  const systemPrompt = await buildSystemPromptWithNotificationContext(
-    userCtx,
-    normalized.userId
-  );
+  const systemPrompt = await buildSystemPromptWithNotificationContext(userCtx, normalized.userId);
 
   // Run agent
   const stream = await runCoreAgent({
@@ -370,20 +359,23 @@ export async function sendTelegramNotification(userId: string, itemCount: number
   await storeNotificationContext(userId, {
     eventType: "new_items",
     type: "record",
-    entityIds: items.map(i => i.id),
+    entityIds: items.map((i) => i.id),
     summary: `You have ${itemCount} new items to review`,
     timestamp: Date.now(),
     action: "review",
     sourcePlatform: "telegram",
   });
 
-  await telegramBot.sendMessage(userId, `
+  await telegramBot.sendMessage(
+    userId,
+    `
 New items: ${itemCount}
 
-${items.map(i => `• ${i.title} (${i.date})`).join("\n")}
+${items.map((i) => `• ${i.title} (${i.date})`).join("\n")}
 
 Reply to manage them.
-`);
+`,
+  );
 }
 ```
 
@@ -397,7 +389,7 @@ For durability across server restarts, use the database instead of (or in additi
 // db/notification-context.ts
 export async function storeNotificationContextInDb(
   userId: string,
-  context: NotificationContext
+  context: NotificationContext,
 ): Promise<void> {
   await db.notificationContexts.upsert({
     userId,
@@ -406,7 +398,9 @@ export async function storeNotificationContextInDb(
   });
 }
 
-export async function getNotificationContextFromDb(userId: string): Promise<NotificationContext | null> {
+export async function getNotificationContextFromDb(
+  userId: string,
+): Promise<NotificationContext | null> {
   const row = await db.notificationContexts.findUnique({ where: { userId } });
   if (!row || row.expiresAt < new Date()) return null;
   return JSON.parse(row.context);
@@ -479,20 +473,20 @@ test("stores and retrieves notification context", async () => {
 test("context expires after TTL", async () => {
   const userId = "user-123";
   const context = { ... };
-  
+
   await storeNotificationContext(userId, context);
-  
+
   // Simulate TTL expiry
   jest.useFakeTimers();
   jest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
-  
+
   const retrieved = await getNotificationContext(userId);
   expect(retrieved).toBeNull();
 });
 
 test("agent uses context when replying to notification", async () => {
   const userId = "user-123";
-  
+
   await storeNotificationContext(userId, {
     eventType: "order_approval",
     type: "order",
@@ -512,7 +506,7 @@ test("agent uses context when replying to notification", async () => {
   });
 
   const response = await stream.finalMessage();
-  
+
   // Agent should reference the order, not ask "what should I approve?"
   expect(response.content[0].text).toContain("order");
 });
@@ -538,4 +532,3 @@ test("agent uses context when replying to notification", async () => {
 - [Platform-Agnostic Core](/docs/cookbook/platform-agnostic-core) — handling replies across platforms.
 - [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — injecting context into prompts.
 - [Agentic Loop](/docs/cookbook/agentic-loop) — where the agent runs.
-

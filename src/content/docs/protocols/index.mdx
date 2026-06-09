@@ -39,15 +39,15 @@ These protocols and complementary standards define how agents discover capabilit
 
 ## The Protocols
 
-| Protocol | Purpose | Learn More |
-|----------|---------|-----------|
-| **MCP 2025-11-25** | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp) |
-| **A2A v1.0** | Agent-to-agent delegation (horizontal) | [A2A docs](/docs/protocols/a2a) |
-| **ACP emerging** | Agent-initiated commerce | [ACP docs](/docs/protocols/acp) |
-| **Arazzo 1.1.0** | Multi-step API workflow sequences | [Comparison page](/docs/protocols/comparison) |
-| **OpenTelemetry GenAI** | Observability & tracing | [Emerging standards](/docs/protocols/emerging-standards) |
-| **AGENTS.md** | Agent context documentation | [Emerging standards](/docs/protocols/emerging-standards) |
-| **llms.txt** | LLM-friendly API docs | [Emerging standards](/docs/protocols/emerging-standards) |
+| Protocol                | Purpose                                  | Learn More                                               |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| **MCP 2025-11-25**      | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp)                          |
+| **A2A v1.0**            | Agent-to-agent delegation (horizontal)   | [A2A docs](/docs/protocols/a2a)                          |
+| **ACP emerging**        | Agent-initiated commerce                 | [ACP docs](/docs/protocols/acp)                          |
+| **Arazzo 1.1.0**        | Multi-step API workflow sequences        | [Comparison page](/docs/protocols/comparison)            |
+| **OpenTelemetry GenAI** | Observability & tracing                  | [Emerging standards](/docs/protocols/emerging-standards) |
+| **AGENTS.md**           | Agent context documentation              | [Emerging standards](/docs/protocols/emerging-standards) |
+| **llms.txt**            | LLM-friendly API docs                    | [Emerging standards](/docs/protocols/emerging-standards) |
 
 ## Architecture Pattern
 
@@ -66,6 +66,7 @@ Orchestrator Agent (uses A2A)
 ## Discovery Checklist
 
 Publish these endpoints for agents to find you:
+
 - `/.well-known/agent.json` — A2A AgentCard (for multi-agent scenarios)
 - `/.well-known/acp.json` — ACP capabilities (if you accept agent-initiated payments)
 - `/AGENTS.md` — Agent context & MCP servers (always useful)

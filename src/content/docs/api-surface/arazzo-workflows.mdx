@@ -70,7 +70,7 @@ workflows:
           type: string
           format: date
         passenger:
-          $ref: '#/components/inputs/PassengerDetails'
+          $ref: "#/components/inputs/PassengerDetails"
     steps:
       - stepId: search-flights
         operationId: $sourceDescriptions.flights-api#search_flights
@@ -179,16 +179,16 @@ components:
 
 Runtime expressions are how Arazzo passes data between steps. They use a `$`-prefixed path syntax that resolves at execution time.
 
-| Expression | Resolves To |
-|------------|-------------|
-| `$inputs.field_name` | A workflow input field |
-| `$steps.stepId.outputs.field` | An output field from a named step |
-| `$steps.stepId.request.body#/path` | A field from the request body of a named step |
-| `$response.body#/json/pointer` | A JSON Pointer into the current step's response body |
-| `$response.body#/field` | Shorthand JSON Pointer for top-level response fields |
-| `$statusCode` | The HTTP status code of the current step's response |
-| `$request.header.name` | A header from the current step's request |
-| `$response.header.name` | A header from the current step's response |
+| Expression                         | Resolves To                                          |
+| ---------------------------------- | ---------------------------------------------------- |
+| `$inputs.field_name`               | A workflow input field                               |
+| `$steps.stepId.outputs.field`      | An output field from a named step                    |
+| `$steps.stepId.request.body#/path` | A field from the request body of a named step        |
+| `$response.body#/json/pointer`     | A JSON Pointer into the current step's response body |
+| `$response.body#/field`            | Shorthand JSON Pointer for top-level response fields |
+| `$statusCode`                      | The HTTP status code of the current step's response  |
+| `$request.header.name`             | A header from the current step's request             |
+| `$response.header.name`            | A header from the current step's response            |
 
 ### Output Extraction
 
@@ -242,7 +242,7 @@ After a step fails, you can:
 onFailure:
   - name: retry-on-timeout
     type: retry
-    retryAfter: 2      # seconds
+    retryAfter: 2 # seconds
     retryLimit: 3
     criteria:
       - condition: $statusCode == 503
@@ -336,18 +336,18 @@ steps:
   - stepId: list-transactions
     operationId: list_transactions
     parameters:
-      $ref: '#/components/parameters/PaginationParameters'
+      $ref: "#/components/parameters/PaginationParameters"
 ```
 
 ## How Arazzo Complements MCP
 
 MCP tools expose individual operations. Arazzo describes how those operations combine into business workflows. They are complementary layers:
 
-| Layer | Tool | Scope |
-|-------|------|-------|
-| Individual operations | MCP tools | Single API call |
-| Business workflows | Arazzo | Multi-step sequences with control flow |
-| Orchestration | Agent | High-level task completion |
+| Layer                 | Tool      | Scope                                  |
+| --------------------- | --------- | -------------------------------------- |
+| Individual operations | MCP tools | Single API call                        |
+| Business workflows    | Arazzo    | Multi-step sequences with control flow |
+| Orchestration         | Agent     | High-level task completion             |
 
 When you generate MCP tools from an API, generate tools for both individual endpoints and Arazzo workflows. An agent exposed to a `book_flight` workflow tool can invoke the complete booking sequence as a single atomic operation, rather than being responsible for sequencing search → hold → pay → confirm itself.
 
@@ -389,7 +389,9 @@ Without workflow definitions, agents that need to execute multi-step processes w
 Arazzo makes the sequence explicit, the data dependencies traceable, and the failure paths defined.
 
 <Callout type="warn">
-Agents improvising multi-step workflows is one of the most common failure modes in production agent systems. If your API requires more than one operation to complete a user-facing action, define an Arazzo workflow for it.
+  Agents improvising multi-step workflows is one of the most common failure modes in production
+  agent systems. If your API requires more than one operation to complete a user-facing action,
+  define an Arazzo workflow for it.
 </Callout>
 
 ## Practical Integration

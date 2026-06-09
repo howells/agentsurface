@@ -61,13 +61,13 @@ server.tool(
 
   // GOOD: answers all four questions
   "Creates a new invoice and returns the invoice ID and a hosted payment URL. " +
-  "Use when the user wants to charge a customer or bill for services rendered. " +
-  "Requires a valid customer_id — call billing_list_customers first if you only have a name or email. " +
-  "Returns isError: true if the customer has exceeded their credit limit or if a duplicate invoice " +
-  "exists for the same period; check the error message for the specific reason.",
+    "Use when the user wants to charge a customer or bill for services rendered. " +
+    "Requires a valid customer_id — call billing_list_customers first if you only have a name or email. " +
+    "Returns isError: true if the customer has exceeded their credit limit or if a duplicate invoice " +
+    "exists for the same period; check the error message for the specific reason.",
 
   schema,
-  handler
+  handler,
 );
 ```
 
@@ -78,18 +78,18 @@ The length is appropriate — this is not documentation padding. Each sentence r
 ```typescript
 // For mutation tools, name the side effect explicitly
 "Permanently voids the invoice. This cannot be undone. " +
-"The customer will not be charged. Use only when the invoice was created in error. " +
-"To pause a legitimate invoice instead, use billing_pause_invoice."
+  "The customer will not be charged. Use only when the invoice was created in error. " +
+  "To pause a legitimate invoice instead, use billing_pause_invoice.";
 
 // For list tools, document pagination
 "Returns up to 50 invoices matching the filters, ordered by created_at descending. " +
-"Use the cursor field from the response to fetch the next page. " +
-"Returns an empty array (not an error) when no invoices match."
+  "Use the cursor field from the response to fetch the next page. " +
+  "Returns an empty array (not an error) when no invoices match.";
 
 // For tools with important ordering requirements
 "Sends the invoice email to the customer. " +
-"Must be called after billing_create_invoice — calling on a draft invoice returns isError: true. " +
-"Idempotent: calling twice on the same invoice does not send duplicate emails."
+  "Must be called after billing_create_invoice — calling on a draft invoice returns isError: true. " +
+  "Idempotent: calling twice on the same invoice does not send duplicate emails.";
 ```
 
 ## Schema Design with Zod
@@ -106,7 +106,7 @@ const CreateInvoiceSchema = z.object({
     .uuid()
     .describe(
       "The UUID of the customer to invoice. Get this from billing_list_customers " +
-      "or billing_get_customer — do not pass a customer name or email."
+        "or billing_get_customer — do not pass a customer name or email.",
     ),
 
   // Integer type with domain context
@@ -117,7 +117,7 @@ const CreateInvoiceSchema = z.object({
     .max(100_000_000) // $1M ceiling
     .describe(
       "Invoice amount in cents (100 = $1.00). Use integer cents to avoid " +
-      "floating point rounding errors."
+        "floating point rounding errors.",
     ),
 
   // Enum communicates the exact valid set
@@ -131,7 +131,7 @@ const CreateInvoiceSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
     .describe(
       "Payment due date in YYYY-MM-DD format (e.g. '2025-02-28'). " +
-      "Must be today or a future date."
+        "Must be today or a future date.",
     ),
 
   // Optional fields declare their default
@@ -141,12 +141,12 @@ const CreateInvoiceSchema = z.object({
         description: z.string().max(200).describe("Item description shown on the invoice"),
         quantity: z.number().int().positive().describe("Number of units"),
         unit_price_cents: z.number().int().positive().describe("Price per unit in cents"),
-      })
+      }),
     )
     .optional()
     .describe(
       "Line items to include on the invoice. If omitted, a single line item is created " +
-      "using the amount_cents and any description provided at the top level."
+        "using the amount_cents and any description provided at the top level.",
     ),
 });
 ```
@@ -199,12 +199,14 @@ server.tool(
         },
       ],
     };
-  }
+  },
 );
 ```
 
 <Callout type="info">
-Declaring `outputSchema` enables downstream agents to receive your tool's output as typed structured data rather than free-form text. Use it for tools whose output will be consumed by other tools or stored in agent state.
+  Declaring `outputSchema` enables downstream agents to receive your tool's output as typed
+  structured data rather than free-form text. Use it for tools whose output will be consumed by
+  other tools or stored in agent state.
 </Callout>
 
 ## Response Leanness
@@ -214,25 +216,29 @@ Return exactly what the agent needs. Avoid returning full database records when 
 ```typescript
 // AVOID: returning the entire record
 return {
-  content: [{
-    type: "text",
-    text: JSON.stringify(invoice), // 40+ fields, most irrelevant
-  }],
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify(invoice), // 40+ fields, most irrelevant
+    },
+  ],
 };
 
 // PREFER: returning only the fields agents act on
 return {
-  content: [{
-    type: "text",
-    text: JSON.stringify({
-      invoice_id: invoice.id,
-      status: invoice.status,
-      payment_url: invoice.hostedUrl,
-      amount_cents: invoice.amountCents,
-      currency: invoice.currency,
-      due_date: invoice.dueDate,
-    }),
-  }],
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify({
+        invoice_id: invoice.id,
+        status: invoice.status,
+        payment_url: invoice.hostedUrl,
+        amount_cents: invoice.amountCents,
+        currency: invoice.currency,
+        due_date: invoice.dueDate,
+      }),
+    },
+  ],
 };
 ```
 
@@ -254,39 +260,47 @@ async (params) => {
   if (!customer) {
     return {
       isError: true,
-      content: [{
-        type: "text",
-        text: `Customer ${params.customer_id} not found. ` +
-              `Call billing_list_customers to find the correct customer ID.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text:
+            `Customer ${params.customer_id} not found. ` +
+            `Call billing_list_customers to find the correct customer ID.`,
+        },
+      ],
     };
   }
 
   if (customer.creditLimitCents < params.amount_cents) {
     return {
       isError: true,
-      content: [{
-        type: "text",
-        text: `Invoice amount ${formatCents(params.amount_cents)} exceeds customer credit limit ` +
-              `of ${formatCents(customer.creditLimitCents)}. ` +
-              `Reduce the amount or call billing_increase_credit_limit first.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text:
+            `Invoice amount ${formatCents(params.amount_cents)} exceeds customer credit limit ` +
+            `of ${formatCents(customer.creditLimitCents)}. ` +
+            `Reduce the amount or call billing_increase_credit_limit first.`,
+        },
+      ],
     };
   }
 
   const invoice = await createInvoice(customer, params);
 
   return {
-    content: [{
-      type: "text",
-      text: JSON.stringify({
-        invoice_id: invoice.id,
-        status: invoice.status,
-        payment_url: invoice.hostedUrl,
-      }),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          invoice_id: invoice.id,
+          status: invoice.status,
+          payment_url: invoice.hostedUrl,
+        }),
+      },
+    ],
   };
-}
+};
 ```
 
 ## Writing Actionable Error Messages
@@ -295,25 +309,27 @@ Every `isError: true` response should tell the agent what to do next. An error m
 
 ```typescript
 // INCOMPLETE: states the problem, gives no recovery path
-"Customer not found."
+"Customer not found.";
 
 // COMPLETE: states the problem and provides recovery steps
 "Customer abc-123 not found. " +
-"If you have the customer's email, call billing_list_customers with filter.email to find their ID. " +
-"If the customer was recently created, there may be a replication delay — retry in 10 seconds."
+  "If you have the customer's email, call billing_list_customers with filter.email to find their ID. " +
+  "If the customer was recently created, there may be a replication delay — retry in 10 seconds.";
 
 // INCOMPLETE: vague constraint violation
-"Invalid amount."
+("Invalid amount.");
 
 // COMPLETE: specifies the constraint and the valid range
 "amount_cents must be between 100 (minimum $1.00) and 100000000 (maximum $1,000,000.00). " +
-`Received: ${params.amount_cents}.`
+  `Received: ${params.amount_cents}.`;
 ```
 
 The pattern is: `[what failed] + [why it failed] + [how to fix it]`. All three parts are required for an agent to recover without human intervention.
 
 <Callout type="warn">
-Never throw uncaught exceptions from tool handlers. Uncaught exceptions produce MCP protocol errors with generic messages. Catch domain errors and return them as `isError: true` responses with actionable messages instead.
+  Never throw uncaught exceptions from tool handlers. Uncaught exceptions produce MCP protocol
+  errors with generic messages. Catch domain errors and return them as `isError: true` responses
+  with actionable messages instead.
 </Callout>
 
 ## Tool Granularity
@@ -324,17 +340,17 @@ A useful heuristic: each tool should map to a single, coherent user intention.
 
 ```typescript
 // TOO BROAD: agent cannot predict the side effects
-"Processes the invoice, which may create, send, void, or archive it based on its current state."
+"Processes the invoice, which may create, send, void, or archive it based on its current state.";
 
 // TOO GRANULAR: three round trips to do one thing
-billing_validate_invoice_params()
-billing_reserve_invoice_number()
-billing_commit_invoice()
+billing_validate_invoice_params();
+billing_reserve_invoice_number();
+billing_commit_invoice();
 
 // APPROPRIATE: one call, one outcome, predictable side effects
-billing_create_invoice()   // creates draft
-billing_send_invoice()     // transitions to open, sends email
-billing_void_invoice()     // transitions to void, notifies customer
+billing_create_invoice(); // creates draft
+billing_send_invoice(); // transitions to open, sends email
+billing_void_invoice(); // transitions to void, notifies customer
 ```
 
 When in doubt, model your tools against the operations in your domain API. One HTTP endpoint, one tool — with the exception of CRUD list/get operations that are often worth splitting.

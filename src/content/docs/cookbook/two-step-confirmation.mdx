@@ -29,7 +29,7 @@ server.registerTool(
   async (params) => {
     await sendInvoiceEmail(params.invoiceId);
     return { success: true };
-  }
+  },
 );
 ```
 
@@ -50,11 +50,13 @@ server.registerTool(
     description: "Create a draft invoice. Does not send. Returns a preview URL.",
     inputSchema: z.object({
       customerId: z.string(),
-      items: z.array(z.object({
-        description: z.string(),
-        amount: z.number(),
-        quantity: z.number().default(1),
-      })),
+      items: z.array(
+        z.object({
+          description: z.string(),
+          amount: z.number(),
+          quantity: z.number().default(1),
+        }),
+      ),
       dueDate: z.string().describe("ISO 8601 date (YYYY-MM-DD)"),
     }),
     outputSchema: z.object({
@@ -75,17 +77,19 @@ server.registerTool(
     const previewUrl = `${baseUrl}/invoices/${invoice.id}/preview`;
 
     return {
-      content: [{
-        type: "text",
-        text: `Draft invoice created. Total: ${invoice.total}. Preview: ${previewUrl}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Draft invoice created. Total: ${invoice.total}. Preview: ${previewUrl}`,
+        },
+      ],
       structuredContent: {
         invoiceId: invoice.id,
         previewUrl,
         total: invoice.total,
       },
     };
-  }
+  },
 );
 
 // Step 2: Confirm and send (only after explicit user approval)
@@ -109,10 +113,12 @@ server.registerTool(
     const confirmed = await db.verifyConfirmationToken(params.confirmationToken);
     if (!confirmed) {
       return {
-        content: [{
-          type: "text",
-          text: "Confirmation failed. Please ask the user to confirm again.",
-        }],
+        content: [
+          {
+            type: "text",
+            text: "Confirmation failed. Please ask the user to confirm again.",
+          },
+        ],
         structuredContent: { success: false },
       };
     }
@@ -120,10 +126,12 @@ server.registerTool(
     const invoice = await db.getInvoice(ctx.teamId, params.invoiceId);
     if (invoice.status !== "draft") {
       return {
-        content: [{
-          type: "text",
-          text: `Invoice is already ${invoice.status}, not a draft.`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Invoice is already ${invoice.status}, not a draft.`,
+          },
+        ],
         structuredContent: { success: false },
       };
     }
@@ -135,16 +143,18 @@ server.registerTool(
     });
 
     return {
-      content: [{
-        type: "text",
-        text: `Invoice sent to ${invoice.customerEmail}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Invoice sent to ${invoice.customerEmail}`,
+        },
+      ],
       structuredContent: {
         success: true,
         sentAt: new Date().toISOString(),
       },
     };
-  }
+  },
 );
 ```
 
@@ -217,6 +227,7 @@ export function InvoiceDraftPreview({ invoice }: Props) {
 ```
 
 Agent then calls:
+
 ```typescript
 await agent.call("invoice_confirm_and_send", {
   invoiceId: "inv-123",
@@ -299,6 +310,7 @@ server.registerTool(
 ```
 
 **System prompt**:
+
 ```
 ## Bulk Operations
 
@@ -356,9 +368,7 @@ function ChatResponse({ toolCall }: Props) {
 // __tests__/confirmation-flow.test.ts
 test("invoice draft + confirm flow", async () => {
   const stream = await runAgent({
-    messages: [
-      { role: "user", content: "Create an invoice for Alice for $500 due 2024-05-31" },
-    ],
+    messages: [{ role: "user", content: "Create an invoice for Alice for $500 due 2024-05-31" }],
   });
 
   let response = await stream.nextMessage();
@@ -377,9 +387,7 @@ test("invoice draft + confirm flow", async () => {
 
 test("bulk update shows preview before execution", async () => {
   const stream = await runAgent({
-    messages: [
-      { role: "user", content: "Delete all transactions from 2020" },
-    ],
+    messages: [{ role: "user", content: "Delete all transactions from 2020" }],
   });
 
   let response = await stream.nextMessage();
@@ -411,4 +419,3 @@ test("bulk update shows preview before execution", async () => {
 - [Tool Annotations](/docs/cookbook/tool-annotations) — marking tools as DESTRUCTIVE.
 - [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — prompt guidance on workflows.
 - [Agentic Loop](/docs/cookbook/agentic-loop) — tool execution in the loop.
-

@@ -62,11 +62,11 @@ Node 20 LTS required (.nvmrc enforced).
 
 ```typescript
 // 1. External packages (alphabetical)
-import { z } from 'zod';
+import { z } from "zod";
 // 2. Acme monorepo
-import { Agent } from '@acme/sdk';
+import { Agent } from "@acme/sdk";
 // 3. Local relative
-import { execute } from './execute';
+import { execute } from "./execute";
 ```
 
 ### Error handling (RFC 9457)

@@ -36,6 +36,7 @@ async function chat(userMessage: string, platform: "web" | "whatsapp") {
 ```
 
 **Problems**:
+
 - Prompt is static; doesn't adapt to user context (timezone, locale, currency).
 - Platform logic lives in agent code, not prompt; hard to tweak.
 - Unsafe: no routing rules, no confirmation workflows.
@@ -73,7 +74,8 @@ export function buildSystemPrompt(ctx: UserContext): string {
   const timeLabel = ctx.timeFormat === 12 ? "12-hour (AM/PM)" : "24-hour";
   const currentTime = ctx.localTime ?? new Date().toISOString();
 
-  return `You are an AI assistant for a SaaS business application.
+  return (
+    `You are an AI assistant for a SaaS business application.
 
 ## User Context
 
@@ -134,9 +136,10 @@ export function buildSystemPrompt(ctx: UserContext): string {
 
 **User**: "What's the price of X product?"
 **You**: (Call web_search if you don't have current pricing; present the result with source)
-`
-  // Conditionally append upload context
-  + buildRecentUploadsSection(ctx.recentUploadSummaries);
+` +
+    // Conditionally append upload context
+    buildRecentUploadsSection(ctx.recentUploadSummaries)
+  );
 }
 ```
 
@@ -145,16 +148,14 @@ export function buildSystemPrompt(ctx: UserContext): string {
 When users upload documents (receipts, invoices, contracts), the pipeline OCRs them before the chat response. Inject summaries into the prompt so the agent has immediate context:
 
 ```typescript
-function buildRecentUploadsSection(
-  summaries: UploadSummary[] | undefined
-): string {
+function buildRecentUploadsSection(summaries: UploadSummary[] | undefined): string {
   if (!summaries?.length) return "";
 
-  return `\n## Recently Uploaded Documents\n\n` +
-    summaries.map(s =>
-      `- **${s.filename}** (${s.type}): ${s.summary}`
-    ).join("\n") +
-    `\n\nThe user may ask about these documents. Use the data above to answer.`;
+  return (
+    `\n## Recently Uploaded Documents\n\n` +
+    summaries.map((s) => `- **${s.filename}** (${s.type}): ${s.summary}`).join("\n") +
+    `\n\nThe user may ask about these documents. Use the data above to answer.`
+  );
 }
 ```
 
@@ -197,7 +198,7 @@ For multi-platform agents, append platform-specific rules:
 // chat/prompt.ts (continued)
 export function buildSystemPromptForPlatform(
   userCtx: UserContext,
-  platform: "dashboard" | "whatsapp" | "telegram" | "slack"
+  platform: "dashboard" | "whatsapp" | "telegram" | "slack",
 ): string {
   const basePrompt = buildSystemPrompt(userCtx);
 
@@ -305,7 +306,7 @@ describe("buildSystemPrompt", () => {
   test("respects 12-hour vs 24-hour time format", () => {
     const prompt12h = buildSystemPrompt({ ...mockUserCtx, timeFormat: 12 });
     const prompt24h = buildSystemPrompt({ ...mockUserCtx, timeFormat: 24 });
-    
+
     expect(prompt12h).toContain("12-hour (AM/PM)");
     expect(prompt24h).toContain("24-hour");
   });
@@ -363,6 +364,7 @@ export async function streamAssistant(params: {
 ```
 
 **Advantages**:
+
 - Every request gets a fresh, correct prompt for that user and platform.
 - Timezone, locale, and currency are baked in; no per-response formatting logic.
 - Safety rules are universal; no branching.
@@ -416,9 +418,7 @@ export function buildSystemPrompt(ctx: UserContext): string {
     },
   ];
 
-  return sections
-    .map(s => `## ${s.title}\n\n${s.content}`)
-    .join("\n\n");
+  return sections.map((s) => `## ${s.title}\n\n${s.content}`).join("\n\n");
 }
 ```
 
@@ -483,4 +483,3 @@ ${FORMATTING_TEMPLATE}
 - [Platform-Agnostic Core](/docs/cookbook/platform-agnostic-core) — using dynamic prompts across platforms.
 - [Agentic Loop](/docs/cookbook/agentic-loop) — where the prompt is passed to the model.
 - [Tool Annotations](/docs/cookbook/tool-annotations) — encoding safety in tool metadata.
-

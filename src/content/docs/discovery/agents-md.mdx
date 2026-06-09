@@ -67,21 +67,22 @@ The maximum file size is 32 KiB. Files larger than this limit may be truncated o
 
 **Use real code examples, not prose.** Agents parse code more reliably than natural language descriptions. Show the pattern, don't describe it:
 
-```markdown
+````markdown
 ## Patterns
 
 New API routes go in src/app/api/. Follow this shape:
 
 ```typescript
 // src/app/api/widgets/route.ts
-import { db } from '@/lib/db'
-import { widgets } from '@/db/schema'
+import { db } from "@/lib/db";
+import { widgets } from "@/db/schema";
 
 export async function GET() {
-  const rows = await db.select().from(widgets)
-  return Response.json(rows)
+  const rows = await db.select().from(widgets);
+  return Response.json(rows);
 }
 ```
+````
 
 **State testing rules explicitly.** Ambiguity about what tests to write causes agents to skip them entirely or write tests that pass vacuously:
 
@@ -101,16 +102,19 @@ export async function GET() {
 ## Agent Boundaries
 
 **Autonomous** — the agent may do these without asking:
+
 - Write and modify files in src/
 - Install packages listed in package.json devDependencies
 - Run any command in the Commands section
 
 **Ask first** — require confirmation before:
+
 - Adding new dependencies (propose the package and reason)
 - Modifying database schema files
 - Changing environment variable names
 
 **Never** — the agent must not:
+
 - Modify .env or .env.local files
 - Push to any remote branch
 - Run migrations against the production database
@@ -121,12 +125,14 @@ export async function GET() {
 Before adding anything to `AGENTS.md`, ask: can the agent discover this from the code itself? If the answer is yes, delete it. `AGENTS.md` should contain only information that is not self-evident from reading the source.
 
 Things agents can discover from code (do not document):
+
 - Variable and function names
 - Import paths and module structure
 - TypeScript types and interfaces
 - Library APIs (agents know these from training)
 
 Things agents cannot discover from code (document these):
+
 - Which commands to run and in what order
 - Environment setup steps
 - External service dependencies
@@ -143,13 +149,13 @@ Target 150–370 lines. Hard cap at 500 lines. If you find yourself over that li
 
 `CLAUDE.md` is Claude Code's equivalent of `AGENTS.md`. It follows a five-layer hierarchy where each layer can augment or override the previous:
 
-| Layer | Location | Scope |
-|-------|----------|-------|
-| Enterprise policy | Platform-level | All instances |
-| User global | `~/.claude/CLAUDE.md` | All repositories |
-| Project root | `./CLAUDE.md` | Full repository |
-| Subdirectory | `./src/CLAUDE.md` | Subtree |
-| Session | Created at runtime | Current session |
+| Layer             | Location              | Scope            |
+| ----------------- | --------------------- | ---------------- |
+| Enterprise policy | Platform-level        | All instances    |
+| User global       | `~/.claude/CLAUDE.md` | All repositories |
+| Project root      | `./CLAUDE.md`         | Full repository  |
+| Subdirectory      | `./src/CLAUDE.md`     | Subtree          |
+| Session           | Created at runtime    | Current session  |
 
 Claude Code processes all applicable files, with closer files taking precedence for conflicts. The effective instruction budget is approximately 150 instruction-equivalents across all layers — beyond this, instructions begin competing for attention and effectiveness degrades.
 
@@ -174,6 +180,7 @@ Cursor uses `.mdc` files in the `.cursor/rules/` directory. Each file has a YAML
 `description: "..."` (intelligent) — Cursor's AI decides when to include this rule based on the task description. Most rules should use this mode.
 
 Glob pattern in frontmatter — Rule activates when the current file matches the pattern:
+
 ```yaml
 ---
 globs: ["src/**/*.test.ts", "src/**/*.spec.ts"]
@@ -236,13 +243,13 @@ Character limits vary by plan. Keep individual rule files under 6,000 characters
 
 ## Tool Support Matrix
 
-| File | Cursor | Claude Code | Copilot | Windsurf | OpenAI Codex |
-|------|--------|-------------|---------|----------|-------------|
-| `AGENTS.md` | Partial | No | No | Partial | Yes |
-| `CLAUDE.md` | No | Yes | No | No | No |
-| `.cursor/rules/*.mdc` | Yes | No | No | No | No |
-| `.github/copilot-instructions.md` | No | No | Yes | No | No |
-| `.windsurf/rules/*.md` | No | No | No | Yes | No |
+| File                              | Cursor  | Claude Code | Copilot | Windsurf | OpenAI Codex |
+| --------------------------------- | ------- | ----------- | ------- | -------- | ------------ |
+| `AGENTS.md`                       | Partial | No          | No      | Partial  | Yes          |
+| `CLAUDE.md`                       | No      | Yes         | No      | No       | No           |
+| `.cursor/rules/*.mdc`             | Yes     | No          | No      | No       | No           |
+| `.github/copilot-instructions.md` | No      | No          | Yes     | No       | No           |
+| `.windsurf/rules/*.md`            | No      | No          | No      | Yes      | No           |
 
 For maximum coverage, maintain both `AGENTS.md` (vendor-neutral) and the vendor-specific file for your primary tool. The content can overlap — the vendor-specific file can add tool-specific formatting or activation logic that `AGENTS.md` cannot express.
 

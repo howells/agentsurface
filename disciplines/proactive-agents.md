@@ -25,12 +25,14 @@ Most agents are reactive: a user sends a request, the agent responds. Proactive 
 Cron jobs run on a schedule, indifferent to whether there's work to do.
 
 **Time-driven**:
+
 ```
 Every day at 2 AM, run reconciliation_agent
 → Even if no transactions changed, agent runs, wastes compute
 ```
 
 **Event-driven**:
+
 ```
 When a transaction is inserted (event), enqueue "reconcile_for_date:2026-04-17"
 → Agent runs only if there's work
@@ -46,6 +48,7 @@ When a transaction is inserted (event), enqueue "reconcile_for_date:2026-04-17"
 A proactive agent may run for hours. It must tolerate interruption.
 
 Store state in a database:
+
 ```typescript
 type WorkflowState = {
   id: string;
@@ -59,6 +62,7 @@ type WorkflowState = {
 ```
 
 On resumption:
+
 1. Agent reads current state
 2. Replays last tool call if in_progress (idempotent)
 3. Continues from checkpoint
@@ -72,11 +76,13 @@ Agent work should surface to the user naturally.
 **Bad**: Agent runs, logs result to database. User never knows unless they check.
 
 **Good**: Agent work → notification:
+
 - Email: "Your reconciliation for April is ready. 2 discrepancies found. [View](link)"
 - In-app notification: Badge on dashboard + detailed card
 - Webhook: System integration (e.g., Slack: "Invoice #123 approved by agent")
 
 **Implementation**:
+
 ```typescript
 const result = await agent.run(task);
 if (result.status === "success") {
@@ -95,18 +101,20 @@ Users should feel the agent is part of their workflow, not a hidden background p
 Collecting work into batches reduces per-task overhead and improves agent efficiency.
 
 **Categorize events by urgency, not source**:
+
 - **Immediate** (0 delay): User-initiated matches (e.g., receipt just uploaded → matched to transaction). User expects instant feedback.
 - **Short window** (10 min): Frequent background events (new transactions synced, invoices paid). Batch to avoid spam.
 - **Medium window** (30 min): Important but non-urgent (overdue invoices). User needs awareness, not instant action.
 - **Long window** (60 min): Advance notices (upcoming recurring invoices). Awareness only.
 
 **Pattern**:
+
 ```typescript
 const BATCH_WINDOWS: Record<string, number> = {
-  document_match: 0,                // Immediate
-  transaction: 10 * 60 * 1000,      // 10 min
-  invoice_paid: 10 * 60 * 1000,     // 10 min
-  invoice_overdue: 30 * 60 * 1000,  // 30 min
+  document_match: 0, // Immediate
+  transaction: 10 * 60 * 1000, // 10 min
+  invoice_paid: 10 * 60 * 1000, // 10 min
+  invoice_overdue: 30 * 60 * 1000, // 30 min
   recurring_invoice_upcoming: 60 * 60 * 1000, // 60 min
 };
 ```
@@ -138,6 +146,7 @@ Proactive agents may fall behind (slow database, API rate limits, agent crash).
 Proactive agents are harder to monitor (no explicit user to complain if they fail).
 
 **Metrics**:
+
 - **Freshness**: How old is the oldest pending task? Alert if >SLA
 - **Throughput**: Tasks processed per hour (track over time)
 - **Error rate**: % of tasks that failed (target <1%)
@@ -152,26 +161,31 @@ Proactive agents are harder to monitor (no explicit user to complain if they fai
 ## Anti-Patterns
 
 ### 1. Unbounded Agent Runs
+
 An agent starts at 2 AM and is still running at 8 AM. Cascading failures.
 
 **Fix**: Set a timeout per agent (e.g., 5 minutes). Exceed timeout → pause, resume next batch window.
 
 ### 2. No Notification
+
 Agent runs silently. User doesn't know if it succeeded or failed.
 
 **Fix**: Every completion generates a notification. Route to user's preferred channel (email, in-app, webhook).
 
 ### 3. Lost State on Crash
+
 Agent crashes mid-task. No checkpoint. Task is lost or retried blindly.
 
 **Fix**: Persist state every tool call. On resume, read state and continue.
 
 ### 4. Too Many Batches
+
 Scheduling 1000 tiny batches per day (one per minute). Orchestration overhead dominates.
 
 **Fix**: Tune batching window and size. Aim for 10-100 batches per day.
 
 ### 5. No Feedback Loop
+
 Agent makes a mistake (e.g., approves an invalid invoice). Human corrects it. Agent has no way to learn.
 
 **Fix**: Log corrections. Use them to improve prompts or tool constraints. Audit trail is essential.

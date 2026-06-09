@@ -26,14 +26,14 @@ Standard OpenAPI covers what your API does. Extensions tell agents how to behave
 
 The AgenticAPI project defines six action categories (the ACTION taxonomy) for classifying API operations by what kind of effect they have. These categories help agents reason about risk, sequencing, and reversibility without reading the full operation description.
 
-| Category | Code | Description | Examples |
-|----------|------|-------------|---------|
-| Acquire | A | Read data without side effects | `get_user`, `list_orders`, `search_products` |
-| Compute | C | Transform or analyze data | `calculate_tax`, `generate_report`, `validate_address` |
-| Transact | T | Create or modify records | `create_order`, `update_profile`, `process_payment` |
-| Integrate | I | Connect or sync with external systems | `sync_contacts`, `import_csv`, `webhook_register` |
-| Orchestrate | O | Trigger multi-step processes | `run_pipeline`, `kick_off_workflow`, `deploy_release` |
-| Notify | N | Send communications | `send_email`, `post_slack_message`, `push_notification` |
+| Category    | Code | Description                           | Examples                                                |
+| ----------- | ---- | ------------------------------------- | ------------------------------------------------------- |
+| Acquire     | A    | Read data without side effects        | `get_user`, `list_orders`, `search_products`            |
+| Compute     | C    | Transform or analyze data             | `calculate_tax`, `generate_report`, `validate_address`  |
+| Transact    | T    | Create or modify records              | `create_order`, `update_profile`, `process_payment`     |
+| Integrate   | I    | Connect or sync with external systems | `sync_contacts`, `import_csv`, `webhook_register`       |
+| Orchestrate | O    | Trigger multi-step processes          | `run_pipeline`, `kick_off_workflow`, `deploy_release`   |
+| Notify      | N    | Send communications                   | `send_email`, `post_slack_message`, `push_notification` |
 
 ### `x-action` and `x-category` Extensions
 
@@ -176,7 +176,7 @@ paths:
     get:
       operationId: get_debug_state
       x-speakeasy-mcp:
-        ignored: true   # Do not generate an MCP tool for this endpoint
+        ignored: true # Do not generate an MCP tool for this endpoint
 ```
 
 ### Grouping Tools by Scope
@@ -274,7 +274,7 @@ paths:
         category. Agents can call this to understand what capabilities are
         available before selecting specific tools.
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema:
@@ -327,6 +327,7 @@ POST /orders create_order "Creates a new order for the authenticated user"
 ```
 
 LAPIS is useful for:
+
 - Injecting API context into agent prompts without exhausting the context window
 - Pre-processing specs before tool generation
 - Building lightweight tool-picker prompts
@@ -337,12 +338,12 @@ Several tools convert OpenAPI specs into MCP servers automatically. None of them
 
 ### Tool Comparison
 
-| Tool | Approach | Strengths | Limitations |
-|------|----------|-----------|-------------|
-| Stainless | SDK + MCP generation | High-quality, polished output | Requires Stainless account; opinionated structure |
-| Speakeasy | SDK + MCP generation | `x-speakeasy-mcp` extension support; fine-grained control | Commercial; complex config |
-| FastMCP | Python MCP server from OpenAPI | Fast setup; good for Python stacks | Limited description customization |
-| openapi-mcp-generator | Open source, zero config | Free; works with any spec | Naive 1:1 generation; no description rewriting |
+| Tool                  | Approach                       | Strengths                                                 | Limitations                                       |
+| --------------------- | ------------------------------ | --------------------------------------------------------- | ------------------------------------------------- |
+| Stainless             | SDK + MCP generation           | High-quality, polished output                             | Requires Stainless account; opinionated structure |
+| Speakeasy             | SDK + MCP generation           | `x-speakeasy-mcp` extension support; fine-grained control | Commercial; complex config                        |
+| FastMCP               | Python MCP server from OpenAPI | Fast setup; good for Python stacks                        | Limited description customization                 |
+| openapi-mcp-generator | Open source, zero config       | Free; works with any spec                                 | Naive 1:1 generation; no description rewriting    |
 
 ### Why Naive Generation Fails
 
@@ -367,7 +368,9 @@ Treat auto-generation as a starting point, not the final output:
 The goal is not comprehensive coverage of your API surface. The goal is the minimal set of tools that lets an agent accomplish the target use cases reliably.
 
 <Callout type="info">
-Start by identifying the top 5 user-facing tasks your API needs to support. Build tools for those tasks, not for every endpoint. Expand the tool set incrementally as you validate that existing tools work correctly.
+  Start by identifying the top 5 user-facing tasks your API needs to support. Build tools for those
+  tasks, not for every endpoint. Expand the tool set incrementally as you validate that existing
+  tools work correctly.
 </Callout>
 
 ## Checklist

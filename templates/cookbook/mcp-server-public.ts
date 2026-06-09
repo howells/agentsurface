@@ -32,7 +32,7 @@
  * - Configure CORS for your Claude/ChatGPT deployments
  */
 
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Server } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolRequest, Tool } from "@modelcontextprotocol/sdk/shared/messages.js";
 import { createHash, randomBytes } from "node:crypto";
@@ -44,47 +44,47 @@ import { z } from "zod";
  */
 const toolDefinitions: Tool[] = [
   {
-    name: "create_order",
     description: "Create a new order",
     inputSchema: {
-      type: "object" as const,
       properties: {
         customerId: { type: "string" },
         items: {
-          type: "array",
           items: {
-            type: "object",
             properties: {
               productId: { type: "string" },
               quantity: { type: "number" },
             },
+            type: "object",
           },
+          type: "array",
         },
       },
       required: ["customerId", "items"],
+      type: "object" as const,
     },
+    name: "create_order",
   },
   {
-    name: "list_orders",
     description: "List orders by status",
     inputSchema: {
-      type: "object" as const,
       properties: {
+        limit: { maximum: 100, minimum: 1, type: "number" },
         status: {
-          type: "string",
           enum: ["pending", "shipped", "delivered"],
+          type: "string",
         },
-        limit: { type: "number", minimum: 1, maximum: 100 },
       },
       required: ["status"],
+      type: "object" as const,
     },
+    name: "list_orders",
   },
 ];
 
 /**
  * In-memory OAuth token store (use Redis/Postgres in production).
  */
-const tokenStore: Map<
+const tokenStore = new Map<
   string,
   {
     clientId: string;
@@ -93,18 +93,18 @@ const tokenStore: Map<
     expiresAt: number;
     dpopThumbprint?: string;
   }
-> = new Map();
+>();
 
 /**
  * Rate limit store (track requests per tenant).
  */
-const rateLimitStore: Map<
+const rateLimitStore = new Map<
   string,
   {
     requestCount: number;
     windowStart: number;
   }
-> = new Map();
+>();
 
 const RATE_LIMIT_PER_MINUTE = 60;
 
@@ -116,7 +116,7 @@ function checkRateLimit(tenantId: string): boolean {
   const key = tenantId;
   const record = rateLimitStore.get(key);
 
-  if (!record || now - record.windowStart > 60000) {
+  if (!record || now - record.windowStart > 60_000) {
     // New window
     rateLimitStore.set(key, { requestCount: 1, windowStart: now });
     return true;
@@ -142,19 +142,19 @@ function validateToken(
   error?: string;
 } {
   if (!authHeader.startsWith("DPoP ")) {
-    return { valid: false, error: "Missing DPoP token" };
+    return { error: "Missing DPoP token", valid: false };
   }
 
   const token = authHeader.slice(5);
   const tokenRecord = tokenStore.get(token);
 
   if (!tokenRecord) {
-    return { valid: false, error: "Invalid token" };
+    return { error: "Invalid token", valid: false };
   }
 
   if (tokenRecord.expiresAt < Date.now()) {
     tokenStore.delete(token);
-    return { valid: false, error: "Token expired" };
+    return { error: "Token expired", valid: false };
   }
 
   // Validate DPoP proof (if token was bound)
@@ -163,11 +163,11 @@ function validateToken(
     const thumbprint = proof.jti; // Simplified; real DPoP uses cryptographic binding
 
     if (thumbprint !== tokenRecord.dpopThumbprint) {
-      return { valid: false, error: "DPoP proof mismatch" };
+      return { error: "DPoP proof mismatch", valid: false };
     }
   }
 
-  return { valid: true, tenantId: tokenRecord.tenantId };
+  return { tenantId: tokenRecord.tenantId, valid: true };
 }
 
 /**
@@ -187,51 +187,46 @@ class PublicMCPServer {
 
   private setupHandlers() {
     // Tool discovery
-    this.server.setRequestHandler("tools/list", async () => {
-      return {
-        tools: toolDefinitions,
-      };
-    });
+    this.server.setRequestHandler("tools/list", async () => ({
+      tools: toolDefinitions,
+    }));
 
     // Tool execution
-    this.server.setRequestHandler(
-      "tools/call",
-      async (request: CallToolRequest) => {
-        const { name, arguments: args } = request;
+    this.server.setRequestHandler("tools/call", async (request: CallToolRequest) => {
+      const { name, arguments: args } = request;
 
-        if (name === "create_order") {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Created order with items: ${JSON.stringify(args)}`,
-              },
-            ],
-          };
-        }
-
-        if (name === "list_orders") {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Listed orders with status: ${args.status}`,
-              },
-            ],
-          };
-        }
-
+      if (name === "create_order") {
         return {
           content: [
             {
+              text: `Created order with items: ${JSON.stringify(args)}`,
               type: "text" as const,
-              text: "Tool not found",
             },
           ],
-          isError: true,
         };
-      },
-    );
+      }
+
+      if (name === "list_orders") {
+        return {
+          content: [
+            {
+              text: `Listed orders with status: ${args.status}`,
+              type: "text" as const,
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            text: "Tool not found",
+            type: "text" as const,
+          },
+        ],
+        isError: true,
+      };
+    });
   }
 
   async start(transport: StdioServerTransport) {
@@ -252,7 +247,7 @@ export async function setupPublicMCPServer() {
 
   const server = http.createServer(async (req, res) => {
     const parsedUrl = new url.URL(req.url || "", `http://${req.headers.host}`);
-    const pathname = parsedUrl.pathname;
+    const { pathname } = parsedUrl;
 
     // CORS headers
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -264,11 +259,11 @@ export async function setupPublicMCPServer() {
       res.writeHead(200);
       res.end(
         JSON.stringify({
-          issuer: "https://api.example.com",
-          token_endpoint: "https://api.example.com/oauth/token",
           authorization_endpoint: "https://api.example.com/oauth/authorize",
           dpop_signing_alg_values_supported: ["ES256"],
+          issuer: "https://api.example.com",
           resource: "https://api.example.com/mcp",
+          token_endpoint: "https://api.example.com/oauth/token",
         }),
       );
       return;
@@ -279,12 +274,12 @@ export async function setupPublicMCPServer() {
       res.writeHead(200);
       res.end(
         JSON.stringify({
-          protocolVersion: "2024-11-05",
           capabilities: {
-            tools: {},
-            resources: {},
             prompts: {},
+            resources: {},
+            tools: {},
           },
+          protocolVersion: "2024-11-05",
           serverInfo: {
             name: "agent-mcp-server",
             version: "1.0.0",
@@ -317,19 +312,19 @@ export async function setupPublicMCPServer() {
         const token = randomBytes(32).toString("hex");
         tokenStore.set(token, {
           clientId: clientId || "unknown",
-          tenantId,
-          scope: "tools:read tools:write",
-          expiresAt: Date.now() + 3600000, // 1 hour
           dpopThumbprint,
+          expiresAt: Date.now() + 3600000, // 1 hour
+          scope: "tools:read tools:write",
+          tenantId,
         });
 
         res.writeHead(200);
         res.end(
           JSON.stringify({
             access_token: token,
-            token_type: "DPoP",
             expires_in: 3600,
             scope: "tools:read tools:write",
+            token_type: "DPoP",
           }),
         );
       });
@@ -405,23 +400,20 @@ export async function exampleClientConnection() {
   console.log("[client] Requesting OAuth token...");
 
   const dpopHeader = JSON.stringify({
-    jti: createHash("sha256")
-      .update(randomBytes(32))
-      .digest("hex")
-      .slice(0, 8),
+    jti: createHash("sha256").update(randomBytes(32)).digest("hex").slice(0, 8),
   });
 
   const tokenResponse = await fetch("http://localhost:3001/oauth/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      dpop: dpopHeader,
-    },
     body: new URLSearchParams({
       client_id: clientId,
       tenant_id: tenantId,
       grant_type: "client_credentials",
     }).toString(),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      dpop: dpopHeader,
+    },
+    method: "POST",
   });
 
   const { access_token } = await tokenResponse.json();
@@ -431,11 +423,11 @@ export async function exampleClientConnection() {
   console.log("[client] Connecting to MCP server...");
 
   const mcpResponse = await fetch("http://localhost:3001/mcp", {
-    method: "OPTIONS",
     headers: {
       authorization: `DPoP ${access_token}`,
       dpop: dpopHeader,
     },
+    method: "OPTIONS",
   });
 
   const status = await mcpResponse.json();

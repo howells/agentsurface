@@ -18,12 +18,14 @@ API keys are the simplest machine credential: a pre-shared secret in an environm
 ## When API Keys Are OK
 
 API keys are appropriate when:
+
 - The calling service is trusted infrastructure you control.
 - The key's permissions are narrow (`resource:read` only, not `admin`).
 - The key can be rotated in hours or days, not months.
 - The target service has no OAuth implementation or it's prohibitively complex.
 
 API keys are not appropriate when:
+
 - The key grants broad permissions (`admin`, `*`, all operations).
 - Third-party agents or services need independent credential revocation.
 - You need per-user delegation or on-behalf-of semantics.
@@ -37,12 +39,12 @@ Store keys in environment variables or secret managers, never in code:
 
 ```typescript
 const apiKey = process.env.STRIPE_API_KEY;
-if (!apiKey) throw new Error('STRIPE_API_KEY is required');
+if (!apiKey) throw new Error("STRIPE_API_KEY is required");
 
-const res = await fetch('https://api.stripe.com/v1/charges', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${apiKey}` },
-  body: new URLSearchParams({ amount: '2000', currency: 'usd' }),
+const res = await fetch("https://api.stripe.com/v1/charges", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: new URLSearchParams({ amount: "2000", currency: "usd" }),
 });
 ```
 
@@ -82,19 +84,19 @@ function requireScope(scope: string) {
     if (!keyScopes.includes(scope)) {
       return Response.json(
         {
-          type: 'https://example.com/errors/forbidden',
-          title: 'Insufficient scope',
+          type: "https://example.com/errors/forbidden",
+          title: "Insufficient scope",
           detail: `Requires scope: ${scope}`,
           granted_scopes: keyScopes,
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
   };
 }
 
-router.get('/invoices', requireScope('invoices:read'), listInvoices);
-router.post('/invoices', requireScope('invoices:write'), createInvoice);
+router.get("/invoices", requireScope("invoices:read"), listInvoices);
+router.post("/invoices", requireScope("invoices:write"), createInvoice);
 ```
 
 ## Rotation and Expiry
@@ -139,14 +141,14 @@ Rotation uses an overlap window to prevent interruptions:
 ```typescript
 async function rotateKey(keyId: string, client: KeyManagementClient) {
   const newKey = await client.issueKey({
-    scopes: ['invoices:read'],
+    scopes: ["invoices:read"],
     expires_in_days: 14,
   });
 
-  await secretsStore.set('API_KEY', newKey.key);
+  await secretsStore.set("API_KEY", newKey.key);
 
   // Grace period for in-flight requests
-  await new Promise(r => setTimeout(r, 5 * 60 * 1000));
+  await new Promise((r) => setTimeout(r, 5 * 60 * 1000));
 
   await client.revokeKey(keyId);
 }
@@ -184,11 +186,11 @@ Never in logs. Redact before serializing:
 ```typescript
 function sanitizeHeaders(headers: Record<string, string>) {
   const clean = { ...headers };
-  if (clean.authorization) clean.authorization = '[REDACTED]';
+  if (clean.authorization) clean.authorization = "[REDACTED]";
   return clean;
 }
 
-logger.info('Request', { url, headers: sanitizeHeaders(headers) });
+logger.info("Request", { url, headers: sanitizeHeaders(headers) });
 ```
 
 Never in Referer headers. Never hardcoded in source code.

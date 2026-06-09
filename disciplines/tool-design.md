@@ -2,7 +2,7 @@
 
 ## Summary
 
-Agent-grade tools are not API endpoints; they are cognitive interfaces designed for autonomous reasoning. A well-designed tool exposes the *atomic actions* that an agent can take to achieve goals, with clear input contracts, predictable outputs, and explicit error modes. Tools should be simple enough to compose, powerful enough to be useful, and well-documented enough that an agent can infer intent from signature and description alone.
+Agent-grade tools are not API endpoints; they are cognitive interfaces designed for autonomous reasoning. A well-designed tool exposes the _atomic actions_ that an agent can take to achieve goals, with clear input contracts, predictable outputs, and explicit error modes. Tools should be simple enough to compose, powerful enough to be useful, and well-documented enough that an agent can infer intent from signature and description alone.
 
 - **Atomicity**: Each tool does one thing; composition (chains, loops) is the agent's job
 - **Clarity**: Signature, description, and error modes must be understandable at a glance
@@ -24,7 +24,7 @@ An agent that misunderstands a tool's purpose or misapplies its parameters will 
 
 ### 1. Atomic Intent, Not Generic Endpoints
 
-A tool should map to a *user intent*, not a REST method.
+A tool should map to a _user intent_, not a REST method.
 
 **Bad**: `httpRequest(method, url, body)` — This requires the agent to build HTTP calls correctly; errors are legion.
 
@@ -35,6 +35,7 @@ A tool should map to a *user intent*, not a REST method.
 ### 2. Explicit Parameter Constraints
 
 Every parameter should declare:
+
 - **Type**: `string | number | enum`
 - **Required vs. optional**: Use nullability or explicit optional markers
 - **Range/length/format**: Constraints that prevent invalid states (e.g., `amount > 0`, `email matches RFC 5322`)
@@ -59,13 +60,14 @@ Tools must fail gracefully and predictably.
 
 - Return structured error objects with a `code` field (e.g., `CUSTOMER_NOT_FOUND`, `INSUFFICIENT_FUNDS`)
 - Include actionable context (e.g., which customer ID was not found)
-- Distinguish between *recoverable* errors (retry-safe) and *fatal* errors (agent should abandon this path)
+- Distinguish between _recoverable_ errors (retry-safe) and _fatal_ errors (agent should abandon this path)
 
 **Example**:
+
 ```typescript
-type ToolResult<T> = 
+type ToolResult<T> =
   | { success: true; data: T }
-  | { success: false; error: { code: string; message: string; retryable: boolean } }
+  | { success: false; error: { code: string; message: string; retryable: boolean } };
 ```
 
 This pattern ensures the agent can branch on error type and decide whether to retry, escalate, or try an alternative approach.
@@ -86,12 +88,14 @@ A tool's output should be consumable by downstream tools.
 ### 5. Observable Execution
 
 Every tool invocation should produce a log entry with:
+
 - Input parameters (sanitized for secrets)
 - Execution duration
 - Success/failure status
 - Result summary (or full result if <1KB)
 
 This allows you to:
+
 - Debug agent reasoning ("why did it call this tool with these params?")
 - Measure tool performance (slow tool → optimize or decompose)
 - Audit access patterns (for security and compliance)
@@ -100,14 +104,16 @@ This allows you to:
 
 ## The "Every CRUD" Philosophy
 
-Production agentic apps don't just expose a few high-level tools — they wrap *every* business operation as a tool. A financial platform might have 14 transaction tools, 12 invoice tools, 13 report tools, 12 time-tracking tools, plus customer, settings, document, and search tools — easily 100+ total. This gives the agent comprehensive coverage of the domain.
+Production agentic apps don't just expose a few high-level tools — they wrap _every_ business operation as a tool. A financial platform might have 14 transaction tools, 12 invoice tools, 13 report tools, 12 time-tracking tools, plus customer, settings, document, and search tools — easily 100+ total. This gives the agent comprehensive coverage of the domain.
 
 **Why this works**:
+
 - The agent becomes a universal controller, not a limited assistant
 - Users can compose arbitrary workflows through natural language
 - New capabilities emerge from tool combinations the developers didn't anticipate
 
 **What makes it viable**:
+
 - Semantic tool selection (embedding-based filtering to ~12 per turn) prevents token overload
 - Tool annotations (READ_ONLY/WRITE/DESTRUCTIVE) encode safety without per-tool logic
 - Scope-based registration gates tool visibility by user permissions
@@ -120,16 +126,19 @@ Without these scaling patterns, 100+ tools would be unmanageable. With them, eac
 ## Anti-Patterns
 
 ### 1. "God Tools"
+
 A single tool that does everything (e.g., `transactionProcess` handles matching, categorization, and reconciliation). Agents will struggle to reason about side effects and error modes.
 
 **Fix**: Break into `transactionMatch`, `transactionCategorize`, `transactionReconcile`. Let the agent compose.
 
 ### 2. Implicit State or Side Effects
+
 A tool that modifies global state or depends on undocumented context (e.g., "if this is the 5th call, behavior changes").
 
 **Fix**: All state must be passed as parameters or returned explicitly. Tools are functions, not stateful objects.
 
 ### 3. Vague Error Messages
+
 ```typescript
 { success: false, error: "Something went wrong" }
 ```
@@ -139,14 +148,17 @@ The agent learns nothing; it cannot recover or escalate meaningfully.
 **Fix**: Be specific. `{ code: "DUPLICATE_INVOICE", customerId: "cust_123", existingInvoiceId: "inv_456" }`
 
 ### 4. Unbounded Outputs
+
 A tool that returns the entire customer record when the agent only needs the ID.
 
 **Fix**: Return minimal, relevant data. If the agent needs more, let it ask for it explicitly via a separate tool.
 
 ### 5. Undersigned Tools
+
 No description, no schema, no examples.
 
 **Fix**: Every tool must have:
+
 - One-sentence purpose
 - Full parameter documentation (types, constraints, examples)
 - At least one success and one failure example

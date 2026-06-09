@@ -154,7 +154,7 @@ The agent now has everything needed to construct a corrected request without cal
 // Build corrected request using validation error details
 function correctRequest(
   original: Record<string, unknown>,
-  errors: ValidationError[]
+  errors: ValidationError[],
 ): Record<string, unknown> {
   const corrected = { ...original };
 
@@ -178,7 +178,7 @@ The general pattern for agent error recovery is a bounded loop: attempt the oper
 async function tryWithRewrite<T>(
   operation: () => Promise<T>,
   rewrite: (error: ProblemDetails) => Promise<(() => Promise<T>) | null>,
-  maxAttempts = 3
+  maxAttempts = 3,
 ): Promise<T> {
   let attempt = 0;
 

@@ -85,10 +85,10 @@ Implement field masks at the CLI layer if the underlying API does not support th
 ```typescript
 function applyFieldMask<T extends Record<string, unknown>>(
   record: T,
-  fields: string[]
+  fields: string[],
 ): Partial<T> {
   return fields.reduce((acc, field) => {
-    const parts = field.split('.');
+    const parts = field.split(".");
     if (parts.length === 1) {
       if (field in record) {
         acc[field as keyof T] = record[field as keyof T];
@@ -97,11 +97,8 @@ function applyFieldMask<T extends Record<string, unknown>>(
       // Nested field
       const [head, ...tail] = parts;
       const nested = record[head as keyof T];
-      if (nested && typeof nested === 'object') {
-        const projected = applyFieldMask(
-          nested as Record<string, unknown>,
-          [tail.join('.')]
-        );
+      if (nested && typeof nested === "object") {
+        const projected = applyFieldMask(nested as Record<string, unknown>, [tail.join(".")]);
         (acc as Record<string, unknown>)[head] = projected;
       }
     }
@@ -111,7 +108,7 @@ function applyFieldMask<T extends Record<string, unknown>>(
 
 function applyFieldMaskToList<T extends Record<string, unknown>>(
   records: T[],
-  fields: string[] | null
+  fields: string[] | null,
 ): T[] | Partial<T>[] {
   if (!fields || fields.length === 0) {
     return records;
@@ -176,7 +173,7 @@ The most durable context window protection is not a flag — it is documentation
 
 Your SKILL.md (see [Schema Introspection](./schema-introspection)) and AGENTS.md files should explicitly instruct agents on field mask usage:
 
-```markdown
+````markdown
 ---
 name: mytool
 version: 2.4.1
@@ -196,13 +193,15 @@ version: 2.4.1
 ```bash
 mytool users list --status active --all --fields id --json | wc -l
 ```
+````
 
 ## Example: Find a user by email
 
 ```bash
 mytool users list --email alice@example.com --fields id,name,email,status --json
 ```
-```
+
+````
 
 These instructions prime the agent with the right patterns at the start of every session, before it has made any tool calls.
 
@@ -219,7 +218,7 @@ $ mytool users list --full --json
 
 # Custom field set
 $ mytool users list --fields id,name,billing.plan --json
-```
+````
 
 Document the default field set in the schema introspection output:
 
@@ -227,7 +226,24 @@ Document the default field set in the schema introspection output:
 {
   "command": "users list",
   "default_fields": ["id", "name", "email", "status", "created_at"],
-  "all_fields": ["id", "name", "email", "role", "status", "created_at", "updated_at", "last_login_at", "login_count", "mfa_enabled", "avatar_url", "timezone", "locale", "notification_preferences", "billing", "feature_flags"]
+  "all_fields": [
+    "id",
+    "name",
+    "email",
+    "role",
+    "status",
+    "created_at",
+    "updated_at",
+    "last_login_at",
+    "login_count",
+    "mfa_enabled",
+    "avatar_url",
+    "timezone",
+    "locale",
+    "notification_preferences",
+    "billing",
+    "feature_flags"
+  ]
 }
 ```
 
@@ -235,12 +251,12 @@ Document the default field set in the schema introspection output:
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | Returns full API responses with no way to limit fields or paginate. |
-| 1 | Supports `--fields` or field masks on some commands. |
-| 2 | Field masks on all read commands. Pagination with `--page-all` or equivalent. |
-| 3 | Streaming pagination (NDJSON per page). Explicit guidance in context/skill files on field mask usage. The CLI actively protects the agent from token waste. |
+| Score | Criteria                                                                                                                                                    |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Returns full API responses with no way to limit fields or paginate.                                                                                         |
+| 1     | Supports `--fields` or field masks on some commands.                                                                                                        |
+| 2     | Field masks on all read commands. Pagination with `--page-all` or equivalent.                                                                               |
+| 3     | Streaming pagination (NDJSON per page). Explicit guidance in context/skill files on field mask usage. The CLI actively protects the agent from token waste. |
 
 ## Checklist
 

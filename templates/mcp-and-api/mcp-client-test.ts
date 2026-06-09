@@ -29,11 +29,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  InMemoryTransport,
-  type Client,
-  type TextContent,
-} from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/client/index.js";
+import type { Client, TextContent } from "@modelcontextprotocol/sdk/client/index.js";
 import { z } from "zod";
 
 // ===== MCP Server Factory =====
@@ -46,11 +43,11 @@ function createTestServer(): McpServer {
     },
     {
       capabilities: {
-        tools: {},
-        resources: {},
         prompts: {},
+        resources: {},
+        tools: {},
       },
-    }
+    },
   );
 
   // search_docs tool
@@ -59,8 +56,8 @@ function createTestServer(): McpServer {
     "Search documentation by keyword.",
     {
       schema: z.object({
-        query: z.string().min(1),
         limit: z.number().int().min(1).max(50).default(10),
+        query: z.string().min(1),
       }),
     },
     async (input) => {
@@ -78,13 +75,13 @@ function createTestServer(): McpServer {
       return {
         content: [
           {
-            type: "text" as const,
             text: JSON.stringify(results),
+            type: "text" as const,
           },
         ],
       };
     },
-    { annotations: { readOnlyHint: true, openWorldHint: true } }
+    { annotations: { openWorldHint: true, readOnlyHint: true } },
   );
 
   // create_issue tool
@@ -93,28 +90,28 @@ function createTestServer(): McpServer {
     "Create a new issue in the tracker.",
     {
       schema: z.object({
-        title: z.string().min(1),
         description: z.string(),
         priority: z.enum(["low", "medium", "high"]).default("medium"),
+        title: z.string().min(1),
       }),
     },
     async (input) => {
-      const issueId = `ISSUE-${Math.floor(Math.random() * 10000)}`;
+      const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
       return {
         content: [
           {
-            type: "text" as const,
             text: JSON.stringify({
               id: issueId,
               title: input.title,
               priority: input.priority,
               created_at: new Date().toISOString(),
             }),
+            type: "text" as const,
           },
         ],
       };
     },
-    { annotations: { destructiveHint: true, idempotentHint: true } }
+    { annotations: { destructiveHint: true, idempotentHint: true } },
   );
 
   // error_demo tool (demonstrates isError handling)
@@ -131,8 +128,8 @@ function createTestServer(): McpServer {
         return {
           content: [
             {
-              type: "text" as const,
               text: "Simulated error occurred",
+              type: "text" as const,
             },
           ],
           isError: true,
@@ -141,30 +138,25 @@ function createTestServer(): McpServer {
       return {
         content: [
           {
-            type: "text" as const,
             text: "Success",
+            type: "text" as const,
           },
         ],
       };
     },
-    { annotations: { readOnlyHint: true } }
+    { annotations: { readOnlyHint: true } },
   );
 
   // config resource
-  server.resource(
-    "config://test",
-    "text/plain",
-    "Test Configuration",
-    async () => ({
-      contents: [
-        {
-          uri: "config://test",
-          mimeType: "text/plain",
-          text: "Test config data",
-        },
-      ],
-    })
-  );
+  server.resource("config://test", "text/plain", "Test Configuration", async () => ({
+    contents: [
+      {
+        mimeType: "text/plain",
+        text: "Test config data",
+        uri: "config://test",
+      },
+    ],
+  }));
 
   return server;
 }
@@ -191,14 +183,14 @@ describe("MCP Client Tests", () => {
   describe("search_docs tool", () => {
     it("should return search results", async () => {
       const result = await client.callTool("search_docs", {
-        query: "MCP",
         limit: 2,
+        query: "MCP",
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe("text");
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
       const parsed = JSON.parse(text);
 
       expect(Array.isArray(parsed)).toBe(true);
@@ -209,11 +201,11 @@ describe("MCP Client Tests", () => {
 
     it("should respect limit parameter", async () => {
       const result = await client.callTool("search_docs", {
-        query: "test",
         limit: 1,
+        query: "test",
       });
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
       const parsed = JSON.parse(text);
 
       expect(parsed).toHaveLength(1);
@@ -241,15 +233,15 @@ describe("MCP Client Tests", () => {
   describe("create_issue tool", () => {
     it("should create an issue with required fields", async () => {
       const result = await client.callTool("create_issue", {
-        title: "Bug: login fails",
         description: "Users cannot log in on mobile",
         priority: "high",
+        title: "Bug: login fails",
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.isError).toBeFalsy();
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
       const parsed = JSON.parse(text);
 
       expect(parsed).toHaveProperty("id");
@@ -261,11 +253,11 @@ describe("MCP Client Tests", () => {
 
     it("should use default priority", async () => {
       const result = await client.callTool("create_issue", {
-        title: "Task: refactor auth",
         description: "Clean up auth logic",
+        title: "Task: refactor auth",
       });
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
       const parsed = JSON.parse(text);
 
       expect(parsed.priority).toBe("medium");
@@ -308,9 +300,9 @@ describe("MCP Client Tests", () => {
 
       expect(resources.resources).toContainEqual(
         expect.objectContaining({
-          uri: "config://test",
           name: "Test Configuration",
-        })
+          uri: "config://test",
+        }),
       );
     });
 
@@ -340,24 +332,24 @@ describe("MCP Client Tests", () => {
 
       // Build inventory
       const inventory = {
-        serverName: "test-server",
         capabilities: {
-          tools: tools.tools.map((t) => ({
-            name: t.name,
-            description: t.description?.substring(0, 50) + "...",
-            hasAnnotations: !!t.annotations && Object.keys(t.annotations).length > 0,
-            annotations: t.annotations,
+          prompts: prompts.prompts?.map((p) => ({
+            name: p.name,
+            description: `${p.description?.substring(0, 50)}...`,
           })),
           resources: resources.resources.map((r) => ({
             uri: r.uri,
             name: r.name,
             mimeType: r.mimeType,
           })),
-          prompts: prompts.prompts?.map((p) => ({
-            name: p.name,
-            description: p.description?.substring(0, 50) + "...",
+          tools: tools.tools.map((t) => ({
+            name: t.name,
+            description: `${t.description?.substring(0, 50)}...`,
+            hasAnnotations: !!t.annotations && Object.keys(t.annotations).length > 0,
+            annotations: t.annotations,
           })),
         },
+        serverName: "test-server",
       };
 
       // Assertions
@@ -377,11 +369,11 @@ describe("MCP Client Tests", () => {
   describe("output schema validation", () => {
     it("search_docs output should be valid JSON", async () => {
       const result = await client.callTool("search_docs", {
-        query: "test",
         limit: 1,
+        query: "test",
       });
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
 
       // Should parse without error
       const parsed = JSON.parse(text);
@@ -393,27 +385,27 @@ describe("MCP Client Tests", () => {
           expect.objectContaining({
             title: expect.any(String),
             url: expect.any(String),
-          })
+          }),
         );
       });
     });
 
     it("create_issue output should be valid JSON", async () => {
       const result = await client.callTool("create_issue", {
-        title: "Test",
         description: "Test issue",
+        title: "Test",
       });
 
-      const text = (result.content[0] as TextContent).text;
+      const { text } = result.content[0] as TextContent;
       const parsed = JSON.parse(text);
 
       expect(parsed).toEqual(
         expect.objectContaining({
-          id: expect.stringMatching(/^ISSUE-\d+$/),
-          title: expect.any(String),
-          priority: expect.stringMatching(/^(low|medium|high)$/),
           created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-        })
+          id: expect.stringMatching(/^ISSUE-\d+$/),
+          priority: expect.stringMatching(/^(low|medium|high)$/),
+          title: expect.any(String),
+        }),
       );
     });
   });

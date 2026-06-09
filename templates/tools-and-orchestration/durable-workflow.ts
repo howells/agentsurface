@@ -42,14 +42,14 @@ import {
   setHandler,
   sleep,
   workflowInfo,
-} from '@temporalio/workflow';
+} from "@temporalio/workflow";
 import {
   Client,
   WorkflowFailedError,
   WorkflowExecutionAlreadyStartedError,
   Duration,
-} from '@temporalio/client';
-import { Anthropic } from '@anthropic-ai/sdk';
+} from "@temporalio/client";
+import { Anthropic } from "@anthropic-ai/sdk";
 
 // ============================================================================
 // ACTIVITIES (actual work; can be retried independently)
@@ -67,61 +67,58 @@ export const runAgentTurn = defineActivity(
     });
 
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-7',
       max_tokens: 500,
-      system: `You are an AI agent. ${context}`,
       messages: [
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
+      model: "claude-opus-4-7",
+      system: `You are an AI agent. ${context}`,
     });
 
-    return response.content[0]?.type === 'text' ? response.content[0].text : '';
-  }
+    return response.content[0]?.type === "text" ? response.content[0].text : "";
+  },
 );
 
 /**
  * Activity: Call a tool (e.g., run tests, deploy).
  */
-export const callTool = defineActivity(
-  async (toolName: string, params: unknown): Promise<any> => {
-    // <CUSTOMISE> Route to actual tool
-    switch (toolName) {
-      case 'run_tests':
-        return { status: 'passed', count: 127 };
-      case 'deploy':
-        return { status: 'success', deployment_id: 'deploy-123' };
-      default:
-        throw new ApplicationFailure(`Unknown tool: ${toolName}`);
+export const callTool = defineActivity(async (toolName: string, params: unknown): Promise<any> => {
+  // <CUSTOMISE> Route to actual tool
+  switch (toolName) {
+    case "run_tests": {
+      return { status: "passed", count: 127 };
+    }
+    case "deploy": {
+      return { status: "success", deployment_id: "deploy-123" };
+    }
+    default: {
+      throw new ApplicationFailure(`Unknown tool: ${toolName}`);
     }
   }
-);
+});
 
 /**
  * Activity: Wait for human approval (blocking).
  * Timed activity; fails if approval doesn't arrive in time.
  */
-export const waitForApproval = defineActivity(
-  async (reason: string): Promise<boolean> => {
-    console.log(`⏳ Waiting for approval: ${reason}`);
-    // In real scenario: emit event, wait on approval signal
-    // For demo: auto-approve after 10 seconds
-    await sleep(Duration.seconds(10));
-    return true; // Approved
-  }
-);
+export const waitForApproval = defineActivity(async (reason: string): Promise<boolean> => {
+  console.log(`⏳ Waiting for approval: ${reason}`);
+  // In real scenario: emit event, wait on approval signal
+  // For demo: auto-approve after 10 seconds
+  await sleep(Duration.seconds(10));
+  return true; // Approved
+});
 
 /**
  * Activity: Log status (lightweight, no retries).
  */
-export const logStatus = defineActivity(
-  async (status: string): Promise<void> => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${status}`);
-  }
-);
+export const logStatus = defineActivity(async (status: string): Promise<void> => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${status}`);
+});
 
 // ============================================================================
 // WORKFLOW STATE & SIGNALS
@@ -132,7 +129,7 @@ export const logStatus = defineActivity(
  */
 interface WorkflowState {
   task: string;
-  status: 'running' | 'waiting_approval' | 'failed' | 'completed';
+  status: "running" | "waiting_approval" | "failed" | "completed";
   result: string;
   step: number;
 }
@@ -140,30 +137,28 @@ interface WorkflowState {
 /**
  * Signal: User cancels workflow mid-flight.
  */
-const cancelSignal = defineSignal<void>('cancel');
+const cancelSignal = defineSignal<void>("cancel");
 
 /**
  * Signal: User approves a pending action.
  */
-const approveSignal = defineSignal<boolean>('approve');
+const approveSignal = defineSignal<boolean>("approve");
 
 /**
  * Query: Check current workflow status.
  */
-const statusQuery = defineQuery<string>('status');
+const statusQuery = defineQuery<string>("status");
 
 // ============================================================================
 // WORKFLOW DEFINITION
 // ============================================================================
 
-export async function agentWorkflow(
-  task: string
-): Promise<string> {
+export async function agentWorkflow(task: string): Promise<string> {
   // Initialize state
-  let state: WorkflowState = {
+  const state: WorkflowState = {
     task,
-    status: 'running',
-    result: '',
+    status: "running",
+    result: "",
     step: 0,
   };
 
@@ -180,49 +175,49 @@ export async function agentWorkflow(
   });
 
   // Handle status query: return current state
-  setHandler(statusQuery, () => {
-    return JSON.stringify(state);
-  });
+  setHandler(statusQuery, () => JSON.stringify(state));
 
-  const activities = proxyActivities<typeof import('./durable-workflow')>({
-    startToCloseTimeout: Duration.seconds(300), // 5 min max per activity
+  const activities = proxyActivities<typeof import("./durable-workflow")>({
     retryPolicy: {
       initialInterval: Duration.seconds(1),
-      maximumInterval: Duration.seconds(60),
       maximumAttempts: 3,
+      maximumInterval: Duration.seconds(60),
     },
+    startToCloseTimeout: Duration.seconds(300), // 5 min max per activity,
   });
 
   try {
     // Step 1: Analyze task
     state.step = 1;
-    state.status = 'running';
+    state.status = "running";
     const analysis = await activities.runAgentTurn(
       `Analyze this task: ${task}`,
-      'You are an analyst.'
+      "You are an analyst.",
     );
     state.result = analysis;
     await activities.logStatus(`Step 1 (analysis): Complete`);
 
-    if (shouldCancel) throw new ApplicationFailure('Workflow cancelled');
+    if (shouldCancel) {
+      throw new ApplicationFailure("Workflow cancelled");
+    }
 
     // Step 2: Plan approach
     state.step = 2;
     const plan = await activities.runAgentTurn(
       `Based on this analysis, create a plan: ${analysis}`,
-      'You are a planner.'
+      "You are a planner.",
     );
     state.result = plan;
     await activities.logStatus(`Step 2 (planning): Complete`);
 
-    if (shouldCancel) throw new ApplicationFailure('Workflow cancelled');
+    if (shouldCancel) {
+      throw new ApplicationFailure("Workflow cancelled");
+    }
 
     // Step 3: Request approval (human-in-the-loop)
     state.step = 3;
-    state.status = 'waiting_approval';
-    await activities.logStatus(
-      `Step 3: Awaiting approval for plan. Timeout: 5 minutes`
-    );
+    state.status = "waiting_approval";
+    await activities.logStatus(`Step 3: Awaiting approval for plan. Timeout: 5 minutes`);
 
     // Wait for signal or timeout
     let approvalTimeout = false;
@@ -242,39 +237,43 @@ export async function agentWorkflow(
     ]);
 
     if (approvalTimeout) {
-      throw new ApplicationFailure('Approval timeout (5 min)');
+      throw new ApplicationFailure("Approval timeout (5 min)");
     }
-    if (shouldCancel) throw new ApplicationFailure('Workflow cancelled');
+    if (shouldCancel) {
+      throw new ApplicationFailure("Workflow cancelled");
+    }
 
-    state.status = 'running';
+    state.status = "running";
     await activities.logStatus(`Step 3: Approval received`);
 
     // Step 4: Execute plan (call tools)
     state.step = 4;
-    const toolResult = await activities.callTool('run_tests', {
-      suite: 'integration',
+    const toolResult = await activities.callTool("run_tests", {
+      suite: "integration",
     });
     state.result = JSON.stringify(toolResult);
     await activities.logStatus(`Step 4 (tool call): ${toolResult.status}`);
 
-    if (shouldCancel) throw new ApplicationFailure('Workflow cancelled');
+    if (shouldCancel) {
+      throw new ApplicationFailure("Workflow cancelled");
+    }
 
     // Step 5: Summarize
     state.step = 5;
     const summary = await activities.runAgentTurn(
       `Summarize results: ${state.result}`,
-      'You are a summarizer.'
+      "You are a summarizer.",
     );
     state.result = summary;
-    state.status = 'completed';
+    state.status = "completed";
     await activities.logStatus(`Step 5: Workflow complete`);
 
     return summary;
-  } catch (err: any) {
-    state.status = 'failed';
-    state.result = err.message;
-    await activities.logStatus(`Workflow failed: ${err.message}`);
-    throw err;
+  } catch (error: any) {
+    state.status = "failed";
+    state.result = error.message;
+    await activities.logStatus(`Workflow failed: ${error.message}`);
+    throw error;
   }
 }
 
@@ -286,13 +285,13 @@ export async function submitAgentWorkflow(task: string): Promise<void> {
   // Connect to Temporal server (local: localhost:7233)
   const client = new Client({
     connection: {
-      address: process.env.TEMPORAL_SERVER || 'localhost:7233',
+      address: process.env.TEMPORAL_SERVER || "localhost:7233",
     },
   });
 
   const workflowHandle = await client.workflow.start(agentWorkflow, {
     args: [task],
-    taskQueue: 'agent-tasks',
+    taskQueue: "agent-tasks",
     workflowId: `agent-${Date.now()}`,
   });
 
@@ -307,21 +306,21 @@ export async function submitAgentWorkflow(task: string): Promise<void> {
       const status = await workflowHandle.query(statusQuery);
       const parsed = JSON.parse(status);
       console.log(
-        `Status: ${parsed.status} (step ${parsed.step}), result: ${parsed.result.substring(0, 100)}...`
+        `Status: ${parsed.status} (step ${parsed.step}), result: ${parsed.result.slice(0, 100)}...`,
       );
 
-      if (parsed.status === 'completed' || parsed.status === 'failed') {
+      if (parsed.status === "completed" || parsed.status === "failed") {
         done = true;
       }
-    } catch (err) {
+    } catch {
       // Query may fail if workflow not yet started
-      console.log('(waiting for workflow to start)');
+      console.log("(waiting for workflow to start)");
     }
   }
 
   // Wait for final result
   const result = await workflowHandle.result();
-  console.log('Workflow result:', result);
+  console.log("Workflow result:", result);
 }
 
 // ============================================================================
@@ -384,13 +383,13 @@ export async function cancelWorkflow(workflowId: string): Promise<void> {
 
 export async function testWorkflowLocally(): Promise<void> {
   // Simulate workflow (for testing without Temporal server)
-  console.log('Testing agent workflow...');
+  console.log("Testing agent workflow...");
 
-  const task = 'Analyze code changes and deploy if tests pass';
+  const task = "Analyze code changes and deploy if tests pass";
   try {
     const result = await agentWorkflow(task);
-    console.log('Test passed. Result:', result);
-  } catch (err) {
-    console.error('Test failed:', err);
+    console.log("Test passed. Result:", result);
+  } catch (error) {
+    console.error("Test failed:", error);
   }
 }

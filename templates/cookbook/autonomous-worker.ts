@@ -39,21 +39,19 @@ import { z } from "zod";
  * Activity definitions (pure, deterministic functions called by workflows).
  */
 const activities = proxyActivities<typeof import("./activities")>({
-  startToCloseTimeout: "10 minutes",
   retryPolicy: {
-    initialInterval: "1 second",
-    maximumInterval: "1 minute",
-    maximumAttempts: 5,
     backoffCoefficient: 2,
+    initialInterval: "1 second",
+    maximumAttempts: 5,
+    maximumInterval: "1 minute",
   },
+  startToCloseTimeout: "10 minutes",
 });
 
 /**
  * Signal handlers (allow external events to modify workflow state).
  */
-const signalCancelledByUser = defineSignal<[{ reason: string }]>(
-  "cancelledByUser",
-);
+const signalCancelledByUser = defineSignal<[{ reason: string }]>("cancelledByUser");
 
 /**
  * Workflow: Generate weekly insights (Mondays 07:00 local time).
@@ -79,9 +77,9 @@ export async function* weeklyInsightsWorkflow(input: {
   try {
     // Fetch user's recent activity
     const activity = yield activities.fetchUserActivitySummary({
-      userId: input.userId,
-      lookbackDays: input.lookbackDays,
       idempotencyKey: `summary-${input.userId}-${Math.floor(Date.now() / 1000 / 86400)}`,
+      lookbackDays: input.lookbackDays,
+      userId: input.userId,
     });
 
     if (!activity) {
@@ -92,17 +90,17 @@ export async function* weeklyInsightsWorkflow(input: {
     // Generate insights (e.g., ML-based recommendations)
     const insights = yield activities.generateInsights({
       activity,
-      userId: input.userId,
       idempotencyKey: `insights-${input.userId}-${Math.floor(Date.now() / 1000 / 86400)}`,
+      userId: input.userId,
     });
 
     // Send notification
     yield activities.sendNotification({
-      userId: input.userId,
-      channel: "email",
-      title: "Your Weekly Insights",
       body: insights,
+      channel: "email",
       idempotencyKey: `notify-${input.userId}-${Math.floor(Date.now() / 1000 / 86400)}`,
+      title: "Your Weekly Insights",
+      userId: input.userId,
     });
 
     console.log(`[insights] Completed for user ${input.userId}`);
@@ -125,10 +123,10 @@ export async function* hourlyJobRunnerWorkflow(input: {
   while (attempt < maxAttempts) {
     try {
       const result = yield activities.executeJob({
-        jobType: input.jobType,
-        batchSize: input.batchSize,
         attempt,
+        batchSize: input.batchSize,
         idempotencyKey: `job-${input.jobType}-${Math.floor(Date.now() / 1000 / 3600)}`,
+        jobType: input.jobType,
       });
 
       console.log(`[hourly-job] Completed: ${input.jobType}`);
@@ -141,10 +139,8 @@ export async function* hourlyJobRunnerWorkflow(input: {
       }
 
       // Exponential backoff
-      const delayMs = Math.pow(2, attempt) * 1000;
-      console.log(
-        `[hourly-job] Retry attempt ${attempt + 1} in ${delayMs}ms`,
-      );
+      const delayMs = 2 ** attempt * 1000;
+      console.log(`[hourly-job] Retry attempt ${attempt + 1} in ${delayMs}ms`);
       yield sleep(delayMs);
     }
   }
@@ -154,17 +150,15 @@ export async function* hourlyJobRunnerWorkflow(input: {
  * Workflow: Per-minute notification flusher.
  * Batches pending notifications and sends them.
  */
-export async function* notificationFlusherWorkflow(): AsyncGenerator<
-  Promise<unknown> | null
-> {
-  const flushWindowMs = 60000; // 1 minute
+export async function* notificationFlusherWorkflow(): AsyncGenerator<Promise<unknown> | null> {
+  const flushWindowMs = 60_000; // 1 minute
 
   try {
     // Collect all pending notifications
     const batch = yield activities.fetchPendingNotifications({
+      idempotencyKey: `flush-${Math.floor(Date.now() / flushWindowMs)}`,
       limit: 1000,
       maxAgeMs: flushWindowMs,
-      idempotencyKey: `flush-${Math.floor(Date.now() / flushWindowMs)}`,
     });
 
     if (batch.length === 0) {
@@ -175,11 +169,11 @@ export async function* notificationFlusherWorkflow(): AsyncGenerator<
     // Send in parallel (fan-out)
     const sendPromises = batch.map((notification) =>
       activities.sendNotification({
-        userId: notification.userId,
-        channel: notification.channel,
-        title: notification.title,
         body: notification.body,
+        channel: notification.channel,
         idempotencyKey: `send-${notification.id}`,
+        title: notification.title,
+        userId: notification.userId,
       }),
     );
 
@@ -205,13 +199,11 @@ export async function fetchUserActivitySummary(input: {
   totalRevenue: number;
 }> {
   // <CUSTOMISE> Implement real database query
-  console.log(
-    `[activity] Fetching activity for ${input.userId} (key: ${input.idempotencyKey})`,
-  );
+  console.log(`[activity] Fetching activity for ${input.userId} (key: ${input.idempotencyKey})`);
 
   return {
-    ordersCount: Math.floor(Math.random() * 100),
     invoicesSent: Math.floor(Math.random() * 50),
+    ordersCount: Math.floor(Math.random() * 100),
     totalRevenue: Math.floor(Math.random() * 50000),
   };
 }
@@ -225,9 +217,7 @@ export async function generateInsights(input: {
   idempotencyKey: string;
 }): Promise<string> {
   // <CUSTOMISE> Call your ML/LLM backend
-  console.log(
-    `[activity] Generating insights (key: ${input.idempotencyKey})`,
-  );
+  console.log(`[activity] Generating insights (key: ${input.idempotencyKey})`);
 
   return `Based on your activity this week, you're on track for a great month!`;
 }
@@ -248,8 +238,8 @@ export async function sendNotification(input: {
   );
 
   return {
-    sent: true,
     messageId: uuidv4(),
+    sent: true,
   };
 }
 
@@ -273,8 +263,8 @@ export async function executeJob(input: {
   }
 
   return {
-    processed: input.batchSize,
     failed: 0,
+    processed: input.batchSize,
   };
 }
 
@@ -286,18 +276,16 @@ export async function fetchPendingNotifications(input: {
   maxAgeMs: number;
   idempotencyKey: string;
 }): Promise<
-  Array<{
+  {
     id: string;
     userId: string;
     channel: "email" | "sms" | "push";
     title: string;
     body: string;
-  }>
+  }[]
 > {
   // <CUSTOMISE> Query notification queue
-  console.log(
-    `[activity] Fetching pending notifications (key: ${input.idempotencyKey})`,
-  );
+  console.log(`[activity] Fetching pending notifications (key: ${input.idempotencyKey})`);
 
   return [];
 }
@@ -311,17 +299,17 @@ export async function setupTemporalWorker() {
   });
 
   const worker = await Worker.create({
+    activities: {
+      executeJob,
+      fetchPendingNotifications,
+      fetchUserActivitySummary,
+      generateInsights,
+      sendNotification,
+    },
     connection,
     namespace: "default",
     taskQueue: "agent-tasks",
     workflowsPath: require.resolve("./autonomous-worker.ts"),
-    activities: {
-      fetchUserActivitySummary,
-      generateInsights,
-      sendNotification,
-      executeJob,
-      fetchPendingNotifications,
-    },
   });
 
   console.log("[worker] Starting Temporal worker...");
@@ -339,22 +327,19 @@ export async function scheduleWorkflows() {
   const client = new Client({ connection });
 
   // Schedule weekly insights (Mondays 07:00)
-  const weeklyHandle = await client.workflow.start(
-    weeklyInsightsWorkflow,
-    {
-      taskQueue: "agent-tasks",
-      workflowId: "weekly-insights-scheduler",
-      cronSchedule: "0 7 ? * MON", // Cron: Mondays at 07:00 UTC
-    },
-  );
+  const weeklyHandle = await client.workflow.start(weeklyInsightsWorkflow, {
+    cronSchedule: "0 7 ? * MON", // Cron: Mondays at 07:00 UTC
+    taskQueue: "agent-tasks",
+    workflowId: "weekly-insights-scheduler",
+  });
 
   console.log(`[scheduler] Started weekly insights workflow: ${weeklyHandle.workflowId}`);
 
   // Schedule hourly job runner
   const hourlyHandle = await client.workflow.start(hourlyJobRunnerWorkflow, {
+    cronSchedule: "0 * * * *", // Cron: Every hour
     taskQueue: "agent-tasks",
     workflowId: "hourly-job-runner",
-    cronSchedule: "0 * * * *", // Cron: Every hour
   });
 
   console.log(`[scheduler] Started hourly job runner: ${hourlyHandle.workflowId}`);

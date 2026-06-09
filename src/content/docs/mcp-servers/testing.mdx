@@ -85,11 +85,7 @@ describe("billing_create_invoice", () => {
 });
 
 // Helper — exercise the tool handler without a transport
-async function callTool(
-  server: McpServer,
-  toolName: string,
-  params: Record<string, unknown>
-) {
+async function callTool(server: McpServer, toolName: string, params: Record<string, unknown>) {
   const tool = (server as any)._registeredTools.get(toolName);
   if (!tool) throw new Error(`Tool not registered: ${toolName}`);
   return tool.handler(params, {});
@@ -230,17 +226,17 @@ The `InMemoryTransport.createLinkedPair()` call returns two transport objects th
 
 ## Testing Approach Matrix
 
-| Scenario | Level | Tool |
-| ---|---|---|
-| Schema validation rejects bad input | Unit | Direct handler call |
-| isError returned for domain errors | Unit | Direct handler call |
-| All tools are registered | Integration | `client.listTools()` |
-| Tool descriptions are non-empty | Integration | `client.listTools()` |
-| Full happy path creates correct output | Integration | `client.callTool()` |
-| Resources are readable | Integration | `client.readResource()` |
-| Prompts return expected messages | Integration | `client.getPrompt()` |
-| Human-friendly interactive testing | Interactive | MCP Inspector |
-| Authentication is enforced | Integration | Custom auth middleware test |
+| Scenario                               | Level       | Tool                        |
+| -------------------------------------- | ----------- | --------------------------- |
+| Schema validation rejects bad input    | Unit        | Direct handler call         |
+| isError returned for domain errors     | Unit        | Direct handler call         |
+| All tools are registered               | Integration | `client.listTools()`        |
+| Tool descriptions are non-empty        | Integration | `client.listTools()`        |
+| Full happy path creates correct output | Integration | `client.callTool()`         |
+| Resources are readable                 | Integration | `client.readResource()`     |
+| Prompts return expected messages       | Integration | `client.getPrompt()`        |
+| Human-friendly interactive testing     | Interactive | MCP Inspector               |
+| Authentication is enforced             | Integration | Custom auth middleware test |
 
 ## MCP Inspector
 
@@ -283,7 +279,9 @@ npx @modelcontextprotocol/inspector --port 5174 --proxy-port 3001 node dist/cli.
 Use the Inspector for exploratory testing, verifying that descriptions read well, and debugging tool failures before writing regression tests. It is not a substitute for automated tests — errors you find in the Inspector should become test cases.
 
 <Callout type="info">
-The Inspector connects using the same MCP client library used by Claude Desktop and other MCP clients. If something works in the Inspector but fails in your actual agent client, the issue is in the client configuration or authentication layer, not the server implementation.
+  The Inspector connects using the same MCP client library used by Claude Desktop and other MCP
+  clients. If something works in the Inspector but fails in your actual agent client, the issue is
+  in the client configuration or authentication layer, not the server implementation.
 </Callout>
 
 ## Vitest Configuration

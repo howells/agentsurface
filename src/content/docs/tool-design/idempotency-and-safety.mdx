@@ -47,8 +47,11 @@ The agent calls `upsert_user` once. If the call succeeds, the user exists with t
 const createInvoiceSchema = z.object({
   customer_id: z.string().uuid(),
   amount_cents: z.number().int().positive(),
-  idempotency_key: z.string()
-    .describe('Unique key (e.g., UUID) for this operation. Prevents duplicate invoices if retried.'),
+  idempotency_key: z
+    .string()
+    .describe(
+      "Unique key (e.g., UUID) for this operation. Prevents duplicate invoices if retried.",
+    ),
 });
 
 // Handler
@@ -56,21 +59,25 @@ async (params) => {
   const existing = await db.invoices.findByIdempotencyKey(params.idempotency_key);
   if (existing) {
     return {
-      content: [{
-        type: 'text',
-        text: `Invoice ${existing.id} already exists (idempotency key: ${params.idempotency_key}).`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Invoice ${existing.id} already exists (idempotency key: ${params.idempotency_key}).`,
+        },
+      ],
     };
   }
-  
+
   const invoice = await createInvoice(params);
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify({ invoice_id: invoice.id, status: invoice.status }),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({ invoice_id: invoice.id, status: invoice.status }),
+      },
+    ],
   };
-}
+};
 ```
 
 If the agent retries with the same `idempotency_key`, it gets the same invoice back—no duplicate charge.
@@ -84,16 +91,10 @@ All read tools are idempotent by definition. Calling `search_issues` ten times w
 Use the MCP `idempotentHint` annotation:
 
 ```typescript
-server.tool(
-  'upsert_user',
-  'Creates a user or updates if exists. Idempotent.',
-  schema,
-  handler,
-  {
-    idempotentHint: true,  // Safe to retry
-    destructiveHint: false,  // Does not delete
-  }
-);
+server.tool("upsert_user", "Creates a user or updates if exists. Idempotent.", schema, handler, {
+  idempotentHint: true, // Safe to retry
+  destructiveHint: false, // Does not delete
+});
 ```
 
 ## Read vs Write Classification
@@ -105,18 +106,12 @@ Every tool must be clearly classified as read-only or write (mutating).
 Tools that query without side effects:
 
 ```typescript
-server.tool(
-  'search_issues',
-  'Search for existing issues...',
-  searchSchema,
-  handler,
-  {
-    readOnlyHint: true,      // No mutations
-    destructiveHint: false,   // Nothing deleted
-    idempotentHint: true,     // Always safe to retry
-    openWorldHint: false,     // All effects local to this API
-  }
-);
+server.tool("search_issues", "Search for existing issues...", searchSchema, handler, {
+  readOnlyHint: true, // No mutations
+  destructiveHint: false, // Nothing deleted
+  idempotentHint: true, // Always safe to retry
+  openWorldHint: false, // All effects local to this API
+});
 ```
 
 Read-only tools can be called in parallel without coordination. Agents may call five read tools simultaneously without risk.
@@ -126,18 +121,12 @@ Read-only tools can be called in parallel without coordination. Agents may call 
 Tools that create, update, or mutate state:
 
 ```typescript
-server.tool(
-  'create_invoice',
-  'Creates a new invoice...',
-  createSchema,
-  handler,
-  {
-    readOnlyHint: false,       // Mutates database
-    destructiveHint: false,    // Does not delete (can be reversed)
-    idempotentHint: true,      // Supports idempotency keys
-    openWorldHint: false,      // All effects local
-  }
-);
+server.tool("create_invoice", "Creates a new invoice...", createSchema, handler, {
+  readOnlyHint: false, // Mutates database
+  destructiveHint: false, // Does not delete (can be reversed)
+  idempotentHint: true, // Supports idempotency keys
+  openWorldHint: false, // All effects local
+});
 ```
 
 Write tools should typically be called sequentially or in known dependency order. If multiple write tools are called in parallel, the agent must understand and handle conflicts.
@@ -148,16 +137,16 @@ Tools that delete, void, or irreversibly modify data:
 
 ```typescript
 server.tool(
-  'delete_invoice',
-  'Permanently deletes an invoice. This cannot be undone...',
+  "delete_invoice",
+  "Permanently deletes an invoice. This cannot be undone...",
   deleteSchema,
   handler,
   {
     readOnlyHint: false,
-    destructiveHint: true,     // Irreversible mutation
-    idempotentHint: false,     // Not safe to retry (second call will fail)
+    destructiveHint: true, // Irreversible mutation
+    idempotentHint: false, // Not safe to retry (second call will fail)
     openWorldHint: false,
-  }
+  },
 );
 ```
 
@@ -170,31 +159,33 @@ For risky operations, expose a preview tool that describes what would happen wit
 ```typescript
 // Preview tool
 server.tool(
-  'preview_migration',
-  'Shows what tables and columns would change without executing...',
+  "preview_migration",
+  "Shows what tables and columns would change without executing...",
   migrationSchema,
   async (params) => {
     const plan = await generateMigrationPlan(params.migration_id);
     return {
-      content: [{
-        type: 'text',
-        text: `Would create tables: ${plan.tablesToCreate.join(', ')}. Would add columns: ${plan.columnsToAdd.join(', ')}.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Would create tables: ${plan.tablesToCreate.join(", ")}. Would add columns: ${plan.columnsToAdd.join(", ")}.`,
+        },
+      ],
     };
   },
-  { readOnlyHint: true }
+  { readOnlyHint: true },
 );
 
 // Execution tool (called only after preview approved)
 server.tool(
-  'execute_migration',
-  'Executes the migration. Call preview_migration first to review changes...',
+  "execute_migration",
+  "Executes the migration. Call preview_migration first to review changes...",
   migrationSchema,
   async (params) => {
     const result = await runMigration(params.migration_id);
-    return { content: [{ type: 'text', text: `Migration ${params.migration_id} applied.` }] };
+    return { content: [{ type: "text", text: `Migration ${params.migration_id} applied.` }] };
   },
-  { destructiveHint: true, idempotentHint: false }
+  { destructiveHint: true, idempotentHint: false },
 );
 ```
 
@@ -207,9 +198,9 @@ The agent calls `preview_migration` first to show the human what will happen, th
 Destructive tools often require a valid ID. Ensure the corresponding list operation exists:
 
 ```typescript
-list_invoices()      // Returns invoice_ids
-get_invoice(id)      // Fetches full details
-delete_invoice(id)   // Requires valid id from list or get
+list_invoices(); // Returns invoice_ids
+get_invoice(id); // Fetches full details
+delete_invoice(id); // Requires valid id from list or get
 ```
 
 Agents cannot delete safely if they cannot list and inspect targets first.
@@ -241,14 +232,14 @@ In descriptions, explicitly state:
 
 ```typescript
 server.tool(
-  'send_invoice_email',
-  'Sends the invoice to the customer via email. Idempotent: calling twice ' +
-  'on the same invoice does not send duplicate emails. The customer receives ' +
-  'the hosted payment link in the email body. This can be reverted by calling ' +
-  '`revoke_sent_invoice` if sent in error.',
+  "send_invoice_email",
+  "Sends the invoice to the customer via email. Idempotent: calling twice " +
+    "on the same invoice does not send duplicate emails. The customer receives " +
+    "the hosted payment link in the email body. This can be reverted by calling " +
+    "`revoke_sent_invoice` if sent in error.",
   schema,
   handler,
-  { idempotentHint: true }
+  { idempotentHint: true },
 );
 ```
 
@@ -259,47 +250,53 @@ See `/docs/error-handling/idempotency` for structured error patterns. For destru
 ```typescript
 async (params) => {
   const invoice = await db.invoices.findById(params.invoice_id);
-  
+
   if (!invoice) {
     return {
       isError: true,
-      content: [{
-        type: 'text',
-        text: `Invoice ${params.invoice_id} not found. Cannot delete.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Invoice ${params.invoice_id} not found. Cannot delete.`,
+        },
+      ],
     };
   }
-  
-  if (invoice.status === 'paid') {
+
+  if (invoice.status === "paid") {
     return {
       isError: true,
-      content: [{
-        type: 'text',
-        text: `Cannot delete paid invoice. Call \`void_invoice\` instead to prevent future charges.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Cannot delete paid invoice. Call \`void_invoice\` instead to prevent future charges.`,
+        },
+      ],
     };
   }
-  
+
   await db.invoices.delete(invoice.id);
   return {
-    content: [{
-      type: 'text',
-      text: `Invoice ${invoice.id} deleted.`,
-    }],
+    content: [
+      {
+        type: "text",
+        text: `Invoice ${invoice.id} deleted.`,
+      },
+    ],
   };
-}
+};
 ```
 
 ## MCP Annotations Reference
 
 ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
 
-| Annotation | Default | Meaning |
-|-----------|---------|---------|
-| `readOnlyHint` | false | Tool does not modify server state |
-| `destructiveHint` | true | Tool may delete or irreversibly modify data |
-| `idempotentHint` | false | Calling multiple times with same inputs has same effect |
-| `openWorldHint` | true | Tool interacts with external systems beyond the server |
+| Annotation        | Default | Meaning                                                 |
+| ----------------- | ------- | ------------------------------------------------------- |
+| `readOnlyHint`    | false   | Tool does not modify server state                       |
+| `destructiveHint` | true    | Tool may delete or irreversibly modify data             |
+| `idempotentHint`  | false   | Calling multiple times with same inputs has same effect |
+| `openWorldHint`   | true    | Tool interacts with external systems beyond the server  |
 
 MCP defaults are conservative: tools are assumed writable, potentially destructive, non-idempotent, and open-world unless you say otherwise. Set hints only when the property is accurate for the implementation.
 

@@ -177,12 +177,12 @@ $ mytool describe --json
         "type": "object",
         "required": ["id", "name", "email", "role", "status"],
         "properties": {
-          "id": {"type": "string", "format": "uuid"},
-          "name": {"type": "string"},
-          "email": {"type": "string", "format": "email"},
-          "role": {"type": "string", "enum": ["admin", "member", "viewer"]},
-          "status": {"type": "string", "enum": ["active", "suspended", "pending"]},
-          "created_at": {"type": "string", "format": "date-time"}
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["admin", "member", "viewer"] },
+          "status": { "type": "string", "enum": ["active", "suspended", "pending"] },
+          "created_at": { "type": "string", "format": "date-time" }
         }
       }
     }
@@ -204,7 +204,7 @@ $ mytool user create --help --json
 ```typescript
 async function getCommandSchema(command: string): Promise<CommandSchema> {
   // Fetch live spec from the backing API
-  const spec = await fetchOpenAPISpec(api.baseURL + '/openapi.json');
+  const spec = await fetchOpenAPISpec(api.baseURL + "/openapi.json");
 
   // Find the operation matching this command
   const operation = findOperation(spec, command);
@@ -221,6 +221,7 @@ Live schemas surface new fields immediately when the API adds them, without requ
 A complete schema exposes everything an agent needs to construct a valid call:
 
 **OAuth scopes required:**
+
 ```json
 {
   "command": "user delete",
@@ -230,20 +231,22 @@ A complete schema exposes everything an agent needs to construct a valid call:
 ```
 
 **Exhaustive enums with descriptions:**
+
 ```json
 {
   "name": "status",
   "type": "string",
   "enum": [
-    {"value": "active", "description": "Account is fully operational"},
-    {"value": "suspended", "description": "Temporarily disabled by an administrator"},
-    {"value": "pending", "description": "Awaiting email verification"},
-    {"value": "deleted", "description": "Scheduled for permanent deletion within 30 days"}
+    { "value": "active", "description": "Account is fully operational" },
+    { "value": "suspended", "description": "Temporarily disabled by an administrator" },
+    { "value": "pending", "description": "Awaiting email verification" },
+    { "value": "deleted", "description": "Scheduled for permanent deletion within 30 days" }
   ]
 }
 ```
 
 **Nested type references:**
+
 ```json
 {
   "name": "address",
@@ -259,7 +262,7 @@ Agent Skills are portable folders with a `SKILL.md` entrypoint. For CLIs, you ca
 
 A CLI skill can live in the repository root, alongside the binary, or inside a skills directory:
 
-```markdown
+````markdown
 ---
 name: mytool
 version: 2.4.1
@@ -297,6 +300,7 @@ mytool user create --name "Alice Chen" --email alice@example.com --json | \
   jq -r '.id' | \
   xargs -I{} mytool user role assign {} --role admin
 ```
+````
 
 ### Bulk-export active users as NDJSON
 
@@ -308,7 +312,8 @@ mytool user list --status active --all --json
 
 - `user delete` is irreversible. Always `--dry-run` first.
 - `dns record delete` propagates within 60 seconds. Verify the record before deletion.
-```
+
+````
 
 The YAML frontmatter is machine-readable metadata. The Markdown body is prose guidance for the agent's context. The `schema_command` field tells the agent exactly how to fetch the full runtime schema for any command.
 
@@ -317,18 +322,18 @@ Auto-generate or validate CLI skill metadata from your CLI's describe output as 
 ```bash
 # Generate or validate SKILL.md from live schema
 mytool describe --json | generate-skill-md > SKILL.md
-```
+````
 
 ## Scoring Rubric
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | Only `--help` text. No machine-readable schema. |
-| 1 | `--help --json` or a `describe` command for some surfaces, but incomplete. |
-| 2 | Full schema introspection for all commands — params, types, required fields — as JSON. |
-| 3 | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
+| Score | Criteria                                                                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Only `--help` text. No machine-readable schema.                                                                                                         |
+| 1     | `--help --json` or a `describe` command for some surfaces, but incomplete.                                                                              |
+| 2     | Full schema introspection for all commands — params, types, required fields — as JSON.                                                                  |
+| 3     | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
 
 ## Checklist
 

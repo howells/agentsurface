@@ -39,21 +39,12 @@ export enum ToolAnnotation {
  * Tool metadata with annotations.
  */
 export const AnnotatedToolSchema = z.object({
-  name: z.string().describe("Tool identifier"),
-  description: z.string().describe("Human-readable description"),
   annotation: z.nativeEnum(ToolAnnotation).describe("Risk level"),
-  requiresConfirmation: z
-    .boolean()
-    .default(false)
-    .describe("Ask user before executing"),
-  auditLogged: z
-    .boolean()
-    .default(false)
-    .describe("Log all invocations for compliance"),
-  roles: z
-    .array(z.string())
-    .optional()
-    .describe("Allowed roles (if omitted, all roles)"),
+  auditLogged: z.boolean().default(false).describe("Log all invocations for compliance"),
+  description: z.string().describe("Human-readable description"),
+  name: z.string().describe("Tool identifier"),
+  requiresConfirmation: z.boolean().default(false).describe("Ask user before executing"),
+  roles: z.array(z.string()).optional().describe("Allowed roles (if omitted, all roles)"),
   tags: z.array(z.string()).optional().describe("Tool categories"),
 });
 
@@ -64,22 +55,22 @@ export type AnnotatedTool = z.infer<typeof AnnotatedToolSchema>;
  */
 export const ANNOTATION_POLICIES = {
   [ToolAnnotation.READ_ONLY]: {
-    riskLevel: 0,
-    requiresConfirmation: false,
     auditLogged: false,
     description: "Safe read operation, no side effects",
+    requiresConfirmation: false,
+    riskLevel: 0,
   },
   [ToolAnnotation.WRITE]: {
-    riskLevel: 1,
-    requiresConfirmation: false,
     auditLogged: true,
     description: "Create or update records, reversible",
+    requiresConfirmation: false,
+    riskLevel: 1,
   },
   [ToolAnnotation.DESTRUCTIVE]: {
-    riskLevel: 2,
-    requiresConfirmation: true,
     auditLogged: true,
     description: "Delete or cancel, irreversible",
+    requiresConfirmation: true,
+    riskLevel: 2,
   },
 };
 
@@ -87,48 +78,33 @@ export const ANNOTATION_POLICIES = {
  * Role-based permission matrix.
  */
 export const ROLE_PERMISSIONS: Record<string, ToolAnnotation[]> = {
+  admin: [ToolAnnotation.READ_ONLY, ToolAnnotation.WRITE, ToolAnnotation.DESTRUCTIVE],
   guest: [ToolAnnotation.READ_ONLY],
+  system: [ToolAnnotation.READ_ONLY, ToolAnnotation.WRITE, ToolAnnotation.DESTRUCTIVE],
   user: [ToolAnnotation.READ_ONLY, ToolAnnotation.WRITE],
-  admin: [
-    ToolAnnotation.READ_ONLY,
-    ToolAnnotation.WRITE,
-    ToolAnnotation.DESTRUCTIVE,
-  ],
-  system: [
-    ToolAnnotation.READ_ONLY,
-    ToolAnnotation.WRITE,
-    ToolAnnotation.DESTRUCTIVE,
-  ],
 };
 
 /**
  * Central tool registry.
  */
 export class ToolRegistry {
-  private tools: Map<string, AnnotatedTool> = new Map();
-  private implementations: Map<string, Tool> = new Map();
+  private tools = new Map<string, AnnotatedTool>();
+  private implementations = new Map<string, Tool>();
 
   /**
    * Register a tool with annotations.
    */
-  register(
-    metadata: AnnotatedTool,
-    implementation: Tool,
-  ): void {
+  register(metadata: AnnotatedTool, implementation: Tool): void {
     this.tools.set(metadata.name, metadata);
     this.implementations.set(metadata.name, implementation);
 
-    console.log(
-      `[registry] Registered "${metadata.name}" (${metadata.annotation})`,
-    );
+    console.log(`[registry] Registered "${metadata.name}" (${metadata.annotation})`);
   }
 
   /**
    * Register multiple tools at once.
    */
-  registerBatch(
-    tools: Array<{ metadata: AnnotatedTool; implementation: Tool }>,
-  ): void {
+  registerBatch(tools: { metadata: AnnotatedTool; implementation: Tool }[]): void {
     tools.forEach(({ metadata, implementation }) => {
       this.register(metadata, implementation);
     });
@@ -149,7 +125,7 @@ export class ToolRegistry {
     role?: string;
     tags?: string[];
   }): AnnotatedTool[] {
-    let results = Array.from(this.tools.values());
+    let results = [...this.tools.values()];
 
     // Filter by annotation
     if (options?.annotation) {
@@ -161,17 +137,14 @@ export class ToolRegistry {
       const allowedAnnotations = ROLE_PERMISSIONS[options.role] || [];
       results = results.filter(
         (t) =>
-          allowedAnnotations.includes(t.annotation) &&
-          (!t.roles || t.roles.includes(options.role)),
+          allowedAnnotations.includes(t.annotation) && (!t.roles || t.roles.includes(options.role)),
       );
     }
 
     // Filter by tags
     if (options?.tags && options.tags.length > 0) {
       results = results.filter(
-        (t) =>
-          t.tags &&
-          options.tags!.every((tag) => t.tags!.includes(tag)),
+        (t) => t.tags && options.tags!.every((tag) => t.tags!.includes(tag)),
       );
     }
 
@@ -183,7 +156,9 @@ export class ToolRegistry {
    */
   canCallTool(toolName: string, userRole: string): boolean {
     const tool = this.getTool(toolName);
-    if (!tool) return false;
+    if (!tool) {
+      return false;
+    }
 
     const allowedAnnotations = ROLE_PERMISSIONS[userRole] || [];
     if (!allowedAnnotations.includes(tool.annotation)) {
@@ -221,7 +196,9 @@ export class ToolRegistry {
     let prompt = "## Available Tools\n\n";
 
     for (const [annotation, tools] of Object.entries(byAnnotation)) {
-      if (tools.length === 0) continue;
+      if (tools.length === 0) {
+        continue;
+      }
 
       const policy = ANNOTATION_POLICIES[annotation as ToolAnnotation];
       prompt += `### ${annotation} (${policy.description})\n`;
@@ -252,66 +229,66 @@ export function createExampleRegistry(): ToolRegistry {
   // READ_ONLY tools
   registry.register(
     {
-      name: "tickets_list",
-      description: "List tickets with filtering by status, assignee, priority",
       annotation: ToolAnnotation.READ_ONLY,
+      description: "List tickets with filtering by status, assignee, priority",
+      name: "tickets_list",
       tags: ["tickets", "search"],
     },
     {
       description: "List tickets",
-      parameters: z.object({
-        status: z.enum(["open", "closed", "in-progress"]).optional(),
-        limit: z.number().int().min(1).max(100).default(25),
-      }),
       execute: async ({ status, limit }) => {
         console.log(`[tickets_list] status=${status} limit=${limit}`);
         return { tickets: [], total: 0 };
       },
+      parameters: z.object({
+        status: z.enum(["open", "closed", "in-progress"]).optional(),
+        limit: z.number().int().min(1).max(100).default(25),
+      }),
     },
   );
 
   // WRITE tools
   registry.register(
     {
-      name: "tickets_create",
-      description: "Create a new ticket (draft, not yet assigned)",
       annotation: ToolAnnotation.WRITE,
       auditLogged: true,
+      description: "Create a new ticket (draft, not yet assigned)",
+      name: "tickets_create",
       tags: ["tickets", "create"],
     },
     {
       description: "Create a ticket",
+      execute: async ({ title, description, priority }) => {
+        console.log(`[tickets_create] title="${title}" priority=${priority}`);
+        return { ticketId: `ticket-${Date.now()}`, status: "draft" };
+      },
       parameters: z.object({
         title: z.string(),
         description: z.string().optional(),
         priority: z.enum(["low", "medium", "high"]).default("medium"),
       }),
-      execute: async ({ title, description, priority }) => {
-        console.log(`[tickets_create] title="${title}" priority=${priority}`);
-        return { ticketId: `ticket-${Date.now()}`, status: "draft" };
-      },
     },
   );
 
   // DESTRUCTIVE tools
   registry.register(
     {
-      name: "tickets_delete",
-      description: "Delete a ticket and all its comments (irreversible)",
       annotation: ToolAnnotation.DESTRUCTIVE,
-      requiresConfirmation: true,
       auditLogged: true,
+      description: "Delete a ticket and all its comments (irreversible)",
+      name: "tickets_delete",
+      requiresConfirmation: true,
       tags: ["tickets", "delete"],
     },
     {
       description: "Delete a ticket",
-      parameters: z.object({
-        ticketId: z.string(),
-      }),
       execute: async ({ ticketId }) => {
         console.log(`[tickets_delete] ticketId=${ticketId}`);
         return { deleted: true, ticketId };
       },
+      parameters: z.object({
+        ticketId: z.string(),
+      }),
     },
   );
 
@@ -342,16 +319,10 @@ export class AuditLogger {
     });
 
     // <CUSTOMISE> Persist to database, CloudWatch, Datadog, etc.
-    console.log(
-      `[audit] ${entry.userId} called ${entry.toolName} (${entry.annotation})`,
-    );
+    console.log(`[audit] ${entry.userId} called ${entry.toolName} (${entry.annotation})`);
   }
 
-  getLogs(options?: {
-    userId?: string;
-    annotation?: ToolAnnotation;
-    limit?: number;
-  }): AuditLog[] {
+  getLogs(options?: { userId?: string; annotation?: ToolAnnotation; limit?: number }): AuditLog[] {
     let results = this.logs;
 
     if (options?.userId) {
@@ -387,17 +358,15 @@ export async function callToolSafely(
 
   // Permission check
   if (!registry.canCallTool(toolName, userRole)) {
-    const error = new Error(
-      `User role "${userRole}" cannot call tool "${toolName}"`,
-    );
+    const error = new Error(`User role "${userRole}" cannot call tool "${toolName}"`);
     auditLogger.log({
-      userId,
-      toolName,
       annotation: ToolAnnotation.READ_ONLY,
+      errorMessage: error.message,
       input,
       result: null,
       success: false,
-      errorMessage: error.message,
+      toolName,
+      userId,
     });
     throw error;
   }
@@ -405,9 +374,7 @@ export async function callToolSafely(
   // Confirmation check (for DESTRUCTIVE tools)
   const tool = registry.getTool(toolName)!;
   if (tool.requiresConfirmation) {
-    console.log(
-      `[callToolSafely] Destructive operation requires user confirmation: ${toolName}`,
-    );
+    console.log(`[callToolSafely] Destructive operation requires user confirmation: ${toolName}`);
     // <CUSTOMISE> Implement user confirmation flow (modal, email, etc.)
   }
 
@@ -422,13 +389,13 @@ export async function callToolSafely(
   } catch (error) {
     result = null;
     auditLogger.log({
-      userId,
-      toolName,
       annotation: tool.annotation,
+      errorMessage: String(error),
       input,
       result,
       success,
-      errorMessage: String(error),
+      toolName,
+      userId,
     });
     throw error;
   }
@@ -436,12 +403,12 @@ export async function callToolSafely(
   // Audit logging
   if (tool.auditLogged) {
     auditLogger.log({
-      userId,
-      toolName,
       annotation: tool.annotation,
       input,
       result,
       success,
+      toolName,
+      userId,
     });
   }
 

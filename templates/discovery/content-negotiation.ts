@@ -24,7 +24,8 @@
  * 3. Test: curl -H "Accept: text/markdown" https://localhost:3000/docs/api
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * Documentation paths that support content negotiation.
@@ -37,8 +38,8 @@ const API_PATHS = /^\/api\/(reference|endpoints)\/.+/;
  * User-Agent patterns to identify AI agents.
  */
 const AGENT_PATTERNS = {
-  training: /GPTBot|ClaudeBot|Google-Extended|Meta-ExternalAgent|CCBot|Bytespider/i,
   search: /OAI-SearchBot|Claude-SearchBot|PerplexityBot/i,
+  training: /GPTBot|ClaudeBot|Google-Extended|Meta-ExternalAgent|CCBot|Bytespider/i,
   user: /ChatGPT-User|Claude-User/i,
 };
 
@@ -47,25 +48,25 @@ const AGENT_PATTERNS = {
  * Helps agents decide how much content to ingest.
  */
 const TOKEN_BUDGETS = {
-  overview: 500,
+  "api-reference": 3000,
+  "full-docs": 10000,
   guide: 1500,
-  'api-reference': 3000,
-  'full-docs': 10000,
+  overview: 500,
 } as const;
 
 /**
  * Detect if request prefers markdown.
  */
 function prefersMarkdown(request: NextRequest): boolean {
-  const accept = request.headers.get('accept') || '';
-  return accept.includes('text/markdown');
+  const accept = request.headers.get("accept") || "";
+  return accept.includes("text/markdown");
 }
 
 /**
  * Detect if request is from an AI agent.
  */
 function isAgent(request: NextRequest): boolean {
-  const userAgent = request.headers.get('user-agent') || '';
+  const userAgent = request.headers.get("user-agent") || "";
   return (
     AGENT_PATTERNS.training.test(userAgent) ||
     AGENT_PATTERNS.search.test(userAgent) ||
@@ -76,11 +77,17 @@ function isAgent(request: NextRequest): boolean {
 /**
  * Classify agent type.
  */
-function classifyAgent(request: NextRequest): 'training' | 'search' | 'user' | null {
-  const userAgent = request.headers.get('user-agent') || '';
-  if (AGENT_PATTERNS.training.test(userAgent)) return 'training';
-  if (AGENT_PATTERNS.search.test(userAgent)) return 'search';
-  if (AGENT_PATTERNS.user.test(userAgent)) return 'user';
+function classifyAgent(request: NextRequest): "training" | "search" | "user" | null {
+  const userAgent = request.headers.get("user-agent") || "";
+  if (AGENT_PATTERNS.training.test(userAgent)) {
+    return "training";
+  }
+  if (AGENT_PATTERNS.search.test(userAgent)) {
+    return "search";
+  }
+  if (AGENT_PATTERNS.user.test(userAgent)) {
+    return "user";
+  }
   return null;
 }
 
@@ -127,10 +134,10 @@ function estimateTokens(content: string): number {
  * Get appropriate token budget for content type.
  */
 function getTokenBudget(pathname: string): number {
-  if (pathname.includes('api') || pathname.includes('reference')) {
-    return TOKEN_BUDGETS['api-reference'];
+  if (pathname.includes("api") || pathname.includes("reference")) {
+    return TOKEN_BUDGETS["api-reference"];
   }
-  if (pathname.includes('guide')) {
+  if (pathname.includes("guide")) {
     return TOKEN_BUDGETS.guide;
   }
   return TOKEN_BUDGETS.overview;
@@ -141,13 +148,12 @@ function getTokenBudget(pathname: string): number {
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isDocPath =
-    DOCUMENTATION_PATHS.test(pathname) || API_PATHS.test(pathname);
+  const isDocPath = DOCUMENTATION_PATHS.test(pathname) || API_PATHS.test(pathname);
 
   // Only apply negotiation to documentation paths
   if (!isDocPath) {
     const response = NextResponse.next();
-    response.headers.set('Vary', 'Accept');
+    response.headers.set("Vary", "Accept");
     return response;
   }
 
@@ -164,16 +170,16 @@ export async function middleware(request: NextRequest) {
 
       // Build markdown response
       const response = new NextResponse(markdown, {
-        status: 200,
         headers: {
-          'Content-Type': 'text/markdown; charset=utf-8',
-          'Vary': 'Accept',
-          'x-markdown-tokens': tokens.toString(),
-          'x-token-budget': budget.toString(),
-          'x-agent-type': agentType || 'unknown',
+          "Content-Type": "text/markdown; charset=utf-8",
+          Vary: "Accept",
+          "x-markdown-tokens": tokens.toString(),
+          "x-token-budget": budget.toString(),
+          "x-agent-type": agentType || "unknown",
           // Cache for agents (not as aggressive as HTML)
-          'Cache-Control': 'public, max-age=3600',
+          "Cache-Control": "public, max-age=3600",
         },
+        status: 200,
       });
 
       return response;
@@ -182,8 +188,8 @@ export async function middleware(request: NextRequest) {
 
   // Default: serve HTML with Vary header
   const response = NextResponse.next();
-  response.headers.set('Vary', 'Accept');
-  response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+  response.headers.set("Vary", "Accept");
+  response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
 
   return response;
 }
@@ -194,10 +200,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Documentation routes
-    '/docs/:path*',
-    '/api/reference/:path*',
-    '/api/endpoints/:path*',
-    '/guides/:path*',
+    "/docs/:path*",
+    "/api/reference/:path*",
+    "/api/endpoints/:path*",
+    "/guides/:path*",
   ],
 };
 

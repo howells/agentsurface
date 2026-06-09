@@ -21,11 +21,11 @@ Use `auth.md` when an agent needs to create or claim a user-bound credential for
 
 Agent auth has three separate but connected surfaces:
 
-| Surface | Audience | Purpose |
-|---|---|---|
-| `auth.md` | Agents and humans | Step-by-step registration instructions, supported flows, scopes, and contact links. |
-| Protected Resource Metadata | OAuth clients and MCP clients | Resource identity, authorization servers, supported scopes, bearer methods, and discovery bootstrap. |
-| Authorization Server Metadata | OAuth clients and agent registration clients | Token endpoints, supported grants, and optional `agent_auth` registration metadata. |
+| Surface                       | Audience                                     | Purpose                                                                                              |
+| ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `auth.md`                     | Agents and humans                            | Step-by-step registration instructions, supported flows, scopes, and contact links.                  |
+| Protected Resource Metadata   | OAuth clients and MCP clients                | Resource identity, authorization servers, supported scopes, bearer methods, and discovery bootstrap. |
+| Authorization Server Metadata | OAuth clients and agent registration clients | Token endpoints, supported grants, and optional `agent_auth` registration metadata.                  |
 
 The protected resource metadata is the authority for the resource. `auth.md` is a readable companion that helps agents that arrive through docs, SDKs, search, or a 401 challenge understand how to register before they make normal authenticated API calls.
 
@@ -63,10 +63,7 @@ The authorization server metadata can add an `agent_auth` block. Keep token issu
     "revocation_uri": "https://auth.example.com/agent/auth/revoke",
     "identity_types_supported": ["identity_assertion", "anonymous"],
     "identity_assertion": {
-      "assertion_types_supported": [
-        "urn:ietf:params:oauth:token-type:id-jag",
-        "verified_email"
-      ],
+      "assertion_types_supported": ["urn:ietf:params:oauth:token-type:id-jag", "verified_email"],
       "credential_types_supported": ["access_token", "api_key"]
     },
     "anonymous": {
@@ -80,11 +77,11 @@ Advertise only flows you actually accept. If anonymous registration is not safe 
 
 ## Flow Selection
 
-| Agent has | Flow | Result |
-|---|---|---|
-| A provider session that can mint an audience-bound ID-JAG | Agent verified | Service verifies the assertion and returns credentials immediately. |
-| A user email but no provider-signed assertion | User claimed, email required | Service emails the user, waits for OTP completion, then issues credentials. |
-| No usable user identity | User claimed, anonymous start | Service issues a low-scope pre-claim credential and lets the user claim it later. |
+| Agent has                                                 | Flow                          | Result                                                                            |
+| --------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| A provider session that can mint an audience-bound ID-JAG | Agent verified                | Service verifies the assertion and returns credentials immediately.               |
+| A user email but no provider-signed assertion             | User claimed, email required  | Service emails the user, waits for OTP completion, then issues credentials.       |
+| No usable user identity                                   | User claimed, anonymous start | Service issues a low-scope pre-claim credential and lets the user claim it later. |
 
 ### Agent Verified
 

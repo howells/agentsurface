@@ -35,7 +35,7 @@ The practical consequences:
 
 - **Globally unique** across your entire spec
 - **Verb-noun format** that unambiguously describes the action and resource
-- **Snake\_case or camelCase** — pick one and be consistent
+- **Snake_case or camelCase** — pick one and be consistent
 
 ```yaml
 # Bad — no operationId, frameworks generate names from path + method
@@ -273,11 +273,11 @@ Examples are part of the contract. Include them at the operation level so agents
 
 ```yaml
 responses:
-  '200':
+  "200":
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         example:
           id: "usr_01HV3K8MNPQR2STUVW"
           email: "alice@example.com"
@@ -292,15 +292,15 @@ Document every error response your operation can return. An undocumented 422 is 
 
 ```yaml
 responses:
-  '200':
+  "200":
     description: User found and returned
-  '400':
+  "400":
     description: Invalid user_id format (must be UUID)
-  '404':
+  "404":
     description: User not found or has been permanently deleted
-  '429':
+  "429":
     description: Rate limit exceeded; retry after the Retry-After header value
-  '500':
+  "500":
     description: Internal server error; safe to retry with exponential backoff
 ```
 
@@ -341,16 +341,18 @@ paths:
 
 Every description field becomes part of the context window when an agent is choosing which tool to call. Excessive description length degrades accuracy.
 
-| Description length | Effect |
-|--------------------|--------|
-| ~200 tokens (~150 words) | Acceptable — full context fits in tool selection window |
-| ~500 tokens | Marginal — monitor routing accuracy |
-| ~2000 tokens | Problematic — crowds out other tools, degrades selection |
+| Description length       | Effect                                                   |
+| ------------------------ | -------------------------------------------------------- |
+| ~200 tokens (~150 words) | Acceptable — full context fits in tool selection window  |
+| ~500 tokens              | Marginal — monitor routing accuracy                      |
+| ~2000 tokens             | Problematic — crowds out other tools, degrades selection |
 
 Write descriptions that are precise, not exhaustive. If you find yourself writing paragraphs of edge cases, that is a signal the operation should be split into more focused operations.
 
 <Callout type="warn">
-Long descriptions hurt agent performance more than they help. A 2000-token description does not make an agent smarter about when to use a tool — it makes every other tool harder to select. Target under 150 words per operation description.
+  Long descriptions hurt agent performance more than they help. A 2000-token description does not
+  make an agent smarter about when to use a tool — it makes every other tool harder to select.
+  Target under 150 words per operation description.
 </Callout>
 
 ## OpenAPI 3.1 Features That Matter
@@ -375,7 +377,7 @@ In 3.1, `$ref` can appear alongside other keywords:
 ```yaml
 properties:
   user:
-    $ref: '#/components/schemas/User'
+    $ref: "#/components/schemas/User"
     description: The owning user; see get_user for full field details
 ```
 
@@ -395,7 +397,7 @@ webhooks:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OrderCompletedEvent'
+              $ref: "#/components/schemas/OrderCompletedEvent"
 ```
 
 ## OpenAPI 3.2 Features
@@ -408,13 +410,13 @@ Native support for streaming response bodies, replacing custom content-type conv
 
 ```yaml
 responses:
-  '200':
+  "200":
     content:
       application/jsonl:
         schema:
           type: array
           items:
-            $ref: '#/components/schemas/StreamChunk'
+            $ref: "#/components/schemas/StreamChunk"
 ```
 
 ### `$self` for Multi-Document Specs
@@ -469,22 +471,22 @@ paths:
                   maxItems: 5
                   description: Additional email addresses to CC on the invoice email
       responses:
-        '200':
+        "200":
           description: Invoice sent successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Invoice'
+                $ref: "#/components/schemas/Invoice"
               example:
                 id: "inv_01HV3K8MNPQR"
                 status: "sent"
                 sent_at: "2024-03-15T14:22:00Z"
                 customer_email: "billing@acme.com"
-        '404':
+        "404":
           description: Invoice not found
-        '409':
+        "409":
           description: Invoice is already sent or has been voided
-        '422':
+        "422":
           description: Customer account has no email address on record
 ```
 
@@ -492,7 +494,7 @@ paths:
 
 Before treating a spec as agent-ready:
 
-- [ ] Every operation has a unique `operationId` in verb\_noun format
+- [ ] Every operation has a unique `operationId` in verb_noun format
 - [ ] Every operation description answers when to call it and when not to
 - [ ] Similar operations explicitly disambiguate from each other
 - [ ] All enum values are listed with semantic descriptions

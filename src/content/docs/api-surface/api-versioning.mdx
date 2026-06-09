@@ -31,28 +31,30 @@ Three independent layers can break independently:
 
 The conservative list of breaking changes for agent APIs:
 
-| Change Type | Breaking? | Notes |
-|-------------|-----------|-------|
-| Removing a required parameter | Yes | Hard schema break |
-| Removing an optional parameter | Yes | Agents may be passing it |
-| Renaming a parameter | Yes | Old name no longer accepted |
-| Changing a parameter type | Yes | e.g., string → integer |
-| Removing a response field | Yes | Agents may depend on it |
-| Renaming a response field | Yes | Old name returns undefined |
-| Changing `operationId` | Yes | Breaks all generated tool definitions |
-| Removing an enum value | Yes | Agents may pass the old value |
-| Adding a required parameter | Yes | Existing calls missing the new field fail |
-| Changing sync → async | Yes | Behavior break; agents expect synchronous result |
-| Removing an endpoint | Yes | Tool no longer callable |
-| Changing description (CUJ regresses) | Yes | Behavior break via routing failure |
-| Adding an optional parameter | No | Additive |
-| Adding a response field | No | Additive |
-| Adding a new enum value | No | Additive, unless agents enumerate exhaustively |
-| Adding a new endpoint | No | Additive |
-| Fixing a description that was factually wrong | Yes, evaluate | Monitor CUJ pass rates before and after |
+| Change Type                                   | Breaking?     | Notes                                            |
+| --------------------------------------------- | ------------- | ------------------------------------------------ |
+| Removing a required parameter                 | Yes           | Hard schema break                                |
+| Removing an optional parameter                | Yes           | Agents may be passing it                         |
+| Renaming a parameter                          | Yes           | Old name no longer accepted                      |
+| Changing a parameter type                     | Yes           | e.g., string → integer                           |
+| Removing a response field                     | Yes           | Agents may depend on it                          |
+| Renaming a response field                     | Yes           | Old name returns undefined                       |
+| Changing `operationId`                        | Yes           | Breaks all generated tool definitions            |
+| Removing an enum value                        | Yes           | Agents may pass the old value                    |
+| Adding a required parameter                   | Yes           | Existing calls missing the new field fail        |
+| Changing sync → async                         | Yes           | Behavior break; agents expect synchronous result |
+| Removing an endpoint                          | Yes           | Tool no longer callable                          |
+| Changing description (CUJ regresses)          | Yes           | Behavior break via routing failure               |
+| Adding an optional parameter                  | No            | Additive                                         |
+| Adding a response field                       | No            | Additive                                         |
+| Adding a new enum value                       | No            | Additive, unless agents enumerate exhaustively   |
+| Adding a new endpoint                         | No            | Additive                                         |
+| Fixing a description that was factually wrong | Yes, evaluate | Monitor CUJ pass rates before and after          |
 
 <Callout type="warn">
-Changing an `operationId` is the most impactful breaking change. All generated SDKs, MCP servers, and tool definitions use the `operationId` as the function name. Treat `operationId` as immutable once an endpoint ships.
+  Changing an `operationId` is the most impactful breaking change. All generated SDKs, MCP servers,
+  and tool definitions use the `operationId` as the function name. Treat `operationId` as immutable
+  once an endpoint ships.
 </Callout>
 
 ## Versioning Strategies
@@ -193,15 +195,15 @@ const cujTests = [
     name: "User looks up their recent orders",
     userMessage: "Show me my last 5 orders",
     expectedTools: ["list_orders"],
-    expectedOutcome: (result) => result.orders.length <= 5
+    expectedOutcome: (result) => result.orders.length <= 5,
   },
   {
     name: "User gets details on a specific order",
     userMessage: "What's the status of order #ABC123?",
     expectedTools: ["get_order"],
-    expectedOutcome: (result) => result.order.id === "ABC123"
-  }
-]
+    expectedOutcome: (result) => result.order.id === "ABC123",
+  },
+];
 ```
 
 Run these tests before and after any description change, and before any version release. See the [Testing](/docs/testing) section for agent evaluation patterns.

@@ -126,18 +126,13 @@ import { z } from "zod";
 import type { ServerConfig } from "../server.js";
 
 const CreateInvoiceSchema = z.object({
-  customer_id: z
-    .string()
-    .uuid()
-    .describe("The UUID of the customer to invoice"),
+  customer_id: z.string().uuid().describe("The UUID of the customer to invoice"),
   amount_cents: z
     .number()
     .int()
     .positive()
     .describe("Invoice amount in cents to avoid floating point issues"),
-  currency: z
-    .enum(["usd", "eur", "gbp"])
-    .describe("ISO 4217 currency code"),
+  currency: z.enum(["usd", "eur", "gbp"]).describe("ISO 4217 currency code"),
   due_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -156,7 +151,7 @@ export function registerCreateInvoice(server: McpServer, config: ServerConfig): 
     CreateInvoiceSchema,
     async (params) => {
       // implementation
-    }
+    },
   );
 }
 ```
@@ -244,13 +239,13 @@ const server = new McpServer({
   name: "billing-mcp",
   version: "1.0.0",
   capabilities: {
-    tools: {},              // Server supports tools
+    tools: {}, // Server supports tools
     resources: {
-      subscribe: true,     // Clients can subscribe to resource changes
-      listChanged: true,   // Server will notify when resource list changes
+      subscribe: true, // Clients can subscribe to resource changes
+      listChanged: true, // Server will notify when resource list changes
     },
-    prompts: {},           // Server supports prompts
-    logging: {},           // Server can send log messages to the client
+    prompts: {}, // Server supports prompts
+    logging: {}, // Server can send log messages to the client
   },
 });
 ```
@@ -258,7 +253,9 @@ const server = new McpServer({
 Declaring `resources.subscribe: true` without implementing the `resources/subscribe` handler will cause client errors. Declare only what you implement.
 
 <Callout type="warn">
-Never declare `experimental_sampling` in capabilities unless you have implemented the full sampling request handler. Clients that send sampling requests to an unimplemented handler will receive protocol errors that are difficult to debug.
+  Never declare `experimental_sampling` in capabilities unless you have implemented the full
+  sampling request handler. Clients that send sampling requests to an unimplemented handler will
+  receive protocol errors that are difficult to debug.
 </Callout>
 
 ## Environment Variable Conventions
@@ -273,8 +270,7 @@ function loadConfig(): ServerConfig {
   for (const key of required) {
     if (!process.env[key]) {
       throw new Error(
-        `Missing required environment variable: ${key}. ` +
-        `See README for setup instructions.`
+        `Missing required environment variable: ${key}. ` + `See README for setup instructions.`,
       );
     }
   }

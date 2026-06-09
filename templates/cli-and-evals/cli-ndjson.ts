@@ -25,18 +25,19 @@
  * - CLI design guide: https://code.claude.com/docs/en/cli-reference
  */
 
-import { z } from 'zod';
-import { createWriteStream, WriteStream } from 'fs';
-import { createInterface } from 'readline';
+import { z } from "zod";
+import type { WriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
+import { createInterface } from "node:readline";
 
 // Event schema
 const NDJSONEventSchema = z.object({
-  ts: z.string().datetime(), // ISO 8601
-  level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  kind: z.enum(['progress', 'tool_call', 'tool_result', 'log', 'final']),
-  trace_id: z.string().optional(),
   duration_ms: z.number().optional(),
+  kind: z.enum(["progress", "tool_call", "tool_result", "log", "final"]),
+  level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   payload: z.record(z.string(), z.unknown()),
+  trace_id: z.string().optional(),
+  ts: z.string().datetime(), // ISO 8601,
 });
 
 export type NDJSONEvent = z.infer<typeof NDJSONEventSchema>;
@@ -48,12 +49,12 @@ export class NDJSONStream {
   private traceId: string;
 
   constructor(output?: string, traceId?: string) {
-    this.stream = output ? createWriteStream(output, { flags: 'a' }) : process.stdout;
+    this.stream = output ? createWriteStream(output, { flags: "a" }) : process.stdout;
     this.traceId = traceId || this.generateTraceId();
   }
 
   private generateTraceId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    return `${Date.now()}-${Math.random().toString(36).slice(7)}`;
   }
 
   /**
@@ -61,17 +62,17 @@ export class NDJSONStream {
    */
   progress(message: string, current: number, total: number, metadata?: Record<string, unknown>) {
     const event: NDJSONEvent = {
-      ts: new Date().toISOString(),
-      level: 'info',
-      kind: 'progress',
-      trace_id: this.traceId,
+      kind: "progress",
+      level: "info",
       payload: {
-        message,
         current,
-        total,
+        message,
         percent: Math.round((current / total) * 100),
+        total,
         ...metadata,
       },
+      trace_id: this.traceId,
+      ts: new Date().toISOString(),
     };
     this.emit(event);
   }
@@ -81,15 +82,15 @@ export class NDJSONStream {
    */
   toolCall(toolName: string, callId: string, args: Record<string, unknown>) {
     const event: NDJSONEvent = {
-      ts: new Date().toISOString(),
-      level: 'debug',
-      kind: 'tool_call',
-      trace_id: this.traceId,
+      kind: "tool_call",
+      level: "debug",
       payload: {
-        tool_name: toolName,
-        call_id: callId,
         arguments: args,
+        call_id: callId,
+        tool_name: toolName,
       },
+      trace_id: this.traceId,
+      ts: new Date().toISOString(),
     };
     this.emit(event);
   }
@@ -99,15 +100,15 @@ export class NDJSONStream {
    */
   toolResult(callId: string, result: unknown, durationMs?: number) {
     const event: NDJSONEvent = {
-      ts: new Date().toISOString(),
-      level: 'debug',
-      kind: 'tool_result',
-      trace_id: this.traceId,
       duration_ms: durationMs,
+      kind: "tool_result",
+      level: "debug",
       payload: {
         call_id: callId,
         result,
       },
+      trace_id: this.traceId,
+      ts: new Date().toISOString(),
     };
     this.emit(event);
   }
@@ -115,16 +116,20 @@ export class NDJSONStream {
   /**
    * Emit a log event
    */
-  log(message: string, level: 'debug' | 'info' | 'warn' | 'error' = 'info', details?: Record<string, unknown>) {
+  log(
+    message: string,
+    level: "debug" | "info" | "warn" | "error" = "info",
+    details?: Record<string, unknown>,
+  ) {
     const event: NDJSONEvent = {
-      ts: new Date().toISOString(),
+      kind: "log",
       level,
-      kind: 'log',
-      trace_id: this.traceId,
       payload: {
         message,
         ...details,
       },
+      trace_id: this.traceId,
+      ts: new Date().toISOString(),
     };
     this.emit(event);
   }
@@ -134,15 +139,15 @@ export class NDJSONStream {
    */
   final(success: boolean, data?: unknown, error?: string) {
     const event: NDJSONEvent = {
-      ts: new Date().toISOString(),
-      level: success ? 'info' : 'error',
-      kind: 'final',
-      trace_id: this.traceId,
+      kind: "final",
+      level: success ? "info" : "error",
       payload: {
-        success,
         data,
         error,
+        success,
       },
+      trace_id: this.traceId,
+      ts: new Date().toISOString(),
     };
     this.emit(event);
   }
@@ -162,7 +167,7 @@ export class NDJSONStream {
    */
   flush() {
     for (const event of this.buffer) {
-      this.stream.write(JSON.stringify(event) + '\n');
+      this.stream.write(`${JSON.stringify(event)}\n`);
     }
     this.buffer = [];
   }
@@ -184,8 +189,8 @@ export class NDJSONStream {
 export class StreamParser {
   async *parseStream(input: NodeJS.ReadableStream): AsyncGenerator<NDJSONEvent> {
     const rl = createInterface({
-      input,
       crlfDelay: Infinity,
+      input,
     });
 
     for await (const line of rl) {
@@ -193,8 +198,8 @@ export class StreamParser {
         try {
           const event = NDJSONEventSchema.parse(JSON.parse(line));
           yield event;
-        } catch (err) {
-          console.error(`Failed to parse NDJSON line: ${line}`, err);
+        } catch (error) {
+          console.error(`Failed to parse NDJSON line: ${line}`, error);
         }
       }
     }
@@ -207,7 +212,9 @@ export class StreamParser {
     const events: NDJSONEvent[] = [];
     for await (const event of this.parseStream(input)) {
       events.push(event);
-      if (event.kind === 'final') break;
+      if (event.kind === "final") {
+        break;
+      }
     }
     return events;
   }

@@ -37,7 +37,7 @@ Use delta scorecards to:
 ## TypeScript Function
 
 ```typescript
-import { Scorecard } from './scorecard-schema';
+import { Scorecard } from "./scorecard-schema";
 
 interface DeltaDimension {
   name: string;
@@ -71,15 +71,10 @@ interface DeltaScorecard {
  * Compute delta between two scorecards.
  * Assumes both scorecards are from the same project.
  */
-export function deltaScorecard(
-  before: Scorecard,
-  after: Scorecard
-): DeltaScorecard {
+export function deltaScorecard(before: Scorecard, after: Scorecard): DeltaScorecard {
   // Validate project match
   if (before.project.name !== after.project.name) {
-    throw new Error(
-      `Project mismatch: ${before.project.name} vs ${after.project.name}`
-    );
+    throw new Error(`Project mismatch: ${before.project.name} vs ${after.project.name}`);
   }
 
   // Dimension deltas
@@ -93,10 +88,7 @@ export function deltaScorecard(
     const scoreAfter = dimAfter.score;
 
     // Handle N/A dimensions
-    const delta =
-      scoreBefore === null || scoreAfter === null
-        ? 0
-        : scoreAfter - scoreBefore;
+    const delta = scoreBefore === null || scoreAfter === null ? 0 : scoreAfter - scoreBefore;
 
     return {
       name: dimBefore.name,
@@ -120,9 +112,7 @@ export function deltaScorecard(
   // Cluster impact
   const clustersApproached = after.findingClusters
     .filter((cluster) =>
-      cluster.findings.some(
-        (finding) => finding.currentScore < finding.targetScore
-      )
+      cluster.findings.some((finding) => finding.currentScore < finding.targetScore),
     )
     .map((c) => c.name);
 
@@ -149,51 +139,46 @@ export function deltaScorecard(
  */
 export function formatDeltaScorecard(delta: DeltaScorecard): string {
   const lines: string[] = [
-    '╔════════════════════════════════════════════════════════╗',
-    '║              SURFACE DELTA SCORECARD                 ║',
+    "╔════════════════════════════════════════════════════════╗",
+    "║              SURFACE DELTA SCORECARD                 ║",
     `║              ${delta.projectName.padEnd(47)}║`,
-    '╠════════════════════════════════════════════════════════╣',
-    '',
-    '  Dimension                    Before  After   Delta',
-    '  ─────────────────────────────────────────────────────',
+    "╠════════════════════════════════════════════════════════╣",
+    "",
+    "  Dimension                    Before  After   Delta",
+    "  ─────────────────────────────────────────────────────",
   ];
 
   delta.dimensions.forEach((d) => {
-    const before = d.scoreBefore === null ? 'N/A' : `${d.scoreBefore}/3`;
-    const after = d.scoreAfter === null ? 'N/A' : `${d.scoreAfter}/3`;
-    const deltaStr =
-      d.delta > 0
-        ? `+${d.delta} ✦`
-        : d.delta < 0
-          ? `${d.delta} ✗`
-          : '  —';
-    const status = d.improved ? '↑' : d.regressed ? '↓' : '→';
+    const before = d.scoreBefore === null ? "N/A" : `${d.scoreBefore}/3`;
+    const after = d.scoreAfter === null ? "N/A" : `${d.scoreAfter}/3`;
+    const deltaStr = d.delta > 0 ? `+${d.delta} ✦` : d.delta < 0 ? `${d.delta} ✗` : "  —";
+    const status = d.improved ? "↑" : d.regressed ? "↓" : "→";
     lines.push(
-      `  ${d.name.padEnd(30)}${before.padStart(6)}  ${after.padStart(5)}  ${deltaStr.padStart(6)} ${status}`
+      `  ${d.name.padEnd(30)}${before.padStart(6)}  ${after.padStart(5)}  ${deltaStr.padStart(6)} ${status}`,
     );
   });
 
-  lines.push('');
-  lines.push('  ─────────────────────────────────────────────────────');
+  lines.push("");
+  lines.push("  ─────────────────────────────────────────────────────");
   lines.push(
-    `  TOTAL: ${delta.totalBefore}/${delta.maxBefore} → ${delta.totalAfter}/${delta.maxAfter} (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`
+    `  TOTAL: ${delta.totalBefore}/${delta.maxBefore} → ${delta.totalAfter}/${delta.maxAfter} (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`,
   );
   lines.push(
-    `  RATING: ${delta.ratingBefore} → ${delta.ratingAfter} ${delta.overallDelta > 0 ? '✦' : delta.overallDelta < 0 ? '✗' : '—'}`
+    `  RATING: ${delta.ratingBefore} → ${delta.ratingAfter} ${delta.overallDelta > 0 ? "✦" : delta.overallDelta < 0 ? "✗" : "—"}`,
   );
-  lines.push('');
+  lines.push("");
 
   if (delta.clustersApproached.length > 0) {
     lines.push(`  Clusters tackled:`);
     delta.clustersApproached.forEach((c) => {
       lines.push(`    • ${c}`);
     });
-    lines.push('');
+    lines.push("");
   }
 
-  lines.push('╚════════════════════════════════════════════════════════╝');
+  lines.push("╚════════════════════════════════════════════════════════╝");
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 ```
 
@@ -278,8 +263,8 @@ Rating: Agent-ready
 ### Delta Computation
 
 ```typescript
-const before = JSON.parse(fs.readFileSync('scorecard-2026-03-15.json', 'utf-8'));
-const after = JSON.parse(fs.readFileSync('scorecard-2026-04-17.json', 'utf-8'));
+const before = JSON.parse(fs.readFileSync("scorecard-2026-03-15.json", "utf-8"));
+const after = JSON.parse(fs.readFileSync("scorecard-2026-04-17.json", "utf-8"));
 
 const delta = deltaScorecard(before, after);
 console.log(formatDeltaScorecard(delta));

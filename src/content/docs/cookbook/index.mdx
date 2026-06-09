@@ -22,24 +22,25 @@ This cookbook distills 10 patterns extracted from a production agentic applicati
 
 ## Quick Reference Table
 
-| Pattern | When to Use | Complexity | ROI |
-|---------|-----------|-----------|-----|
-| **Agentic Loop as Commodity** | Building any agent (web, bot, worker) | Low | High — save 500+ lines of state logic |
-| **Tool Annotations** | >5 tools, need safety/UI hints | Low | High — single source of truth |
-| **Semantic Tool Selection** | >20 tools, hitting token limits | Medium | Medium–High — reduces noise |
-| **System Prompt as Configuration** | Multi-tenant, platform-aware agents | Low | Medium — easier to test & iterate |
-| **Platform-Agnostic Core** | Supporting web + mobile + chat | High | High — code reuse, fast iteration |
-| **Notification-to-Conversation** | Mobile/chat agents with async updates | Medium | High — UX feels conversational |
-| **Two-Step Confirmation** | Any destructive action (send, delete) | Low | Critical — prevents data loss |
-| **MCP as External API** | Want users to integrate elsewhere | Medium | Medium — network effect; differentiation |
-| **External-App Routing** | Connecting to >5 external services | Medium | Medium — no pre-registration overhead |
-| **Autonomous Background Agents** | Proactive insights, batch processing | High | Medium–High — runs at off-peak hours |
+| Pattern                            | When to Use                           | Complexity | ROI                                      |
+| ---------------------------------- | ------------------------------------- | ---------- | ---------------------------------------- |
+| **Agentic Loop as Commodity**      | Building any agent (web, bot, worker) | Low        | High — save 500+ lines of state logic    |
+| **Tool Annotations**               | >5 tools, need safety/UI hints        | Low        | High — single source of truth            |
+| **Semantic Tool Selection**        | >20 tools, hitting token limits       | Medium     | Medium–High — reduces noise              |
+| **System Prompt as Configuration** | Multi-tenant, platform-aware agents   | Low        | Medium — easier to test & iterate        |
+| **Platform-Agnostic Core**         | Supporting web + mobile + chat        | High       | High — code reuse, fast iteration        |
+| **Notification-to-Conversation**   | Mobile/chat agents with async updates | Medium     | High — UX feels conversational           |
+| **Two-Step Confirmation**          | Any destructive action (send, delete) | Low        | Critical — prevents data loss            |
+| **MCP as External API**            | Want users to integrate elsewhere     | Medium     | Medium — network effect; differentiation |
+| **External-App Routing**           | Connecting to >5 external services    | Medium     | Medium — no pre-registration overhead    |
+| **Autonomous Background Agents**   | Proactive insights, batch processing  | High       | Medium–High — runs at off-peak hours     |
 
 ---
 
 ## Patterns Overview
 
 ### 1. Agentic Loop as Commodity
+
 Use a framework loop instead of custom tool-call orchestration. `ToolLoopAgent` (Vercel AI), `generateText` with `stopWhen`/`maxSteps` (Vercel AI), Claude Code SDK `query()`, and OpenAI `@openai/agents` already handle repeated model/tool turns. The agentic part is the tools and prompts, not the control flow.
 
 **Stack**: Vercel AI SDK 0.6+, Claude Code SDK, OpenAI Agents.
@@ -49,9 +50,11 @@ Use a framework loop instead of custom tool-call orchestration. `ToolLoopAgent` 
 ---
 
 ### 2. Every CRUD as Tool + Annotations
+
 Expose CRUD operations as MCP tools when they are useful to agents. Declare intent with annotations: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. System prompt reads annotations to inject safety rules; client UI reads them to show confirmations.
 
 **Annotation types**:
+
 - `READ_ONLY`: Safe to call repeatedly; no state change.
 - `WRITE`: Idempotent state change; can be safely retried.
 - `DESTRUCTIVE`: Irreversible; requires confirmation before exposure to the model.
@@ -63,6 +66,7 @@ Expose CRUD operations as MCP tools when they are useful to agents. Declare inte
 ---
 
 ### 3. Semantic Tool Selection at Scale
+
 At >20 tools, embedding-based selection ("toolpick") reduces token use and context bloat. Embed tool descriptions once, pick a tuned subset per turn using cosine similarity + a `prepareStep` hook. Keep a small "always active" set (e.g., `web_search`, `search_tools`, meta-tools).
 
 **Trade-off**: Slightly higher latency per turn (embedding lookup) vs. massive token savings and model clarity.
@@ -74,6 +78,7 @@ At >20 tools, embedding-based selection ("toolpick") reduces token use and conte
 ---
 
 ### 4. System Prompt as Configuration Layer
+
 Build prompts with a `buildSystemPrompt(context)` function. Compose: user identity (name, timezone, currency), safety rules (no invention, confirm before send), tool routing (internal vs. Composio vs. web), formatting rules (tables for 3+, markdown links), and platform-specific blocks.
 
 **Benefit**: Prompts become testable, versioned, and platform-aware without branching agent logic.
@@ -85,6 +90,7 @@ Build prompts with a `buildSystemPrompt(context)` function. Compose: user identi
 ---
 
 ### 5. Platform-Agnostic Agent Core + Platform-Specific Formatting
+
 Use one agent core (chat loop, tools, logic) with platform adapters for web, WhatsApp, Slack, and email. Each adapter injects formatting rules via `getPlatformInstructions(platform)`, so agent logic does not branch by platform.
 
 **Example**: "tables work on the dashboard" → injected into prompt for web only. Mobile platforms get short lists instead.
@@ -96,6 +102,7 @@ Use one agent core (chat loop, tools, logic) with platform adapters for web, Wha
 ---
 
 ### 6. Notification-to-Conversation Continuity
+
 When a user replies to a push notification (e.g., "You have 3 new orders"), the agent needs context. Store `lastNotificationContext` per user (in Redis); inject into the next prompt so the agent knows what they're replying to.
 
 **Example**: Notification fires "Order #123 needs approval"; user replies "approve it". Without context, the agent doesn't know what "it" is.
@@ -107,6 +114,7 @@ When a user replies to a push notification (e.g., "You have 3 new orders"), the 
 ---
 
 ### 7. Two-Step Confirmation for Writes
+
 Every destructive or costly action (send invoice, delete record, bulk update) follows: `prepare_draft` (show user what will happen) → `confirm_draft` (user approves) → `execute` (commit). Never expose direct-send tools to the model unprompted.
 
 **Benefit**: Eliminates accidental sends and unintended bulk operations.
@@ -118,6 +126,7 @@ Every destructive or costly action (send invoice, delete record, bulk update) fo
 ---
 
 ### 8. MCP as External API
+
 Ship your MCP server publicly with OAuth 2.1 + DPoP when external clients should use your agent's tools. Users can connect compatible AI clients directly instead of working only through your app.
 
 **Stack**: MCP-compatible server, OAuth 2.1, DPoP (Demonstration of Proof-of-Possession).
@@ -127,6 +136,7 @@ Ship your MCP server publicly with OAuth 2.1 + DPoP when external clients should
 ---
 
 ### 9. External-App Routing via Meta-Tools
+
 Instead of pre-registering hundreds of Composio tools, expose two meta-tools: `search_tools` (find actions in external apps) and `multi_execute_tool` (run them). The agent dynamically discovers and calls actions without pre-loading.
 
 **Trade-off**: Slightly slower than direct tools, but massively reduces cognitive load and pre-registration overhead.
@@ -138,6 +148,7 @@ Instead of pre-registering hundreds of Composio tools, expose two meta-tools: `s
 ---
 
 ### 10. Autonomous Background Agents
+
 Separate interactive agents (chat, bots) from autonomous workers (hourly, daily). Workers proactively generate insights, match records, send reminders. Scheduled via Temporal, Inngest, or cron; batched in 10–60 min windows to avoid spam.
 
 **Stack**: Temporal, Inngest, or Bun cron + idempotency tracking.

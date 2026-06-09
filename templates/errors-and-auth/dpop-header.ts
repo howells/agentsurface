@@ -10,8 +10,8 @@
  * </CUSTOMISE>
  */
 
-import { SignJWT, generateKeyPair, exportSPKI, exportPKCS8, importPKCS8 } from 'jose';
-import * as crypto from 'crypto';
+import { SignJWT, generateKeyPair, exportSPKI, exportPKCS8, importPKCS8 } from "jose";
+import * as crypto from "node:crypto";
 
 /**
  * DPoP keypair manager
@@ -22,11 +22,7 @@ export class DPoP {
   private publicKeyJWK: { kty: string; crv: string; x: string; y: string } | null = null;
   private claimTtlSeconds: number;
 
-  constructor(opts: {
-    publicKeyPEM: string;
-    privateKeyPEM: string;
-    claimTtlSeconds?: number;
-  }) {
+  constructor(opts: { publicKeyPEM: string; privateKeyPEM: string; claimTtlSeconds?: number }) {
     this.publicKeyPEM = opts.publicKeyPEM;
     this.privateKeyPEM = opts.privateKeyPEM;
     this.claimTtlSeconds = opts.claimTtlSeconds || 60; // 1 minute default
@@ -37,12 +33,12 @@ export class DPoP {
    * Run once and store securely
    */
   static async generateKeyPair(): Promise<{ publicKeyPEM: string; privateKeyPEM: string }> {
-    const { publicKey, privateKey } = await generateKeyPair('ES256');
+    const { publicKey, privateKey } = await generateKeyPair("ES256");
 
     const publicKeyPEM = await exportSPKI(publicKey);
     const privateKeyPEM = await exportPKCS8(privateKey);
 
-    return { publicKeyPEM, privateKeyPEM };
+    return { privateKeyPEM, publicKeyPEM };
   }
 
   /**
@@ -53,14 +49,14 @@ export class DPoP {
     // For ES256 (P-256), extract x and y coordinates from PEM
     // This is a simplified version; production should use jose's built-in methods
     const publicKey = await crypto.webcrypto.subtle.importKey(
-      'spki',
+      "spki",
       new TextEncoder().encode(this.publicKeyPEM),
-      { name: 'ECDSA', namedCurve: 'P-256' },
+      { name: "ECDSA", namedCurve: "P-256" },
       true,
-      ['verify']
+      ["verify"],
     );
 
-    const exported = await crypto.webcrypto.subtle.exportKey('jwk', publicKey);
+    const exported = await crypto.webcrypto.subtle.exportKey("jwk", publicKey);
     const jwkJson = JSON.stringify({
       crv: exported.crv,
       kty: exported.kty,
@@ -69,8 +65,8 @@ export class DPoP {
     });
 
     // SHA-256 of the JWK
-    const hash = crypto.createHash('sha256').update(jwkJson).digest();
-    return Buffer.from(hash).toString('base64url');
+    const hash = crypto.createHash("sha256").update(jwkJson).digest();
+    return Buffer.from(hash).toString("base64url");
   }
 
   /**
@@ -95,20 +91,20 @@ export class DPoP {
     const jti = crypto.randomUUID();
 
     // Import private key for signing
-    const privateKey = await importPKCS8(this.privateKeyPEM, 'ES256');
+    const privateKey = await importPKCS8(this.privateKeyPEM, "ES256");
 
     // Create DPoP proof JWT
     const proof = await new SignJWT({
-      jti,
+      exp: now + this.claimTtlSeconds,
       htm: method.toUpperCase(),
       htu: uri,
       iat: now,
-      exp: now + this.claimTtlSeconds,
+      jti,
     })
       .setProtectedHeader({
-        alg: 'ES256',
-        typ: 'dpop+jwt',
+        alg: "ES256",
         jwk: await this.getPublicKeyJWK(),
+        typ: "dpop+jwt",
       })
       .sign(privateKey);
 
@@ -124,14 +120,14 @@ export class DPoP {
     }
 
     const publicKey = await crypto.webcrypto.subtle.importKey(
-      'spki',
+      "spki",
       new TextEncoder().encode(this.publicKeyPEM),
-      { name: 'ECDSA', namedCurve: 'P-256' },
+      { name: "ECDSA", namedCurve: "P-256" },
       true,
-      ['verify']
+      ["verify"],
     );
 
-    const exported = await crypto.webcrypto.subtle.exportKey('jwk', publicKey);
+    const exported = await crypto.webcrypto.subtle.exportKey("jwk", publicKey);
     this.publicKeyJWK = exported as any;
     return exported;
   }
@@ -146,19 +142,19 @@ export class DPoP {
   async request<T = unknown>(
     url: string,
     accessToken: string,
-    options?: RequestInit & { method?: string }
+    options?: RequestInit & { method?: string },
   ): Promise<T> {
-    const method = options?.method ?? 'GET';
+    const method = options?.method ?? "GET";
     const proof = await this.generateProof(method, url);
 
     const headers = new Headers(options?.headers || {});
-    headers.set('Authorization', `DPoP ${accessToken}`);
-    headers.set('DPoP', proof);
+    headers.set("Authorization", `DPoP ${accessToken}`);
+    headers.set("DPoP", proof);
 
     const response = await fetch(url, {
       ...options,
-      method,
       headers,
+      method,
     });
 
     if (!response.ok) {
@@ -184,17 +180,17 @@ export function initializeDPoP(opts: {
   claimTtlSeconds?: number;
 }): DPoP {
   if (!globalDPoP) {
-    const publicKeyPEM = opts.publicKeyPEM || process.env.DPOP_PUBLIC_KEY || '';
-    const privateKeyPEM = opts.privateKeyPEM || process.env.DPOP_PRIVATE_KEY || '';
+    const publicKeyPEM = opts.publicKeyPEM || process.env.DPOP_PUBLIC_KEY || "";
+    const privateKeyPEM = opts.privateKeyPEM || process.env.DPOP_PRIVATE_KEY || "";
 
     if (!publicKeyPEM || !privateKeyPEM) {
-      throw new Error('DPOP_PUBLIC_KEY and DPOP_PRIVATE_KEY environment variables required');
+      throw new Error("DPOP_PUBLIC_KEY and DPOP_PRIVATE_KEY environment variables required");
     }
 
     globalDPoP = new DPoP({
-      publicKeyPEM,
-      privateKeyPEM,
       claimTtlSeconds: opts.claimTtlSeconds,
+      privateKeyPEM,
+      publicKeyPEM,
     });
   }
 

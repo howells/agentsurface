@@ -12,7 +12,7 @@ Tool selection accuracy degrades above 20 tools per context. Name collisions, ov
 - Description overlap: conflicting signals about which tool to call
 - Context saturation: tool list alone consumes thousands of tokens
 - Semantic Kernel plugins: group related tools, load by domain
-- Namespacing: billing__get_invoice avoids collision
+- Namespacing: billing\_\_get_invoice avoids collision
 - Never keep deprecated tools out of fear of breakage
 
 Tool sprawl is the condition where an agent system accumulates more tools than any agent can use effectively. The tools exist, they are registered, but no one knows which ones are current, which overlap with others, or which are actually being called. Treat this as both an interface problem and an ownership problem: every tool needs a namespace, an owner, usage data, and a removal path.
@@ -55,21 +55,21 @@ from semantic_kernel.kernel import Kernel
 
 class BillingPlugin:
     """All billing operations. No non-billing functions belong here."""
-    
+
     @kernel_function(
         name="get_invoice",
         description="Get a single invoice by ID. Returns full invoice details including line items."
     )
     async def get_invoice(self, invoice_id: str) -> str:
         ...
-    
+
     @kernel_function(
         name="list_invoices",
         description="List invoices with optional filters. Returns paginated results."
     )
     async def list_invoices(self, status: str = None, limit: int = 20) -> str:
         ...
-    
+
     @kernel_function(
         name="create_invoice",
         description="Create a new invoice for a customer. Returns the invoice ID and payment link."
@@ -79,7 +79,7 @@ class BillingPlugin:
 
 class DocumentPlugin:
     """All document operations. No billing or other domain functions here."""
-    
+
     @kernel_function(name="get_document", description="...")
     async def get_document(self, doc_id: str) -> str: ...
 
@@ -154,14 +154,11 @@ MCP servers can notify clients when their tool list changes. Clients that handle
 
 ```typescript
 // Client-side: handle dynamic tool list updates
-client.setNotificationHandler(
-  "notifications/tools/list_changed",
-  async () => {
-    const { tools } = await client.listTools()
-    // Re-build the agent's active tool set from the updated list
-    activeTools = tools.filter(t => isRelevantToCurrentTask(t, currentTaskContext))
-  }
-)
+client.setNotificationHandler("notifications/tools/list_changed", async () => {
+  const { tools } = await client.listTools();
+  // Re-build the agent's active tool set from the updated list
+  activeTools = tools.filter((t) => isRelevantToCurrentTask(t, currentTaskContext));
+});
 ```
 
 Servers use this to expose context-sensitive tool sets: a billing server might expose different tools depending on the authenticated user's permissions, or expose different tools at different points in a workflow.
@@ -171,32 +168,30 @@ Servers use this to expose context-sensitive tool sets: a billing server might e
 Anthropic's recommended pattern for large tool surfaces uses BM25 keyword search to select a relevant subset before each generation step:
 
 ```typescript
-import { BM25 } from "orama/components"
+import { BM25 } from "orama/components";
 
 // Index all available tools
-const toolIndex = new BM25()
+const toolIndex = new BM25();
 for (const tool of allAvailableTools) {
   toolIndex.add({
     id: tool.name,
-    text: `${tool.name} ${tool.description} ${Object.keys(tool.parameters.properties || {}).join(" ")}`
-  })
+    text: `${tool.name} ${tool.description} ${Object.keys(tool.parameters.properties || {}).join(" ")}`,
+  });
 }
 
 // Before each generation: search for relevant tools
 async function selectTools(userMessage: string, allTools: Tool[]): Promise<Tool[]> {
-  const results = toolIndex.search(userMessage, { limit: 8 })
-  const selectedNames = new Set(results.hits.map(h => h.id))
-  return allTools.filter(t => selectedNames.has(t.name))
+  const results = toolIndex.search(userMessage, { limit: 8 });
+  const selectedNames = new Set(results.hits.map((h) => h.id));
+  return allTools.filter((t) => selectedNames.has(t.name));
 }
 
 // Use only selected tools in the generation call
 const { text } = await generateText({
   model,
-  tools: Object.fromEntries(
-    (await selectTools(userMessage, allTools)).map(t => [t.name, t])
-  ),
-  prompt: userMessage
-})
+  tools: Object.fromEntries((await selectTools(userMessage, allTools)).map((t) => [t.name, t])),
+  prompt: userMessage,
+});
 ```
 
 ### Vercel AI SDK activeTools
@@ -204,27 +199,28 @@ const { text } = await generateText({
 The AI SDK's `activeTools` parameter enables declaring a large tool surface while activating only a subset per turn:
 
 ```typescript
-import { generateText } from "ai"
+import { generateText } from "ai";
 
 // All tools are defined — none are active by default
-const allTools = { ...billingTools, ...documentTools, ...crmTools, ...analyticsTools }
+const allTools = { ...billingTools, ...documentTools, ...crmTools, ...analyticsTools };
 
 // Per-turn selection based on conversation context
 function selectActiveTools(message: string): string[] {
-  const isBillingQuery = /invoice|payment|charge|refund/.test(message.toLowerCase())
-  const isDocQuery = /document|file|report/.test(message.toLowerCase())
-  
-  if (isBillingQuery) return ["billing_get_invoice", "billing_list_invoices", "billing_create_invoice"]
-  if (isDocQuery) return ["docs_get_document", "docs_list_documents", "docs_create_document"]
-  return ["billing_get_invoice", "docs_get_document"] // default minimal set
+  const isBillingQuery = /invoice|payment|charge|refund/.test(message.toLowerCase());
+  const isDocQuery = /document|file|report/.test(message.toLowerCase());
+
+  if (isBillingQuery)
+    return ["billing_get_invoice", "billing_list_invoices", "billing_create_invoice"];
+  if (isDocQuery) return ["docs_get_document", "docs_list_documents", "docs_create_document"];
+  return ["billing_get_invoice", "docs_get_document"]; // default minimal set
 }
 
 const { text } = await generateText({
   model,
   tools: allTools,
-  activeTools: selectActiveTools(userMessage),  // only these are in the context window
-  prompt: userMessage
-})
+  activeTools: selectActiveTools(userMessage), // only these are in the context window
+  prompt: userMessage,
+});
 ```
 
 The full tool list is defined for type safety and schema validation, but only `activeTools` are injected into the model's context window.
@@ -244,9 +240,9 @@ A minimal registry entry:
 - name: billing_create_invoice
   owner: billing-team
   version: 2.1.0
-  status: active  # active | deprecated | experimental
+  status: active # active | deprecated | experimental
   description: "Creates a new invoice and returns the invoice ID and payment link."
-  replaces: billing_new_invoice  # deprecated predecessor
+  replaces: billing_new_invoice # deprecated predecessor
   used_by:
     - billing-agent
     - finance-workflow
@@ -273,26 +269,26 @@ export const TOOL_SETS = {
     "billing_list_invoices",
     "billing_create_invoice",
     "billing_process_refund",
-    "billing_get_customer"
+    "billing_get_customer",
   ],
   "technical-support": [
     "docs_search",
     "logs_get_recent",
     "infra_get_service_status",
-    "tickets_create"
+    "tickets_create",
   ],
   "general-assistant": [
-    "billing_get_invoice",     // read-only billing access
+    "billing_get_invoice", // read-only billing access
     "docs_search",
-    "calendar_get_events"
-  ]
-} as const
+    "calendar_get_events",
+  ],
+} as const;
 
 // Enforce at agent construction time
 function createBillingAgent() {
   return new Agent({
-    tools: filterTools(allTools, TOOL_SETS["billing-specialist"])
-  })
+    tools: filterTools(allTools, TOOL_SETS["billing-specialist"]),
+  });
 }
 ```
 
@@ -306,18 +302,18 @@ function withObservability(tool: Tool, toolName: string): Tool {
   return {
     ...tool,
     execute: async (...args) => {
-      const start = Date.now()
+      const start = Date.now();
       try {
-        const result = await tool.execute(...args)
-        metrics.increment("tool.call.success", { tool: toolName })
-        metrics.histogram("tool.call.duration_ms", Date.now() - start, { tool: toolName })
-        return result
+        const result = await tool.execute(...args);
+        metrics.increment("tool.call.success", { tool: toolName });
+        metrics.histogram("tool.call.duration_ms", Date.now() - start, { tool: toolName });
+        return result;
       } catch (err) {
-        metrics.increment("tool.call.error", { tool: toolName })
-        throw err
+        metrics.increment("tool.call.error", { tool: toolName });
+        throw err;
       }
-    }
-  }
+    },
+  };
 }
 ```
 

@@ -43,65 +43,62 @@ The cleanest approach in Next.js is a middleware rewrite that intercepts request
 
 ```typescript
 // middleware.ts
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const accept = request.headers.get('accept') ?? ''
+  const accept = request.headers.get("accept") ?? "";
 
-  if (accept.includes('text/markdown')) {
-    const url = request.nextUrl.clone()
+  if (accept.includes("text/markdown")) {
+    const url = request.nextUrl.clone();
     // Route to a markdown handler at /_md/[path]
-    url.pathname = `/_md${request.nextUrl.pathname}`
-    return NextResponse.rewrite(url)
+    url.pathname = `/_md${request.nextUrl.pathname}`;
+    return NextResponse.rewrite(url);
   }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/docs/:path*'],
-}
+  matcher: ["/docs/:path*"],
+};
 ```
 
 ### Markdown Route Handler
 
 ```typescript
 // app/_md/docs/[...slug]/route.ts
-import { source } from '@/lib/source'
-import { notFound } from 'next/navigation'
+import { source } from "@/lib/source";
+import { notFound } from "next/navigation";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: { slug: string[] } }
-) {
-  const page = source.getPage(params.slug)
+export async function GET(_request: Request, { params }: { params: { slug: string[] } }) {
+  const page = source.getPage(params.slug);
 
   if (!page) {
-    notFound()
+    notFound();
   }
 
   // source.getPage returns the MDX source — strip frontmatter for clean Markdown
-  const markdown = stripFrontmatter(page.data._raw.flattenedPath)
+  const markdown = stripFrontmatter(page.data._raw.flattenedPath);
 
-  const tokenCount = estimateTokens(markdown)
+  const tokenCount = estimateTokens(markdown);
 
   return new Response(markdown, {
     headers: {
-      'Content-Type': 'text/markdown; charset=utf-8',
-      'Vary': 'Accept',
-      'x-markdown-tokens': String(tokenCount),
-      'Cache-Control': 'public, max-age=3600',
+      "Content-Type": "text/markdown; charset=utf-8",
+      Vary: "Accept",
+      "x-markdown-tokens": String(tokenCount),
+      "Cache-Control": "public, max-age=3600",
     },
-  })
+  });
 }
 
 function stripFrontmatter(content: string): string {
-  return content.replace(/^---[\s\S]*?---\n/, '')
+  return content.replace(/^---[\s\S]*?---\n/, "");
 }
 
 function estimateTokens(text: string): number {
   // Rough approximation: 1 token ≈ 4 characters for English prose
-  return Math.ceil(text.length / 4)
+  return Math.ceil(text.length / 4);
 }
 ```
 
@@ -111,69 +108,63 @@ A simpler approach that avoids middleware complexity: serve Markdown at `.md`-su
 
 ```typescript
 // app/docs/[...slug]/route.ts — handles /docs/authentication.md
-export async function GET(
-  request: Request,
-  { params }: { params: { slug: string[] } }
-) {
-  const lastSegment = params.slug[params.slug.length - 1]
+export async function GET(request: Request, { params }: { params: { slug: string[] } }) {
+  const lastSegment = params.slug[params.slug.length - 1];
 
-  if (!lastSegment.endsWith('.md')) {
-    return new Response('Not found', { status: 404 })
+  if (!lastSegment.endsWith(".md")) {
+    return new Response("Not found", { status: 404 });
   }
 
-  const slug = [
-    ...params.slug.slice(0, -1),
-    lastSegment.slice(0, -3),
-  ]
+  const slug = [...params.slug.slice(0, -1), lastSegment.slice(0, -3)];
 
-  const page = source.getPage(slug)
+  const page = source.getPage(slug);
 
   if (!page) {
-    return new Response('Not found', { status: 404 })
+    return new Response("Not found", { status: 404 });
   }
 
   return new Response(page.data._raw.sourceFileContent, {
     headers: {
-      'Content-Type': 'text/markdown; charset=utf-8',
-      'Vary': 'Accept',
+      "Content-Type": "text/markdown; charset=utf-8",
+      Vary: "Accept",
     },
-  })
+  });
 }
 ```
 
 ## Express / Node.js
 
 ```typescript
-import express from 'express'
-import { readDocPage } from './docs'
+import express from "express";
+import { readDocPage } from "./docs";
 
-const app = express()
+const app = express();
 
-app.get('/docs/:slug', async (req, res) => {
-  const page = await readDocPage(req.params.slug)
+app.get("/docs/:slug", async (req, res) => {
+  const page = await readDocPage(req.params.slug);
 
   if (!page) {
-    return res.status(404).json({ error: 'Page not found' })
+    return res.status(404).json({ error: "Page not found" });
   }
 
-  const accept = req.headers.accept ?? ''
+  const accept = req.headers.accept ?? "";
 
-  if (accept.includes('text/markdown')) {
-    const markdown = page.markdown
-    const tokenCount = Math.ceil(markdown.length / 4)
+  if (accept.includes("text/markdown")) {
+    const markdown = page.markdown;
+    const tokenCount = Math.ceil(markdown.length / 4);
 
     return res
       .status(200)
       .set({
-        'Content-Type': 'text/markdown; charset=utf-8',
-        'Vary': 'Accept',
-        'x-markdown-tokens': String(tokenCount),
+        "Content-Type": "text/markdown; charset=utf-8",
+        Vary: "Accept",
+        "x-markdown-tokens": String(tokenCount),
       })
-      .send(markdown)
+      .send(markdown);
   }
 
-  return res.status(200).send(page.html)
-})
+  return res.status(200).send(page.html);
+});
 ```
 
 ## Required Headers

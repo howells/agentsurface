@@ -22,14 +22,14 @@
  * Validation: Use Zod to validate output shape at build time (see bottom of file).
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Base schema.org context + @type shape.
  */
 const BaseSchemaShape = z.object({
-  '@context': z.literal('https://schema.org'),
-  '@type': z.string(),
+  "@context": z.literal("https://schema.org"),
+  "@type": z.string(),
 });
 
 /**
@@ -37,38 +37,38 @@ const BaseSchemaShape = z.object({
  * https://schema.org/SoftwareApplication
  */
 const SoftwareApplicationSchema = BaseSchemaShape.extend({
-  '@type': z.literal('SoftwareApplication'),
-  name: z.string().describe('Project name'),
-  description: z.string().describe('One-sentence description'),
-  url: z.string().url().describe('Homepage URL'),
+  "@type": z.literal("SoftwareApplication"),
+  applicationCategory: z.enum(["DeveloperApplication", "WebApplication", "Utility"]),
   author: z.object({
-    '@type': z.literal('Organization'),
+    "@type": z.literal("Organization"),
     name: z.string(),
     url: z.string().url().optional(),
   }),
-  applicationCategory: z.enum(['DeveloperApplication', 'WebApplication', 'Utility']),
-  codeRepository: z.string().url().optional().describe('GitHub repo URL'),
-  issueTracker: z.string().url().optional().describe('GitHub issues URL'),
-  downloadUrl: z.string().url().optional().describe('npm package URL'),
-  version: z.string().optional().describe('Current version'),
-  operatingSystem: z.string().optional().describe('e.g., "Any", "Linux", "macOS"'),
-  license: z.string().url().optional().describe('License URL (MIT, Apache 2.0, etc.)'),
+  codeRepository: z.string().url().optional().describe("GitHub repo URL"),
+  description: z.string().describe("One-sentence description"),
+  downloadUrl: z.string().url().optional().describe("npm package URL"),
+  issueTracker: z.string().url().optional().describe("GitHub issues URL"),
+  license: z.string().url().optional().describe("License URL (MIT, Apache 2.0, etc.)"),
+  name: z.string().describe("Project name"),
   offers: z
     .object({
-      '@type': z.literal('AggregateOffer'),
+      "@type": z.literal("AggregateOffer"),
       priceCurrency: z.string().optional(),
       lowPrice: z.string(),
       highPrice: z.string().optional(),
     })
     .optional(),
+  operatingSystem: z.string().optional().describe('e.g., "Any", "Linux", "macOS"'),
   screenshots: z
     .array(
       z.object({
-        '@type': z.literal('ImageObject'),
+        "@type": z.literal("ImageObject"),
         url: z.string().url(),
       }),
     )
     .optional(),
+  url: z.string().url().describe("Homepage URL"),
+  version: z.string().optional().describe("Current version"),
 });
 
 export type SoftwareApplication = z.infer<typeof SoftwareApplicationSchema>;
@@ -86,7 +86,7 @@ export function createSoftwareApplication({
   issueTrackerUrl,
   npmPackageUrl,
   version,
-  license = 'MIT',
+  license = "MIT",
 }: {
   name: string;
   description: string;
@@ -100,25 +100,35 @@ export function createSoftwareApplication({
   license?: string;
 }): SoftwareApplication {
   const schema: SoftwareApplication = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name,
-    description,
-    url,
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    applicationCategory: "DeveloperApplication",
     author: {
-      '@type': 'Organization',
+      "@type": "Organization",
       name: organizationName,
       url: organizationUrl,
     },
-    applicationCategory: 'DeveloperApplication',
-    operatingSystem: 'Any',
+    description,
+    name,
+    operatingSystem: "Any",
+    url,
   };
 
-  if (repositoryUrl) schema.codeRepository = repositoryUrl;
-  if (issueTrackerUrl) schema.issueTracker = issueTrackerUrl;
-  if (npmPackageUrl) schema.downloadUrl = npmPackageUrl;
-  if (version) schema.version = version;
-  if (license) schema.license = license;
+  if (repositoryUrl) {
+    schema.codeRepository = repositoryUrl;
+  }
+  if (issueTrackerUrl) {
+    schema.issueTracker = issueTrackerUrl;
+  }
+  if (npmPackageUrl) {
+    schema.downloadUrl = npmPackageUrl;
+  }
+  if (version) {
+    schema.version = version;
+  }
+  if (license) {
+    schema.license = license;
+  }
 
   // Validate before returning
   return SoftwareApplicationSchema.parse(schema);
@@ -129,18 +139,18 @@ export function createSoftwareApplication({
  * https://schema.org/WebAPI
  */
 const WebAPISchema = BaseSchemaShape.extend({
-  '@type': z.literal('WebAPI'),
-  name: z.string(),
-  description: z.string(),
-  url: z.string().url(),
-  documentation: z.string().url().optional(),
+  "@type": z.literal("WebAPI"),
   contact: z
     .object({
-      '@type': z.literal('ContactPoint'),
+      "@type": z.literal("ContactPoint"),
       contactType: z.string(),
       email: z.string().email().optional(),
     })
     .optional(),
+  description: z.string(),
+  documentation: z.string().url().optional(),
+  name: z.string(),
+  url: z.string().url(),
 });
 
 export type WebAPI = z.infer<typeof WebAPISchema>;
@@ -162,18 +172,20 @@ export function createWebAPI({
   contactEmail?: string;
 }): WebAPI {
   const schema: WebAPI = {
-    '@context': 'https://schema.org',
-    '@type': 'WebAPI',
-    name,
+    "@context": "https://schema.org",
+    "@type": "WebAPI",
     description,
+    name,
     url,
   };
 
-  if (documentationUrl) schema.documentation = documentationUrl;
+  if (documentationUrl) {
+    schema.documentation = documentationUrl;
+  }
   if (contactEmail) {
     schema.contact = {
-      '@type': 'ContactPoint',
-      contactType: 'Support',
+      "@type": "ContactPoint",
+      contactType: "Support",
       email: contactEmail,
     };
   }
@@ -186,18 +198,18 @@ export function createWebAPI({
  * https://schema.org/FAQPage
  */
 const FAQPageSchema = BaseSchemaShape.extend({
-  '@type': z.literal('FAQPage'),
-  name: z.string().optional(),
+  "@type": z.literal("FAQPage"),
   mainEntity: z.array(
     z.object({
-      '@type': z.literal('Question'),
+      "@type": z.literal("Question"),
       name: z.string(),
       acceptedAnswer: z.object({
-        '@type': z.literal('Answer'),
+        "@type": z.literal("Answer"),
         text: z.string(),
       }),
     }),
   ),
+  name: z.string().optional(),
 });
 
 export type FAQPage = z.infer<typeof FAQPageSchema>;
@@ -206,20 +218,20 @@ export type FAQPage = z.infer<typeof FAQPageSchema>;
  * Generator for FAQPage schema.
  */
 export function createFAQPage(
-  faqs: Array<{ question: string; answer: string }>,
+  faqs: { question: string; answer: string }[],
   pageName?: string,
 ): FAQPage {
   const schema: FAQPage = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
     ...(pageName && { name: pageName }),
     mainEntity: faqs.map(({ question, answer }) => ({
-      '@type': 'Question' as const,
-      name: question,
+      "@type": "Question" as const,
       acceptedAnswer: {
-        '@type': 'Answer' as const,
+        "@type": "Answer" as const,
         text: answer,
       },
+      name: question,
     })),
   };
 
@@ -231,21 +243,21 @@ export function createFAQPage(
  * https://schema.org/HowTo
  */
 const HowToSchema = BaseSchemaShape.extend({
-  '@type': z.literal('HowTo'),
-  name: z.string(),
+  "@type": z.literal("HowTo"),
   description: z.string().optional(),
+  estimatedTime: z.string().optional().describe("ISO 8601 duration (e.g., PT30M)"),
   image: z.string().url().optional(),
-  estimatedTime: z.string().optional().describe('ISO 8601 duration (e.g., PT30M)'),
-  tool: z.array(z.string()).optional(),
+  name: z.string(),
   step: z.array(
     z.object({
-      '@type': z.literal('HowToStep'),
+      "@type": z.literal("HowToStep"),
       position: z.number(),
       name: z.string(),
       text: z.string(),
       image: z.string().url().optional(),
     }),
   ),
+  tool: z.array(z.string()).optional(),
 });
 
 export type HowTo = z.infer<typeof HowToSchema>;
@@ -263,23 +275,23 @@ export function createHowTo({
 }: {
   name: string;
   description?: string;
-  steps: Array<{ name: string; text: string; imageUrl?: string }>;
+  steps: { name: string; text: string; imageUrl?: string }[];
   estimatedTime?: string;
   tools?: string[];
   imageUrl?: string;
 }): HowTo {
   const schema: HowTo = {
-    '@context': 'https://schema.org',
-    '@type': 'HowTo',
+    "@context": "https://schema.org",
+    "@type": "HowTo",
     name,
     ...(description && { description }),
     ...(imageUrl && { image: imageUrl }),
     ...(estimatedTime && { estimatedTime }),
     ...(tools && { tool: tools }),
     step: steps.map((step, i) => ({
-      '@type': 'HowToStep' as const,
-      position: i + 1,
+      "@type": "HowToStep" as const,
       name: step.name,
+      position: i + 1,
       text: step.text,
       ...(step.imageUrl && { image: step.imageUrl }),
     })),
@@ -293,18 +305,18 @@ export function createHowTo({
  * https://schema.org/Organization
  */
 const OrganizationSchema = BaseSchemaShape.extend({
-  '@type': z.literal('Organization'),
-  name: z.string(),
-  url: z.string().url(),
-  logo: z.string().url().optional(),
-  sameAs: z.array(z.string().url()).optional().describe('Social media + GitHub URLs'),
+  "@type": z.literal("Organization"),
   contact: z
     .object({
-      '@type': z.literal('ContactPoint'),
+      "@type": z.literal("ContactPoint"),
       contactType: z.string(),
       email: z.string().email(),
     })
     .optional(),
+  logo: z.string().url().optional(),
+  name: z.string(),
+  sameAs: z.array(z.string().url()).optional().describe("Social media + GitHub URLs"),
+  url: z.string().url(),
 });
 
 export type Organization = z.infer<typeof OrganizationSchema>;
@@ -326,20 +338,22 @@ export function createOrganization({
   socialMediaUrls?: string[];
 }): Organization {
   const schema: Organization = {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
+    "@context": "https://schema.org",
+    "@type": "Organization",
     name,
     url,
   };
 
-  if (logoUrl) schema.logo = logoUrl;
+  if (logoUrl) {
+    schema.logo = logoUrl;
+  }
   if (socialMediaUrls && socialMediaUrls.length > 0) {
     schema.sameAs = socialMediaUrls;
   }
   if (contactEmail) {
     schema.contact = {
-      '@type': 'ContactPoint',
-      contactType: 'Support',
+      "@type": "ContactPoint",
+      contactType: "Support",
       email: contactEmail,
     };
   }
@@ -404,27 +418,25 @@ export function createOrganization({
 export function validateAllSchemas(): void {
   // Example: validate a complete set
   const app = createSoftwareApplication({
-    name: 'Example',
-    description: 'Example app',
-    url: 'https://example.com',
-    organizationName: 'Example Inc.',
+    description: "Example app",
+    name: "Example",
+    organizationName: "Example Inc.",
+    url: "https://example.com",
   });
 
   const org = createOrganization({
-    name: 'Example Inc.',
-    url: 'https://example.com',
+    name: "Example Inc.",
+    url: "https://example.com",
   });
 
-  const faq = createFAQPage([
-    { question: 'How do I install?', answer: 'Run npm install' },
-  ]);
+  const faq = createFAQPage([{ answer: "Run npm install", question: "How do I install?" }]);
 
   const howto = createHowTo({
-    name: 'Getting Started',
-    steps: [{ name: 'Install', text: 'Run npm install' }],
+    name: "Getting Started",
+    steps: [{ name: "Install", text: "Run npm install" }],
   });
 
-  console.log('✓ JSON-LD schemas validate at build time');
+  console.log("✓ JSON-LD schemas validate at build time");
 }
 
 // Uncomment to run validation at build (add to next.config.ts):

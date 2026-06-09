@@ -41,11 +41,7 @@ body {
   --color-fd-card: var(--ag-color-surface);
   --color-fd-popover: var(--ag-color-surface);
   --color-fd-muted: var(--color-zinc-100);
-  --color-fd-border: color-mix(
-    in oklab,
-    var(--color-zinc-200) 85%,
-    transparent
-  );
+  --color-fd-border: color-mix(in oklab, var(--color-zinc-200) 85%, transparent);
   --color-fd-foreground: var(--color-zinc-950);
   --color-fd-muted-foreground: var(--color-zinc-500);
   --color-fd-secondary: var(--color-zinc-100);
@@ -111,18 +107,14 @@ body {
 
 #nd-page
   .prose
-  :where(a:not([data-card])):not(
-    :where([class~="not-prose"], [class~="not-prose"] *)
-  ) {
+  :where(a:not([data-card])):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   color: var(--color-fd-muted-foreground);
   text-decoration-color: var(--color-fd-ring);
 }
 
 #nd-page
   .prose
-  :where(a:not([data-card]):hover):not(
-    :where([class~="not-prose"], [class~="not-prose"] *)
-  ) {
+  :where(a:not([data-card]):hover):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   color: var(--color-fd-foreground);
 }
 

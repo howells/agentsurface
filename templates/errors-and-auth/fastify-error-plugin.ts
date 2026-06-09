@@ -10,9 +10,10 @@
  * </CUSTOMISE>
  */
 
-import fastifyPlugin from 'fastify-plugin';
-import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from 'fastify';
-import { ProblemDetails, problemDetails } from './problem-details';
+import fastifyPlugin from "fastify-plugin";
+import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from "fastify";
+import type { ProblemDetails } from "./problem-details";
+import { problemDetails } from "./problem-details";
 
 /**
  * Fastify error hierarchy
@@ -25,19 +26,22 @@ export class FastifyDomainError extends Error implements FastifyError {
     code: string,
     statusCode: number,
     message: string,
-    public context?: Record<string, unknown>
+    public context?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = 'FastifyDomainError';
+    this.name = "FastifyDomainError";
     this.code = code;
     this.statusCode = statusCode;
   }
 }
 
 export class ValidationErrorFastify extends FastifyDomainError {
-  constructor(message: string, public fields?: Array<{ field: string; code: string; message: string }>) {
-    super('ERR_VALIDATION', 422, message);
-    this.name = 'ValidationErrorFastify';
+  constructor(
+    message: string,
+    public fields?: { field: string; code: string; message: string }[],
+  ) {
+    super("ERR_VALIDATION", 422, message);
+    this.name = "ValidationErrorFastify";
   }
 }
 
@@ -53,40 +57,40 @@ function getTraceId(request: FastifyRequest): string {
  */
 function mapFastifyErrorToProblemDetails(
   err: FastifyError | Error,
-  traceId: string
+  traceId: string,
 ): ProblemDetails {
   // Handle validation errors from Fastify's built-in validator
-  if ('validation' in err && Array.isArray((err as any).validation)) {
+  if ("validation" in err && Array.isArray((err as any).validation)) {
     const validationErrors = (err as any).validation.map(
       (v: { instancePath: string; keyword: string; message: string }) => ({
-        field: v.instancePath || 'root',
         code: v.keyword,
+        field: v.instancePath || "root",
         message: v.message,
-      })
+      }),
     );
 
     return problemDetails({
-      type: 'https://api.example.com/errors/ERR_VALIDATION',
-      title: 'Validation Failed',
-      status: 400,
-      detail: 'One or more validation errors occurred',
-      code: 'ERR_VALIDATION',
-      trace_id: traceId,
-      doc_uri: 'https://api.example.com/docs/errors#ERR_VALIDATION',
+      code: "ERR_VALIDATION",
+      detail: "One or more validation errors occurred",
+      doc_uri: "https://api.example.com/docs/errors#ERR_VALIDATION",
       errors: validationErrors,
+      status: 400,
+      title: "Validation Failed",
+      trace_id: traceId,
+      type: "https://api.example.com/errors/ERR_VALIDATION",
     });
   }
 
   // Handle custom domain errors
   if (err instanceof FastifyDomainError) {
     const response = problemDetails({
-      type: `https://api.example.com/errors/${err.code.toLowerCase()}`,
-      title: err.code.replace('ERR_', '').replace(/_/g, ' '),
-      status: err.statusCode,
-      detail: err.message,
       code: err.code,
-      trace_id: traceId,
+      detail: err.message,
       doc_uri: `https://api.example.com/docs/errors#${err.code}`,
+      status: err.statusCode,
+      title: err.code.replace("ERR_", "").replace(/_/g, " "),
+      trace_id: traceId,
+      type: `https://api.example.com/errors/${err.code.toLowerCase()}`,
     });
 
     if (err instanceof ValidationErrorFastify && err.fields) {
@@ -97,27 +101,27 @@ function mapFastifyErrorToProblemDetails(
   }
 
   // Handle FastifyError with statusCode
-  if ('statusCode' in err) {
+  if ("statusCode" in err) {
     const fastErr = err as FastifyError;
     return problemDetails({
-      type: `https://api.example.com/errors/fastify_error`,
-      title: 'HTTP Error',
-      status: fastErr.statusCode || 500,
       detail: fastErr.message,
-      trace_id: traceId,
       is_retriable: fastErr.statusCode >= 500,
+      status: fastErr.statusCode || 500,
+      title: "HTTP Error",
+      trace_id: traceId,
+      type: `https://api.example.com/errors/fastify_error`,
     });
   }
 
   // Fallback for generic errors
   return problemDetails({
-    type: 'https://api.example.com/errors/internal_error',
-    title: 'Internal Server Error',
-    status: 500,
-    detail: err.message || 'An unexpected error occurred',
-    trace_id: traceId,
+    detail: err.message || "An unexpected error occurred",
     is_retriable: true,
     retry_after_ms: 1000,
+    status: 500,
+    title: "Internal Server Error",
+    trace_id: traceId,
+    type: "https://api.example.com/errors/internal_error",
   });
 }
 
@@ -134,11 +138,11 @@ const errorPlugin = fastifyPlugin(
       const status = problemDetail.status || 500;
 
       // Set headers
-      reply.header('Content-Type', 'application/problem+json');
-      reply.header('X-Request-ID', traceId);
+      reply.header("Content-Type", "application/problem+json");
+      reply.header("X-Request-ID", traceId);
 
       if (problemDetail.is_retriable && problemDetail.retry_after_ms) {
-        reply.header('Retry-After', String(Math.ceil(problemDetail.retry_after_ms / 1000)));
+        reply.header("Retry-After", String(Math.ceil(problemDetail.retry_after_ms / 1000)));
       }
 
       // Log error for observability
@@ -146,11 +150,11 @@ const errorPlugin = fastifyPlugin(
         fastify.log.error(
           {
             err,
-            traceId,
             method: request.method,
+            traceId,
             url: request.url,
           },
-          'Unhandled server error'
+          "Unhandled server error",
         );
       }
 
@@ -158,18 +162,18 @@ const errorPlugin = fastifyPlugin(
     });
 
     // Decorator: helper to throw domain errors
-    fastify.decorate('throwValidationError', (message: string, fields?: any) => {
+    fastify.decorate("throwValidationError", (message: string, fields?: any) => {
       throw new ValidationErrorFastify(message, fields);
     });
 
-    fastify.decorate('throwDomainError', (code: string, statusCode: number, message: string) => {
+    fastify.decorate("throwDomainError", (code: string, statusCode: number, message: string) => {
       throw new FastifyDomainError(code, statusCode, message);
     });
   },
   {
-    name: 'error-handler-plugin',
-    version: '1.0.0',
-  }
+    name: "error-handler-plugin",
+    version: "1.0.0",
+  },
 );
 
 export default errorPlugin;
@@ -177,7 +181,7 @@ export default errorPlugin;
 /**
  * TypeScript module augmentation for Fastify decorators
  */
-declare module 'fastify' {
+declare module "fastify" {
   interface FastifyInstance {
     throwValidationError: (message: string, fields?: any) => never;
     throwDomainError: (code: string, statusCode: number, message: string) => never;

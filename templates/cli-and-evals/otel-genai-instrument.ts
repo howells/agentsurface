@@ -42,15 +42,15 @@ import {
   ConsoleSpanExporter,
   SimpleSpanProcessor,
   BatchSpanProcessor,
-} from '@opentelemetry/sdk-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-proto';
-import { context, trace, Span, SpanStatusCode } from '@opentelemetry/api';
-import { z } from 'zod';
+} from "@opentelemetry/sdk-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-otlp-proto";
+import { context, trace, Span, SpanStatusCode } from "@opentelemetry/api";
+import { z } from "zod";
 
 // <CUSTOMISE>: Update model, provider, system prompt
-const MODEL_NAME = 'claude-opus-4-7';
-const PROVIDER = 'anthropic';
-const SYSTEM_PROMPT = 'You are a helpful AI agent...';
+const MODEL_NAME = "claude-opus-4-7";
+const PROVIDER = "anthropic";
+const SYSTEM_PROMPT = "You are a helpful AI agent...";
 
 /**
  * Initialize OpenTelemetry tracing
@@ -59,20 +59,22 @@ export function initializeTracing(): NodeTracerProvider {
   const provider = new NodeTracerProvider();
 
   // Console exporter (for development)
-  if (process.env.OTEL_DEBUG === '1') {
+  if (process.env.OTEL_DEBUG === "1") {
     provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
   }
 
   // OTLP exporter (production)
   const otlpExporter = new OTLPTraceExporter({
-    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
-    headers: process.env.OTEL_EXPORTER_OTLP_HEADERS ? JSON.parse(process.env.OTEL_EXPORTER_OTLP_HEADERS) : {},
+    headers: process.env.OTEL_EXPORTER_OTLP_HEADERS
+      ? JSON.parse(process.env.OTEL_EXPORTER_OTLP_HEADERS)
+      : {},
+    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318",
   });
   provider.addSpanProcessor(new BatchSpanProcessor(otlpExporter));
 
   // Langfuse integration (optional)
   if (process.env.LANGFUSE_SECRET_KEY) {
-    const { LangfuseExporter } = require('@langfuse/opentelemetry');
+    const { LangfuseExporter } = require("@langfuse/opentelemetry");
     const langfuseExporter = new LangfuseExporter();
     provider.addSpanProcessor(new SimpleSpanProcessor(langfuseExporter));
   }
@@ -84,7 +86,7 @@ export function initializeTracing(): NodeTracerProvider {
 /**
  * Tracer instance
  */
-const tracer = trace.getTracer('agent-tracer', '1.0.0');
+const tracer = trace.getTracer("agent-tracer", "1.0.0");
 
 /**
  * Chat operation span
@@ -114,12 +116,12 @@ interface ChatSpanOutput {
 }
 
 export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
-  operationName: string = 'chat'
+  operationName: string = "chat",
 ) {
   return function decorator(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: T): Promise<R> {
+    descriptor.value = async function value(...args: T): Promise<R> {
       const span = tracer.startSpan(operationName);
 
       try {
@@ -128,37 +130,35 @@ export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
 
         // Set semantic convention attributes
         span.setAttributes({
-          'gen_ai.system': PROVIDER,
-          'gen_ai.request.model': input.model || MODEL_NAME,
-          'gen_ai.operation.name': operationName,
-          'gen_ai.input.messages': JSON.stringify([
-            { role: 'system', content: input.systemPrompt || SYSTEM_PROMPT },
-            { role: 'user', content: input.prompt },
+          "gen_ai.input.messages": JSON.stringify([
+            { role: "system", content: input.systemPrompt || SYSTEM_PROMPT },
+            { role: "user", content: input.prompt },
           ]),
+          "gen_ai.operation.name": operationName,
+          "gen_ai.request.model": input.model || MODEL_NAME,
+          "gen_ai.system": PROVIDER,
         });
 
         // Optional: user context
         if (input.userId) {
-          span.setAttribute('user.id', input.userId);
+          span.setAttribute("user.id", input.userId);
         }
         if (input.requestId) {
-          span.setAttribute('request.id', input.requestId);
+          span.setAttribute("request.id", input.requestId);
         }
 
         // Run the original method
-        const result = await originalMethod.apply(this, args) as R;
+        const result = (await originalMethod.apply(this, args)) as R;
 
         // Record output
         span.setAttributes({
-          'gen_ai.output.messages': JSON.stringify([
-            { role: 'assistant', content: result.text },
-          ]),
-          'gen_ai.usage.input_tokens': result.inputTokens,
-          'gen_ai.usage.output_tokens': result.outputTokens,
+          "gen_ai.output.messages": JSON.stringify([{ content: result.text, role: "assistant" }]),
+          "gen_ai.usage.input_tokens": result.inputTokens,
+          "gen_ai.usage.output_tokens": result.outputTokens,
         });
 
         if (result.stopReason) {
-          span.setAttribute('gen_ai.stop_reason', result.stopReason);
+          span.setAttribute("gen_ai.stop_reason", result.stopReason);
         }
 
         span.setStatus({ code: SpanStatusCode.OK });
@@ -187,14 +187,14 @@ export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
 export async function withToolSpan<T>(
   toolName: string,
   callId: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   const span = tracer.startSpan(`tool.${toolName}`);
 
   try {
     span.setAttributes({
-      'gen_ai.tool.name': toolName,
-      'gen_ai.tool.call.id': callId,
+      "gen_ai.tool.call.id": callId,
+      "gen_ai.tool.name": toolName,
     });
 
     const result = await context.with(trace.setSpan(context.active(), span), () => fn());
@@ -225,24 +225,23 @@ interface AgentResponse {
 }
 
 export class InstrumentedAgent {
-  @withGenAISpan('chat')
+  @withGenAISpan("chat")
   async chat(input: AgentRequest & ChatSpanInput): Promise<AgentResponse> {
     // Call your actual agent SDK here
     // This is a stub:
 
     // Simulate tool calls
-    const toolName = 'search_docs';
+    const toolName = "search_docs";
     const callId = `call-${Date.now()}`;
 
-    const toolResult = await withToolSpan(toolName, callId, async () => {
-      // Call actual tool
-      return { docs: 'example documentation' };
-    });
+    const toolResult = await withToolSpan(toolName, callId, async () => ({
+      docs: "example documentation",
+    }));
 
     return {
-      text: `Found documentation: ${JSON.stringify(toolResult)}`,
       inputTokens: 100,
       outputTokens: 150,
+      text: `Found documentation: ${JSON.stringify(toolResult)}`,
     };
   }
 }

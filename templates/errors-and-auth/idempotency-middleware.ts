@@ -10,12 +10,13 @@
  * </CUSTOMISE>
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { Redis } from 'ioredis';
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { Redis } from "ioredis";
 
-const IDEMPOTENCY_TTL_SECONDS = 86400; // 24 hours
-const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
-const IDEMPOTENCY_REPLAY_HEADER = 'x-idempotency-replayed';
+const IDEMPOTENCY_TTL_SECONDS = 86_400; // 24 hours
+const IDEMPOTENCY_KEY_HEADER = "idempotency-key";
+const IDEMPOTENCY_REPLAY_HEADER = "x-idempotency-replayed";
 
 /**
  * Initialize Redis client (or use your preferred cache)
@@ -26,9 +27,9 @@ let redis: Redis | null = null;
 function getRedisClient(): Redis {
   if (!redis) {
     redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      host: process.env.REDIS_HOST || "localhost",
       password: process.env.REDIS_PASSWORD,
+      port: Number.parseInt(process.env.REDIS_PORT || "6379", 10),
       retryStrategy: (times) => Math.min(times * 50, 2000),
     });
   }
@@ -51,17 +52,20 @@ interface IdempotencyEntry {
 async function serializeResponse(response: NextResponse): Promise<IdempotencyEntry> {
   const headers: Record<string, string> = {};
   response.headers.forEach((value, key) => {
-    if (!key.startsWith('content-encoding')) {
+    if (!key.startsWith("content-encoding")) {
       headers[key] = value;
     }
   });
 
-  const body = await response.clone().json().catch(() => null);
+  const body = await response
+    .clone()
+    .json()
+    .catch(() => null);
 
   return {
-    status: response.status,
-    headers,
     body,
+    headers,
+    status: response.status,
     timestamp: Date.now(),
   };
 }
@@ -78,7 +82,7 @@ function replayResponse(entry: IdempotencyEntry): NextResponse {
     response.headers.set(key, value);
   });
 
-  response.headers.set(IDEMPOTENCY_REPLAY_HEADER, 'true');
+  response.headers.set(IDEMPOTENCY_REPLAY_HEADER, "true");
   return response;
 }
 
@@ -95,12 +99,9 @@ function replayResponse(entry: IdempotencyEntry): NextResponse {
  * };
  * ```
  */
-export async function idempotencyMiddleware(
-  req: NextRequest,
-  next: any
-): Promise<NextResponse> {
+export async function idempotencyMiddleware(req: NextRequest, next: any): Promise<NextResponse> {
   // Only apply to mutation methods
-  if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)) {
+  if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
     return next(req);
   }
 
@@ -110,16 +111,16 @@ export async function idempotencyMiddleware(
   if (!idempotencyKey) {
     return NextResponse.json(
       {
-        type: 'https://api.example.com/errors/missing-idempotency-key',
-        title: 'Missing Idempotency Key',
-        status: 400,
+        code: "ERR_VALIDATION",
         detail: `${IDEMPOTENCY_KEY_HEADER} header is required for ${req.method} requests`,
-        code: 'ERR_VALIDATION',
+        status: 400,
+        title: "Missing Idempotency Key",
+        type: "https://api.example.com/errors/missing-idempotency-key",
       },
       {
+        headers: { "Content-Type": "application/problem+json" },
         status: 400,
-        headers: { 'Content-Type': 'application/problem+json' },
-      }
+      },
     );
   }
 
@@ -134,13 +135,13 @@ export async function idempotencyMiddleware(
       console.log(`[Idempotency] Cache hit for key ${idempotencyKey}`);
       return replayResponse(entry);
     }
-  } catch (err) {
-    console.warn(`[Idempotency] Cache lookup error: ${err}`, { idempotencyKey });
+  } catch (error) {
+    console.warn(`[Idempotency] Cache lookup error: ${error}`, { idempotencyKey });
     // Fall through; don't fail the request on cache miss
   }
 
   // Call the next middleware/handler
-  let response = await next(req);
+  const response = await next(req);
 
   // Only cache successful responses (2xx)
   if (response.status >= 200 && response.status < 300) {
@@ -148,8 +149,8 @@ export async function idempotencyMiddleware(
       const entry = await serializeResponse(response);
       await redis.setex(cacheKey, IDEMPOTENCY_TTL_SECONDS, JSON.stringify(entry));
       console.log(`[Idempotency] Cached response for key ${idempotencyKey}`);
-    } catch (err) {
-      console.warn(`[Idempotency] Cache write error: ${err}`, { idempotencyKey });
+    } catch (error) {
+      console.warn(`[Idempotency] Cache write error: ${error}`, { idempotencyKey });
       // Proceed anyway; caching failure shouldn't block the response
     }
   }
@@ -170,10 +171,10 @@ export async function idempotencyMiddleware(
  * ```
  */
 export function withIdempotency(
-  handler: (req: NextRequest) => Promise<NextResponse>
+  handler: (req: NextRequest) => Promise<NextResponse>,
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
-    if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)) {
+    if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
       return handler(req);
     }
 
@@ -182,13 +183,13 @@ export function withIdempotency(
     if (!idempotencyKey) {
       return NextResponse.json(
         {
-          type: 'https://api.example.com/errors/missing-idempotency-key',
-          title: 'Missing Idempotency Key',
-          status: 400,
+          code: "ERR_VALIDATION",
           detail: `${IDEMPOTENCY_KEY_HEADER} header is required`,
-          code: 'ERR_VALIDATION',
+          status: 400,
+          title: "Missing Idempotency Key",
+          type: "https://api.example.com/errors/missing-idempotency-key",
         },
-        { status: 400, headers: { 'Content-Type': 'application/problem+json' } }
+        { headers: { "Content-Type": "application/problem+json" }, status: 400 },
       );
     }
 
@@ -203,8 +204,8 @@ export function withIdempotency(
         const response = replayResponse(entry);
         return response;
       }
-    } catch (err) {
-      console.warn(`[Idempotency] Cache error, proceeding: ${err}`);
+    } catch (error) {
+      console.warn(`[Idempotency] Cache error, proceeding: ${error}`);
     }
 
     const response = await handler(req);
@@ -213,8 +214,8 @@ export function withIdempotency(
       try {
         const entry = await serializeResponse(response);
         await redis.setex(cacheKey, IDEMPOTENCY_TTL_SECONDS, JSON.stringify(entry));
-      } catch (err) {
-        console.warn(`[Idempotency] Failed to cache: ${err}`);
+      } catch (error) {
+        console.warn(`[Idempotency] Failed to cache: ${error}`);
       }
     }
 

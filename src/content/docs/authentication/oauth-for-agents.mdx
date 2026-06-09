@@ -48,7 +48,7 @@ No `refresh_token`. When the token expires, request a new one using the same cre
 Short-lived tokens (1–4 hours) are cheap to issue and validate. Cache them and reuse for their lifetime. Refresh proactively before expiry with a buffer (typically 5 minutes).
 
 ```typescript
-import { jwtDecode } from 'jose';
+import { jwtDecode } from "jose";
 
 interface TokenCache {
   accessToken: string;
@@ -72,15 +72,15 @@ async function getAccessToken(config: {
   }
 
   const form = new URLSearchParams({
-    grant_type: 'client_credentials',
+    grant_type: "client_credentials",
     client_id: config.clientId,
     client_secret: config.clientSecret,
-    scope: config.scopes.join(' '),
+    scope: config.scopes.join(" "),
   });
 
   const res = await fetch(config.tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
@@ -104,8 +104,8 @@ Use the cached token on all requests:
 
 ```typescript
 const token = await getAccessToken(config);
-const res = await fetch('https://api.example.com/invoices', {
-  headers: { 'Authorization': `Bearer ${token}` },
+const res = await fetch("https://api.example.com/invoices", {
+  headers: { Authorization: `Bearer ${token}` },
 });
 ```
 
@@ -132,13 +132,13 @@ Request the minimum for each operation:
 // Reading invoices: only invoices:read
 const readToken = await getAccessToken({
   ...config,
-  scopes: ['invoices:read'],
+  scopes: ["invoices:read"],
 });
 
 // Creating invoices: only invoices:write
 const writeToken = await getAccessToken({
   ...config,
-  scopes: ['invoices:write'],
+  scopes: ["invoices:write"],
 });
 ```
 
@@ -149,16 +149,14 @@ For multi-step workflows where scope requirements vary, use Token Exchange (RFC 
 Tokens from OAuth servers are JWTs. Validate before trusting any claim inside. Use `jose`:
 
 ```typescript
-import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
-const jwks = createRemoteJWKSet(
-  new URL('https://auth.example.com/.well-known/jwks.json')
-);
+const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 
 async function validateToken(token: string): Promise<Record<string, any>> {
   const { payload } = await jwtVerify(token, jwks, {
-    issuer: 'https://auth.example.com/',
-    audience: 'https://api.example.com/',
+    issuer: "https://auth.example.com/",
+    audience: "https://api.example.com/",
   });
 
   // payload.iss, payload.aud, payload.exp, payload.scope are now trusted
@@ -179,13 +177,13 @@ If your tokens include `org_id` or `tenant_id`, validate those as part of author
 async function authorize(token: string, resourceOrgId: string): Promise<void> {
   const payload = await validateToken(token);
 
-  const scopes = (payload.scope as string || '').split(' ');
-  if (!scopes.includes('invoices:read')) {
-    throw new Error('Missing scope: invoices:read');
+  const scopes = ((payload.scope as string) || "").split(" ");
+  if (!scopes.includes("invoices:read")) {
+    throw new Error("Missing scope: invoices:read");
   }
 
   if (payload.org_id !== resourceOrgId) {
-    throw new Error('Token org does not match resource');
+    throw new Error("Token org does not match resource");
   }
 }
 ```

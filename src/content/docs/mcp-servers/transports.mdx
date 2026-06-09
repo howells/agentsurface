@@ -176,12 +176,7 @@ app.post("/mcp", async (req, res) => {
 
   server.onSessionStateChanged = async (state) => {
     if (sessionId) {
-      await redis.set(
-        `mcp:session:${sessionId}`,
-        JSON.stringify(state),
-        "EX",
-        3600
-      );
+      await redis.set(`mcp:session:${sessionId}`, JSON.stringify(state), "EX", 3600);
     }
   };
 
@@ -228,7 +223,7 @@ const handler = createMcpHandler(
   }),
   {
     basePath: "/mcp",
-  }
+  },
 );
 
 export const maxDuration = 60; // seconds — requires Vercel Pro or higher
@@ -250,7 +245,9 @@ export { handler as GET, handler as POST, handler as DELETE };
 ```
 
 <Callout type="info">
-`maxDuration` of 60 seconds requires a Pro plan. On the Hobby plan, the limit is 10 seconds. For tools with long-running operations (file processing, external API calls), either upgrade the plan or use a streaming response to heartbeat the connection while work proceeds.
+  `maxDuration` of 60 seconds requires a Pro plan. On the Hobby plan, the limit is 10 seconds. For
+  tools with long-running operations (file processing, external API calls), either upgrade the plan
+  or use a streaming response to heartbeat the connection while work proceeds.
 </Callout>
 
 **The `mcp-handler` package** (`@vercel/mcp-adapter`) handles transport setup, session management, and the GET/POST/DELETE routing automatically. The `basePath` option tells the adapter which path prefix to strip when constructing client-facing URLs.
@@ -271,9 +268,7 @@ if (process.env.PORT) {
   const { startHttpServer } = await import("./http-server.js");
   await startHttpServer(server, Number(process.env.PORT));
 } else {
-  const { StdioServerTransport } = await import(
-    "@modelcontextprotocol/sdk/server/stdio.js"
-  );
+  const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
@@ -282,5 +277,7 @@ if (process.env.PORT) {
 This pattern avoids bundling HTTP server dependencies into the stdio binary and vice versa — each transport path imports its dependencies lazily.
 
 <Callout type="warn">
-Never use the same `McpServer` instance across multiple transport connections. The server maintains state about the connected client. Create a new server instance per connection when using the Streamable HTTP transport.
+  Never use the same `McpServer` instance across multiple transport connections. The server
+  maintains state about the connected client. Create a new server instance per connection when using
+  the Streamable HTTP transport.
 </Callout>

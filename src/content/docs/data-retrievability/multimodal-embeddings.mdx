@@ -12,6 +12,7 @@ Freshness note: last reviewed 2026-06-02. Multimodal model coverage, modality su
 Use multimodal embeddings when documents include images (PDFs, slides, charts), video archives, or cross-modal queries such as "find documents with charts like this image." Verify current modality support before choosing a model: Gemini embedding models, Voyage Multimodal, Cohere Embed, CLIP, and SigLIP move at different speeds across text, image, video, audio, and code.
 
 **Key takeaways:**
+
 - **Gemini embedding models:** Check current Google model docs for modality support and benchmark claims.
 - **Voyage Multimodal 3.5:** Text + images + video; unified 1,024-dim space.
 - **ColPali pattern:** Treat PDFs as images; late-interaction retrieval; no OCR needed.
@@ -19,72 +20,69 @@ Use multimodal embeddings when documents include images (PDFs, slides, charts), 
 
 ## Model comparison
 
-| Model | Modalities | Dims | Cost | Quality | Notes |
-|-------|-----------|------|------|---------|-------|
-| **Gemini Embedding 2** | Verify current docs | 768 | ~$0.02/1M | Verify current benchmark | Google API |
-| **Voyage Multimodal 3.5** | Text, image, video | 1,024 | $0.01/1M | 63.5 | Latest Voyage; MongoDB-owned |
-| **Cohere Embed v4** | Text, image | 1,536 (Matryoshka) | $0.12/1M text, $0.47/1M image | 64.2 | Multimodal; enterprise |
-| **CLIP ViT-L/14** | Text, image | 768 | Free | 59.5 | Open-source; widely integrated |
-| **SigLIP-384px** | Text, image | 768 | Free | 62.0 | CLIP successor; efficient |
-| **OpenCLIP** | Text, image | 768–1024 | Free | 62–63 | Variant of CLIP; Hugging Face |
+| Model                     | Modalities          | Dims               | Cost                          | Quality                  | Notes                          |
+| ------------------------- | ------------------- | ------------------ | ----------------------------- | ------------------------ | ------------------------------ |
+| **Gemini Embedding 2**    | Verify current docs | 768                | ~$0.02/1M                     | Verify current benchmark | Google API                     |
+| **Voyage Multimodal 3.5** | Text, image, video  | 1,024              | $0.01/1M                      | 63.5                     | Latest Voyage; MongoDB-owned   |
+| **Cohere Embed v4**       | Text, image         | 1,536 (Matryoshka) | $0.12/1M text, $0.47/1M image | 64.2                     | Multimodal; enterprise         |
+| **CLIP ViT-L/14**         | Text, image         | 768                | Free                          | 59.5                     | Open-source; widely integrated |
+| **SigLIP-384px**          | Text, image         | 768                | Free                          | 62.0                     | CLIP successor; efficient      |
+| **OpenCLIP**              | Text, image         | 768–1024           | Free                          | 62–63                    | Variant of CLIP; Hugging Face  |
 
 ## Use cases
 
 **PDF/slide decks as images:** Treat full PDF as a single image. ColPali (late-interaction) outperforms OCR + chunking on visually complex documents (forms, contracts, tables).
 
 ```typescript
-import Anthropic from '@anthropic-sdk/sdk';
-import * as fs from 'fs';
+import Anthropic from "@anthropic-sdk/sdk";
+import * as fs from "fs";
 
 async function extractPDFAsImage(pdfPath: string) {
   // Use Anthropic Vision API to analyze PDF as image
   const client = new Anthropic();
   const imageData = fs.readFileSync(pdfPath);
-  const base64 = imageData.toString('base64');
+  const base64 = imageData.toString("base64");
 
   const response = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
+    model: "claude-3-5-sonnet-20241022",
     max_tokens: 2048,
     messages: [
       {
-        role: 'user',
+        role: "user",
         content: [
           {
-            type: 'image',
+            type: "image",
             source: {
-              type: 'base64',
-              media_type: 'application/pdf',
+              type: "base64",
+              media_type: "application/pdf",
               data: base64,
             },
           },
           {
-            type: 'text',
-            text: 'Describe this document in detail: structure, key sections, tables, figures.',
+            type: "text",
+            text: "Describe this document in detail: structure, key sections, tables, figures.",
           },
         ],
       },
     ],
   });
 
-  return response.content[0].type === 'text' ? response.content[0].text : '';
+  return response.content[0].type === "text" ? response.content[0].text : "";
 }
 ```
 
 **Video retrieval:** Embed frames at intervals; retrieve similar videos by frame similarity.
 
 ```typescript
-async function embedVideoFrames(
-  videoPath: string,
-  intervalSeconds: number = 5
-) {
+async function embedVideoFrames(videoPath: string, intervalSeconds: number = 5) {
   // Pseudocode: extract frames, embed each
   const frames = await extractFramesAtInterval(videoPath, intervalSeconds);
   const embeddings = await Promise.all(
     frames.map((frame) =>
       voyageMultimodal.embed({
-        inputs: [{ type: 'image', data: frame }],
-      })
-    )
+        inputs: [{ type: "image", data: frame }],
+      }),
+    ),
   );
   return embeddings;
 }
@@ -93,15 +91,15 @@ async function embedVideoFrames(
 **Cross-modal search:** Query with text, retrieve images; or query with image, retrieve text/images.
 
 ```typescript
-import Voyage from '@voyageai/voyageai';
+import Voyage from "@voyageai/voyageai";
 
 async function crossModalSearch(query: string, documents: any[]) {
   const client = new Voyage({ apiKey: process.env.VOYAGE_API_KEY });
 
   // Query embedding (text)
   const queryEmbed = await client.embed({
-    input: [{ type: 'text', data: query }],
-    model: 'voyage-multimodal-3-5',
+    input: [{ type: "text", data: query }],
+    model: "voyage-multimodal-3-5",
   });
 
   // Document embeddings (mix of text and images)
@@ -109,19 +107,19 @@ async function crossModalSearch(query: string, documents: any[]) {
     documents.map((doc) =>
       client.embed({
         input: [
-          { type: 'text', data: doc.text },
-          { type: 'image', data: doc.imageBase64 },
+          { type: "text", data: doc.text },
+          { type: "image", data: doc.imageBase64 },
         ],
-        model: 'voyage-multimodal-3-5',
-      })
-    )
+        model: "voyage-multimodal-3-5",
+      }),
+    ),
   );
 
   // Find most similar docs
   return docEmbeds.sort(
     (a, b) =>
       cosineSimilarity(queryEmbed.data[0].embedding, b.data[0].embedding) -
-      cosineSimilarity(queryEmbed.data[0].embedding, a.data[0].embedding)
+      cosineSimilarity(queryEmbed.data[0].embedding, a.data[0].embedding),
   );
 }
 ```
@@ -131,6 +129,7 @@ async function crossModalSearch(query: string, documents: any[]) {
 **Concept:** Treat entire PDF as image; use late-interaction (token-level embeddings); no OCR preprocessing.
 
 **Advantages:**
+
 - Preserves visual layout (tables, figures, formatting)
 - Handles scanned PDFs, handwritten annotations
 - No chunking complexity
@@ -149,9 +148,7 @@ async function paliRetrievePDFs(query: string, pdfPaths: string[]) {
   const queryTokens = await colpaliEncode(query);
 
   // 4. MaxSim: max similarity between query tokens and PDF tokens
-  const scores = pdfImages.map((_, idx) =>
-    maxSim(queryTokens, pdfTokenEmbeds[idx])
-  );
+  const scores = pdfImages.map((_, idx) => maxSim(queryTokens, pdfTokenEmbeds[idx]));
 
   // 5. Return top PDFs
   return pdfPaths
@@ -166,39 +163,32 @@ async function paliRetrievePDFs(query: string, pdfPaths: string[]) {
 Store image embeddings + blobs together:
 
 ```typescript
-import { pgvector } from 'pgvector/utils';
-import { Drizzle } from 'drizzle-orm';
+import { pgvector } from "pgvector/utils";
+import { Drizzle } from "drizzle-orm";
 
 // Schema
-export const multimedialDocs = pgTable(
-  'multimedia_docs',
-  {
-    id: serial('id').primaryKey(),
-    docId: text('doc_id').notNull(),
-    embedding: vector('embedding', { dimensions: 1024 }),
-    imageBlob: bytea('image_blob'), // Store image as BLOB
-    imageType: text('image_type'), // 'png', 'jpeg', 'pdf'
-    metadata: jsonb('metadata'),
-    createdAt: timestamp('created_at').defaultNow(),
-  }
-);
+export const multimedialDocs = pgTable("multimedia_docs", {
+  id: serial("id").primaryKey(),
+  docId: text("doc_id").notNull(),
+  embedding: vector("embedding", { dimensions: 1024 }),
+  imageBlob: bytea("image_blob"), // Store image as BLOB
+  imageType: text("image_type"), // 'png', 'jpeg', 'pdf'
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Insert
-async function storeMultimodalDoc(
-  docId: string,
-  imageBlob: Buffer,
-  metadata: Record<string, any>
-) {
+async function storeMultimodalDoc(docId: string, imageBlob: Buffer, metadata: Record<string, any>) {
   const embedding = await voyageMultimodal.embed({
-    inputs: [{ type: 'image', data: imageBlob }],
-    model: 'voyage-multimodal-3-5',
+    inputs: [{ type: "image", data: imageBlob }],
+    model: "voyage-multimodal-3-5",
   });
 
   await db.insert(multimedialDocs).values({
     docId,
     embedding: pgvector.toSql(embedding.data[0].embedding),
     imageBlob,
-    imageType: 'png',
+    imageType: "png",
     metadata,
   });
 }
@@ -206,16 +196,14 @@ async function storeMultimodalDoc(
 // Search
 async function searchMultimedial(query: string) {
   const queryEmbed = await voyageMultimodal.embed({
-    inputs: [{ type: 'text', data: query }],
-    model: 'voyage-multimodal-3-5',
+    inputs: [{ type: "text", data: query }],
+    model: "voyage-multimodal-3-5",
   });
 
   const results = await db
     .select()
     .from(multimedialDocs)
-    .orderBy(
-      sql`embedding <-> ${pgvector.toSql(queryEmbed.data[0].embedding)}`
-    )
+    .orderBy(sql`embedding <-> ${pgvector.toSql(queryEmbed.data[0].embedding)}`)
     .limit(10);
 
   return results;
@@ -225,6 +213,7 @@ async function searchMultimedial(query: string) {
 ## Evaluation: multimodal MTEB
 
 MTEB is text-only; for multimodal eval, use domain-specific datasets:
+
 - **COCO Captions:** Image → caption matching
 - **Flickr30K:** Image-text retrieval
 - **CrossModal-3600:** Cross-lingual image-text
@@ -259,8 +248,8 @@ async function embedVideoFramesEfficiently(videoPath: string) {
 
   for (const frame of frames) {
     const embed = await voyageMultimodal.embed({
-      inputs: [{ type: 'image', data: frame }],
-      model: 'voyage-multimodal-3-5',
+      inputs: [{ type: "image", data: frame }],
+      model: "voyage-multimodal-3-5",
     });
     embeddings.push({
       frameTimestamp: frame.timestamp,
@@ -280,17 +269,17 @@ async function embedImageViaSummary(imageBlob: Buffer) {
 
   // Summarize image with Claude Vision
   const description = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
+    model: "claude-3-5-sonnet-20241022",
     max_tokens: 500,
     messages: [
       {
-        role: 'user',
+        role: "user",
         content: [
           {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/png', data: imageBlob.toString('base64') },
+            type: "image",
+            source: { type: "base64", media_type: "image/png", data: imageBlob.toString("base64") },
           },
-          { type: 'text', text: 'Describe this image in detail.' },
+          { type: "text", text: "Describe this image in detail." },
         ],
       },
     ],
@@ -298,8 +287,8 @@ async function embedImageViaSummary(imageBlob: Buffer) {
 
   // Embed the text description
   const textEmbed = await openai.embeddings.create({
-    model: 'text-embedding-3-large',
-    input: description.content[0].type === 'text' ? description.content[0].text : '',
+    model: "text-embedding-3-large",
+    input: description.content[0].type === "text" ? description.content[0].text : "",
   });
 
   return textEmbed.data[0].embedding;

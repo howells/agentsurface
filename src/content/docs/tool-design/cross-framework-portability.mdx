@@ -26,33 +26,42 @@ Define tool metadata and handler once:
 
 ```typescript
 // tools/registry.ts — shared across all frameworks
-import { z } from 'zod';
+import { z } from "zod";
 
-const searchDocsSchema = z.object({
-  query: z.string()
-    .describe('Free text search query. Examples: "authentication", "API rate limits"'),
-  limit: z.number().int().min(1).max(100).default(10)
-    .describe('Max results to return (default 10, max 100)'),
-  offset: z.number().int().min(0).default(0)
-    .describe('Pagination offset for large result sets'),
-  format: z.enum(['concise', 'detailed']).default('concise')
-    .describe('concise: title + URL only. detailed: full snippet (slower, more tokens)'),
-}).strict();
+const searchDocsSchema = z
+  .object({
+    query: z
+      .string()
+      .describe('Free text search query. Examples: "authentication", "API rate limits"'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(10)
+      .describe("Max results to return (default 10, max 100)"),
+    offset: z.number().int().min(0).default(0).describe("Pagination offset for large result sets"),
+    format: z
+      .enum(["concise", "detailed"])
+      .default("concise")
+      .describe("concise: title + URL only. detailed: full snippet (slower, more tokens)"),
+  })
+  .strict();
 
 type SearchDocsInput = z.infer<typeof searchDocsSchema>;
 
 export async function searchDocsHandler(input: SearchDocsInput) {
-  const results = await internal.search(input.query, { 
-    limit: input.limit, 
+  const results = await internal.search(input.query, {
+    limit: input.limit,
     offset: input.offset,
   });
-  
+
   return {
-    results: results.map(doc => ({
+    results: results.map((doc) => ({
       id: doc.id,
       title: doc.title,
       url: doc.url,
-      ...(input.format === 'detailed' && { snippet: doc.snippet }),
+      ...(input.format === "detailed" && { snippet: doc.snippet }),
     })),
     has_more: results.length === input.limit,
     next_offset: input.offset + input.limit,
@@ -60,7 +69,7 @@ export async function searchDocsHandler(input: SearchDocsInput) {
 }
 
 export const searchDocsTool = {
-  name: 'search_docs',
+  name: "search_docs",
   description: `Search internal documentation by keyword. Use this to find setup guides, API references, and troubleshooting steps. 
 Do not use this for general knowledge (use web search instead) or to create new docs (use create_doc). Returns snippets ranked by relevance.`,
   schema: searchDocsSchema,
@@ -68,26 +77,26 @@ Do not use this for general knowledge (use web search instead) or to create new 
 };
 
 // Other tools exported same way
-export const createDocTool = { /* ... */ };
-export const updateDocTool = { /* ... */ };
+export const createDocTool = {
+  /* ... */
+};
+export const updateDocTool = {
+  /* ... */
+};
 
-export const allTools = [
-  searchDocsTool,
-  createDocTool,
-  updateDocTool,
-];
+export const allTools = [searchDocsTool, createDocTool, updateDocTool];
 ```
 
 ### Step 2: MCP Adapter
 
 ```typescript
 // tools/mcp.ts
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { allTools, searchDocsTool, createDocTool, updateDocTool } from './registry';
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { allTools, searchDocsTool, createDocTool, updateDocTool } from "./registry";
 
 const server = new Server({
-  name: 'docs-mcp',
-  version: '1.0.0',
+  name: "docs-mcp",
+  version: "1.0.0",
 });
 
 // Register all tools with MCP-specific annotations
@@ -99,7 +108,7 @@ server.tool(
   {
     readOnlyHint: true,
     idempotentHint: true,
-  }
+  },
 );
 
 server.tool(
@@ -109,8 +118,8 @@ server.tool(
   createDocTool.handler,
   {
     destructiveHint: false,
-    idempotentHint: true,  // Supports idempotency_key parameter
-  }
+    idempotentHint: true, // Supports idempotency_key parameter
+  },
 );
 
 // ... register remaining tools
@@ -160,53 +169,54 @@ For Claude Managed Agents, register equivalent tool definitions or MCP servers i
 
 ```typescript
 // tools/openai-agents.ts
-import { Tool } from '@openai/agents';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import { allTools } from './registry';
+import { Tool } from "@openai/agents";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { allTools } from "./registry";
 
-export const openaiTools = allTools.map(t => 
-  new Tool({
-    name: t.name,
-    description: t.description,
-    parameters: zodToJsonSchema(t.schema),
-    execute: t.handler,
-  })
+export const openaiTools = allTools.map(
+  (t) =>
+    new Tool({
+      name: t.name,
+      description: t.description,
+      parameters: zodToJsonSchema(t.schema),
+      execute: t.handler,
+    }),
 );
 
-export const searchDocsTool = openaiTools.find(t => t.name === 'search_docs');
-export const createDocTool = openaiTools.find(t => t.name === 'create_doc');
+export const searchDocsTool = openaiTools.find((t) => t.name === "search_docs");
+export const createDocTool = openaiTools.find((t) => t.name === "create_doc");
 ```
 
 In an OpenAI agent:
 
 ```typescript
-import { Agent } from '@openai/agents';
-import { searchDocsTool, createDocTool } from './tools/openai-agents';
+import { Agent } from "@openai/agents";
+import { searchDocsTool, createDocTool } from "./tools/openai-agents";
 
 const agent = new Agent({
   tools: [searchDocsTool, createDocTool],
 });
 
-const result = await agent.run('Find the authentication guide');
+const result = await agent.run("Find the authentication guide");
 ```
 
 ### Step 5: Vercel AI SDK Adapter
 
 ```typescript
 // tools/vercel-ai.ts
-import { tool } from 'ai';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import { allTools } from './registry';
+import { tool } from "ai";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { allTools } from "./registry";
 
-export const vercelTools = allTools.map(t => 
+export const vercelTools = allTools.map((t) =>
   tool({
     description: t.description,
     parameters: zodToJsonSchema(t.schema),
     execute: t.handler,
-  })
+  }),
 );
 
-export const searchDocsTool = vercelTools.find(t => t.name === 'search_docs');
+export const searchDocsTool = vercelTools.find((t) => t.name === "search_docs");
 ```
 
 ## Handling Framework-Specific Features
@@ -229,7 +239,7 @@ for (const toolDef of allTools) {
     toolDef.description,
     toolDef.schema,
     toolDef.handler,
-    toolAnnotations[toolDef.name] || {}
+    toolAnnotations[toolDef.name] || {},
   );
 }
 ```
@@ -240,25 +250,27 @@ MCP supports `outputSchema` for type-safe responses. Add at the adapter layer:
 
 ```typescript
 // tools/mcp.ts
-import { z } from 'zod';
+import { z } from "zod";
 
 const SearchDocsOutputSchema = z.object({
-  results: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    url: z.string(),
-    snippet: z.string().optional(),
-  })),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      url: z.string(),
+      snippet: z.string().optional(),
+    }),
+  ),
   has_more: z.boolean(),
   next_offset: z.number().int(),
 });
 
 server.tool(
-  'search_docs',
+  "search_docs",
   searchDocsTool.description,
   searchDocsTool.schema,
   searchDocsTool.handler,
-  { outputSchema: SearchDocsOutputSchema }
+  { outputSchema: SearchDocsOutputSchema },
 );
 ```
 
@@ -269,7 +281,7 @@ For agents with >20 tools, use framework-specific dynamic loading:
 **Anthropic BM25 search:**
 
 ```typescript
-import { bm25Search } from '@anthropic-ai/sdk/utils';
+import { bm25Search } from "@anthropic-ai/sdk/utils";
 
 async function selectTools(query: string, allTools: Tool[]) {
   return bm25Search(query, allTools, { topK: 5 });
@@ -277,10 +289,10 @@ async function selectTools(query: string, allTools: Tool[]) {
 
 async function main() {
   const selected = await selectTools(userQuery, claudeTools);
-  
+
   const response = await query({
     prompt: userQuery,
-    tools: selected,  // Only active tools
+    tools: selected, // Only active tools
   });
 }
 ```
@@ -289,9 +301,9 @@ async function main() {
 
 ```typescript
 const agent = new Agent({
-  tools: allTools.map(t => ({
+  tools: allTools.map((t) => ({
     ...t,
-    defer_loading: true,  // Load on demand
+    defer_loading: true, // Load on demand
   })),
 });
 ```
@@ -302,24 +314,24 @@ Test the shared handler independently of frameworks:
 
 ```typescript
 // test/registry.test.ts
-import { searchDocsHandler, searchDocsSchema } from '../tools/registry';
+import { searchDocsHandler, searchDocsSchema } from "../tools/registry";
 
-describe('searchDocsHandler', () => {
-  it('returns paginated results', async () => {
+describe("searchDocsHandler", () => {
+  it("returns paginated results", async () => {
     const result = await searchDocsHandler({
-      query: 'authentication',
+      query: "authentication",
       limit: 10,
       offset: 0,
-      format: 'concise',
+      format: "concise",
     });
-    
+
     expect(result.results).toHaveLength(10);
-    expect(result).toHaveProperty('has_more');
-    expect(result).toHaveProperty('next_offset');
+    expect(result).toHaveProperty("has_more");
+    expect(result).toHaveProperty("next_offset");
   });
-  
-  it('validates input schema', () => {
-    const badInput = { query: 'test', limit: 1000 };  // limit > 100
+
+  it("validates input schema", () => {
+    const badInput = { query: "test", limit: 1000 }; // limit > 100
     expect(() => searchDocsSchema.parse(badInput)).toThrow();
   });
 });
@@ -329,25 +341,25 @@ Then test each adapter separately:
 
 ```typescript
 // test/mcp.test.ts
-import server from '../tools/mcp';
+import server from "../tools/mcp";
 
-describe('MCP adapter', () => {
-  it('exposes search_docs tool with annotations', async () => {
+describe("MCP adapter", () => {
+  it("exposes search_docs tool with annotations", async () => {
     const tools = await server.listTools({});
-    const searchDocs = tools.find(t => t.name === 'search_docs');
+    const searchDocs = tools.find((t) => t.name === "search_docs");
     expect(searchDocs).toBeDefined();
   });
 });
 
 // test/claude-agent-sdk.test.ts
-import { searchDocsTool } from '../tools/claude-agent-sdk';
+import { searchDocsTool } from "../tools/claude-agent-sdk";
 
-describe('Claude Code SDK adapter', () => {
-  it('tool has correct shape', () => {
-    expect(searchDocsTool).toHaveProperty('name', 'search_docs');
-    expect(searchDocsTool).toHaveProperty('description');
-    expect(searchDocsTool).toHaveProperty('inputSchema');
-    expect(searchDocsTool).toHaveProperty('execute');
+describe("Claude Code SDK adapter", () => {
+  it("tool has correct shape", () => {
+    expect(searchDocsTool).toHaveProperty("name", "search_docs");
+    expect(searchDocsTool).toHaveProperty("description");
+    expect(searchDocsTool).toHaveProperty("inputSchema");
+    expect(searchDocsTool).toHaveProperty("execute");
   });
 });
 ```

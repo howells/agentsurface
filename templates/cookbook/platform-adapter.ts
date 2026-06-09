@@ -30,11 +30,8 @@ import { z } from "zod";
  * Canonical message format used internally.
  */
 export const CanonicalMessageSchema = z.object({
-  id: z.string(),
-  role: z.enum(["user", "assistant"]),
   content: z.string(),
-  platform: z.enum(["web", "slack", "whatsapp", "telegram", "sendblue"]),
-  userId: z.string(),
+  id: z.string(),
   metadata: z
     .object({
       timestamp: z.number(),
@@ -48,6 +45,9 @@ export const CanonicalMessageSchema = z.object({
         .optional(),
     })
     .optional(),
+  platform: z.enum(["web", "slack", "whatsapp", "telegram", "sendblue"]),
+  role: z.enum(["user", "assistant"]),
+  userId: z.string(),
 });
 
 export type CanonicalMessage = z.infer<typeof CanonicalMessageSchema>;
@@ -80,22 +80,22 @@ export class WebAdapter implements PlatformAdapter {
     const data = incoming as Record<string, unknown>;
 
     return {
-      id: String(data.id || ""),
-      role: data.role === "user" ? "user" : "assistant",
       content: String(data.content || ""),
-      platform: "web",
-      userId: String(data.userId || ""),
+      id: String(data.id || ""),
       metadata: {
         timestamp: Date.now(),
       },
+      platform: "web",
+      role: data.role === "user" ? "user" : "assistant",
+      userId: String(data.userId || ""),
     };
   }
 
   async format(msg: CanonicalMessage): Promise<unknown> {
     return {
-      id: msg.id,
       content: msg.content,
       html: this.markdownToHtml(msg.content),
+      id: msg.id,
       richContent: msg.metadata?.richContent,
     };
   }
@@ -113,7 +113,7 @@ export class WebAdapter implements PlatformAdapter {
    */
   private markdownToHtml(md: string): string {
     // <CUSTOMISE> Use marked.js, remark, or similar
-    return md.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    return md.replaceAll(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   }
 }
 
@@ -126,14 +126,14 @@ export class SlackAdapter implements PlatformAdapter {
     const slackEvent = data.event as Record<string, unknown> | undefined;
 
     return {
-      id: String(slackEvent?.ts || ""),
-      role: "user",
       content: String(slackEvent?.text || ""),
-      platform: "slack",
-      userId: String(slackEvent?.user || ""),
+      id: String(slackEvent?.ts || ""),
       metadata: {
         timestamp: Number(slackEvent?.ts) * 1000,
       },
+      platform: "slack",
+      role: "user",
+      userId: String(slackEvent?.user || ""),
     };
   }
 
@@ -158,16 +158,16 @@ export class SlackAdapter implements PlatformAdapter {
   /**
    * Convert markdown to Slack Block Kit JSON.
    */
-  private markdownToBlocks(md: string): Array<Record<string, unknown>> {
+  private markdownToBlocks(md: string): Record<string, unknown>[] {
     // <CUSTOMISE> Implement full markdown → Block Kit conversion
     // For now, simple text blocks:
     return [
       {
-        type: "section",
         text: {
-          type: "mrkdwn",
           text: md,
+          type: "mrkdwn",
         },
+        type: "section",
       },
     ];
   }
@@ -175,7 +175,7 @@ export class SlackAdapter implements PlatformAdapter {
   /**
    * Extract plain text from blocks (for fallback).
    */
-  private blockToPlainText(blocks: Array<Record<string, unknown>>): string {
+  private blockToPlainText(blocks: Record<string, unknown>[]): string {
     return blocks
       .map((block) => {
         if (block.type === "section" && block.text) {
@@ -196,14 +196,14 @@ export class WhatsAppAdapter implements PlatformAdapter {
     const message = data.messages?.[0] as Record<string, unknown> | undefined;
 
     return {
-      id: String(message?.id || ""),
-      role: "user",
       content: String(message?.text?.body || ""),
-      platform: "whatsapp",
-      userId: String(message?.from || ""),
+      id: String(message?.id || ""),
       metadata: {
         timestamp: Number(message?.timestamp) * 1000,
       },
+      platform: "whatsapp",
+      role: "user",
+      userId: String(message?.from || ""),
     };
   }
 
@@ -211,11 +211,11 @@ export class WhatsAppAdapter implements PlatformAdapter {
     // WhatsApp accepts plain text or template messages
     return {
       messaging_product: "whatsapp",
-      to: msg.userId,
-      type: "text",
       text: {
         body: msg.content,
       },
+      to: msg.userId,
+      type: "text",
     };
   }
 
@@ -238,22 +238,22 @@ export class TelegramAdapter implements PlatformAdapter {
     const message = data.message as Record<string, unknown> | undefined;
 
     return {
-      id: String(message?.message_id || ""),
-      role: "user",
       content: String(message?.text || ""),
-      platform: "telegram",
-      userId: String(message?.from?.id || ""),
+      id: String(message?.message_id || ""),
       metadata: {
         timestamp: (message?.date as number) * 1000,
       },
+      platform: "telegram",
+      role: "user",
+      userId: String(message?.from?.id || ""),
     };
   }
 
   async format(msg: CanonicalMessage): Promise<unknown> {
     return {
       chat_id: msg.userId,
-      text: msg.content,
       parse_mode: "Markdown",
+      text: msg.content,
     };
   }
 
@@ -272,7 +272,7 @@ export class TelegramAdapter implements PlatformAdapter {
  * In production, use Redis or a database.
  */
 export class IdentityLinkStore {
-  private links: Map<string, string> = new Map();
+  private links = new Map<string, string>();
 
   /**
    * Generate a linking code (QR code or short code).
@@ -286,11 +286,7 @@ export class IdentityLinkStore {
   /**
    * Verify linking code and associate userId with email.
    */
-  async verifyLink(
-    email: string,
-    linkingCode: string,
-    userId: string,
-  ): Promise<boolean> {
+  async verifyLink(email: string, linkingCode: string, userId: string): Promise<boolean> {
     // <CUSTOMISE> Validate code, check TTL, then store
     this.links.set(email, userId);
     return true;
@@ -312,19 +308,25 @@ export function getPlatformAdapter(
   platform: "web" | "slack" | "whatsapp" | "telegram" | "sendblue",
 ): PlatformAdapter {
   switch (platform) {
-    case "web":
+    case "web": {
       return new WebAdapter();
-    case "slack":
+    }
+    case "slack": {
       return new SlackAdapter();
-    case "whatsapp":
+    }
+    case "whatsapp": {
       return new WhatsAppAdapter();
-    case "telegram":
+    }
+    case "telegram": {
       return new TelegramAdapter();
-    case "sendblue":
+    }
+    case "sendblue": {
       // <CUSTOMISE> Implement SendblueAdapter
-      return new WhatsAppAdapter(); // Placeholder
-    default:
-      return new WebAdapter(); // Default to web
+      return new WhatsAppAdapter();
+    } // Placeholder
+    default: {
+      return new WebAdapter();
+    } // Default to web
   }
 }
 
@@ -343,9 +345,7 @@ export async function processMessage(
 /**
  * Example: Format a response back to platform.
  */
-export async function formatResponse(
-  msg: CanonicalMessage,
-): Promise<unknown> {
+export async function formatResponse(msg: CanonicalMessage): Promise<unknown> {
   const adapter = getPlatformAdapter(
     msg.platform as "web" | "slack" | "whatsapp" | "telegram" | "sendblue",
   );

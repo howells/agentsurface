@@ -30,7 +30,8 @@
  * ✓ Test with MCP client library
  */
 
-import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply } from "fastify";
+import Fastify from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import fastifyJwt from "@fastify/jwt";
 import fastifyCors from "@fastify/cors";
 import { HttpServerTransport } from "@modelcontextprotocol/sdk/server/http.js";
@@ -40,7 +41,7 @@ import type { TextContent, ErrorContent } from "@modelcontextprotocol/sdk/types.
 
 // ===== Configuration =====
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
 const OAUTH_ISSUER = process.env.OAUTH_ISSUER || "https://auth.example.com";
 const OAUTH_AUDIENCE = process.env.OAUTH_AUDIENCE || "mcp-server";
@@ -58,26 +59,26 @@ class Logger {
   info(message: string, data?: Record<string, unknown>): void {
     console.log(
       JSON.stringify({
-        level: "INFO",
         context: this.context,
+        level: "INFO",
         message,
         timestamp: new Date().toISOString(),
         ...(data && { data }),
-      })
+      }),
     );
   }
 
   error(message: string, error?: Error, data?: Record<string, unknown>): void {
     console.error(
       JSON.stringify({
-        level: "ERROR",
         context: this.context,
-        message,
         error: error?.message,
+        level: "ERROR",
+        message,
         stack: error?.stack,
         timestamp: new Date().toISOString(),
         ...(data && { data }),
-      })
+      }),
     );
   }
 }
@@ -101,7 +102,7 @@ class RateLimiter {
     if (!bucket || now > bucket.resetAt) {
       this.buckets.set(clientId, {
         count: 1,
-        resetAt: now + 60000, // 1 minute window
+        resetAt: now + 60_000, // 1 minute window
       });
       return true;
     }
@@ -124,15 +125,15 @@ const limiter = new RateLimiter(100); // 100 requests per minute per client
 // ===== Input Schemas (Zod) =====
 
 const searchDocsSchema = z.object({
-  query: z.string().min(1),
   limit: z.number().int().min(1).max(50).default(10),
+  query: z.string().min(1),
 });
 
 const createIssueSchema = z.object({
-  title: z.string().min(1),
-  description: z.string(),
   assignee: z.string().optional(),
+  description: z.string(),
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  title: z.string().min(1),
 });
 
 // ===== MCP Server Setup =====
@@ -145,11 +146,11 @@ function setupMcpServer(): McpServer {
     },
     {
       capabilities: {
-        tools: {},
-        resources: {},
         prompts: {},
+        resources: {},
+        tools: {},
       },
-    }
+    },
   );
 
   // search_docs tool
@@ -159,14 +160,15 @@ function setupMcpServer(): McpServer {
     { schema: searchDocsSchema },
     async (input) => {
       logger.info("tool:search_docs", { query: input.query });
-      const results = [
-        { title: "Getting Started", url: "https://example.com/docs/start" },
-      ].slice(0, input.limit);
+      const results = [{ title: "Getting Started", url: "https://example.com/docs/start" }].slice(
+        0,
+        input.limit,
+      );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(results) }],
+        content: [{ text: JSON.stringify(results), type: "text" as const }],
       };
     },
-    { annotations: { readOnlyHint: true, openWorldHint: true } }
+    { annotations: { openWorldHint: true, readOnlyHint: true } },
   );
 
   // create_issue tool
@@ -176,39 +178,34 @@ function setupMcpServer(): McpServer {
     { schema: createIssueSchema },
     async (input) => {
       logger.info("tool:create_issue", { title: input.title });
-      const issueId = `ISSUE-${Math.floor(Math.random() * 10000)}`;
+      const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
       return {
         content: [
           {
-            type: "text" as const,
             text: JSON.stringify({
               id: issueId,
               title: input.title,
               priority: input.priority,
               created_at: new Date().toISOString(),
             }),
+            type: "text" as const,
           },
         ],
       };
     },
-    { annotations: { destructiveHint: true, idempotentHint: true } }
+    { annotations: { destructiveHint: true, idempotentHint: true } },
   );
 
   // config resource
-  server.resource(
-    "config://api-docs",
-    "text/markdown",
-    "API Documentation",
-    async () => ({
-      contents: [
-        {
-          uri: "config://api-docs",
-          mimeType: "text/markdown",
-          text: "# API Documentation\n\nRemote MCP server. See https://modelcontextprotocol.io/specification/2025-11-25",
-        },
-      ],
-    })
-  );
+  server.resource("config://api-docs", "text/markdown", "API Documentation", async () => ({
+    contents: [
+      {
+        mimeType: "text/markdown",
+        text: "# API Documentation\n\nRemote MCP server. See https://modelcontextprotocol.io/specification/2025-11-25",
+        uri: "config://api-docs",
+      },
+    ],
+  }));
 
   return server;
 }
@@ -226,18 +223,18 @@ async function setupFastify(): Promise<FastifyInstance> {
 
   // ===== CORS =====
   await fastify.register(fastifyCors, {
-    origin: ALLOWED_ORIGINS,
     credentials: true,
+    origin: ALLOWED_ORIGINS,
   });
 
   // ===== Health Check =====
-  fastify.get("/health", async (_request, reply) => {
-    return reply.send({ status: "ok", timestamp: new Date().toISOString() });
-  });
+  fastify.get("/health", async (_request, reply) =>
+    reply.send({ status: "ok", timestamp: new Date().toISOString() }),
+  );
 
   // ===== OAuth Metadata (RFC 8414 + ext) =====
-  fastify.get("/.well-known/oauth-protected-resource", async (_request, reply) => {
-    return reply.send({
+  fastify.get("/.well-known/oauth-protected-resource", async (_request, reply) =>
+    reply.send({
       issuer: OAUTH_ISSUER,
       token_endpoint: `${OAUTH_ISSUER}/oauth/token`,
       authorization_endpoint: `${OAUTH_ISSUER}/oauth/authorize`,
@@ -245,8 +242,8 @@ async function setupFastify(): Promise<FastifyInstance> {
       grant_types_supported: ["client_credentials"],
       scopes_supported: ["mcp:tools:read", "mcp:resources:read"],
       dpop_signing_alg_values_supported: ["RS256"],
-    });
-  });
+    }),
+  );
 
   // ===== MCP Endpoint =====
   fastify.post<{ Body: Record<string, unknown> }>(
@@ -255,28 +252,28 @@ async function setupFastify(): Promise<FastifyInstance> {
       schema: {
         description: "MCP Streamable HTTP endpoint",
         headers: {
-          type: "object",
           properties: {
             authorization: { type: "string" },
             "mcp-session-id": { type: "string" },
           },
           required: ["authorization"],
+          type: "object",
         },
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authHeader = request.headers.authorization;
-      const sessionId = request.headers["mcp-session-id"] as string || `session-${Date.now()}`;
+      const sessionId = (request.headers["mcp-session-id"] as string) || `session-${Date.now()}`;
 
       // ===== JWT Validation =====
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         logger.error("mcp_auth_missing", undefined, { sessionId });
         return reply.status(401).send({
-          type: "https://api.example.com/errors/missing-auth",
-          title: "Missing Authorization",
-          status: 401,
           detail: "Authorization header missing or malformed",
           instance: sessionId,
+          status: 401,
+          title: "Missing Authorization",
+          type: "https://api.example.com/errors/missing-auth",
         });
       }
 
@@ -294,21 +291,21 @@ async function setupFastify(): Promise<FastifyInstance> {
             sessionId,
           });
           return reply.status(403).send({
-            type: "https://api.example.com/errors/insufficient-scope",
-            title: "Insufficient Scope",
-            status: 403,
             detail: "Token missing 'mcp:tools:read' scope",
             instance: sessionId,
+            status: 403,
+            title: "Insufficient Scope",
+            type: "https://api.example.com/errors/insufficient-scope",
           });
         }
-      } catch (err) {
-        logger.error("mcp_jwt_verify_failed", err as Error, { sessionId });
+      } catch (error) {
+        logger.error("mcp_jwt_verify_failed", error as Error, { sessionId });
         return reply.status(401).send({
-          type: "https://api.example.com/errors/invalid-token",
-          title: "Invalid Token",
-          status: 401,
           detail: "JWT validation failed",
           instance: sessionId,
+          status: 401,
+          title: "Invalid Token",
+          type: "https://api.example.com/errors/invalid-token",
         });
       }
 
@@ -319,11 +316,11 @@ async function setupFastify(): Promise<FastifyInstance> {
           sessionId,
         });
         return reply.status(429).send({
-          type: "https://api.example.com/errors/rate-limit",
-          title: "Too Many Requests",
-          status: 429,
           detail: "Rate limit exceeded (100 requests/minute)",
           instance: sessionId,
+          status: 429,
+          title: "Too Many Requests",
+          type: "https://api.example.com/errors/rate-limit",
           "x-ratelimit-reset": new Date(Date.now() + 60000).toISOString(),
         });
       }
@@ -347,8 +344,8 @@ async function setupFastify(): Promise<FastifyInstance> {
           clientId,
           sessionId,
         });
-      } catch (err) {
-        logger.error("mcp_session_error", err as Error, {
+      } catch (error) {
+        logger.error("mcp_session_error", error as Error, {
           clientId,
           sessionId,
         });
@@ -356,11 +353,11 @@ async function setupFastify(): Promise<FastifyInstance> {
           type: "https://api.example.com/errors/mcp-error",
           title: "MCP Error",
           status: 500,
-          detail: (err as Error).message,
+          detail: (error as Error).message,
           instance: sessionId,
         });
       }
-    }
+    },
   );
 
   return fastify;
@@ -371,10 +368,10 @@ async function setupFastify(): Promise<FastifyInstance> {
 async function main(): Promise<void> {
   try {
     const fastify = await setupFastify();
-    await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    logger.info("server_listening", { port: PORT, pid: process.pid });
-  } catch (err) {
-    logger.error("startup_failed", err as Error);
+    await fastify.listen({ host: "0.0.0.0", port: PORT });
+    logger.info("server_listening", { pid: process.pid, port: PORT });
+  } catch (error) {
+    logger.error("startup_failed", error as Error);
     process.exit(1);
   }
 }

@@ -43,7 +43,7 @@ async function validateDPopProof(proof: string): Promise<void> {
 
   // Check if this JTI has been seen
   if (seenJtis.has(jti)) {
-    throw new Error('DPoP JTI has been replayed');
+    throw new Error("DPoP JTI has been replayed");
   }
 
   // Store the JTI with expiry
@@ -61,18 +61,18 @@ async function validateDPopProof(proof: string): Promise<void> {
 For distributed systems, use Redis or a similar distributed store:
 
 ```typescript
-import redis from 'redis';
+import redis from "redis";
 
 const redisClient = redis.createClient();
 const JTI_TTL = 2 * 60; // 2 minutes
 
 async function recordDPopJti(jti: string): Promise<boolean> {
-  const result = await redisClient.set(`dpop:jti:${jti}`, '1', {
+  const result = await redisClient.set(`dpop:jti:${jti}`, "1", {
     EX: JTI_TTL, // Auto-expire after TTL
-    NX: true,    // Only set if key doesn't exist
+    NX: true, // Only set if key doesn't exist
   });
 
-  return result === 'OK';
+  return result === "OK";
 }
 
 async function validateDPopProof(proof: string): Promise<void> {
@@ -81,7 +81,7 @@ async function validateDPopProof(proof: string): Promise<void> {
 
   const recorded = await recordDPopJti(jti);
   if (!recorded) {
-    throw new Error('DPoP JTI has been replayed');
+    throw new Error("DPoP JTI has been replayed");
   }
 }
 ```
@@ -111,18 +111,15 @@ Content-Type: application/json
 Servers store a mapping of `Idempotency-Key` → response for a limited time (typically 24 hours). On subsequent requests with the same key, the server returns the cached response without re-executing.
 
 ```typescript
-import redis from 'redis';
+import redis from "redis";
 
 const redisClient = redis.createClient();
 const IDEMPOTENCY_TTL = 24 * 60 * 60; // 24 hours
 
 async function handlePayment(req: Request): Promise<Response> {
-  const idempotencyKey = req.headers.get('Idempotency-Key');
+  const idempotencyKey = req.headers.get("Idempotency-Key");
   if (!idempotencyKey) {
-    return Response.json(
-      { error: 'Idempotency-Key header is required' },
-      { status: 400 }
-    );
+    return Response.json({ error: "Idempotency-Key header is required" }, { status: 400 });
   }
 
   // Check if this request has been seen before
@@ -143,24 +140,16 @@ async function handlePayment(req: Request): Promise<Response> {
   }
 
   // Cache the successful response
-  await redisClient.set(
-    cacheKey,
-    JSON.stringify(result),
-    { EX: IDEMPOTENCY_TTL }
-  );
+  await redisClient.set(cacheKey, JSON.stringify(result), { EX: IDEMPOTENCY_TTL });
 
   return Response.json(result, { status: 200 });
 }
 
-async function processPayment(data: {
-  amount: number;
-  currency: string;
-  description: string;
-}) {
+async function processPayment(data: { amount: number; currency: string; description: string }) {
   // Execute payment logic
   return {
-    transaction_id: 'txn_01HV3K8MNP',
-    status: 'completed',
+    transaction_id: "txn_01HV3K8MNP",
+    status: "completed",
     amount: data.amount,
   };
 }
@@ -182,9 +171,9 @@ For high-value operations (payments, user provisioning, data deletion), use both
 
 ```typescript
 async function handlePayment(req: Request): Promise<Response> {
-  const idempotencyKey = req.headers.get('Idempotency-Key');
-  const dpopHeader = req.headers.get('DPoP');
-  const authHeader = req.headers.get('Authorization');
+  const idempotencyKey = req.headers.get("Idempotency-Key");
+  const dpopHeader = req.headers.get("DPoP");
+  const authHeader = req.headers.get("Authorization");
 
   // Validate DPoP (prevents token replay)
   if (dpopHeader) {
@@ -193,10 +182,7 @@ async function handlePayment(req: Request): Promise<Response> {
 
   // Validate idempotency (prevents double-submission)
   if (!idempotencyKey) {
-    return Response.json(
-      { error: 'Idempotency-Key is required' },
-      { status: 400 }
-    );
+    return Response.json({ error: "Idempotency-Key is required" }, { status: 400 });
   }
 
   const cached = await redisClient.get(`idempotency:${idempotencyKey}`);
@@ -207,11 +193,9 @@ async function handlePayment(req: Request): Promise<Response> {
   // Process payment
   const result = await processPayment(await req.json());
 
-  await redisClient.set(
-    `idempotency:${idempotencyKey}`,
-    JSON.stringify(result),
-    { EX: 24 * 60 * 60 }
-  );
+  await redisClient.set(`idempotency:${idempotencyKey}`, JSON.stringify(result), {
+    EX: 24 * 60 * 60,
+  });
 
   return Response.json(result, { status: 200 });
 }
@@ -227,20 +211,20 @@ For large-scale systems, maintain separate stores:
 
 ```typescript
 // Using Redis with automatic expiration
-const dPopStore = redisClient.createClient({ password: '...', db: 0 });
-const idempotencyStore = redisClient.createClient({ password: '...', db: 1 });
+const dPopStore = redisClient.createClient({ password: "...", db: 0 });
+const idempotencyStore = redisClient.createClient({ password: "...", db: 1 });
 
 async function recordDPopJti(jti: string): Promise<boolean> {
-  const result = await dPopStore.set(`jti:${jti}`, '1', {
-    EX: 120,      // 2 minutes
+  const result = await dPopStore.set(`jti:${jti}`, "1", {
+    EX: 120, // 2 minutes
     NX: true,
   });
-  return result === 'OK';
+  return result === "OK";
 }
 
 async function recordIdempotencyKey(key: string, response: string): Promise<void> {
   await idempotencyStore.set(`key:${key}`, response, {
-    EX: 86400,    // 24 hours
+    EX: 86400, // 24 hours
   });
 }
 ```
@@ -252,21 +236,21 @@ Monitor store size to prevent unbounded growth. Use Redis eviction policies (e.g
 Agents should generate idempotency keys and retry on network failures:
 
 ```typescript
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 
 async function makePaymentWithRetry(amount: number, maxRetries = 3) {
   const idempotencyKey = randomUUID();
-  const dPopProof = await generateDPopProof('POST', 'https://api.example.com/payments');
+  const dPopProof = await generateDPopProof("POST", "https://api.example.com/payments");
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await fetch('https://api.example.com/payments', {
-        method: 'POST',
+      const res = await fetch("https://api.example.com/payments", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'DPoP': dPopProof,
-          'Idempotency-Key': idempotencyKey,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          DPoP: dPopProof,
+          "Idempotency-Key": idempotencyKey,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ amount }),
       });
@@ -277,7 +261,7 @@ async function makePaymentWithRetry(amount: number, maxRetries = 3) {
 
       if (res.status === 408 || res.status >= 500) {
         // Retryable error
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         continue;
       }
 
@@ -286,7 +270,7 @@ async function makePaymentWithRetry(amount: number, maxRetries = 3) {
     } catch (err) {
       if (attempt === maxRetries - 1) throw err;
       // Retry on network error
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
     }
   }
 }

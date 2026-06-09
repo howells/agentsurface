@@ -11,14 +11,14 @@ Use this page when evaluating or scaffolding Claude-native systems.
 
 ## Current Surfaces
 
-| Surface | Use When | Notes |
-|---|---|---|
-| Claude Managed Agents | You want Anthropic to run the autonomous agent harness. | Public beta. Sessions, containers, streaming events, memory, webhooks, vault credentials, multiagent sessions, and outcomes use the `managed-agents-2026-04-01` beta header. |
-| Claude Code SDK | You need the Claude Code harness in an app or service. | File operations, code execution, web search, permissions, sessions, monitoring, and MCP extensibility. |
-| Messages API with MCP Connector | A Claude request should call public remote MCP tools directly. | Supports remote HTTP/SSE or Streamable HTTP servers. Current connector support is tool-focused, not the full MCP primitive set. |
-| Agent Skills | You need reusable procedures, scripts, assets, and domain workflows. | Skills complement MCP: MCP exposes callable systems; Skills teach Claude how to carry out repeatable work. |
-| Built-in tools | Claude should use web search, web fetch, code execution, tool search, or memory without custom servers. | Several tools became generally available in 2026, reducing the need for custom wrappers. |
-| Claude Platform on AWS / Bedrock / Microsoft Foundry / Vertex AI | Enterprise deployment, regional, cloud billing, or IAM constraints drive the choice. | Capabilities vary by cloud and release channel; check the current platform docs before assuming parity. |
+| Surface                                                          | Use When                                                                                                | Notes                                                                                                                                                                        |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Managed Agents                                            | You want Anthropic to run the autonomous agent harness.                                                 | Public beta. Sessions, containers, streaming events, memory, webhooks, vault credentials, multiagent sessions, and outcomes use the `managed-agents-2026-04-01` beta header. |
+| Claude Code SDK                                                  | You need the Claude Code harness in an app or service.                                                  | File operations, code execution, web search, permissions, sessions, monitoring, and MCP extensibility.                                                                       |
+| Messages API with MCP Connector                                  | A Claude request should call public remote MCP tools directly.                                          | Supports remote HTTP/SSE or Streamable HTTP servers. Current connector support is tool-focused, not the full MCP primitive set.                                              |
+| Agent Skills                                                     | You need reusable procedures, scripts, assets, and domain workflows.                                    | Skills complement MCP: MCP exposes callable systems; Skills teach Claude how to carry out repeatable work.                                                                   |
+| Built-in tools                                                   | Claude should use web search, web fetch, code execution, tool search, or memory without custom servers. | Several tools became generally available in 2026, reducing the need for custom wrappers.                                                                                     |
+| Claude Platform on AWS / Bedrock / Microsoft Foundry / Vertex AI | Enterprise deployment, regional, cloud billing, or IAM constraints drive the choice.                    | Capabilities vary by cloud and release channel; check the current platform docs before assuming parity.                                                                      |
 
 ## What Changed Recently
 

@@ -39,8 +39,8 @@ Why does this repo exist? What does it do?
 ```markdown
 # AGENTS.md
 
-Monorepo for SaaS analytics platform. API server (Node/Fastify), 
-Web (Next.js 15), shared type definitions. Handles time-series data 
+Monorepo for SaaS analytics platform. API server (Node/Fastify),
+Web (Next.js 15), shared type definitions. Handles time-series data
 ingestion, real-time dashboards, and user management.
 ```
 
@@ -52,18 +52,18 @@ Ship actual command lines, not prose. Include timing, which commands block CI.
 ## Quick Start
 
 Development (fast):
-  pnpm dev          # Start API + Web (http://localhost:3000)
-  pnpm test         # All tests (~10s)
-  pnpm test:watch   # Watch mode
-  pnpm lint         # ESLint + Prettier (~3s)
+pnpm dev # Start API + Web (http://localhost:3000)
+pnpm test # All tests (~10s)
+pnpm test:watch # Watch mode
+pnpm lint # ESLint + Prettier (~3s)
 
 Build (slow):
-  pnpm build        # Production bundles (~3m)
-  turbo run test --parallel -- --coverage
+pnpm build # Production bundles (~3m)
+turbo run test --parallel -- --coverage
 
 Database:
-  pnpm db:migrate   # Apply pending migrations (~30s)
-  pnpm db:seed      # Populate test data
+pnpm db:migrate # Apply pending migrations (~30s)
+pnpm db:seed # Populate test data
 ```
 
 Include timing. Mark slow commands (>30s). Include `--json`, `--dry-run`, and other agent-affecting flags.
@@ -76,21 +76,24 @@ Link to key directories. No generic descriptions.
 ## Tech Stack
 
 API server (packages/api):
-  - Fastify + TypeScript
-  - Prisma ORM + PostgreSQL
-  - Routes: src/routes/
-  - Tests: src/routes/__tests__/
+
+- Fastify + TypeScript
+- Prisma ORM + PostgreSQL
+- Routes: src/routes/
+- Tests: src/routes/**tests**/
 
 Web (packages/web):
-  - Next.js 15 + React 19
-  - TailwindCSS + shadcn/ui
-  - Components: src/components/
-  - Pages: src/app/
+
+- Next.js 15 + React 19
+- TailwindCSS + shadcn/ui
+- Components: src/components/
+- Pages: src/app/
 
 Shared (packages/shared):
-  - Type definitions: src/types/
-  - Zod schemas: src/schemas/
-  - Utilities: src/lib/
+
+- Type definitions: src/types/
+- Zod schemas: src/schemas/
+- Utilities: src/lib/
 ```
 
 Be specific. "/src/routes/" not "/the routes directory".
@@ -126,9 +129,10 @@ E2E: Playwright in packages/web
 Coverage: --coverage flag for reports
 
 Blocks merge:
-  - Unit tests must pass (pnpm test)
-  - No TypeScript errors (pnpm type-check)
-  - Lint errors block CI (pnpm lint)
+
+- Unit tests must pass (pnpm test)
+- No TypeScript errors (pnpm type-check)
+- Lint errors block CI (pnpm lint)
 
 Add tests: Create .test.ts alongside source files.
 ```
@@ -141,25 +145,28 @@ Always / Ask first / Never. Explicit and enforceable.
 ## Boundaries
 
 Always:
-  - Read files in src/, tests/, docs/
-  - Run tests: pnpm test
-  - Run linting: pnpm lint
-  - Open draft PRs: gh pr create --draft
-  - Review error messages and logs
+
+- Read files in src/, tests/, docs/
+- Run tests: pnpm test
+- Run linting: pnpm lint
+- Open draft PRs: gh pr create --draft
+- Review error messages and logs
 
 Ask first:
-  - Install new dependencies (pnpm add ...)
-  - Run migrations (pnpm db:migrate)
-  - Modify TypeScript config or build settings
-  - Commit directly to main (use PR instead)
-  - Deploy to staging
+
+- Install new dependencies (pnpm add ...)
+- Run migrations (pnpm db:migrate)
+- Modify TypeScript config or build settings
+- Commit directly to main (use PR instead)
+- Deploy to staging
 
 Never:
-  - Deploy to production
-  - Rotate API keys or secrets
-  - Delete branches or tags
-  - Modify .env files in git
-  - Run sudo or system-wide commands
+
+- Deploy to production
+- Rotate API keys or secrets
+- Delete branches or tags
+- Modify .env files in git
+- Run sudo or system-wide commands
 ```
 
 Make boundaries rules, not aspirations.
@@ -219,29 +226,29 @@ SaaS analytics platform: API (Fastify + Node), Web (Next.js 15), Shared types.
 ## Quick Start
 
 Dev:
-  pnpm dev        # Both API + Web
-  pnpm test       # All packages (~10s)
-  pnpm lint       # ESLint + Prettier
+pnpm dev # Both API + Web
+pnpm test # All packages (~10s)
+pnpm lint # ESLint + Prettier
 
 Build & release:
-  pnpm build      # Production builds (~3m)
-  changeset add   # Stage version bump
-  pnpm release    # Publish to npm
+pnpm build # Production builds (~3m)
+changeset add # Stage version bump
+pnpm release # Publish to npm
 
 ## Commands by Package
 
 API (packages/api):
-  pnpm --filter=@app/api dev         # http://localhost:3001
-  pnpm --filter=@app/api test:watch
-  pnpm --filter=@app/api db:migrate  # Ask before running
+pnpm --filter=@app/api dev # http://localhost:3001
+pnpm --filter=@app/api test:watch
+pnpm --filter=@app/api db:migrate # Ask before running
 
 Web (packages/web):
-  pnpm --filter=@app/web dev         # http://localhost:3000
-  pnpm --filter=@app/web build
+pnpm --filter=@app/web dev # http://localhost:3000
+pnpm --filter=@app/web build
 
 Shared (packages/shared):
-  pnpm --filter=@app/shared type-check
-  pnpm --filter=@app/shared build    # Emits TS + ESM
+pnpm --filter=@app/shared type-check
+pnpm --filter=@app/shared build # Emits TS + ESM
 
 ## Conventions
 
@@ -258,26 +265,30 @@ E2E: Playwright
 Coverage: --coverage flag
 
 Blocks merge:
-  - pnpm test must pass
-  - pnpm type-check must pass (strict mode)
-  - pnpm lint must pass (no manual overrides)
+
+- pnpm test must pass
+- pnpm type-check must pass (strict mode)
+- pnpm lint must pass (no manual overrides)
 
 ## Boundaries
 
 Always:
-  - Read files in src/, tests/, docs/
-  - Run tests, linting, type-check
-  - Open draft PRs: gh pr create --draft
+
+- Read files in src/, tests/, docs/
+- Run tests, linting, type-check
+- Open draft PRs: gh pr create --draft
 
 Ask first:
-  - Install dependencies
-  - Run migrations
-  - Modify TypeScript config
+
+- Install dependencies
+- Run migrations
+- Modify TypeScript config
 
 Never:
-  - Deploy to production
-  - Rotate credentials or modify .env
-  - Delete branches or tags
+
+- Deploy to production
+- Rotate credentials or modify .env
+- Delete branches or tags
 
 ## Gotchas
 

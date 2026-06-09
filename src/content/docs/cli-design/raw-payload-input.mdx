@@ -93,8 +93,8 @@ async function createDNSRecord(flags: Flags, stdin: Readable) {
       payload = JSON.parse(flags.payload);
     } catch {
       exitWithError({
-        error: 'invalid_json',
-        message: 'Value passed to --payload is not valid JSON',
+        error: "invalid_json",
+        message: "Value passed to --payload is not valid JSON",
         code: 2,
       });
     }
@@ -105,8 +105,8 @@ async function createDNSRecord(flags: Flags, stdin: Readable) {
       payload = JSON.parse(raw);
     } catch {
       exitWithError({
-        error: 'invalid_json',
-        message: 'Stdin input is not valid JSON',
+        error: "invalid_json",
+        message: "Stdin input is not valid JSON",
         code: 2,
       });
     }
@@ -202,12 +202,12 @@ Do not silently coerce types. If the agent passed `"priority": "10"` as a string
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | Only bespoke flags. No way to pass structured input. |
-| 1 | Accepts `--json` or stdin JSON for some commands, but most require flags. |
-| 2 | All mutating commands accept a raw JSON payload that maps directly to the underlying API schema. |
-| 3 | Raw payload is first-class alongside convenience flags. The agent can use the API schema as documentation with zero translation loss. |
+| Score | Criteria                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Only bespoke flags. No way to pass structured input.                                                                                  |
+| 1     | Accepts `--json` or stdin JSON for some commands, but most require flags.                                                             |
+| 2     | All mutating commands accept a raw JSON payload that maps directly to the underlying API schema.                                      |
+| 3     | Raw payload is first-class alongside convenience flags. The agent can use the API schema as documentation with zero translation loss. |
 
 ## Checklist
 

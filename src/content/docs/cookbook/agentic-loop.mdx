@@ -144,6 +144,7 @@ export async function generateMonthlyInsights(params: {
 ```
 
 **Use when**:
+
 - No streaming required (worker scripts, scheduled jobs).
 - Deterministic input/output (not user-facing chat).
 - You need the final text without token-by-token updates.
@@ -176,11 +177,13 @@ async function askAgent(userMessage: string) {
 ```
 
 **Pros**:
+
 - Reuses Claude Code's tool harness and permission model.
 - Works naturally with local/repo context and MCP configuration.
 - Good for coding, incident response, migration, and agentic CLI workflows.
 
 **Cons**:
+
 - Fit is weaker for product chat UI than Vercel AI SDK.
 - App-specific tools are usually exposed through MCP rather than direct in-process handlers.
 - Permission and allowed-tool policy still need explicit configuration.
@@ -286,25 +289,31 @@ const tools = {
         const customer = await db.getCustomer(params.id);
         if (!customer) {
           return {
-            content: [{
-              type: "text",
-              text: `Customer ${params.id} not found`,
-            }],
+            content: [
+              {
+                type: "text",
+                text: `Customer ${params.id} not found`,
+              },
+            ],
             isError: true, // Framework marks this as failed
           };
         }
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(customer),
-          }],
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(customer),
+            },
+          ],
         };
       } catch (err) {
         return {
-          content: [{
-            type: "text",
-            text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
           isError: true,
         };
       }
@@ -314,6 +323,7 @@ const tools = {
 ```
 
 **Framework behavior**:
+
 - Tools that return `isError: true` are shown to the model as failures; the model can retry.
 - Return `isError: true` for recoverable errors (not found, validation) so the model can retry or adjust. Throw exceptions for truly fatal errors (auth failure, missing config) that should halt the agent.
 
@@ -351,12 +361,14 @@ const stream = await client.agents.stream({
 ## Streaming vs. Non-Streaming
 
 **Streaming** (real-time user feedback):
+
 - Use `agent.stream()` or `client.agents.stream()`.
 - Emit tokens as they arrive.
 - Better UX for chat interfaces.
 - Use Vercel AI or Claude Code SDK.
 
 **Non-streaming** (background jobs, deterministic output):
+
 - Use `generateText()` or `client.agents.query()`.
 - Wait for final result.
 - Easier for workers; no streaming infrastructure needed.
@@ -375,10 +387,11 @@ If you have a custom loop:
 5. **Adjust max steps**: Framework defaults are often too high; dial down to 5–10.
 
 **Before** (custom loop):
+
 ```typescript
 async function chatLoop(userMessage: string) {
   const messages = [{ role: "user", content: userMessage }];
-  
+
   for (let step = 0; step < 10; step++) {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -391,7 +404,7 @@ async function chatLoop(userMessage: string) {
 
     const choice = response.choices[0];
     if (choice.finish_reason === "stop") break;
-    
+
     for (const call of choice.message.tool_calls ?? []) {
       const result = await executeTool(call.function.name, call.function.arguments);
       messages.push({
@@ -406,12 +419,13 @@ async function chatLoop(userMessage: string) {
       });
     }
   }
-  
+
   return messages[messages.length - 1].content;
 }
 ```
 
 **After** (Vercel AI):
+
 ```typescript
 async function chatLoop(userMessage: string) {
   const agent = new ToolLoopAgent({

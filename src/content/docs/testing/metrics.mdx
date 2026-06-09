@@ -32,8 +32,8 @@ function calculatePassAtK(results: boolean[], k: number): number {
   if (results.length < k) {
     throw new Error(`Need at least ${k} trials, got ${results.length}`);
   }
-  
-  const successCount = results.slice(0, k).filter(r => r).length;
+
+  const successCount = results.slice(0, k).filter((r) => r).length;
   return successCount > 0 ? 1 : 0; // 1 if any pass, 0 if all fail
 }
 
@@ -56,8 +56,8 @@ function calculatePassCaretK(results: boolean[], k: number): number {
   if (results.length < k) {
     throw new Error(`Need at least ${k} trials, got ${results.length}`);
   }
-  
-  return results.slice(0, k).every(r => r) ? 1 : 0; // 1 only if all pass
+
+  return results.slice(0, k).every((r) => r) ? 1 : 0; // 1 only if all pass
 }
 
 // Same trials as above
@@ -85,27 +85,23 @@ interface ToolCall {
 
 function calculateToolF1(
   expected: string[],
-  actual: string[]
+  actual: string[],
 ): { precision: number; recall: number; f1: number } {
   const expectedSet = new Set(expected);
   const actualSet = new Set(actual);
-  
-  const truePositives = Array.from(actualSet).filter(t => expectedSet.has(t)).length;
-  const falsePositives = Array.from(actualSet).filter(t => !expectedSet.has(t)).length;
-  const falseNegatives = Array.from(expectedSet).filter(t => !actualSet.has(t)).length;
-  
-  const precision = (truePositives + falsePositives === 0) 
-    ? 1 
-    : truePositives / (truePositives + falsePositives);
-  
-  const recall = (truePositives + falseNegatives === 0)
-    ? 1
-    : truePositives / (truePositives + falseNegatives);
-  
-  const f1 = (precision + recall === 0) 
-    ? 0 
-    : 2 * (precision * recall) / (precision + recall);
-  
+
+  const truePositives = Array.from(actualSet).filter((t) => expectedSet.has(t)).length;
+  const falsePositives = Array.from(actualSet).filter((t) => !expectedSet.has(t)).length;
+  const falseNegatives = Array.from(expectedSet).filter((t) => !actualSet.has(t)).length;
+
+  const precision =
+    truePositives + falsePositives === 0 ? 1 : truePositives / (truePositives + falsePositives);
+
+  const recall =
+    truePositives + falseNegatives === 0 ? 1 : truePositives / (truePositives + falseNegatives);
+
+  const f1 = precision + recall === 0 ? 0 : (2 * (precision * recall)) / (precision + recall);
+
   return { precision, recall, f1 };
 }
 
@@ -126,38 +122,30 @@ interface ToolSchema {
   required: string[];
 }
 
-function conformanceRate(
-  calls: ToolCall[],
-  schemas: Record<string, ToolSchema>
-): number {
+function conformanceRate(calls: ToolCall[], schemas: Record<string, ToolSchema>): number {
   let conformant = 0;
-  
+
   for (const call of calls) {
     const schema = schemas[call.name];
     if (!schema) continue;
-    
+
     // Check required fields
-    const hasAllRequired = schema.required.every(
-      field => call.arguments[field] !== undefined
-    );
-    
+    const hasAllRequired = schema.required.every((field) => call.arguments[field] !== undefined);
+
     // Check types
-    const typesCorrect = Object.entries(call.arguments).every(
-      ([key, value]) => {
-        const spec = schema.properties[key];
-        if (!spec) return false; // Unknown field
-        
-        const actualType = typeof value;
-        return (spec.type === actualType) || 
-               (spec.type === "number" && actualType === "number");
-      }
-    );
-    
+    const typesCorrect = Object.entries(call.arguments).every(([key, value]) => {
+      const spec = schema.properties[key];
+      if (!spec) return false; // Unknown field
+
+      const actualType = typeof value;
+      return spec.type === actualType || (spec.type === "number" && actualType === "number");
+    });
+
     if (hasAllRequired && typesCorrect) {
       conformant++;
     }
   }
-  
+
   return calls.length > 0 ? conformant / calls.length : 1;
 }
 ```
@@ -177,7 +165,7 @@ function mttr(attempts: Attempt[]): number {
   let totalRecoverySteps = 0;
   let recoveryCount = 0;
   let failureStart: number | null = null;
-  
+
   for (let i = 0; i < attempts.length; i++) {
     if (!attempts[i].success) {
       if (failureStart === null) {
@@ -189,7 +177,7 @@ function mttr(attempts: Attempt[]): number {
       failureStart = null;
     }
   }
-  
+
   return recoveryCount > 0 ? totalRecoverySteps / recoveryCount : 0;
 }
 
@@ -210,28 +198,26 @@ Fraction of tool calls where the agent invoked a tool that does not exist or pas
 function hallucinationRate(
   calls: ToolCall[],
   availableTools: Set<string>,
-  schemas: Record<string, ToolSchema>
+  schemas: Record<string, ToolSchema>,
 ): number {
   let hallucinations = 0;
-  
+
   for (const call of calls) {
     // Non-existent tool
     if (!availableTools.has(call.name)) {
       hallucinations++;
       continue;
     }
-    
+
     // Invalid schema
     const schema = schemas[call.name];
-    const missingRequired = schema.required.some(
-      f => call.arguments[f] === undefined
-    );
-    
+    const missingRequired = schema.required.some((f) => call.arguments[f] === undefined);
+
     if (missingRequired) {
       hallucinations++;
     }
   }
-  
+
   return calls.length > 0 ? hallucinations / calls.length : 0;
 }
 
@@ -260,11 +246,9 @@ interface TaskExecution {
 }
 
 function costPerTask(executions: TaskExecution[]): number {
-  const successful = executions.filter(e => e.success).length;
-  const totalCost = executions.reduce((sum, e) => 
-    sum + e.tokenCost + (e.judgeCost ?? 0), 0
-  );
-  
+  const successful = executions.filter((e) => e.success).length;
+  const totalCost = executions.reduce((sum, e) => sum + e.tokenCost + (e.judgeCost ?? 0), 0);
+
   return successful > 0 ? totalCost / successful : Infinity;
 }
 ```

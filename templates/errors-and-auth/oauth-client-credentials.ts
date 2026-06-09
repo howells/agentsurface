@@ -31,7 +31,7 @@ export class ClientCredentialsClient {
   private clientId: string;
   private clientSecret: string;
   private scopes: string[];
-  private tokenCache: Map<string, CachedToken> = new Map();
+  private tokenCache = new Map<string, CachedToken>();
   private maxRetries: number = 3;
   private retryBackoffMs: number = 100;
 
@@ -42,12 +42,12 @@ export class ClientCredentialsClient {
     scopes?: string[];
   }) {
     this.tokenEndpoint = opts.tokenEndpoint;
-    this.clientId = opts.clientId || process.env.OAUTH_CLIENT_ID || '';
-    this.clientSecret = opts.clientSecret || process.env.OAUTH_CLIENT_SECRET || '';
-    this.scopes = opts.scopes || (process.env.OAUTH_SCOPE?.split(' ') || []);
+    this.clientId = opts.clientId || process.env.OAUTH_CLIENT_ID || "";
+    this.clientSecret = opts.clientSecret || process.env.OAUTH_CLIENT_SECRET || "";
+    this.scopes = opts.scopes || process.env.OAUTH_SCOPE?.split(" ") || [];
 
     if (!this.clientId || !this.clientSecret) {
-      throw new Error('OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET required');
+      throw new Error("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET required");
     }
   }
 
@@ -55,23 +55,23 @@ export class ClientCredentialsClient {
    * Get a valid access token, using cache if available
    */
   async getAccessToken(): Promise<string> {
-    const cacheKey = this.scopes.join(' ') || 'default';
+    const cacheKey = this.scopes.join(" ") || "default";
 
     // Check cache
     const cached = this.tokenCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now() + 30000) {
+    if (cached && cached.expiresAt > Date.now() + 30_000) {
       // If >30s left, use cached token
       return cached.token;
     }
 
     // Fetch new token with exponential backoff retry
     const token = await this.fetchTokenWithRetry();
-    const expiresAt = Date.now() + token.expires_in * 1000 - 30000; // Refresh 30s early
+    const expiresAt = Date.now() + token.expires_in * 1000 - 30_000; // Refresh 30s early
 
     this.tokenCache.set(cacheKey, {
-      token: token.access_token,
       expiresAt,
       scope: token.scope,
+      token: token.access_token,
     });
 
     return token.access_token;
@@ -86,18 +86,18 @@ export class ClientCredentialsClient {
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
         return await this.fetchToken();
-      } catch (err) {
-        lastError = err as Error;
-        const waitMs = this.retryBackoffMs * Math.pow(2, attempt) + Math.random() * 1000;
+      } catch (error) {
+        lastError = error as Error;
+        const waitMs = this.retryBackoffMs * 2 ** attempt + Math.random() * 1000;
         console.warn(
-          `[OAuth] Token fetch attempt ${attempt + 1} failed, retrying in ${waitMs}ms: ${lastError.message}`
+          `[OAuth] Token fetch attempt ${attempt + 1} failed, retrying in ${waitMs}ms: ${lastError.message}`,
         );
         await new Promise((resolve) => setTimeout(resolve, waitMs));
       }
     }
 
     throw new Error(
-      `Failed to fetch access token after ${this.maxRetries} attempts: ${lastError?.message}`
+      `Failed to fetch access token after ${this.maxRetries} attempts: ${lastError?.message}`,
     );
   }
 
@@ -106,29 +106,27 @@ export class ClientCredentialsClient {
    */
   private async fetchToken(): Promise<TokenResponse> {
     const body = new URLSearchParams({
-      grant_type: 'client_credentials',
       client_id: this.clientId,
       client_secret: this.clientSecret,
+      grant_type: "client_credentials",
     });
 
     if (this.scopes.length > 0) {
-      body.append('scope', this.scopes.join(' '));
+      body.append("scope", this.scopes.join(" "));
     }
 
     const response = await fetch(this.tokenEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'oauth-client-credentials/1.0',
-      },
       body: body.toString(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "oauth-client-credentials/1.0",
+      },
+      method: "POST",
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(
-        `Token endpoint returned ${response.status}: ${errorBody.slice(0, 200)}`
-      );
+      throw new Error(`Token endpoint returned ${response.status}: ${errorBody.slice(0, 200)}`);
     }
 
     return response.json() as Promise<TokenResponse>;
@@ -137,18 +135,15 @@ export class ClientCredentialsClient {
   /**
    * Make an authenticated HTTP request with Authorization header
    */
-  async request<T = unknown>(
-    url: string,
-    options?: RequestInit & { method?: string }
-  ): Promise<T> {
+  async request<T = unknown>(url: string, options?: RequestInit & { method?: string }): Promise<T> {
     const token = await this.getAccessToken();
 
     const headers = new Headers(options?.headers || {});
-    headers.set('Authorization', `Bearer ${token}`);
+    headers.set("Authorization", `Bearer ${token}`);
 
     // Add X-Forwarded-For for tracing (if available)
     if (process.env.X_FORWARDED_FOR) {
-      headers.set('X-Forwarded-For', process.env.X_FORWARDED_FOR);
+      headers.set("X-Forwarded-For", process.env.X_FORWARDED_FOR);
     }
 
     const response = await fetch(url, {
@@ -158,11 +153,11 @@ export class ClientCredentialsClient {
 
     if (response.status === 401 || response.status === 403) {
       // Token may have expired server-side; invalidate cache and retry once
-      const cacheKey = this.scopes.join(' ') || 'default';
+      const cacheKey = this.scopes.join(" ") || "default";
       this.tokenCache.delete(cacheKey);
 
       const newToken = await this.getAccessToken();
-      headers.set('Authorization', `Bearer ${newToken}`);
+      headers.set("Authorization", `Bearer ${newToken}`);
 
       return fetch(url, { ...options, headers }).then((r) => r.json());
     }
@@ -190,8 +185,8 @@ export function getOAuthClient(opts?: {
   if (!globalClient) {
     globalClient = new ClientCredentialsClient(
       opts || {
-        tokenEndpoint: process.env.OAUTH_TOKEN_URL || 'https://auth.example.com/token',
-      }
+        tokenEndpoint: process.env.OAUTH_TOKEN_URL || "https://auth.example.com/token",
+      },
     );
   }
   return globalClient;

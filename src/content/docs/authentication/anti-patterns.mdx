@@ -7,17 +7,17 @@ description: Silent failures and late-stage breakage in agent auth workflows
 
 Nine patterns that break agent auth silently: authorization-code-only API access, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silently or fail late.
 
-| Pattern | Fix |
-|---------|-----|
+| Pattern                                | Fix                                                         |
+| -------------------------------------- | ----------------------------------------------------------- |
 | Authorization Code only for API access | Support Client Credentials or an explicit registration flow |
-| CAPTCHA on token endpoint | Use rate limiting instead |
-| Session cookies | Use Bearer tokens with explicit `exp` |
-| Long-lived broad-scope keys | Short-lived, minimum-scope |
-| Overly broad scopes | Request only required scopes |
-| Hardcoded secrets | Environment variables only |
-| Per-request token calls | Cache for lifetime, refresh proactively |
-| No `aud` claim | Always set `aud`; use Token Exchange |
-| No DPoP binding | Add DPoP for sensitive resources |
+| CAPTCHA on token endpoint              | Use rate limiting instead                                   |
+| Session cookies                        | Use Bearer tokens with explicit `exp`                       |
+| Long-lived broad-scope keys            | Short-lived, minimum-scope                                  |
+| Overly broad scopes                    | Request only required scopes                                |
+| Hardcoded secrets                      | Environment variables only                                  |
+| Per-request token calls                | Cache for lifetime, refresh proactively                     |
+| No `aud` claim                         | Always set `aud`; use Token Exchange                        |
+| No DPoP binding                        | Add DPoP for sensitive resources                            |
 
 Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silent or fail late.
 
@@ -84,12 +84,12 @@ Requesting all scopes upfront because "the agent might need it" is a widespread 
 ```typescript
 // Wrong: all scopes requested blindly
 const token = await getToken({
-  scopes: ['invoices:read', 'invoices:write', 'customers:read', 'customers:write', 'admin'],
+  scopes: ["invoices:read", "invoices:write", "customers:read", "customers:write", "admin"],
 });
 
 // Right: only what this task needs
 const token = await getToken({
-  scopes: ['invoices:read'],
+  scopes: ["invoices:read"],
 });
 ```
 
@@ -108,7 +108,7 @@ Fix: Environment variables or secrets managers only.
 
 ```typescript
 const key = process.env.API_KEY;
-if (!key) throw new Error('API_KEY is required');
+if (!key) throw new Error("API_KEY is required");
 ```
 
 If you find a hardcoded credential: rotate it immediately (before cleaning history — the secret is already compromised), remove it from code, then clean `git history`.
@@ -131,9 +131,9 @@ async function callApi(path: string) {
 Fix: Cache tokens for their lifetime, refresh proactively before expiry.
 
 ```typescript
-const token = await getAccessToken(config);  // cached, refreshed if needed
+const token = await getAccessToken(config); // cached, refreshed if needed
 const res = await fetch(`https://api.example.com${path}`, {
-  headers: { 'Authorization': `Bearer ${token}` },
+  headers: { Authorization: `Bearer ${token}` },
 });
 ```
 
@@ -184,17 +184,17 @@ For high-value resources and sensitive agent-to-agent communication, require DPo
 
 ## Summary
 
-| Anti-pattern | Why it breaks | Fix |
-|---|---|---|
+| Anti-pattern                           | Why it breaks                     | Fix                                                |
+| -------------------------------------- | --------------------------------- | -------------------------------------------------- |
 | Authorization Code only for API access | Requires browser-mediated consent | Support Client Credentials or bounded registration |
-| CAPTCHA on token endpoint | Blocks automated requests | Remove; use rate limiting |
-| Session cookies | Expire without structured signal | Use Bearer tokens + explicit `exp` |
-| Long-lived broad-scope keys | Maximum blast radius on leak | Short-lived, minimum-scope |
-| Overly broad scopes | Excess perms on every token | Request only required scopes |
-| Hardcoded secrets | Permanent compromise on commit | Environment variables |
-| Per-request token calls | Multiplies auth load | Cache tokens for lifetime |
-| No `aud` claim | Token valid everywhere | Always set `aud`; use Token Exchange |
-| No DPoP binding | Token can be replayed if stolen | Add DPoP for sensitive resources |
+| CAPTCHA on token endpoint              | Blocks automated requests         | Remove; use rate limiting                          |
+| Session cookies                        | Expire without structured signal  | Use Bearer tokens + explicit `exp`                 |
+| Long-lived broad-scope keys            | Maximum blast radius on leak      | Short-lived, minimum-scope                         |
+| Overly broad scopes                    | Excess perms on every token       | Request only required scopes                       |
+| Hardcoded secrets                      | Permanent compromise on commit    | Environment variables                              |
+| Per-request token calls                | Multiplies auth load              | Cache tokens for lifetime                          |
+| No `aud` claim                         | Token valid everywhere            | Always set `aud`; use Token Exchange               |
+| No DPoP binding                        | Token can be replayed if stolen   | Add DPoP for sensitive resources                   |
 
 `auth.md` OTP claim flows are not the same anti-pattern as browser-only login. They are bounded registration ceremonies that end by issuing or upgrading a programmatic credential. They become an anti-pattern only when OTP or browser state is required on every API call.
 

@@ -33,6 +33,7 @@ Google initially developed and published the A2A specification in April 2025 as 
 In a multi-agent system, not every agent can or should do everything. A travel booking agent does not need to understand flight pricing algorithms — it needs to hand that task to a specialist flight agent. A customer support orchestrator should not contain HR policy logic — it should delegate HR questions to an HR specialist agent.
 
 A2A defines how that delegation works in practice:
+
 - How the orchestrator discovers that a specialist exists and what it handles
 - How to hand off the task with sufficient context
 - How to receive results, ask clarifying questions, and complete the workflow
@@ -80,6 +81,7 @@ GET /.well-known/agent.json
 For backward compatibility, `.well-known/agent-card.json` is accepted as a fallback.
 
 A client agent fetches this document to learn:
+
 - What tasks the agent handles
 - What authentication it requires
 - What endpoints to call
@@ -130,9 +132,7 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
       "tags": ["flights", "travel", "search"],
       "inputModes": ["application/json"],
       "outputModes": ["application/json"],
-      "examples": [
-        "Find business class flights from JFK to LHR for 2 passengers on March 15"
-      ]
+      "examples": ["Find business class flights from JFK to LHR for 2 passengers on March 15"]
     },
     {
       "id": "flight-book",
@@ -148,18 +148,18 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
 
 ### AgentCard Fields
 
-| Field | Required | Description |
-|---|---|---|
-| `id` | Yes | Globally unique identifier for this agent |
-| `name` | Yes | Human-readable display name |
-| `description` | Yes | What tasks this agent handles — the primary discovery signal |
-| `version` | Yes | SemVer version of this agent's capabilities |
-| `url` | Yes | Base URL for the agent's JSON-RPC endpoint |
-| `capabilities` | Yes | Which A2A features this agent supports |
-| `authentication` | Yes | Auth schemes and OAuth 2.1 configuration |
-| `skills` | Yes | Array of specific tasks this agent can perform |
-| `defaultInputModes` | No | MIME types this agent accepts by default |
-| `defaultOutputModes` | No | MIME types this agent produces by default |
+| Field                | Required | Description                                                  |
+| -------------------- | -------- | ------------------------------------------------------------ |
+| `id`                 | Yes      | Globally unique identifier for this agent                    |
+| `name`               | Yes      | Human-readable display name                                  |
+| `description`        | Yes      | What tasks this agent handles — the primary discovery signal |
+| `version`            | Yes      | SemVer version of this agent's capabilities                  |
+| `url`                | Yes      | Base URL for the agent's JSON-RPC endpoint                   |
+| `capabilities`       | Yes      | Which A2A features this agent supports                       |
+| `authentication`     | Yes      | Auth schemes and OAuth 2.1 configuration                     |
+| `skills`             | Yes      | Array of specific tasks this agent can perform               |
+| `defaultInputModes`  | No       | MIME types this agent accepts by default                     |
+| `defaultOutputModes` | No       | MIME types this agent produces by default                    |
 
 ### Capabilities Declaration
 
@@ -173,10 +173,10 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
 }
 ```
 
-| Capability | Meaning |
-|---|---|
-| `streaming` | Agent supports SSE streaming for long-running tasks |
-| `pushNotifications` | Agent can send async push updates via webhook |
+| Capability               | Meaning                                              |
+| ------------------------ | ---------------------------------------------------- |
+| `streaming`              | Agent supports SSE streaming for long-running tasks  |
+| `pushNotifications`      | Agent can send async push updates via webhook        |
 | `stateTransitionHistory` | Agent records and exposes its internal state history |
 
 ## Task Communication & Security
@@ -225,14 +225,14 @@ submitted → working → (input-required →) completed
                     ↘ canceled
 ```
 
-| State | Meaning |
-|---|---|
-| `submitted` | Task received, queued for processing |
-| `working` | Agent is actively processing |
+| State            | Meaning                                              |
+| ---------------- | ---------------------------------------------------- |
+| `submitted`      | Task received, queued for processing                 |
+| `working`        | Agent is actively processing                         |
 | `input-required` | Agent needs additional information before continuing |
-| `completed` | Task finished successfully |
-| `failed` | Task failed with an error |
-| `canceled` | Task was canceled by the client or timed out |
+| `completed`      | Task finished successfully                           |
+| `failed`         | Task failed with an error                            |
+| `canceled`       | Task was canceled by the client or timed out         |
 
 ### Streaming Responses
 

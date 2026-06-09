@@ -34,9 +34,9 @@ import {
   InputGuardrail,
   OutputGuardrail,
   ToolGuardrail,
-} from '@openai/agents';
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+} from "@openai/agents";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // ============================================================================
 // OUTPUT SCHEMAS (enforce response shape)
@@ -47,19 +47,19 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
  * <CUSTOMISE> Define schema for your task.
  */
 const WriterOutputSchema = z.object({
-  title: z.string().describe('Article title'),
-  body: z.string().describe('Article content in Markdown'),
-  tags: z.array(z.string()).describe('SEO tags'),
-  readtime_minutes: z.number().describe('Estimated read time'),
+  body: z.string().describe("Article content in Markdown"),
+  readtime_minutes: z.number().describe("Estimated read time"),
+  tags: z.array(z.string()).describe("SEO tags"),
+  title: z.string().describe("Article title"),
 });
 
 /**
  * Editor agent output: feedback on article.
  */
 const EditorOutputSchema = z.object({
-  feedback: z.string().describe('Editorial feedback'),
-  suggestions: z.array(z.string()).describe('Specific improvements'),
-  ready_to_publish: z.boolean().describe('Is article ready?'),
+  feedback: z.string().describe("Editorial feedback"),
+  ready_to_publish: z.boolean().describe("Is article ready?"),
+  suggestions: z.array(z.string()).describe("Specific improvements"),
 });
 
 // ============================================================================
@@ -71,10 +71,9 @@ const EditorOutputSchema = z.object({
  * <CUSTOMISE> Add domain-specific checks.
  */
 const inputGuardrail = new InputGuardrail({
-  name: 'content-policy',
-  description: 'Reject harmful content requests',
+  description: "Reject harmful content requests",
   execute: async (input: string) => {
-    const forbidden = ['hate', 'violence', 'illegal'];
+    const forbidden = ["hate", "violence", "illegal"];
     for (const word of forbidden) {
       if (input.toLowerCase().includes(word)) {
         return {
@@ -85,6 +84,7 @@ const inputGuardrail = new InputGuardrail({
     }
     return { tripwire_triggered: false };
   },
+  name: "content-policy",
 });
 
 // ============================================================================
@@ -95,18 +95,18 @@ const inputGuardrail = new InputGuardrail({
  * Guardrail: ensure tool calls have valid parameters.
  */
 const toolGuardrail = new ToolGuardrail({
-  name: 'tool-safety',
-  description: 'Validate tool parameters before execution',
+  description: "Validate tool parameters before execution",
   execute: async (toolName: string, params: any) => {
     // Example: prevent excessively long inputs
     if (JSON.stringify(params).length > 50000) {
       return {
         tripwire_triggered: true,
-        reason: 'Input too large (>50KB)',
+        reason: "Input too large (>50KB)",
       };
     }
     return { tripwire_triggered: false };
   },
+  name: "tool-safety",
 });
 
 // ============================================================================
@@ -117,24 +117,24 @@ const toolGuardrail = new ToolGuardrail({
  * Guardrail: ensure output matches schema and has minimum quality.
  */
 const outputGuardrail = new OutputGuardrail({
-  name: 'output-quality',
-  description: 'Ensure output meets minimum quality standards',
+  description: "Ensure output meets minimum quality standards",
   execute: async (output: any) => {
     // Check required fields
     if (!output.title || output.title.length < 10) {
       return {
         tripwire_triggered: true,
-        reason: 'Title too short (<10 chars)',
+        reason: "Title too short (<10 chars)",
       };
     }
     if (!output.body || output.body.length < 500) {
       return {
         tripwire_triggered: true,
-        reason: 'Body too short (<500 chars)',
+        reason: "Body too short (<500 chars)",
       };
     }
     return { tripwire_triggered: false };
   },
+  name: "output-quality",
 });
 
 // ============================================================================
@@ -146,33 +146,28 @@ const outputGuardrail = new OutputGuardrail({
  * Returns another Agent; OpenAI Agents SDK will invoke it.
  */
 const delegateToEditorTool = new Tool({
-  name: 'delegate_to_editor',
-  description: 'Hand off article to editor agent for feedback and improvements',
+  description: "Hand off article to editor agent for feedback and improvements",
+  execute: async (params: any) => editorAgent,
+  name: "delegate_to_editor",
   parameters: zodToJsonSchema(
     z.object({
-      article: z.string().describe('Article content to edit'),
-    })
+      article: z.string().describe("Article content to edit"),
+    }),
   ),
-  execute: async (params: any) => {
-    // Return an Agent (not a direct result)
-    return editorAgent;
-  },
 });
 
 /**
  * Tool: Delegate to reviewer agent.
  */
 const delegateToReviewerTool = new Tool({
-  name: 'delegate_to_reviewer',
-  description: 'Hand off to fact-checker / reviewer',
+  description: "Hand off to fact-checker / reviewer",
+  execute: async () => reviewerAgent,
+  name: "delegate_to_reviewer",
   parameters: zodToJsonSchema(
     z.object({
-      article: z.string().describe('Article to review'),
-    })
+      article: z.string().describe("Article to review"),
+    }),
   ),
-  execute: async () => {
-    return reviewerAgent;
-  },
 });
 
 // ============================================================================
@@ -185,19 +180,19 @@ const delegateToReviewerTool = new Tool({
  * <CUSTOMISE> Implement your writer prompt.
  */
 const writerAgent = new Agent({
-  name: 'writer',
-  description: 'Write articles on given topics',
-  model: 'gpt-5.4',
-  tools: [delegateToEditorTool],
+  description: "Write articles on given topics",
   inputGuardrails: [inputGuardrail],
-  outputGuardrails: [outputGuardrail],
-  outputSchema: zodToJsonSchema(WriterOutputSchema),
   instructions: `You are a professional writer. Given a topic:
 1. Research the topic (use your knowledge)
 2. Outline the article
 3. Write engaging content
 4. If you want editorial feedback, use delegate_to_editor
 5. Return final article in JSON format with title, body, tags, readtime_minutes`,
+  model: "gpt-5.4",
+  name: "writer",
+  outputGuardrails: [outputGuardrail],
+  outputSchema: zodToJsonSchema(WriterOutputSchema),
+  tools: [delegateToEditorTool],
 });
 
 /**
@@ -205,13 +200,7 @@ const writerAgent = new Agent({
  * Can hand off to reviewer if fact-check needed.
  */
 const editorAgent = new Agent({
-  name: 'editor',
-  description: 'Edit and improve articles',
-  model: 'gpt-5.4',
-  tools: [delegateToReviewerTool],
-  toolGuardrails: [toolGuardrail],
-  outputGuardrails: [outputGuardrail],
-  outputSchema: zodToJsonSchema(EditorOutputSchema),
+  description: "Edit and improve articles",
   instructions: `You are a senior editor. Review the article for:
 1. Clarity and flow
 2. Grammar and style
@@ -219,6 +208,12 @@ const editorAgent = new Agent({
 4. Whether it's ready to publish
 If you need fact-checking, use delegate_to_reviewer.
 Return feedback as JSON with feedback, suggestions, ready_to_publish.`,
+  model: "gpt-5.4",
+  name: "editor",
+  outputGuardrails: [outputGuardrail],
+  outputSchema: zodToJsonSchema(EditorOutputSchema),
+  toolGuardrails: [toolGuardrail],
+  tools: [delegateToReviewerTool],
 });
 
 /**
@@ -226,23 +221,23 @@ Return feedback as JSON with feedback, suggestions, ready_to_publish.`,
  * Final agent; does not delegate further.
  */
 const reviewerAgent = new Agent({
-  name: 'reviewer',
-  description: 'Fact-check and validate articles',
-  model: 'gpt-5.4',
-  outputGuardrails: [outputGuardrail],
-  outputSchema: zodToJsonSchema(
-    z.object({
-      verified: z.boolean().describe('Are facts correct?'),
-      corrections: z.array(z.string()).describe('Needed corrections'),
-      final_status: z.enum(['approved', 'needs_revision']),
-    })
-  ),
+  description: "Fact-check and validate articles",
   instructions: `You are a fact-checker. Validate the article:
 1. Check key claims against your knowledge
 2. Identify any errors or unsupported statements
 3. Recommend corrections
 4. Give final approval status
 Return result as JSON.`,
+  model: "gpt-5.4",
+  name: "reviewer",
+  outputGuardrails: [outputGuardrail],
+  outputSchema: zodToJsonSchema(
+    z.object({
+      verified: z.boolean().describe("Are facts correct?"),
+      corrections: z.array(z.string()).describe("Needed corrections"),
+      final_status: z.enum(["approved", "needs_revision"]),
+    }),
+  ),
 });
 
 // ============================================================================
@@ -253,33 +248,31 @@ export async function runHandoffExample() {
   // Create a session (conversation thread)
   const session = writerAgent.createSession();
 
-  const topic = 'The history of TypeScript and its impact on web development';
+  const topic = "The history of TypeScript and its impact on web development";
 
   try {
     // Start with writer agent
-    console.log('=== Agents SDK Handoff Example ===');
+    console.log("=== Agents SDK Handoff Example ===");
     console.log(`Task: Write article on "${topic}"`);
-    console.log('');
+    console.log("");
 
     // Run writer (may hand off to editor)
-    const writerResult = await session.run(
-      `Write an article about: ${topic}`
-    );
+    const writerResult = await session.run(`Write an article about: ${topic}`);
 
-    console.log('Writer output:');
+    console.log("Writer output:");
     console.log(writerResult);
-    console.log('');
+    console.log("");
 
     // If writer handed off to editor, the result is editor output
     // If editor handed off to reviewer, result is reviewer output
     // Handoffs preserve conversation history automatically
 
-    console.log('=== Workflow complete ===');
-    console.log('Conversation length:', session.messages.length, 'messages');
+    console.log("=== Workflow complete ===");
+    console.log("Conversation length:", session.messages.length, "messages");
 
     return writerResult;
   } catch (error) {
-    console.error('Workflow failed:', error);
+    console.error("Workflow failed:", error);
     throw error;
   }
 }

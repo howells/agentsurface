@@ -40,21 +40,25 @@ How you split documents determines what the agent can find.
 Never use embeddings alone.
 
 **BM25** (keyword/full-text search):
+
 - Efficient, exact-match strength
 - Fails on synonyms and paraphrases
 - Essential for proper nouns, IDs, dates
 
 **Dense embeddings** (e.g., OpenAI's text-embedding-3):
+
 - Semantic similarity; catches paraphrases
 - Slow at scale without proper indexing
 - Can conflate unrelated concepts
 
 **Reranking** (cross-encoder):
+
 - Re-scores top-k results from BM25 + embeddings
 - Fuses ranking signals; much more accurate than either alone
 - Adds latency; use sparingly (rerank only top 20, not all documents)
 
 **Pattern**:
+
 ```
 1. BM25 search (top 20) + Dense search (top 20) → Union of results
 2. Rerank top 20 combined results
@@ -68,12 +72,14 @@ Latency: ~500ms (BM25 + dense in parallel) + 200ms (rerank) + 300ms (retrieval f
 Don't guess whether retrieval works. Measure it.
 
 **RAGAS metrics**:
+
 - **Context Precision**: Of the retrieved chunks, how many are relevant to the query?
 - **Context Recall**: Of all relevant chunks in the corpus, how many did we retrieve?
 - **Faithfulness**: Does the LLM's answer match the retrieved context (no hallucination)?
 - **Answer Relevance**: Is the answer relevant to the query?
 
 **Workflow**:
+
 1. Build an eval set: (query, ground_truth_answer, relevant_chunk_ids)
 2. Run retrieval; measure context precision/recall
 3. Feed retrieved context to LLM; measure faithfulness/answer relevance
@@ -86,11 +92,13 @@ Don't guess whether retrieval works. Measure it.
 Your retrieval infrastructure must stay in sync with source data.
 
 **Indexing layers**:
+
 - **Full-text index**: PostgreSQL tsvector, Elasticsearch, Meilisearch (rebuild on document change)
 - **Embedding table**: One row per chunk, embedding vector (rebuild periodically, e.g., weekly)
 - **Reranker embeddings**: Store reranker scores (optional; speeds up repeated queries)
 
 **Sync strategy**:
+
 - On document insert/update: Recompute BM25 index immediately, queue embedding job (async)
 - Embedding jobs batch (~1000 chunks per batch) to amortize API costs
 - Stale embeddings acceptable for <1 week
@@ -102,6 +110,7 @@ Your retrieval infrastructure must stay in sync with source data.
 Retrieval is often on the critical path. Optimize ruthlessly.
 
 **Tactics**:
+
 - Run BM25 and dense search in parallel (threads or async)
 - Cache results for repeated queries (Redis, in-memory LRU)
 - Use approximate nearest neighbor (ANN) indexes for dense search (HNSW, IVF)
@@ -125,26 +134,31 @@ This builds trust and enables human-in-the-loop correction: if retrieved context
 ## Anti-Patterns
 
 ### 1. Embeddings Without BM25
+
 "We use vector search; it's more modern." Fails on exact-match queries.
 
 **Fix**: Use both. Combine results; let reranker decide relevance.
 
 ### 2. No Eval on Retrieval
+
 "The agent seems to find the right stuff." No metric, no evidence.
 
 **Fix**: Implement RAGAS eval. Measure context precision/recall quarterly.
 
 ### 3. Fixed Chunk Size Across All Domains
+
 Using 512 tokens for both short FAQs and long policy documents.
 
 **Fix**: Analyze query patterns. Use different chunk sizes per corpus.
 
 ### 4. Index Lag
+
 Embeddings are weeks out of date. Agent retrieves stale information.
 
 **Fix**: Automate embedding jobs. Alert on staleness >7 days.
 
 ### 5. Unbounded Retrieval
+
 "Return all matching chunks." Feeds 100KB of context to the agent, blowing token budget and latency.
 
 **Fix**: Return top 5 after reranking. If agent needs more, let it ask for next-page results.

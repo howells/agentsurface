@@ -1,4 +1,10 @@
 {
   "title": "Agent Scaffolding",
-  "pages": ["index", "design-principles", "framework-selection", "anthropic-platform", "browser-access"]
+  "pages": [
+    "index",
+    "design-principles",
+    "framework-selection",
+    "anthropic-platform",
+    "browser-access"
+  ]
 }

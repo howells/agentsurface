@@ -18,7 +18,10 @@ Human users make typos. They transpose characters, forget required flags, and mi
 The failure modes are different, so the defenses must be different. Standard input validation catches the human failure modes. Agent-specific input hardening catches the hallucination patterns that standard validation misses entirely.
 
 <Callout type="warn">
-The security posture for agent-facing CLIs must be: **the agent is not a trusted operator**. Even when an agent is acting on behalf of an authorized user, it can be manipulated through prompt injection (see [Safety Rails](./safety-rails)) or simply hallucinate inputs that violate intended boundaries. Validate everything.
+  The security posture for agent-facing CLIs must be: **the agent is not a trusted operator**. Even
+  when an agent is acting on behalf of an authorized user, it can be manipulated through prompt
+  injection (see [Safety Rails](./safety-rails)) or simply hallucinate inputs that violate intended
+  boundaries. Validate everything.
 </Callout>
 
 ## Path Traversal Attacks
@@ -36,16 +39,16 @@ mytool deploy artifact --path ../../../root/.ssh/authorized_keys
 Reject any input that contains path traversal sequences before resolving it:
 
 ```typescript
-import { resolve, relative } from 'path';
+import { resolve, relative } from "path";
 
 function validateOutputPath(input: string, allowedBase: string): string {
   const resolved = resolve(allowedBase, input);
   const rel = relative(allowedBase, resolved);
 
   // rel will start with '..' if the resolved path escapes the allowed base
-  if (rel.startsWith('..') || resolve(rel) === resolved) {
+  if (rel.startsWith("..") || resolve(rel) === resolved) {
     exitWithError({
-      error: 'invalid_path',
+      error: "invalid_path",
       message: `Output path must be within ${allowedBase}`,
       received: input,
       code: 2,
@@ -63,9 +66,9 @@ For resource IDs — user IDs, record IDs, slugs — that are used to construct 
 
 ```typescript
 function validateResourceId(id: string, fieldName: string): string {
-  if (id.includes('/') || id.includes('\\') || id.includes('..')) {
+  if (id.includes("/") || id.includes("\\") || id.includes("..")) {
     exitWithError({
-      error: 'invalid_resource_id',
+      error: "invalid_resource_id",
       message: `${fieldName} must not contain path separators`,
       received: id,
       code: 2,
@@ -87,7 +90,7 @@ function rejectControlCharacters(value: string, fieldName: string): string {
     const code = value.charCodeAt(i);
     if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) {
       exitWithError({
-        error: 'invalid_input',
+        error: "invalid_input",
         message: `${fieldName} contains control characters (ASCII < 0x20)`,
         field: fieldName,
         code: 2,
@@ -106,7 +109,7 @@ const RESOURCE_ID_PATTERN = /^[a-zA-Z0-9_\-]+$/;
 function validateResourceIdFormat(id: string, fieldName: string): string {
   if (!RESOURCE_ID_PATTERN.test(id)) {
     exitWithError({
-      error: 'invalid_resource_id',
+      error: "invalid_resource_id",
       message: `${fieldName} must contain only alphanumeric characters, underscores, and hyphens`,
       received: id,
       field: fieldName,
@@ -135,7 +138,7 @@ function normalizeAndValidate(input: string, fieldName: string): string {
   let decoded = input;
 
   // Iteratively decode until stable (handles double/triple encoding)
-  let previous = '';
+  let previous = "";
   while (decoded !== previous) {
     previous = decoded;
     try {
@@ -143,7 +146,7 @@ function normalizeAndValidate(input: string, fieldName: string): string {
     } catch {
       // Invalid percent-encoding — reject outright
       exitWithError({
-        error: 'invalid_encoding',
+        error: "invalid_encoding",
         message: `${fieldName} contains invalid percent-encoding`,
         received: input,
         code: 2,
@@ -152,9 +155,9 @@ function normalizeAndValidate(input: string, fieldName: string): string {
   }
 
   // Now validate the decoded form
-  if (decoded.includes('..') || decoded.includes('/') || decoded.includes('\\')) {
+  if (decoded.includes("..") || decoded.includes("/") || decoded.includes("\\")) {
     exitWithError({
-      error: 'invalid_input',
+      error: "invalid_input",
       message: `${fieldName} contains path traversal sequences after decoding`,
       received: input,
       code: 2,
@@ -182,9 +185,9 @@ Reject these patterns in resource IDs:
 
 ```typescript
 function rejectEmbeddedURLComponents(value: string, fieldName: string): string {
-  if (value.includes('?') || value.includes('#') || value.includes('&')) {
+  if (value.includes("?") || value.includes("#") || value.includes("&")) {
     exitWithError({
-      error: 'invalid_resource_id',
+      error: "invalid_resource_id",
       message: `${fieldName} must not contain URL components (?, #, &)`,
       received: value,
       field: fieldName,
@@ -200,7 +203,7 @@ function rejectEmbeddedURLComponents(value: string, fieldName: string): string {
 When constructing API requests, the CLI must percent-encode path parameters at the HTTP layer — independently of any decoding done during input validation. This prevents double-encoding while ensuring that valid special characters in IDs (spaces, Unicode) are correctly transmitted.
 
 ```typescript
-import { encodeURIComponent } from 'url';
+import { encodeURIComponent } from "url";
 
 function buildAPIPath(template: string, params: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
@@ -214,9 +217,9 @@ function buildAPIPath(template: string, params: Record<string, string>): string 
 }
 
 // Usage
-const path = buildAPIPath('/users/{user_id}/records/{record_id}', {
-  user_id: 'usr_01HV3K8MNPQR',
-  record_id: 'rec with spaces',  // becomes 'rec%20with%20spaces' in the URL
+const path = buildAPIPath("/users/{user_id}/records/{record_id}", {
+  user_id: "usr_01HV3K8MNPQR",
+  record_id: "rec with spaces", // becomes 'rec%20with%20spaces' in the URL
 });
 ```
 
@@ -232,8 +235,8 @@ function sandboxOutputPath(input: string): string {
   // Verify the resolved path is within CWD
   if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
     exitWithError({
-      error: 'path_outside_sandbox',
-      message: 'Output path must be within the current working directory',
+      error: "path_outside_sandbox",
+      message: "Output path must be within the current working directory",
       received: input,
       resolved: resolved,
       sandbox: cwd,
@@ -269,16 +272,16 @@ Combine these checks into a reusable validation pipeline that applies consistent
 type ValidationRule = (value: string, field: string) => string;
 
 const resourceIdRules: ValidationRule[] = [
-  (v, f) => normalizeAndValidate(v, f),       // decode and check traversals
-  (v, f) => rejectControlCharacters(v, f),     // no ASCII < 0x20
+  (v, f) => normalizeAndValidate(v, f), // decode and check traversals
+  (v, f) => rejectControlCharacters(v, f), // no ASCII < 0x20
   (v, f) => rejectEmbeddedURLComponents(v, f), // no ?, #, &
-  (v, f) => validateResourceIdFormat(v, f),    // alphanumeric/dash/underscore only
+  (v, f) => validateResourceIdFormat(v, f), // alphanumeric/dash/underscore only
 ];
 
 const outputPathRules: ValidationRule[] = [
-  (v, f) => normalizeAndValidate(v, f),        // decode percent-encoding
-  (v, f) => rejectControlCharacters(v, f),     // no control characters
-  (v, f) => sandboxOutputPath(v),              // must stay within CWD
+  (v, f) => normalizeAndValidate(v, f), // decode percent-encoding
+  (v, f) => rejectControlCharacters(v, f), // no control characters
+  (v, f) => sandboxOutputPath(v), // must stay within CWD
 ];
 
 function validate(value: string, field: string, rules: ValidationRule[]): string {
@@ -286,8 +289,8 @@ function validate(value: string, field: string, rules: ValidationRule[]): string
 }
 
 // Usage in command handler
-const userId = validate(flags.userId, 'user_id', resourceIdRules);
-const outputFile = validate(flags.output, 'output', outputPathRules);
+const userId = validate(flags.userId, "user_id", resourceIdRules);
+const outputFile = validate(flags.output, "output", outputPathRules);
 ```
 
 ## Structured Validation Errors
@@ -316,12 +319,12 @@ This gives the agent enough information to identify which field was wrong, what 
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | No input validation beyond basic type checks. |
-| 1 | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding). |
-| 2 | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs. |
-| 3 | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
+| Score | Criteria                                                                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No input validation beyond basic type checks.                                                                                                                                         |
+| 1     | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding).                                            |
+| 2     | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs.                                          |
+| 3     | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
 
 ## Checklist
 

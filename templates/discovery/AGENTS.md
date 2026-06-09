@@ -1,10 +1,10 @@
 <!--
 AGENTS.md — Canonical agent-consumable project documentation.
 
-What: A plain-markdown file that tells AI agents (Claude Code, Cursor, Copilot, etc.) what this 
+What: A plain-markdown file that tells AI agents (Claude Code, Cursor, Copilot, etc.) what this
 project does, how to run it, where critical files live, and what they are and are not allowed to change.
 
-When to use: Every software project. Start with this template, hand-curate it, and keep it 
+When to use: Every software project. Start with this template, hand-curate it, and keep it
 in sync as the project evolves.
 
 What to customize:
@@ -32,6 +32,7 @@ Monorepo for enterprise agent infrastructure: TypeScript SDK, Next.js dashboard,
 ## Quick start
 
 **Development (all packages):**
+
 ```sh
 pnpm dev          # Start dev servers (SDK playground + dashboard)
 pnpm test         # Run all tests (~15s)
@@ -40,6 +41,7 @@ pnpm type-check   # Full TypeScript check
 ```
 
 **Build & release:**
+
 ```sh
 pnpm build        # All packages, production bundle (~3m)
 changeset add     # Stage version bump (required)
@@ -48,6 +50,7 @@ pnpm publish      # Push to npm
 ```
 
 **Per-package (faster for focused work):**
+
 ```sh
 pnpm --filter=@acme/sdk dev          # SDK docs (http://localhost:3000)
 pnpm --filter=@acme/sdk test:watch
@@ -142,6 +145,7 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 ## Coding conventions
 
 **TypeScript strict mode required.**
+
 - ESLint + Prettier (enforced in pre-commit hook)
 - Filenames: kebab-case (`agent-executor.ts`, not `AgentExecutor.ts`)
 - Functions / classes: camelCase
@@ -151,23 +155,27 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 - No wildcard imports; explicit paths with `@acme/` aliases
 
 **Import order:**
+
 ```typescript
 // External packages
-import { z } from 'zod';
-import React from 'react';
+import { z } from "zod";
+import React from "react";
 
 // Acme monorepo
-import { Agent, Tool } from '@acme/sdk';
-import { AgentSchema } from '@acme/shared';
+import { Agent, Tool } from "@acme/sdk";
+import { AgentSchema } from "@acme/shared";
 
 // Local relative
-import { executeAgent } from './execute';
-import { validateInput } from '../utils';
+import { executeAgent } from "./execute";
+import { validateInput } from "../utils";
 ```
 
 **Error handling:** Use RFC 9457 `Problem+JSON` shape; return via tool result, not thrown.
+
 ```typescript
-type ToolResult = { success: true; data: T } | { success: false; type: string; status: number; detail: string };
+type ToolResult =
+  | { success: true; data: T }
+  | { success: false; type: string; status: number; detail: string };
 ```
 
 **Schema validation:** All tool inputs validated with Zod `.parse()` at entry; return detailed error messages in tool result.
@@ -185,12 +193,14 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 ```
 
 **Structure:**
+
 - Unit tests colocated: `src/index.test.ts` alongside `src/index.ts`
 - Integration tests: `src/__tests__/integration/`
 - Snapshot tests only for UI (Next.js components)
 - Mock MCP server for agent tests via `InMemoryTransport.createLinkedPair()`
 
 **CI gates (GitHub Actions):**
+
 - `pnpm lint` must pass (no overrides)
 - `pnpm type-check` must pass
 - `pnpm test` must pass
@@ -201,6 +211,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 ## Permission boundaries
 
 **Always (no ask needed):**
+
 - Read files in `src/`, `docs/`, `.github/`
 - Run `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm type-check`
 - Open draft PRs with `gh pr create --draft`
@@ -209,6 +220,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 - Update `README.md`, `AGENTS.md`, inline code comments
 
 **Ask first:**
+
 - Install new dependencies (`pnpm add`)
 - Modify `turbo.json` or `pnpm-workspace.yaml`
 - Change package.json exports or entry points
@@ -217,6 +229,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 - Modify environment config (`packages/*/src/config.ts`)
 
 **Never:**
+
 - Deploy to production
 - Rotate API keys, OAuth secrets, or database credentials
 - Delete branches or tags

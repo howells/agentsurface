@@ -46,14 +46,14 @@ import { randomUUID } from "crypto";
 
 async function createInvoiceIdempotent(
   data: InvoiceData,
-  key: string = randomUUID()
+  key: string = randomUUID(),
 ): Promise<Invoice> {
   return withRetry(async () => {
     const response = await fetch("https://api.example.com/invoices", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": key,  // Same key on every retry
+        "Idempotency-Key": key, // Same key on every retry
       },
       body: JSON.stringify(data),
     });
@@ -137,7 +137,7 @@ async function handleCreateInvoice(req: Request, res: Response) {
 For production, use Redis instead of in-memory storage:
 
 ```typescript
-import { createClient } from 'redis';
+import { createClient } from "redis";
 
 const redis = createClient();
 
@@ -171,7 +171,7 @@ async function handleCreateInvoice(req: Request, res: Response) {
     await redis.setex(
       `idempotency:${idempotencyKey}`,
       24 * 60 * 60,
-      JSON.stringify({ status: 201, body: invoice })
+      JSON.stringify({ status: 201, body: invoice }),
     );
 
     res.writeHead(201);
@@ -181,7 +181,7 @@ async function handleCreateInvoice(req: Request, res: Response) {
     await redis.setex(
       `idempotency:${idempotencyKey}`,
       24 * 60 * 60,
-      JSON.stringify({ status: errorResponse.status, body: errorResponse })
+      JSON.stringify({ status: errorResponse.status, body: errorResponse }),
     );
 
     res.writeHead(errorResponse.status);
@@ -205,7 +205,7 @@ Optional for read-only operations and operations that are already naturally idem
 
 ## Idempotency vs Retry-After
 
-Idempotency keys handle retries safely. `Retry-After` headers tell the agent *when* to retry. Both are needed:
+Idempotency keys handle retries safely. `Retry-After` headers tell the agent _when_ to retry. Both are needed:
 
 - `Idempotency-Key` ensures the second request doesn't create a duplicate resource
 - `Retry-After` tells the agent how long to wait before sending that safe retry

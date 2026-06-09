@@ -9,8 +9,8 @@ CLI errors must be machine-readable. Use exit codes (0 success, 1 general, 2 usa
 
 ```
 $ mytool invoice send inv_01HV3K8MNP (exit 5)
-{"error": "invoice_not_finalized", "message": "...", 
- "suggestions": ["Run: mytool invoice finalize ..."], 
+{"error": "invoice_not_finalized", "message": "...",
+ "suggestions": ["Run: mytool invoice finalize ..."],
  "failing_input": {...}}
 ```
 
@@ -29,14 +29,14 @@ Exit code 0 means success. Exit codes 1–127 have no inherent meaning beyond "f
 
 A five-level scale provides enough resolution for agents to categorize failures without requiring them to parse error messages:
 
-| Code | Category | Description |
-|---|---|---|
-| 0 | Success | The command completed successfully |
-| 1 | General error | An unexpected error — safe to retry with exponential backoff |
-| 2 | Usage error | The command was called incorrectly — wrong flags, missing arguments |
-| 3 | Not found | The specified resource does not exist |
-| 4 | Auth error | Authentication or authorization failed — do not retry until credentials are refreshed |
-| 5 | Conflict | The operation conflicts with current state — precondition not met |
+| Code | Category      | Description                                                                           |
+| ---- | ------------- | ------------------------------------------------------------------------------------- |
+| 0    | Success       | The command completed successfully                                                    |
+| 1    | General error | An unexpected error — safe to retry with exponential backoff                          |
+| 2    | Usage error   | The command was called incorrectly — wrong flags, missing arguments                   |
+| 3    | Not found     | The specified resource does not exist                                                 |
+| 4    | Auth error    | Authentication or authorization failed — do not retry until credentials are refreshed |
+| 5    | Conflict      | The operation conflicts with current state — precondition not met                     |
 
 Agents can branch on exit codes without parsing any output:
 
@@ -79,7 +79,7 @@ When the CLI is running in non-TTY mode (piped or scripted), error output must b
 
 The fields:
 
-- `error` — A stable snake\_case error code that agents can branch on. Never a human-readable message.
+- `error` — A stable snake_case error code that agents can branch on. Never a human-readable message.
 - `message` — A human-readable explanation of this specific occurrence. Can change between releases.
 - `suggestions` — Ordered list of concrete next steps. The first suggestion is the most likely fix.
 - `failing_input` — The input values that caused the failure, to help the agent reason about corrections.
@@ -138,11 +138,13 @@ function emitError(code: string, message: string, details: Record<string, unknow
     }
   } else {
     // Structured JSON for agent consumption
-    process.stderr.write(JSON.stringify({
-      error: code,
-      message,
-      ...details,
-    }) + "\n");
+    process.stderr.write(
+      JSON.stringify({
+        error: code,
+        message,
+        ...details,
+      }) + "\n",
+    );
   }
 
   process.exit(exitCodeForError(code));
@@ -160,7 +162,7 @@ mytool --json invoice send inv_01HV3K8MNP 2>error.json
 
 The `error` field is the stable contract for agents. It must not change between releases. Treat it like an API field — if the semantics change, introduce a new code rather than reusing the old one.
 
-Use snake\_case, domain-prefixed codes:
+Use snake_case, domain-prefixed codes:
 
 ```
 invoice_not_found
@@ -214,7 +216,10 @@ async function main() {
 
       emitError("internal_error", "An unexpected error occurred.", {
         trace_id: traceId,
-        suggestions: ["Check the command syntax and try again", `Contact support with trace ID: ${traceId}`],
+        suggestions: [
+          "Check the command syntax and try again",
+          `Contact support with trace ID: ${traceId}`,
+        ],
       });
     }
   }
@@ -277,7 +282,7 @@ $ mytool --json invoice send inv_NOTREAL 2>&1
 
 - [ ] Exit codes follow the five-level scale (0 success, 1 general, 2 usage, 3 not found, 4 auth, 5 conflict)
 - [ ] Errors are structured JSON on stderr in non-TTY and `--json` mode
-- [ ] The `error` field is a stable snake\_case code — not a human-readable message
+- [ ] The `error` field is a stable snake_case code — not a human-readable message
 - [ ] `suggestions` are concrete, runnable commands, not general advice
 - [ ] `failing_input` includes the values that caused the failure
 - [ ] Stack traces never appear in user-facing output

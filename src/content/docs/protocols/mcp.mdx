@@ -245,7 +245,9 @@ For error conditions, set `isError: true` and include a recovery-oriented messag
 ```
 
 <Callout type="warn">
-Do not return JSON-RPC error objects for business logic failures. Use `isError: true` in the result instead. JSON-RPC errors (`error` instead of `result`) should only be used for protocol-level failures like malformed requests or unknown methods.
+  Do not return JSON-RPC error objects for business logic failures. Use `isError: true` in the
+  result instead. JSON-RPC errors (`error` instead of `result`) should only be used for
+  protocol-level failures like malformed requests or unknown methods.
 </Callout>
 
 ### Resource Read
@@ -295,12 +297,12 @@ Tool definitions support an `annotations` field. Annotations communicate behavio
 }
 ```
 
-| Annotation | Type | Meaning |
-|---|---|---|
-| `readOnlyHint` | boolean | Tool does not modify any state (safe to call freely) |
-| `destructiveHint` | boolean | Tool may delete or irreversibly modify data |
-| `idempotentHint` | boolean | Calling with the same arguments multiple times has the same effect as calling once |
-| `openWorldHint` | boolean | Tool interacts with external systems outside the MCP server's control |
+| Annotation        | Type    | Meaning                                                                            |
+| ----------------- | ------- | ---------------------------------------------------------------------------------- |
+| `readOnlyHint`    | boolean | Tool does not modify any state (safe to call freely)                               |
+| `destructiveHint` | boolean | Tool may delete or irreversibly modify data                                        |
+| `idempotentHint`  | boolean | Calling with the same arguments multiple times has the same effect as calling once |
+| `openWorldHint`   | boolean | Tool interacts with external systems outside the MCP server's control              |
 
 Annotations are hints, not enforcement. Clients may use them to require user confirmation before destructive calls or to allow unrestricted use of read-only tools, but trusted server or workflow code must still enforce authorization, scopes, tenant boundaries, and approval gates.
 
@@ -445,6 +447,7 @@ Omit `nextCursor` from the response to indicate the final page. Clients must not
 The stdio transport runs the MCP server as a subprocess. The client writes JSON-RPC messages to the process's stdin and reads responses from stdout. stderr is reserved for diagnostic logs.
 
 This is the appropriate transport for:
+
 - Desktop applications launching local tools
 - Development tooling and IDE integrations
 - Tools that require filesystem access on the user's machine
@@ -469,6 +472,7 @@ The process is isolated at the OS level. Each MCP client instance gets its own s
 ### Streamable HTTP (Remote Services)
 
 The Streamable HTTP transport is the preferred non-stdio transport for MCP servers. It runs the server as an HTTP endpoint where clients send JSON-RPC messages as POST requests. Responses can be:
+
 - A single JSON response for request/response operations
 - A Server-Sent Events stream for operations that produce multiple messages (progress notifications, streaming tool results, task polling)
 
@@ -508,6 +512,7 @@ Tokens must be validated on every request — not cached across sessions. Valida
 ### Process Isolation for stdio
 
 Each MCP server launched via stdio runs as its own OS process. This provides:
+
 - Memory isolation between MCP servers
 - Separate environment variable namespaces
 - OS-level resource limits per server

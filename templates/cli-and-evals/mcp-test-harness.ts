@@ -34,18 +34,19 @@
  * - Testing & Evaluation: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { Client, Server } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport, StdioServerTransport } from '@modelcontextprotocol/sdk/stdio.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { spawn, ChildProcess } from 'child_process';
-import { z } from 'zod';
-import fc from 'fast-check';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Client, Server } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport, StdioServerTransport } from "@modelcontextprotocol/sdk/stdio.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { z } from "zod";
+import fc from "fast-check";
 
 // Configuration
-const MCP_SERVER_COMMAND = process.env.MCP_SERVER_COMMAND || 'node src/server.js';
-const MCP_TRANSPORT = process.env.MCP_TRANSPORT || 'stdio';
-const MAX_CALLS_PER_TOOL = parseInt(process.env.MAX_CALLS_PER_TOOL || '10');
+const MCP_SERVER_COMMAND = process.env.MCP_SERVER_COMMAND || "node src/server.js";
+const MCP_TRANSPORT = process.env.MCP_TRANSPORT || "stdio";
+const MAX_CALLS_PER_TOOL = Number.parseInt(process.env.MAX_CALLS_PER_TOOL || "10");
 
 interface ToolDefinition {
   name: string;
@@ -65,25 +66,25 @@ interface TestMetrics {
 
 let client: Client;
 let serverProcess: ChildProcess | null = null;
-const metrics: Map<string, TestMetrics> = new Map();
+const metrics = new Map<string, TestMetrics>();
 
 /**
  * Start MCP server (stdio transport)
  */
 async function startServer(): Promise<Client> {
-  serverProcess = spawn('sh', ['-c', MCP_SERVER_COMMAND], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, MCP_DEBUG: '1' },
+  serverProcess = spawn("sh", ["-c", MCP_SERVER_COMMAND], {
+    env: { ...process.env, MCP_DEBUG: "1" },
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
   const transport = new StdioClientTransport({
-    command: 'sh',
-    args: ['-c', MCP_SERVER_COMMAND],
+    args: ["-c", MCP_SERVER_COMMAND],
+    command: "sh",
   });
 
   const newClient = new Client({
-    name: 'test-client',
-    version: '1.0.0',
+    name: "test-client",
+    version: "1.0.0",
   });
 
   await newClient.connect(transport);
@@ -110,11 +111,11 @@ function validateResponse(response: any, toolName: string): { valid: boolean; er
 
   // <CUSTOMISE>: Add output schema validation per tool
   // For now, just check that response is an object with content
-  if (typeof response !== 'object' || !response.content) {
+  if (typeof response !== "object" || !response.content) {
     errors.push('Response missing required "content" field');
   }
 
-  return { valid: errors.length === 0, errors };
+  return { errors, valid: errors.length === 0 };
 }
 
 /**
@@ -134,11 +135,11 @@ function generateToolInputArbitrary(toolDef: ToolDefinition): fc.Arbitrary<Recor
   for (const [propName, propSchema] of Object.entries(schema.properties)) {
     const prop = propSchema as Record<string, any>;
 
-    if (prop.type === 'string') {
+    if (prop.type === "string") {
       arbitraries[propName] = fc.string();
-    } else if (prop.type === 'number') {
+    } else if (prop.type === "number") {
       arbitraries[propName] = fc.integer();
-    } else if (prop.type === 'boolean') {
+    } else if (prop.type === "boolean") {
       arbitraries[propName] = fc.boolean();
     } else if (prop.enum) {
       arbitraries[propName] = fc.constantFrom(...prop.enum);
@@ -153,27 +154,27 @@ function generateToolInputArbitrary(toolDef: ToolDefinition): fc.Arbitrary<Recor
 /**
  * Test suite: MCP server validation
  */
-describe('MCP server test suite', () => {
+describe("MCP server test suite", () => {
   beforeAll(async () => {
     client = await startServer();
-  }, 30000);
+  }, 30_000);
 
   afterAll(async () => {
     await stopServer();
   });
 
-  it('connects successfully', async () => {
+  it("connects successfully", async () => {
     expect(client).toBeDefined();
   });
 
-  it('lists tools', async () => {
+  it("lists tools", async () => {
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
     expect(Array.isArray(result.tools)).toBe(true);
     expect(result.tools.length).toBeGreaterThan(0);
   });
 
-  describe('tool schema compliance', () => {
+  describe("tool schema compliance", () => {
     let tools: ToolDefinition[];
 
     beforeAll(async () => {
@@ -183,26 +184,26 @@ describe('MCP server test suite', () => {
 
     tools?.forEach((tool) => {
       describe(`tool: ${tool.name}`, () => {
-        it('has description', () => {
+        it("has description", () => {
           expect(tool.description).toBeTruthy();
           expect(tool.description.length).toBeGreaterThan(5);
         });
 
-        it('has valid input schema', () => {
+        it("has valid input schema", () => {
           expect(tool.inputSchema).toBeDefined();
-          expect(tool.inputSchema.type).toBe('object');
+          expect(tool.inputSchema.type).toBe("object");
         });
 
         // <CUSTOMISE>: Add tool-specific property tests
-        it('handles valid inputs', { timeout: 60000 }, async () => {
+        it("handles valid inputs", { timeout: 60_000 }, async () => {
           const metrics: TestMetrics = {
-            tool_name: tool.name,
-            total_calls: 0,
-            successful_calls: 0,
-            failed_calls: 0,
             avg_latency_ms: 0,
+            failed_calls: 0,
             max_latency_ms: 0,
             schema_violations: 0,
+            successful_calls: 0,
+            tool_name: tool.name,
+            total_calls: 0,
           };
 
           const latencies: number[] = [];
@@ -231,17 +232,20 @@ describe('MCP server test suite', () => {
                       metrics.schema_violations++;
                     }
                   }
-                } catch (err) {
+                } catch (error) {
                   metrics.failed_calls++;
-                  throw err;
+                  throw error;
                 }
               }),
-              { numRuns: MAX_CALLS_PER_TOOL }
-            ).then(() => resolve()).catch(reject);
+              { numRuns: MAX_CALLS_PER_TOOL },
+            )
+              .then(() => resolve())
+              .catch(reject);
           });
 
           // Compute metrics
-          metrics.avg_latency_ms = latencies.length > 0 ? latencies.reduce((a, b) => a + b) / latencies.length : 0;
+          metrics.avg_latency_ms =
+            latencies.length > 0 ? latencies.reduce((a, b) => a + b) / latencies.length : 0;
           metrics.max_latency_ms = latencies.length > 0 ? Math.max(...latencies) : 0;
 
           // Assertions
@@ -253,16 +257,20 @@ describe('MCP server test suite', () => {
           MCPTestHarness.metrics.set(tool.name, metrics);
 
           console.log(`\n${tool.name}:`);
-          console.log(`  Calls: ${metrics.total_calls}, Success: ${metrics.successful_calls}, Failed: ${metrics.failed_calls}`);
-          console.log(`  Latency: avg ${metrics.avg_latency_ms.toFixed(1)}ms, max ${metrics.max_latency_ms}ms`);
+          console.log(
+            `  Calls: ${metrics.total_calls}, Success: ${metrics.successful_calls}, Failed: ${metrics.failed_calls}`,
+          );
+          console.log(
+            `  Latency: avg ${metrics.avg_latency_ms.toFixed(1)}ms, max ${metrics.max_latency_ms}ms`,
+          );
         });
       });
     });
   });
 
   // <CUSTOMISE>: Add integration tests (tool chains)
-  describe('tool chaining', () => {
-    it('can chain search_docs then extract_code', { timeout: 30000 }, async () => {
+  describe("tool chaining", () => {
+    it("can chain search_docs then extract_code", { timeout: 30_000 }, async () => {
       // Example: search for docs, then extract code snippet
       // This tests the agent's ability to use tools in sequence
 
@@ -272,8 +280,8 @@ describe('MCP server test suite', () => {
   });
 
   // Summary metrics
-  describe('overall metrics', () => {
-    it('computes latency and success statistics', async () => {
+  describe("overall metrics", () => {
+    it("computes latency and success statistics", async () => {
       let totalCalls = 0;
       let totalSuccess = 0;
       let totalLatency = 0;

@@ -58,6 +58,7 @@ Example: In 2025, OAuth 2.1 was optional for Authentication 2/3. In 2026, it's s
 Pick 2 projects from your baseline scorecards—one scoring 1–2 on a dimension, one scoring 2–3. These become your reference projects for that dimension.
 
 For API Surface, example:
+
 - **Reference 1/2:** Project with OpenAPI but terse descriptions, missing examples
 - **Reference 2/3:** Project with OpenAPI, 30+ word descriptions, examples, agent context
 
@@ -72,9 +73,11 @@ If Alice and Bob both score the project as "2/3: Good API design", the rubric is
 For any disagreement >0.5 points, clarify the rubric:
 
 **Before (ambiguous):**
+
 > Agent-oriented descriptions with "use when" and disambiguation. Proper operationIds.
 
 **After (clear):**
+
 > Descriptions include both "Use this when..." AND "Do not use for..." on >90% of operations.
 > operationId on 100% of operations (missing operationId = score capped at 1).
 
@@ -88,6 +91,7 @@ Include in the CHANGELOG:
 ## v1.2 (2026-09-01)
 
 **Calibration changes:**
+
 - API Surface 2/3: Clarified "agent-oriented descriptions" to require both
   "Use when" AND "Do not use for" on >90% of operations.
 - Authentication 1/3: Updated to reflect OAuth 2.1 as baseline (moved from 2/3).
@@ -119,18 +123,18 @@ IRR = (agreements on same score) / (total dimensions scored)
 
 **Project: acme-api**
 
-| Dimension | Auditor A | Auditor B | Auditor C | Mode | Agreement |
-|-----------|-----------|-----------|-----------|------|-----------|
-| API Surface | 2 | 2 | 2 | 2 | ✓ |
-| MCP Server | 1 | 2 | 1 | 1 | ✗ |
-| Auth | 2 | 2 | 3 | 2 | ✗ |
-| Error Handling | 1 | 0 | 1 | 1 | ✗ |
-| Tool Design | 1 | 1 | 1 | 1 | ✓ |
-| Discovery | 2 | 2 | 2 | 2 | ✓ |
-| Context Files | 2 | 2 | 2 | 2 | ✓ |
-| CLI Design | N/A | N/A | N/A | N/A | ✓ |
-| Multi-Agent | N/A | N/A | N/A | N/A | ✓ |
-| Testing | 1 | 1 | 1 | 1 | ✓ |
+| Dimension      | Auditor A | Auditor B | Auditor C | Mode | Agreement |
+| -------------- | --------- | --------- | --------- | ---- | --------- |
+| API Surface    | 2         | 2         | 2         | 2    | ✓         |
+| MCP Server     | 1         | 2         | 1         | 1    | ✗         |
+| Auth           | 2         | 2         | 3         | 2    | ✗         |
+| Error Handling | 1         | 0         | 1         | 1    | ✗         |
+| Tool Design    | 1         | 1         | 1         | 1    | ✓         |
+| Discovery      | 2         | 2         | 2         | 2    | ✓         |
+| Context Files  | 2         | 2         | 2         | 2    | ✓         |
+| CLI Design     | N/A       | N/A       | N/A       | N/A  | ✓         |
+| Multi-Agent    | N/A       | N/A       | N/A       | N/A  | ✓         |
+| Testing        | 1         | 1         | 1         | 1    | ✓         |
 
 **IRR = 7/10 = 0.70** (Fair. MCP Server and Auth criteria need clarification.)
 
@@ -155,6 +159,7 @@ Auditor B: "MCP tools have annotations, outputSchema declared → 2/3"
 **Root cause:** Rubric doesn't specify whether annotations are required for 2/3 or nice-to-have.
 
 **Fix:** Update rubric:
+
 > Score 2 requires: annotations on all tools, outputSchema on tools returning structured data.
 > Score 3 requires: annotations + pagination on list operations + OAuth.
 

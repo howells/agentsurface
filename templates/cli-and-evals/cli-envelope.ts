@@ -24,25 +24,27 @@
  * - RFC 9457 Problem+JSON: https://www.rfc-editor.org/rfc/rfc9457.html
  */
 
-import { z } from 'zod';
-import { exit } from 'process';
-import { isatty } from 'tty';
+import { z } from "zod";
+import { exit } from "node:process";
+import { isatty } from "node:tty";
 
 // Schema: Base envelope structure
 const CLIEnvelopeSchema = z.object({
-  version: z.literal('1.0').default('1.0'),
-  ok: z.boolean(),
   data: z.unknown().optional(),
-  error: z.object({
-    code: z.string(),
-    message: z.string(),
-    details: z.record(z.string(), z.unknown()).optional(),
-  }).optional(),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+      details: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
   meta: z.object({
     trace_id: z.string(),
     took_ms: z.number(),
     command: z.string(),
   }),
+  ok: z.boolean(),
+  version: z.literal("1.0").default("1.0"),
 });
 
 export type CLIEnvelope<T = unknown> = z.infer<typeof CLIEnvelopeSchema> & {
@@ -75,7 +77,7 @@ export class CLIResponse {
   }
 
   private generateTraceId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    return `${Date.now()}-${Math.random().toString(36).slice(7)}`;
   }
 
   private getTookMs(): number {
@@ -94,14 +96,14 @@ export class CLIResponse {
    */
   success<T>(data?: T): string {
     const envelope: CLIEnvelope<T> = {
-      version: '1.0',
-      ok: true,
       data,
       meta: {
-        trace_id: this.traceId,
-        took_ms: this.getTookMs(),
         command: this.command,
+        took_ms: this.getTookMs(),
+        trace_id: this.traceId,
       },
+      ok: true,
+      version: "1.0",
     };
     return this.format(envelope);
   }
@@ -111,18 +113,18 @@ export class CLIResponse {
    */
   error(code: string, message: string, details?: Record<string, unknown>): string {
     const envelope: CLIEnvelope = {
-      version: '1.0',
-      ok: false,
       error: {
         code,
-        message,
         details,
+        message,
       },
       meta: {
-        trace_id: this.traceId,
-        took_ms: this.getTookMs(),
         command: this.command,
+        took_ms: this.getTookMs(),
+        trace_id: this.traceId,
       },
+      ok: false,
+      version: "1.0",
     };
     return this.format(envelope);
   }
@@ -154,13 +156,18 @@ export function setupCLIWithEnvelope(program: any, opts: { json?: boolean; comma
   const response = new CLIResponse(opts.command, opts.json);
 
   return {
-    response,
+    exitError: (
+      code: string,
+      message: string,
+      details?: Record<string, unknown>,
+      exitCode: ExitCode = ExitCode.GENERAL_ERROR,
+    ) => {
+      outputAndExit(response.error(code, message, details), exitCode);
+    },
     exitSuccess: (data?: unknown) => {
       outputAndExit(response.success(data), ExitCode.SUCCESS);
     },
-    exitError: (code: string, message: string, details?: Record<string, unknown>, exitCode: ExitCode = ExitCode.GENERAL_ERROR) => {
-      outputAndExit(response.error(code, message, details), exitCode);
-    },
+    response,
   };
 }
 
@@ -168,7 +175,7 @@ export function setupCLIWithEnvelope(program: any, opts: { json?: boolean; comma
  * Helper: Suppress color when not a TTY or when --json is set
  */
 export function shouldUseColor(jsonMode: boolean): boolean {
-  return !jsonMode && isatty(process.stdout.fd) && process.env.NO_COLOR !== '1';
+  return !jsonMode && isatty(process.stdout.fd) && process.env.NO_COLOR !== "1";
 }
 
 /**

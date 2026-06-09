@@ -45,29 +45,29 @@ If the token is stolen without the private key, an attacker cannot create a vali
 ## Client-Side: Generating DPoP Proofs
 
 ```typescript
-import { SignJWT, generateKeyPair } from 'jose';
-import { randomUUID } from 'crypto';
+import { SignJWT, generateKeyPair } from "jose";
+import { randomUUID } from "crypto";
 
 // Generate keypair once and store securely
-const { publicKey, privateKey } = await generateKeyPair('ES256');
+const { publicKey, privateKey } = await generateKeyPair("ES256");
 
 async function generateDPopProof(method: string, uri: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
   const proof = await new SignJWT({
-    jti: randomUUID(),           // Unique per request
-    htm: method,                 // GET, POST, etc.
-    htu: uri,                    // Full request URI
+    jti: randomUUID(), // Unique per request
+    htm: method, // GET, POST, etc.
+    htu: uri, // Full request URI
     iat: now,
-    exp: now + 120,              // 2 minutes validity
+    exp: now + 120, // 2 minutes validity
   })
     .setProtectedHeader({
-      alg: 'ES256',
-      typ: 'dpop+jwt',
+      alg: "ES256",
+      typ: "dpop+jwt",
       jwk: {
         // Public key in JWK format (without private component)
-        kty: 'EC',
-        crv: 'P-256',
+        kty: "EC",
+        crv: "P-256",
         x: publicKey.x,
         y: publicKey.y,
       },
@@ -78,15 +78,15 @@ async function generateDPopProof(method: string, uri: string): Promise<string> {
 }
 
 // On every request
-const method = 'GET';
-const uri = 'https://api.example.com/invoices';
+const method = "GET";
+const uri = "https://api.example.com/invoices";
 const dpopProof = await generateDPopProof(method, uri);
 
 const res = await fetch(uri, {
   method,
   headers: {
-    'Authorization': `DPoP ${accessToken}`,
-    'DPoP': dpopProof,
+    Authorization: `DPoP ${accessToken}`,
+    DPoP: dpopProof,
   },
 });
 ```
@@ -96,7 +96,7 @@ The `jti` must be globally unique per request to prevent replay. Use a UUID or a
 ## Server-Side: Validating DPoP Proofs
 
 ```typescript
-import { jwtVerify } from 'jose';
+import { jwtVerify } from "jose";
 
 // Store of seen JTIs to prevent replay
 const seenJtis = new Set<string>();
@@ -105,32 +105,32 @@ const JTI_MAX_AGE = 2 * 60; // 2 minutes
 async function validateDPopProof(
   dpopHeader: string,
   method: string,
-  uri: string
+  uri: string,
 ): Promise<{ thumbprint: string; sub: string }> {
   const { payload, protectedHeader } = await jwtVerify(dpopHeader, null, {
-    algorithms: ['ES256', 'RS256'],
+    algorithms: ["ES256", "RS256"],
     // Do NOT verify signature yet; extract the public key from the header
   });
 
   // Extract the public key from the JWT header
   if (!protectedHeader.jwk) {
-    throw new Error('DPoP JWT missing public key in header');
+    throw new Error("DPoP JWT missing public key in header");
   }
 
   const publicKey = await importJWK(protectedHeader.jwk);
 
   // Now verify the signature
   await jwtVerify(dpopHeader, publicKey, {
-    algorithms: ['ES256', 'RS256'],
+    algorithms: ["ES256", "RS256"],
   });
 
   // Verify claims
   const now = Math.floor(Date.now() / 1000);
   if ((payload.iat as number) > now + 60) {
-    throw new Error('DPoP proof issued in the future');
+    throw new Error("DPoP proof issued in the future");
   }
   if ((payload.iat as number) < now - 300) {
-    throw new Error('DPoP proof is stale');
+    throw new Error("DPoP proof is stale");
   }
 
   if (payload.htm !== method) {
@@ -144,7 +144,7 @@ async function validateDPopProof(
   // Check JTI for replay
   const jti = payload.jti as string;
   if (seenJtis.has(jti)) {
-    throw new Error('DPoP JTI has been replayed');
+    throw new Error("DPoP JTI has been replayed");
   }
   seenJtis.add(jti);
 
@@ -180,9 +180,14 @@ On every request, the server verifies:
 If an attacker steals the token but not the private key, they cannot create a valid DPoP proof with the matching thumbprint.
 
 ```typescript
-import { calculateJwkThumbprint, importJWK } from 'jose';
+import { calculateJwkThumbprint, importJWK } from "jose";
 
-async function validateTokenAndDPoP(token: string, dpopHeader: string, method: string, uri: string) {
+async function validateTokenAndDPoP(
+  token: string,
+  dpopHeader: string,
+  method: string,
+  uri: string,
+) {
   // Validate the JWT token
   const { payload: tokenPayload } = await jwtVerify(token, jwks);
 
@@ -192,12 +197,12 @@ async function validateTokenAndDPoP(token: string, dpopHeader: string, method: s
   // Compare thumbprints
   const dpopThumbprint = await calculateJwkThumbprint(protectedHeader.jwk!);
   if (dpopThumbprint !== tokenPayload.dpop_jkt) {
-    throw new Error('DPoP thumbprint does not match token');
+    throw new Error("DPoP thumbprint does not match token");
   }
 
   // Verify htm and htu match
   if (dpopPayload.htm !== method || dpopPayload.htu !== uri) {
-    throw new Error('DPoP proof does not match request');
+    throw new Error("DPoP proof does not match request");
   }
 
   return tokenPayload;
@@ -226,16 +231,16 @@ server.setRequestHandler(
     schema: jsonrpc.JsonRpcRequestSchema,
   },
   async (request) => {
-    const dpopHeader = request.headers?.['DPoP'] as string;
-    const authHeader = request.headers?.['Authorization'] as string;
+    const dpopHeader = request.headers?.["DPoP"] as string;
+    const authHeader = request.headers?.["Authorization"] as string;
 
     if (!dpopHeader) {
-      throw new Error('DPoP proof required');
+      throw new Error("DPoP proof required");
     }
 
     await validateDPopProof(dpopHeader, request.method, request.uri);
     // ... proceed with request
-  }
+  },
 );
 ```
 

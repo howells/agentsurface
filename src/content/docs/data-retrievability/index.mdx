@@ -3,7 +3,7 @@ title: Data Retrievability
 description: How your codebase makes data searchable, retrievable, and understandable to agents
 ---
 
-import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Card, Cards } from "fumadocs-ui/components/card";
 
 Data Retrievability is how effectively your codebase enables agents to find, understand, and retrieve information. This includes RAG pattern selection, embeddings, vector stores, hybrid retrieval, reranking, chunking, knowledge graphs, agentic query planning, and evaluation loops.
 
@@ -14,6 +14,7 @@ Freshness note: last reviewed 2026-06-02. Retrieval model names, vendor pricing,
 The durable pattern is stable: production systems should usually combine sparse keyword retrieval, dense semantic retrieval, metadata filters, reranking, bounded context assembly, and evaluation. Dense-only vector search is a useful prototype baseline, but it is rarely enough for agent workflows that depend on exact identifiers, permissions, citations, and multi-step reasoning.
 
 **Key takeaways:**
+
 - **Hybrid beats dense-only for mixed corpora:** Combine keyword signals, dense vectors, filters, and fusion unless labelled evals prove one retriever is enough.
 - **Chunking is product logic:** Preserve source, section, tenant, version, and citation metadata; do not index anonymous text blobs.
 - **Reranking improves precision:** Retrieve broad, rerank narrow, then assemble only the context an answer can cite.
@@ -26,30 +27,30 @@ The durable pattern is stable: production systems should usually combine sparse 
 graph TD
     A[Need retrieval?] -->|No| B[Not applicable]
     A -->|Yes| C{Data complexity & scale?}
-    
+
     C -->|Simple, `` `<100K` `` docs| D{Hybrid or agentic?}
     C -->|Complex relationships| E{Cost-sensitive?}
     C -->|Large scale >10M| F[pgvector + pgvectorscale or Pinecone]
-    
+
     D -->|Just embed & retrieve| G[Dense vectors + vector DB]
     D -->|Need keyword + semantic| H[Hybrid: BM25 + dense + RRF]
     D -->|Multi-hop reasoning| I[Agentic RAG with planning]
-    
+
     E -->|Yes| J[LightRAG or vector-only]
     E -->|No| K[GraphRAG with Neo4j]
-    
+
     G -->|Many images/PDFs| L[Multimodal embeddings]
     G -->|Text-only| M[Text embedding model]
-    
+
     H -->|Use Weaviate| N[Weaviate hybrid native]
     H -->|DIY pipeline| O[Qdrant + OpenSearch + RRF]
-    
+
     I -->|Graph workflow| P[LangGraph or similar]
     I -->|Index framework| Q[LlamaIndex or similar]
-    
+
     F -->|Managed| R[Pinecone serverless]
     F -->|Self-hosted| S[pgvector + pgvectorscale]
-    
+
     L -->|All modalities| T[Provider multimodal model]
     L -->|Text + images| U[Open or hosted multimodal model]
 ```
@@ -58,17 +59,17 @@ graph TD
 
 For most TypeScript/Node teams:
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| **Embeddings** | Hosted or open model matched to language, modality, and data policy | Provider rankings and prices change; your eval set should decide. |
-| **Multimodal** | Use only when source documents include images, diagrams, slides, audio, or video | Text-only corpora do not need multimodal cost or complexity. |
-| **Vector DB** | Managed service, Postgres extension, or open-source vector store | Choose by ops burden, filtering, scale, and tenancy model. |
-| **Hybrid layer** | Native hybrid search or dense store plus full-text index | Exact identifiers and semantic questions both matter. |
-| **Reranking** | Hosted or self-hosted reranker over broad candidates | Improves precision when first-stage retrieval is noisy. |
-| **Chunking** | Structural chunking plus metadata; contextual summaries when needed | Chunks need enough source context to be cited safely. |
-| **Knowledge graph** | Add only when relationships are explicit and queried often | Graphs are maintenance commitments, not default retrieval. |
-| **Agentic RAG** | Bounded query planning and validation for complex queries | Planning costs more; reserve it for multi-hop or multi-source work. |
-| **Evaluation** | Recall, ranking, faithfulness, latency, cost, and drift gates | Retrieval changes need measurable regression checks. |
+| Layer               | Choice                                                                           | Why                                                                 |
+| ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Embeddings**      | Hosted or open model matched to language, modality, and data policy              | Provider rankings and prices change; your eval set should decide.   |
+| **Multimodal**      | Use only when source documents include images, diagrams, slides, audio, or video | Text-only corpora do not need multimodal cost or complexity.        |
+| **Vector DB**       | Managed service, Postgres extension, or open-source vector store                 | Choose by ops burden, filtering, scale, and tenancy model.          |
+| **Hybrid layer**    | Native hybrid search or dense store plus full-text index                         | Exact identifiers and semantic questions both matter.               |
+| **Reranking**       | Hosted or self-hosted reranker over broad candidates                             | Improves precision when first-stage retrieval is noisy.             |
+| **Chunking**        | Structural chunking plus metadata; contextual summaries when needed              | Chunks need enough source context to be cited safely.               |
+| **Knowledge graph** | Add only when relationships are explicit and queried often                       | Graphs are maintenance commitments, not default retrieval.          |
+| **Agentic RAG**     | Bounded query planning and validation for complex queries                        | Planning costs more; reserve it for multi-hop or multi-source work. |
+| **Evaluation**      | Recall, ranking, faithfulness, latency, cost, and drift gates                    | Retrieval changes need measurable regression checks.                |
 
 ## Dimensions & pages
 

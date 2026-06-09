@@ -29,27 +29,49 @@ Tool schemas are the contract between the agent and the server. They define what
 ### Zod Example
 
 ```typescript
-import { z } from 'zod';
+import { z } from "zod";
 
-const searchIssuesSchema = z.object({
-  query: z.string()
-    .describe('Free text search. Examples: "status:Open", "assignee:alice@company.com", "label:bug"'),
-  
-  assignee: z.string().optional()
-    .describe('Filter by assignee name or email. Omit to search all assignees.'),
-  
-  status: z.enum(['Open', 'In Progress', 'Done', 'Closed']).optional()
-    .describe('Issue workflow state. Omit to search all statuses.'),
-  
-  priority: z.enum(['low', 'medium', 'high', 'critical']).optional()
-    .describe('Severity: low=cosmetic, medium=feature, high=blocker, critical=outage'),
-  
-  limit: z.number().int().min(1).max(100).default(50)
-    .describe('Max results to return. Default 50, capped at 100 for performance.'),
-  
-  offset: z.number().int().min(0).default(0)
-    .describe('Pagination offset. Use next_offset from the previous response to fetch the next page.'),
-}).strict();  // Strict mode rejects unexpected fields
+const searchIssuesSchema = z
+  .object({
+    query: z
+      .string()
+      .describe(
+        'Free text search. Examples: "status:Open", "assignee:alice@company.com", "label:bug"',
+      ),
+
+    assignee: z
+      .string()
+      .optional()
+      .describe("Filter by assignee name or email. Omit to search all assignees."),
+
+    status: z
+      .enum(["Open", "In Progress", "Done", "Closed"])
+      .optional()
+      .describe("Issue workflow state. Omit to search all statuses."),
+
+    priority: z
+      .enum(["low", "medium", "high", "critical"])
+      .optional()
+      .describe("Severity: low=cosmetic, medium=feature, high=blocker, critical=outage"),
+
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(50)
+      .describe("Max results to return. Default 50, capped at 100 for performance."),
+
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe(
+        "Pagination offset. Use next_offset from the previous response to fetch the next page.",
+      ),
+  })
+  .strict(); // Strict mode rejects unexpected fields
 ```
 
 ### JSON Schema Equivalent
@@ -161,33 +183,31 @@ Declare an `outputSchema` when the tool's result will be consumed by other tools
 
 ```typescript
 const InvoiceOutputSchema = z.object({
-  invoice_id: z.string().uuid()
-    .describe('Unique invoice identifier'),
-  
-  status: z.enum(['draft', 'open', 'paid', 'void', 'overdue'])
-    .describe('Current invoice state'),
-  
-  amount_cents: z.number().int().positive()
-    .describe('Total invoice amount in cents'),
-  
-  currency: z.enum(['usd', 'eur', 'gbp']).optional()
-    .describe('ISO 4217 currency code'),
-  
-  payment_url: z.string().url().optional()
-    .describe('Hosted payment page URL if invoice is open'),
-  
-  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
-    .describe('Payment due date in YYYY-MM-DD format'),
+  invoice_id: z.string().uuid().describe("Unique invoice identifier"),
+
+  status: z.enum(["draft", "open", "paid", "void", "overdue"]).describe("Current invoice state"),
+
+  amount_cents: z.number().int().positive().describe("Total invoice amount in cents"),
+
+  currency: z.enum(["usd", "eur", "gbp"]).optional().describe("ISO 4217 currency code"),
+
+  payment_url: z.string().url().optional().describe("Hosted payment page URL if invoice is open"),
+
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .describe("Payment due date in YYYY-MM-DD format"),
 });
 
 server.tool(
-  'billing_create_invoice',
-  'Creates a new invoice and returns the invoice details...',
+  "billing_create_invoice",
+  "Creates a new invoice and returns the invoice details...",
   inputSchema,
   { outputSchema: InvoiceOutputSchema },
   async (params) => {
     const invoice = await createInvoice(params);
-    
+
     return {
       // Required when outputSchema is declared
       structuredContent: {
@@ -199,12 +219,14 @@ server.tool(
         due_date: invoice.dueDate,
       },
       // Human-readable content for display
-      content: [{
-        type: 'text',
-        text: `Invoice ${invoice.id} created: $${(invoice.amountCents / 100).toFixed(2)} due ${invoice.dueDate}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Invoice ${invoice.id} created: $${(invoice.amountCents / 100).toFixed(2)} due ${invoice.dueDate}`,
+        },
+      ],
     };
-  }
+  },
 );
 ```
 
@@ -234,16 +256,24 @@ const schema = z.object({
 When a nested object exists, apply `additionalProperties: false` to it as well:
 
 ```typescript
-const schema = z.object({
-  customer: z.object({
-    name: z.string(),
-    email: z.string().email(),
-  }).strict(),  // Inner object must also be strict
-  items: z.array(z.object({
-    sku: z.string(),
-    quantity: z.number().int(),
-  }).strict()),  // Each array element must be strict
-}).strict();
+const schema = z
+  .object({
+    customer: z
+      .object({
+        name: z.string(),
+        email: z.string().email(),
+      })
+      .strict(), // Inner object must also be strict
+    items: z.array(
+      z
+        .object({
+          sku: z.string(),
+          quantity: z.number().int(),
+        })
+        .strict(),
+    ), // Each array element must be strict
+  })
+  .strict();
 ```
 
 ## Common Anti-Patterns
@@ -252,10 +282,10 @@ const schema = z.object({
 
 ```typescript
 // Bad — OpenAI requires explicit omission, not null
-assignee: z.string().nullable().optional()
+assignee: z.string().nullable().optional();
 
 // Good
-assignee: z.string().optional()  // Omit entirely if not needed
+assignee: z.string().optional(); // Omit entirely if not needed
 ```
 
 ### Nested Union Types
@@ -277,12 +307,10 @@ error_message: z.string().optional(),
 
 ```typescript
 // Bad
-sort_order: z.string()
-  .describe('How to sort results')  // Vague; agent will guess
+sort_order: z.string().describe("How to sort results"); // Vague; agent will guess
 
 // Good
-sort_order: z.enum(['ascending', 'descending'])
-  .describe('ascending=A-Z/0-9, descending=Z-A/9-0')
+sort_order: z.enum(["ascending", "descending"]).describe("ascending=A-Z/0-9, descending=Z-A/9-0");
 ```
 
 ### Inconsistent ID Types
@@ -323,13 +351,15 @@ due_date: z.string()
 Use `zod-to-json-schema` to emit OpenAI-compatible JSON Schema from Zod:
 
 ```typescript
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
-const schema = z.object({
-  query: z.string(),
-  limit: z.number().int().min(1).max(100).default(50),
-}).strict();
+const schema = z
+  .object({
+    query: z.string(),
+    limit: z.number().int().min(1).max(100).default(50),
+  })
+  .strict();
 
 const jsonSchema = zodToJsonSchema(schema);
 console.log(JSON.stringify(jsonSchema, null, 2));

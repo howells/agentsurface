@@ -11,7 +11,8 @@
  * </CUSTOMISE>
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * RFC 8414 Protected Resource Metadata
@@ -37,37 +38,37 @@ interface ProtectedResourceMetadata {
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const metadata: ProtectedResourceMetadata = {
     // <CUSTOMISE> Update to your domain
-    resource_url: process.env.API_URL || 'https://api.example.com',
+    resource_url: process.env.API_URL || "https://api.example.com",
 
     // <CUSTOMISE> Auth server(s) that can issue tokens for this resource
-    authorization_servers: [process.env.AUTH_SERVER || 'https://auth.example.com'],
+    authorization_servers: [process.env.AUTH_SERVER || "https://auth.example.com"],
 
     // <CUSTOMISE> Define scopes your API supports
     scopes_supported: [
-      'agent:read', // MCP: read-only agent operations
-      'agent:write', // MCP: agent write operations
-      'users:read', // Read user data
-      'users:write', // Create/update users
-      'posts:read', // Read posts
-      'posts:write', // Create/update posts
-      'billing:read', // Read billing information
-      'offline_access', // Request refresh token
+      "agent:read", // MCP: read-only agent operations
+      "agent:write", // MCP: agent write operations
+      "users:read", // Read user data
+      "users:write", // Create/update users
+      "posts:read", // Read posts
+      "posts:write", // Create/update posts
+      "billing:read", // Read billing information
+      "offline_access", // Request refresh token
     ],
 
     // <CUSTOMISE> URI to JWKS (public keys for token validation)
-    jwks_uri: process.env.JWKS_URI || 'https://auth.example.com/.well-known/jwks.json',
+    jwks_uri: process.env.JWKS_URI || "https://auth.example.com/.well-known/jwks.json",
 
     // Standard OAuth response types
-    response_types_supported: ['token'],
+    response_types_supported: ["token"],
 
     // Supported grant types for this resource
     grant_types_supported: [
-      'client_credentials', // M2M auth (agents)
-      'urn:ietf:params:oauth:grant-type:token-exchange', // RFC 8693 delegation
+      "client_credentials", // M2M auth (agents)
+      "urn:ietf:params:oauth:grant-type:token-exchange", // RFC 8693 delegation
     ],
 
     // Token endpoint auth methods (if you have a dedicated endpoint)
-    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+    token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
 
     // Optional: Endpoints for token management
     ...(process.env.REVOCATION_ENDPOINT && {
@@ -81,13 +82,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Return with proper caching headers
   // (Remote servers may cache this for hours or days)
   return NextResponse.json(metadata, {
-    status: 200,
     headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+      "Content-Type": "application/json",
     },
+    status: 200,
   });
 }
 
@@ -96,13 +97,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
  */
 export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
   return new NextResponse(null, {
-    status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Max-Age': '86400',
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Max-Age": "86400",
     },
+    status: 204,
   });
 }
 

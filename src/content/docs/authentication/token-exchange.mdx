@@ -77,22 +77,22 @@ An orchestrator agent calls a sub-agent to summarize invoices. The orchestrator 
 async function delegateToSubAgent(
   orchestratorToken: string,
   subAgentId: string,
-  downstreamServiceUri: string
+  downstreamServiceUri: string,
 ): Promise<string> {
   const form = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: orchestratorToken,
-    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     actor_token: subAgentId,
-    actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
     audience: downstreamServiceUri,
-    scope: 'invoices:read',
+    scope: "invoices:read",
   });
 
-  const res = await fetch('https://auth.example.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await fetch("https://auth.example.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
@@ -108,17 +108,18 @@ async function delegateToSubAgent(
 // Orchestrator calls sub-agent
 const subAgentToken = await delegateToSubAgent(
   orchestratorToken,
-  'sub-agent-summarize',
-  'https://invoices-service.example.com/'
+  "sub-agent-summarize",
+  "https://invoices-service.example.com/",
 );
 
 // Sub-agent makes request with the narrowed token
-const res = await fetch('https://invoices-service.example.com/invoices', {
-  headers: { 'Authorization': `Bearer ${subAgentToken}` },
+const res = await fetch("https://invoices-service.example.com/invoices", {
+  headers: { Authorization: `Bearer ${subAgentToken}` },
 });
 ```
 
 The sub-agent receives a token that:
+
 - Is scoped to `invoices:read` only (cannot write)
 - Is only valid for `invoices-service.example.com` (audience-restricted)
 - Expires in 15 minutes (short-lived)
@@ -135,22 +136,22 @@ async function exchangeForDelegatedAccess(
   userToken: string,
   agentId: string,
   audience: string,
-  scope: string[]
+  scope: string[],
 ): Promise<string> {
   const form = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: userToken,
-    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     actor_token: agentId,
-    actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-    requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
     audience: audience,
-    scope: scope.join(' '),
+    scope: scope.join(" "),
   });
 
-  const res = await fetch('https://auth.example.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await fetch("https://auth.example.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
@@ -162,13 +163,14 @@ async function exchangeForDelegatedAccess(
 // User authorizes agent
 const delegatedToken = await exchangeForDelegatedAccess(
   userJwt,
-  'agent-process-invoices',
-  'https://invoices-service.example.com/',
-  ['invoices:read']
+  "agent-process-invoices",
+  "https://invoices-service.example.com/",
+  ["invoices:read"],
 );
 ```
 
 The resulting token includes:
+
 - `sub`: the user's ID
 - `act`: the agent's ID
 - `scope`: `invoices:read` only
@@ -181,22 +183,20 @@ The target service can verify that the user authorized the agent, and the agent 
 When receiving a delegated token, validate both the subject and the actor:
 
 ```typescript
-import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
-const jwks = createRemoteJWKSet(
-  new URL('https://auth.example.com/.well-known/jwks.json')
-);
+const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 
 async function validateDelegatedToken(token: string) {
   const { payload } = await jwtVerify(token, jwks, {
-    issuer: 'https://auth.example.com/',
-    audience: 'https://invoices-service.example.com/',
+    issuer: "https://auth.example.com/",
+    audience: "https://invoices-service.example.com/",
   });
 
   // Verify scopes
-  const scopes = (payload.scope as string || '').split(' ');
-  if (!scopes.includes('invoices:read')) {
-    throw new Error('Token lacks required scope');
+  const scopes = ((payload.scope as string) || "").split(" ");
+  if (!scopes.includes("invoices:read")) {
+    throw new Error("Token lacks required scope");
   }
 
   // Verify subject (user)
@@ -218,69 +218,69 @@ async function validateDelegatedToken(token: string) {
 A minimal token exchange endpoint:
 
 ```typescript
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT, jwtVerify } from "jose";
 
 async function handleTokenExchange(req: Request) {
   const form = await req.formData();
 
-  const grantType = form.get('grant_type');
-  if (grantType !== 'urn:ietf:params:oauth:grant-type:token-exchange') {
-    return Response.json({ error: 'unsupported_grant_type' }, { status: 400 });
+  const grantType = form.get("grant_type");
+  if (grantType !== "urn:ietf:params:oauth:grant-type:token-exchange") {
+    return Response.json({ error: "unsupported_grant_type" }, { status: 400 });
   }
 
   // Validate subject token
-  const subjectToken = form.get('subject_token') as string;
+  const subjectToken = form.get("subject_token") as string;
   let subjectPayload;
   try {
     const { payload } = await jwtVerify(subjectToken, jwks, {
-      issuer: 'https://auth.example.com/',
+      issuer: "https://auth.example.com/",
     });
     subjectPayload = payload;
   } catch (err) {
-    return Response.json({ error: 'invalid_request' }, { status: 400 });
+    return Response.json({ error: "invalid_request" }, { status: 400 });
   }
 
   // Validate actor token (optional)
-  const actorToken = form.get('actor_token') as string;
+  const actorToken = form.get("actor_token") as string;
   let actorPayload = null;
   if (actorToken) {
     try {
       const { payload } = await jwtVerify(actorToken, jwks);
       actorPayload = payload;
     } catch (err) {
-      return Response.json({ error: 'invalid_request' }, { status: 400 });
+      return Response.json({ error: "invalid_request" }, { status: 400 });
     }
   }
 
   // Validate requested scope is a subset of subject scope
-  const requestedScope = (form.get('scope') as string || '').split(' ');
-  const subjectScope = (subjectPayload.scope as string || '').split(' ');
-  const isValidScope = requestedScope.every(s => subjectScope.includes(s));
+  const requestedScope = ((form.get("scope") as string) || "").split(" ");
+  const subjectScope = ((subjectPayload.scope as string) || "").split(" ");
+  const isValidScope = requestedScope.every((s) => subjectScope.includes(s));
   if (!isValidScope) {
-    return Response.json({ error: 'invalid_scope' }, { status: 400 });
+    return Response.json({ error: "invalid_scope" }, { status: 400 });
   }
 
   // Create the new token
   const now = Math.floor(Date.now() / 1000);
-  const audience = form.get('audience') as string;
+  const audience = form.get("audience") as string;
 
   const newToken = await new SignJWT({
     sub: subjectPayload.sub,
     act: actorPayload ? { sub: actorPayload.sub } : undefined,
-    scope: requestedScope.join(' '),
+    scope: requestedScope.join(" "),
     aud: audience,
-    iss: 'https://auth.example.com/',
+    iss: "https://auth.example.com/",
     iat: now,
     exp: now + 900, // 15 minutes
   })
-    .setProtectedHeader({ alg: 'RS256' })
+    .setProtectedHeader({ alg: "RS256" })
     .sign(privateKey);
 
   return Response.json({
     access_token: newToken,
-    token_type: 'Bearer',
+    token_type: "Bearer",
     expires_in: 900,
-    issued_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    issued_token_type: "urn:ietf:params:oauth:token-type:jwt",
   });
 }
 ```

@@ -26,13 +26,11 @@ Tool definitions are included in every agent request. Minimize this cost:
 
 ```typescript
 // 15 tokens — concise
-'Search for issues by text or assignee.',
-
-// 50 tokens — good
-'Search for open issues by text, assignee, or status. Use for finding bugs or feature requests. Do not use for creating new issues (use create_issue instead). Returns paginated results.',
-
-// 200+ tokens — bloated
-'This advanced search tool provides comprehensive filtering capabilities across multiple dimensions including text matching, assignee filtering, status transitions, priority levels, custom fields, date ranges, and many other powerful options that let you slice and dice your issue data in countless ways...'
+("Search for issues by text or assignee.",
+  // 50 tokens — good
+  "Search for open issues by text, assignee, or status. Use for finding bugs or feature requests. Do not use for creating new issues (use create_issue instead). Returns paginated results.",
+  // 200+ tokens — bloated
+  "This advanced search tool provides comprehensive filtering capabilities across multiple dimensions including text matching, assignee filtering, status transitions, priority levels, custom fields, date ranges, and many other powerful options that let you slice and dice your issue data in countless ways...");
 ```
 
 Keep first paragraph under 100 tokens. Link to detailed docs for edge cases rather than inlining.
@@ -54,25 +52,27 @@ query: z.string().describe('The query string that will be used to search across 
 
 ```typescript
 // Bad — bloated
-const schema = z.object({
-  query: z.string(),
-  limit: z.number(),
-  offset: z.number(),
-  sort_by: z.enum(['created', 'updated', 'priority']),
-  sort_order: z.enum(['asc', 'desc']),
-  filter_status: z.enum(['open', 'closed', 'in_progress']),
-  filter_priority: z.enum(['low', 'medium', 'high', 'critical']),
-  filter_assignee: z.string(),
-  filter_labels: z.array(z.string()),
-  include_closed: z.boolean(),
-  include_archived: z.boolean(),
-  group_by: z.enum(['status', 'priority', 'assignee']),
-  // ... 15+ more fields
-}).strict();
+const schema = z
+  .object({
+    query: z.string(),
+    limit: z.number(),
+    offset: z.number(),
+    sort_by: z.enum(["created", "updated", "priority"]),
+    sort_order: z.enum(["asc", "desc"]),
+    filter_status: z.enum(["open", "closed", "in_progress"]),
+    filter_priority: z.enum(["low", "medium", "high", "critical"]),
+    filter_assignee: z.string(),
+    filter_labels: z.array(z.string()),
+    include_closed: z.boolean(),
+    include_archived: z.boolean(),
+    group_by: z.enum(["status", "priority", "assignee"]),
+    // ... 15+ more fields
+  })
+  .strict();
 
 // Good — split into two tools
-search_issues_simple({ query, limit, offset })
-search_issues_advanced({ ...all_filters_above })
+search_issues_simple({ query, limit, offset });
+search_issues_advanced({ ...all_filters_above });
 ```
 
 One lean, high-frequency tool beats one bloated tool that does everything.
@@ -88,29 +88,33 @@ Tool responses are inserted into the conversation for the agent to reason over. 
 async (params) => {
   const issue = await db.issues.findById(params.id);
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify(issue),  // 50+ fields: created_at, updated_at, creator_id, metadata, tags, etc.
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(issue), // 50+ fields: created_at, updated_at, creator_id, metadata, tags, etc.
+      },
+    ],
   };
-}
+};
 
 // Good — return only what agents act on
 async (params) => {
   const issue = await db.issues.findById(params.id);
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify({
-        id: issue.id,
-        title: issue.title,
-        status: issue.status,
-        assignee: issue.assignee,
-        priority: issue.priority,
-      }),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          id: issue.id,
+          title: issue.title,
+          status: issue.status,
+          assignee: issue.assignee,
+          priority: issue.priority,
+        }),
+      },
+    ],
   };
-}
+};
 ```
 
 The lean response is 10x smaller and contains all information the agent needs to decide next steps.
@@ -125,24 +129,26 @@ async (params) => {
     .where(params.filters)
     .limit(params.limit)
     .offset(params.offset)
-    .select(['id', 'title', 'status']);
-  
+    .select(["id", "title", "status"]);
+
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify({
-        results: results.map(r => ({
-          id: r.id,
-          title: r.title,
-          status: r.status,
-        })),
-        has_more: results.length === params.limit,
-        next_offset: params.offset + params.limit,
-        total_count: results.total,  // Allows agent to know scale
-      }),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          results: results.map((r) => ({
+            id: r.id,
+            title: r.title,
+            status: r.status,
+          })),
+          has_more: results.length === params.limit,
+          next_offset: params.offset + params.limit,
+          total_count: results.total, // Allows agent to know scale
+        }),
+      },
+    ],
   };
-}
+};
 ```
 
 Never return all 1000 results at once. Cap at 50, return `has_more: true`, and include `next_offset` for the agent to fetch more.
@@ -195,23 +201,28 @@ Agents that see `remaining: 2` can stop calling the tool before hitting hard lim
 Different models have different context budgets. Shape responses accordingly:
 
 ```typescript
-const responseShape = params.model === 'claude-haiku' 
-  ? 'concise'  // Ultra-lean: IDs + names only
-  : 'detailed'; // Full: include all metadata
+const responseShape =
+  params.model === "claude-haiku"
+    ? "concise" // Ultra-lean: IDs + names only
+    : "detailed"; // Full: include all metadata
 
-if (responseShape === 'concise') {
+if (responseShape === "concise") {
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify(results.map(r => ({ id: r.id, name: r.name }))),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(results.map((r) => ({ id: r.id, name: r.name }))),
+      },
+    ],
   };
 } else {
   return {
-    content: [{
-      type: 'text',
-      text: JSON.stringify(results),
-    }],
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(results),
+      },
+    ],
   };
 }
 ```
@@ -221,8 +232,11 @@ Or expose a `response_format` parameter:
 ```typescript
 const searchSchema = z.object({
   query: z.string(),
-  response_format: z.enum(['concise', 'detailed']).optional().default('concise')
-    .describe('concise: IDs + names only. detailed: full metadata (slower, higher tokens).'),
+  response_format: z
+    .enum(["concise", "detailed"])
+    .optional()
+    .default("concise")
+    .describe("concise: IDs + names only. detailed: full metadata (slower, higher tokens)."),
 });
 ```
 
@@ -259,7 +273,7 @@ Before each agent request, search the tool registry by relevance:
 ```typescript
 async function selectToolsForQuery(userQuery: string, allTools: Tool[]) {
   const ranked = bm25Search(userQuery, allTools, { topK: 5 });
-  return ranked;  // Only inject top 5 tools into context
+  return ranked; // Only inject top 5 tools into context
 }
 ```
 
@@ -271,33 +285,35 @@ For long-running agents, track cumulative tool cost:
 
 ```typescript
 let cumulativeTokens = 0;
-const maxBudget = 100_000;  // Adjust per model and use case
+const maxBudget = 100_000; // Adjust per model and use case
 
 async function callTool(toolName: string, params: object) {
   const estimate = estimateTokens(toolName, params);
   cumulativeTokens += estimate;
-  
+
   if (cumulativeTokens > maxBudget * 0.9) {
-    console.warn(`Token budget 90% consumed (${cumulativeTokens} / ${maxBudget}). Consider stopping or switching to cheaper model.`);
+    console.warn(
+      `Token budget 90% consumed (${cumulativeTokens} / ${maxBudget}). Consider stopping or switching to cheaper model.`,
+    );
   }
-  
+
   if (cumulativeTokens > maxBudget) {
     throw new Error(`Token budget exceeded. Stop and summarize.`);
   }
-  
+
   return await executeTool(toolName, params);
 }
 ```
 
 ## Guidelines
 
-| Aspect | Target | Red Flag |
-|--------|--------|----------|
-| Tool description | `` `<100` `` tokens per tool | `` `>200` `` tokens (link to deeper docs) |
-| Parameter descriptions | `` `<30` `` tokens combined | Paragraphs (condense or split schema) |
-| Response size | `` `<500` `` tokens per result | `` `>2000` `` tokens (paginate, compress, or split) |
-| Tool count | `` `<15` `` per agent session | `` `>25` `` tools without dynamic selection |
-| Single response | `` `<1000` `` tokens | `` `>5000` `` tokens (use pagination or summaries) |
+| Aspect                 | Target                         | Red Flag                                            |
+| ---------------------- | ------------------------------ | --------------------------------------------------- |
+| Tool description       | `` `<100` `` tokens per tool   | `` `>200` `` tokens (link to deeper docs)           |
+| Parameter descriptions | `` `<30` `` tokens combined    | Paragraphs (condense or split schema)               |
+| Response size          | `` `<500` `` tokens per result | `` `>2000` `` tokens (paginate, compress, or split) |
+| Tool count             | `` `<15` `` per agent session  | `` `>25` `` tools without dynamic selection         |
+| Single response        | `` `<1000` `` tokens           | `` `>5000` `` tokens (use pagination or summaries)  |
 
 ## See also
 

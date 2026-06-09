@@ -84,11 +84,11 @@ https://auth.example.com/tenant1/.well-known/openid-configuration
 
 MCP supports three client registration approaches:
 
-| Approach | Use when |
-|---|---|
-| Pre-registration | The client and authorization server already have a relationship. |
+| Approach                           | Use when                                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-registration                   | The client and authorization server already have a relationship.                                                                      |
 | OAuth Client ID Metadata Documents | The client and authorization server do not have a prior relationship, and the authorization server supports URL-formatted client IDs. |
-| Dynamic client registration | The authorization server supports RFC 7591 and dynamic registration is appropriate. |
+| Dynamic client registration        | The authorization server supports RFC 7591 and dynamic registration is appropriate.                                                   |
 
 When several options exist, clients should prefer pre-registered client details, then Client ID Metadata Documents when supported, then dynamic client registration as a fallback.
 
@@ -109,10 +109,7 @@ Example:
   "client_id": "https://app.example.com/oauth/client-metadata.json",
   "client_name": "Example MCP Client",
   "client_uri": "https://app.example.com",
-  "redirect_uris": [
-    "http://127.0.0.1:3000/callback",
-    "http://localhost:3000/callback"
-  ],
+  "redirect_uris": ["http://127.0.0.1:3000/callback", "http://localhost:3000/callback"],
   "grant_types": ["authorization_code"],
   "response_types": ["code"],
   "token_endpoint_auth_method": "none"

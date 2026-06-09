@@ -42,7 +42,7 @@ webhooks:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OrderCreatedEvent'
+              $ref: "#/components/schemas/OrderCreatedEvent"
             example:
               event_type: "order.created"
               event_id: "evt_01HV3K8MNPQR"
@@ -54,9 +54,9 @@ webhooks:
                 customer_id: "cust_xyz"
                 total: 149.99
       responses:
-        '200':
+        "200":
           description: Event acknowledged
-        '202':
+        "202":
           description: Event accepted for async processing
 
   order.status_changed:
@@ -68,7 +68,7 @@ webhooks:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OrderStatusChangedEvent'
+              $ref: "#/components/schemas/OrderStatusChangedEvent"
 
   payment.succeeded:
     post:
@@ -79,7 +79,7 @@ webhooks:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentSucceededEvent'
+              $ref: "#/components/schemas/PaymentSucceededEvent"
 
   payment.failed:
     post:
@@ -90,7 +90,7 @@ webhooks:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentFailedEvent'
+              $ref: "#/components/schemas/PaymentFailedEvent"
 ```
 
 ## Webhooks vs Callbacks
@@ -122,14 +122,14 @@ paths:
                   description: URL to receive the export.completed event
       callbacks:
         exportCompleted:
-          '{$requestBody#/callback_url}':
+          "{$requestBody#/callback_url}":
             post:
               summary: Export completed notification
               requestBody:
                 content:
                   application/json:
                     schema:
-                      $ref: '#/components/schemas/ExportCompletedEvent'
+                      $ref: "#/components/schemas/ExportCompletedEvent"
 ```
 
 Use `webhooks` for system-wide events (order created, payment succeeded). Use `callbacks` for operation-specific async completion events.
@@ -161,7 +161,7 @@ components:
 
     OrderCreatedEvent:
       allOf:
-        - $ref: '#/components/schemas/BaseEvent'
+        - $ref: "#/components/schemas/BaseEvent"
         - type: object
           required: [data]
           properties:
@@ -169,11 +169,11 @@ components:
               type: string
               const: "order.created"
             data:
-              $ref: '#/components/schemas/Order'
+              $ref: "#/components/schemas/Order"
 
     PaymentSucceededEvent:
       allOf:
-        - $ref: '#/components/schemas/BaseEvent'
+        - $ref: "#/components/schemas/BaseEvent"
         - type: object
           required: [data]
           properties:
@@ -181,7 +181,7 @@ components:
               type: string
               const: "payment.succeeded"
             data:
-              $ref: '#/components/schemas/Payment'
+              $ref: "#/components/schemas/Payment"
 ```
 
 ### OpenAPI Discriminator for Polymorphic Event Handling
@@ -195,21 +195,21 @@ components:
       discriminator:
         propertyName: event_type
         mapping:
-          "order.created": '#/components/schemas/OrderCreatedEvent'
-          "order.status_changed": '#/components/schemas/OrderStatusChangedEvent'
-          "order.cancelled": '#/components/schemas/OrderCancelledEvent'
-          "payment.succeeded": '#/components/schemas/PaymentSucceededEvent'
-          "payment.failed": '#/components/schemas/PaymentFailedEvent'
-          "user.created": '#/components/schemas/UserCreatedEvent'
-          "user.deleted": '#/components/schemas/UserDeletedEvent'
+          "order.created": "#/components/schemas/OrderCreatedEvent"
+          "order.status_changed": "#/components/schemas/OrderStatusChangedEvent"
+          "order.cancelled": "#/components/schemas/OrderCancelledEvent"
+          "payment.succeeded": "#/components/schemas/PaymentSucceededEvent"
+          "payment.failed": "#/components/schemas/PaymentFailedEvent"
+          "user.created": "#/components/schemas/UserCreatedEvent"
+          "user.deleted": "#/components/schemas/UserDeletedEvent"
       oneOf:
-        - $ref: '#/components/schemas/OrderCreatedEvent'
-        - $ref: '#/components/schemas/OrderStatusChangedEvent'
-        - $ref: '#/components/schemas/OrderCancelledEvent'
-        - $ref: '#/components/schemas/PaymentSucceededEvent'
-        - $ref: '#/components/schemas/PaymentFailedEvent'
-        - $ref: '#/components/schemas/UserCreatedEvent'
-        - $ref: '#/components/schemas/UserDeletedEvent'
+        - $ref: "#/components/schemas/OrderCreatedEvent"
+        - $ref: "#/components/schemas/OrderStatusChangedEvent"
+        - $ref: "#/components/schemas/OrderCancelledEvent"
+        - $ref: "#/components/schemas/PaymentSucceededEvent"
+        - $ref: "#/components/schemas/PaymentFailedEvent"
+        - $ref: "#/components/schemas/UserCreatedEvent"
+        - $ref: "#/components/schemas/UserDeletedEvent"
 ```
 
 This allows an agent framework that receives any event payload to look up the correct schema by the `event_type` discriminator value, rather than trying to pattern-match the payload shape.
@@ -275,7 +275,7 @@ webhooks:
           required: true
           schema:
             type: string
-            pattern: '^sha256=[0-9a-f]{64}$'
+            pattern: "^sha256=[0-9a-f]{64}$"
           description: >
             HMAC-SHA256 signature of the request body. Format: sha256={hex_digest}.
             Compute: HMAC-SHA256(body_bytes, webhook_secret).
@@ -348,7 +348,7 @@ components:
   schemas:
     OrderStatusChangedEvent:
       allOf:
-        - $ref: '#/components/schemas/BaseEvent'
+        - $ref: "#/components/schemas/BaseEvent"
         - type: object
           properties:
             event_type:
@@ -360,7 +360,7 @@ components:
               properties:
                 # Full state snapshot — agent does not need to call get_order
                 order:
-                  $ref: '#/components/schemas/Order'
+                  $ref: "#/components/schemas/Order"
                 previous_status:
                   type: string
                   enum: [pending, processing, shipped, delivered, cancelled]

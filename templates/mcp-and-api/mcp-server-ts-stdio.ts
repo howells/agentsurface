@@ -28,14 +28,14 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  StdioServerTransport,
-  type Tool,
-  type Resource,
-  type Prompt,
-  type TextContent,
-  type ErrorContent,
-  type TaskState,
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  Tool,
+  Resource,
+  Prompt,
+  TextContent,
+  ErrorContent,
+  TaskState,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
@@ -48,12 +48,12 @@ const server = new McpServer(
   },
   {
     capabilities: {
-      tools: {},
-      resources: {},
       prompts: {},
+      resources: {},
       tasks: {}, // Enable Tasks async primitive (MCP 2025-11-25)
+      tools: {},
     },
-  }
+  },
 );
 
 // ===== Structured Logging =====
@@ -68,26 +68,26 @@ class Logger {
   info(message: string, data?: Record<string, unknown>): void {
     console.error(
       JSON.stringify({
-        level: "INFO",
         context: this.context,
+        level: "INFO",
         message,
         timestamp: new Date().toISOString(),
         ...(data && { data }),
-      })
+      }),
     );
   }
 
   error(message: string, error?: Error, data?: Record<string, unknown>): void {
     console.error(
       JSON.stringify({
-        level: "ERROR",
         context: this.context,
-        message,
         error: error?.message,
+        level: "ERROR",
+        message,
         stack: error?.stack,
         timestamp: new Date().toISOString(),
         ...(data && { data }),
-      })
+      }),
     );
   }
 }
@@ -97,39 +97,23 @@ const logger = new Logger("mcp-server");
 // ===== Input Schemas (Zod) =====
 
 const searchDocsSchema = z.object({
+  limit: z.number().int().min(1).max(50).default(10).describe("Maximum results to return"),
   query: z.string().min(1).describe("Search term (any string)"),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(50)
-    .default(10)
-    .describe("Maximum results to return"),
 });
 
 const createIssueSchema = z.object({
-  title: z.string().min(1).describe("Issue title"),
-  description: z
-    .string()
-    .describe("Detailed description of the issue"),
-  assignee: z
-    .string()
-    .optional()
-    .describe("User ID of assignee (optional)"),
+  assignee: z.string().optional().describe("User ID of assignee (optional)"),
+  description: z.string().describe("Detailed description of the issue"),
   priority: z
     .enum(["low", "medium", "high", "critical"])
     .default("medium")
     .describe("Issue priority level"),
+  title: z.string().min(1).describe("Issue title"),
 });
 
 const waitForBuildSchema = z.object({
   build_id: z.string().describe("Build identifier"),
-  timeout_seconds: z
-    .number()
-    .int()
-    .min(10)
-    .default(600)
-    .describe("Maximum seconds to wait"),
+  timeout_seconds: z.number().int().min(10).default(600).describe("Maximum seconds to wait"),
 });
 
 // ===== Tool Handlers =====
@@ -147,38 +131,38 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
   content: TextContent[];
   isError?: boolean;
 }> {
-  logger.info("search_docs called", { query: input.query, limit: input.limit });
+  logger.info("search_docs called", { limit: input.limit, query: input.query });
 
   try {
     // Stub: in production, query a documentation index
     const mockResults = [
       {
+        relevance: 0.95,
         title: "Getting Started with MCP",
         url: "https://modelcontextprotocol.io/docs/getting-started",
-        relevance: 0.95,
       },
       {
+        relevance: 0.87,
         title: "Tool Design Best Practices",
         url: "https://www.anthropic.com/engineering/writing-tools-for-agents",
-        relevance: 0.87,
       },
     ].slice(0, input.limit);
 
     return {
       content: [
         {
-          type: "text",
           text: JSON.stringify(mockResults),
+          type: "text",
         },
       ],
     };
-  } catch (err) {
-    logger.error("search_docs failed", err as Error);
+  } catch (error) {
+    logger.error("search_docs failed", error as Error);
     return {
       content: [
         {
           type: "text",
-          text: `Search failed: ${(err as Error).message}`,
+          text: `Search failed: ${(error as Error).message}`,
         },
       ],
       isError: true,
@@ -200,29 +184,29 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
   isError?: boolean;
 }> {
   logger.info("create_issue called", {
-    title: input.title,
     priority: input.priority,
+    title: input.title,
   });
 
   try {
     // Stub: in production, persist to issue tracker
-    const issueId = `ISSUE-${Math.floor(Math.random() * 10000)}`;
+    const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
 
     return {
       content: [
         {
-          type: "text",
           text: JSON.stringify({
             id: issueId,
             title: input.title,
             priority: input.priority,
             created_at: new Date().toISOString(),
           }),
+          type: "text",
         },
       ],
     };
-  } catch (err) {
-    logger.error("create_issue failed", err as Error);
+  } catch (error) {
+    logger.error("create_issue failed", error as Error);
     return {
       content: [
         {
@@ -231,7 +215,7 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
             type: "https://api.example.com/errors/issue-creation-failed",
             title: "Issue Creation Failed",
             status: 500,
-            detail: (err as Error).message,
+            detail: (error as Error).message,
             instance: `req-${Date.now()}`,
           }),
         },
@@ -269,8 +253,8 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
     pollCount++;
     logger.info("build_poll", {
       build_id: input.build_id,
-      poll_count: pollCount,
       elapsed_ms: Date.now() - startTime,
+      poll_count: pollCount,
     });
 
     // Stub: in production, query CI/CD system
@@ -280,7 +264,6 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
       return {
         content: [
           {
-            type: "text",
             text: JSON.stringify({
               build_id: input.build_id,
               status: "success",
@@ -292,13 +275,14 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
                 },
               ],
             }),
+            type: "text",
           },
         ],
       };
     }
 
     // Exponential backoff: 500ms, 1s, 2s, 4s, max 30s
-    backoffMs = Math.min(backoffMs * 1.5, 30000);
+    backoffMs = Math.min(backoffMs * 1.5, 30_000);
     await new Promise((resolve) => setTimeout(resolve, backoffMs));
   }
 
@@ -306,7 +290,6 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
   return {
     content: [
       {
-        type: "text",
         text: JSON.stringify({
           type: "https://api.example.com/errors/build-timeout",
           title: "Build Timeout",
@@ -314,6 +297,7 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
           detail: `Build did not complete within ${input.timeout_seconds}s`,
           instance: `req-${Date.now()}`,
         }),
+        type: "text",
       },
     ],
     isError: true,
@@ -331,10 +315,10 @@ server.tool(
   handleSearchDocs,
   {
     annotations: {
-      readOnlyHint: true,
       openWorldHint: true,
+      readOnlyHint: true,
     },
-  }
+  },
 );
 
 server.tool(
@@ -349,7 +333,7 @@ server.tool(
       destructiveHint: true,
       idempotentHint: true,
     },
-  }
+  },
 );
 
 server.tool(
@@ -363,7 +347,7 @@ server.tool(
     annotations: {
       openWorldHint: true,
     },
-  }
+  },
 );
 
 // ===== Resource Handlers =====
@@ -372,12 +356,8 @@ server.tool(
  * Resources: Static data exposed via stable URIs.
  * Agents can query these without tool invocation.
  */
-server.resource(
-  "config://api-docs",
-  "text/markdown",
-  "API Documentation Overview",
-  async () => {
-    const docs = `# API Documentation
+server.resource("config://api-docs", "text/markdown", "API Documentation Overview", async () => {
+  const docs = `# API Documentation
 
 ## Tools
 
@@ -402,17 +382,16 @@ Monitor CI/CD builds.
 See https://modelcontextprotocol.io/specification/2025-11-25 for spec details.
 `;
 
-    return {
-      contents: [
-        {
-          uri: "config://api-docs",
-          mimeType: "text/markdown",
-          text: docs,
-        },
-      ],
-    };
-  }
-);
+  return {
+    contents: [
+      {
+        mimeType: "text/markdown",
+        text: docs,
+        uri: "config://api-docs",
+      },
+    ],
+  };
+});
 
 server.resource(
   "config://schemas",
@@ -423,22 +402,22 @@ server.resource(
       "@context": "https://schema.org",
       "@type": "DataType",
       definitions: {
-        SearchDocsInput: {
-          type: "object",
-          properties: {
-            query: { type: "string" },
-            limit: { type: "integer", minimum: 1, maximum: 50 },
-          },
-          required: ["query"],
-        },
         CreateIssueInput: {
-          type: "object",
           properties: {
-            title: { type: "string" },
             description: { type: "string" },
             priority: { enum: ["low", "medium", "high", "critical"] },
+            title: { type: "string" },
           },
           required: ["title"],
+          type: "object",
+        },
+        SearchDocsInput: {
+          properties: {
+            limit: { maximum: 50, minimum: 1, type: "integer" },
+            query: { type: "string" },
+          },
+          required: ["query"],
+          type: "object",
         },
       },
     };
@@ -446,13 +425,13 @@ server.resource(
     return {
       contents: [
         {
-          uri: "config://schemas",
           mimeType: "application/ld+json",
           text: JSON.stringify(schemas, null, 2),
+          uri: "config://schemas",
         },
       ],
     };
-  }
+  },
 );
 
 // ===== Prompt Handlers =====
@@ -465,29 +444,27 @@ server.prompt(
   "Analyze a discussion thread for sentiment, consensus, and action items. Use when you need to summarize multi-person conversations.",
   [
     {
-      name: "thread_id",
       description: "The unique identifier of the thread",
+      name: "thread_id",
       required: true,
     },
     {
-      name: "max_messages",
       description: "Maximum messages to analyze (default 100)",
+      name: "max_messages",
       required: false,
     },
   ],
-  async (args) => {
-    return {
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Analyze thread ${args.thread_id} (up to ${args.max_messages || 100} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
-          },
+  async (args) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Analyze thread ${args.thread_id} (up to ${args.max_messages || 100} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
         },
-      ],
-    };
-  }
+      },
+    ],
+  }),
 );
 
 // ===== Connection & Transport =====
@@ -501,7 +478,7 @@ async function main(): Promise<void> {
 }
 
 // Run server
-main().catch((err) => {
-  logger.error("server error", err);
+main().catch((error) => {
+  logger.error("server error", error);
   process.exit(1);
 });

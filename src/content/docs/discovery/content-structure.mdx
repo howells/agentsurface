@@ -29,11 +29,11 @@ Exceeding this limit returns HTTP 429 with a `Retry-After` header.
 
 ## By Plan
 
-| Plan     | Requests/minute | Burst allowance |
-|----------|----------------|-----------------|
-| Free     | 100            | 200 for 10s     |
-| Pro      | 1,000          | 5,000 for 10s   |
-| Enterprise | Custom       | Configurable    |
+| Plan       | Requests/minute | Burst allowance |
+| ---------- | --------------- | --------------- |
+| Free       | 100             | 200 for 10s     |
+| Pro        | 1,000           | 5,000 for 10s   |
+| Enterprise | Custom          | Configurable    |
 
 ## Handling Rate Limit Errors
 
@@ -62,7 +62,7 @@ When an agent receives a question about "how to handle webhook signature verific
 
 Write each H2 as if it were the first thing the reader sees:
 
-```markdown
+````markdown
 ## Verifying Webhook Signatures
 
 All webhook requests include an `X-Webhook-Signature` header. Verify
@@ -73,21 +73,21 @@ webhook secret as the key. Find your webhook secret in Settings →
 Webhooks → [your endpoint] → Secret.
 
 ```typescript
-import { createHmac } from 'crypto'
+import { createHmac } from "crypto";
 
 function verifySignature(
-  payload: string,       // raw request body as string
-  signature: string,     // value of X-Webhook-Signature header
-  secret: string         // your webhook secret from the dashboard
+  payload: string, // raw request body as string
+  signature: string, // value of X-Webhook-Signature header
+  secret: string, // your webhook secret from the dashboard
 ): boolean {
-  const expected = createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex')
+  const expected = createHmac("sha256", secret).update(payload).digest("hex");
 
-  return `sha256=${expected}` === signature
+  return `sha256=${expected}` === signature;
 }
 ```
-```
+````
+
+````
 
 This section is complete. An agent can retrieve it and answer "how do I verify webhook signatures" without needing the surrounding page.
 
@@ -103,7 +103,7 @@ Never skip heading levels. `H1 → H3` without an `H2` confuses the document out
 ## How do I rotate an API key?       ← question form (good for FAQPage schema)
 ## Rotating API Keys                  ← noun form (fine, clear enough)
 ## Important Information About Keys   ← vague (avoid)
-```
+````
 
 **H3** — Subtopics within an H2. Do not use H3 for things that could be list items.
 
@@ -113,7 +113,7 @@ Never skip heading levels. `H1 → H3` without an `H2` confuses the document out
 
 Place code examples directly after the prose that introduces them — not in a "Examples" section at the bottom of the page. Agents frequently retrieve a code example and the sentence immediately before it. If the code and its explanation are separated, the code appears without context.
 
-```markdown
+````markdown
 ## Paginating Results
 
 Results are paginated using cursor-based pagination. Each response
@@ -122,23 +122,25 @@ parameter in the next request.
 
 ```typescript
 async function* getAllProjects(apiKey: string) {
-  let cursor: string | undefined
+  let cursor: string | undefined;
 
   do {
     const response = await fetch(
-      `https://api.example.com/v2/projects${cursor ? `?cursor=${cursor}` : ''}`,
-      { headers: { Authorization: `Bearer ${apiKey}` } }
-    )
+      `https://api.example.com/v2/projects${cursor ? `?cursor=${cursor}` : ""}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
 
-    const data = await response.json()
-    yield* data.projects
-    cursor = data.next_cursor
-  } while (cursor)
+    const data = await response.json();
+    yield* data.projects;
+    cursor = data.next_cursor;
+  } while (cursor);
 }
 ```
+````
 
 When `next_cursor` is absent or null, you have reached the last page.
-```
+
+````
 
 Note: closing text after the code block ("When `next_cursor` is absent...") re-anchors the code in the reader's understanding. Include it.
 
@@ -156,7 +158,7 @@ Parameter documentation in prose form is hard for agents to parse into structure
 | `environment` | string | No | Target environment. Default: `production` |
 | `strategy` | string | No | Deployment strategy: `rolling` or `replace`. Default: `rolling` |
 | `timeout` | integer | No | Maximum deployment duration in seconds. Default: `300` |
-```
+````
 
 Use the same format for response fields, environment variables, and configuration options.
 
@@ -164,13 +166,13 @@ Use the same format for response fields, environment variables, and configuratio
 
 Keep page token counts within these limits. Agents working with full context windows of 128K–200K tokens may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded.
 
-| Page type | Target | Hard limit |
-|-----------|--------|------------|
-| Quick start / getting started | < 15K tokens | 20K tokens |
-| Concept explanation | < 10K tokens | 15K tokens |
-| API reference (single endpoint) | < 5K tokens | 8K tokens |
-| API reference (full section) | < 25K tokens | 30K tokens |
-| Changelog / release notes | No limit | No limit |
+| Page type                       | Target       | Hard limit |
+| ------------------------------- | ------------ | ---------- |
+| Quick start / getting started   | < 15K tokens | 20K tokens |
+| Concept explanation             | < 10K tokens | 15K tokens |
+| API reference (single endpoint) | < 5K tokens  | 8K tokens  |
+| API reference (full section)    | < 25K tokens | 30K tokens |
+| Changelog / release notes       | No limit     | No limit   |
 
 Pages over 30K tokens should be split. A "REST API Reference" page with every endpoint documented inline should become individual pages per endpoint group.
 
@@ -188,6 +190,7 @@ Error messages are high-value retrieval targets. When a user pastes an error int
 The deployment did not complete within the configured timeout.
 
 **Causes:**
+
 - Health check endpoint did not respond within the timeout period
 - Container startup time exceeded the timeout
 
@@ -200,6 +203,7 @@ Check `/health` endpoint availability independently with `curl -f https://your-a
 The `ref` parameter does not exist in the linked repository.
 
 **Causes:**
+
 - Branch or tag was deleted after the deployment was initiated
 - Typo in the `ref` parameter
 
@@ -215,7 +219,10 @@ Quote the exact error message string — including punctuation and capitalizatio
 <head>
   <!-- Entity-first: product name before page topic -->
   <meta property="og:title" content="Acme API — Rate Limits" />
-  <meta property="og:description" content="Rate limit thresholds by plan, handling 429 errors, and configuring retry logic for the Acme REST API." />
+  <meta
+    property="og:description"
+    content="Rate limit thresholds by plan, handling 429 errors, and configuring retry logic for the Acme REST API."
+  />
 
   <!-- dateModified is used by agents to assess freshness -->
   <meta property="article:modified_time" content="2025-03-15T09:00:00Z" />
@@ -259,6 +266,7 @@ Quote the exact error message string — including punctuation and capitalizatio
 **Sitemap limits:** maximum 50,000 URLs per sitemap file. For larger sites, use a sitemap index file that references multiple sitemaps.
 
 **Sitemap index:**
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -286,7 +294,8 @@ Search-augmented agents parse HTML. Semantic structure helps them identify the m
 Use:
 
 ```html
-<article>  <!-- main content area -->
+<article>
+  <!-- main content area -->
   <header>
     <h1>Rate Limits</h1>
     <time datetime="2025-03-15">March 15, 2025</time>

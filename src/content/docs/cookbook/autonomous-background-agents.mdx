@@ -43,7 +43,7 @@ export async function generateWeeklyInsights(teamId: string) {
   // 2. Fetch this week's data
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 7);
-  
+
   const transactions = await db.getTransactions(teamId, {
     startDate,
     endDate: new Date(),
@@ -55,8 +55,8 @@ You are a financial insights analyst for a SaaS. Generate a brief weekly summary
 
 Data for analysis:
 - Transactions this week: ${transactions.length}
-- Total revenue: $${transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)}
-- Total expenses: $${transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)}
+- Total revenue: $${transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0)}
+- Total expenses: $${transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0)}
 
 Task: Generate 3-5 bullet-point insights comparing this week to last week.
 Use ONLY the data provided; don't invent numbers.
@@ -81,7 +81,7 @@ Keep it under 200 words.
           return {
             previous: prev,
             current: curr,
-            change: ((curr - prev) / prev * 100).toFixed(1) + "%",
+            change: (((curr - prev) / prev) * 100).toFixed(1) + "%",
           };
         },
       },
@@ -170,11 +170,9 @@ export const generateWeeklyInsights = inngest.createFunction(
 
     for (const team of teams) {
       // Each team gets its own insight generation
-      await step.run("generate-insights", () =>
-        generateWeeklyInsights(team.id)
-      );
+      await step.run("generate-insights", () => generateWeeklyInsights(team.id));
     }
-  }
+  },
 );
 ```
 
@@ -253,14 +251,14 @@ export async function generateWeeklyInsights(teamId: string, executionId: string
 
 Different events warrant different urgency levels. Categorize into immediate (user expects instant feedback) and batched (aggregate then summarize):
 
-| Event | Category | Window | Rationale |
-|-------|----------|--------|-----------|
-| Receipt/document match | **Immediate** | 0 | User just uploaded; wants confirmation |
-| New transactions synced | Batched | 10 min | Frequent; batch avoids notification fatigue |
-| Invoice paid | Batched | 10 min | Good news but not time-critical |
-| Invoice overdue | Batched | 30 min | Important; user needs awareness, not instant action |
-| Recurring invoice upcoming | Batched | 60 min | Advance notice only |
-| Weekly insights generated | Batched | N/A | Scheduled; no batching needed |
+| Event                      | Category      | Window | Rationale                                           |
+| -------------------------- | ------------- | ------ | --------------------------------------------------- |
+| Receipt/document match     | **Immediate** | 0      | User just uploaded; wants confirmation              |
+| New transactions synced    | Batched       | 10 min | Frequent; batch avoids notification fatigue         |
+| Invoice paid               | Batched       | 10 min | Good news but not time-critical                     |
+| Invoice overdue            | Batched       | 30 min | Important; user needs awareness, not instant action |
+| Recurring invoice upcoming | Batched       | 60 min | Advance notice only                                 |
+| Weekly insights generated  | Batched       | N/A    | Scheduled; no batching needed                       |
 
 Instead of 10 notifications, collect changes and send one summary:
 
@@ -308,7 +306,7 @@ export async function batchNotifyNewRecords() {
 new CronJob("*/10 * * * *", batchNotifyNewRecords).start();
 ```
 
-**Timezone-aware scheduling**: For user-facing summaries (weekly insights, daily digests), schedule relative to the user's local time, not UTC. A "Monday morning" digest at 7am should arrive at 7am in *their* timezone. Run the cron job hourly and check each user's local hour:
+**Timezone-aware scheduling**: For user-facing summaries (weekly insights, daily digests), schedule relative to the user's local time, not UTC. A "Monday morning" digest at 7am should arrive at 7am in _their_ timezone. Run the cron job hourly and check each user's local hour:
 
 ```typescript
 // Schedule insights for 7am in each user's timezone
@@ -403,11 +401,7 @@ Track background job health:
 ```typescript
 // apps/worker/src/health.ts
 export async function checkWorkerHealth() {
-  const jobs = [
-    "generate-weekly-insights",
-    "batch-notify-new-records",
-    "match-pending-records",
-  ];
+  const jobs = ["generate-weekly-insights", "batch-notify-new-records", "match-pending-records"];
 
   for (const jobName of jobs) {
     const lastRun = await db.getJobLastRun(jobName);
@@ -457,4 +451,3 @@ new CronJob("0 * * * *", checkWorkerHealth).start();
 - [Agentic Loop](/docs/cookbook/agentic-loop) — ToolLoopAgent for background jobs.
 - [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — composing prompts for specialized tasks.
 - [Tool Design](/docs/tool-design) — designing tools for worker contexts.
-

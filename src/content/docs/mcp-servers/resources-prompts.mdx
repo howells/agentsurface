@@ -76,7 +76,7 @@ export function registerInvoiceSchema(server: McpServer): void {
           },
         ],
       };
-    }
+    },
   );
 }
 
@@ -104,10 +104,7 @@ Dynamic resources use URI templates to accept parameters. The template variables
 ```typescript
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-export function registerInvoiceResource(
-  server: McpServer,
-  config: ServerConfig
-): void {
+export function registerInvoiceResource(server: McpServer, config: ServerConfig): void {
   server.resource(
     "invoice",
     new ResourceTemplate("billing://invoices/{invoice_id}", {
@@ -137,7 +134,7 @@ export function registerInvoiceResource(
           },
         ],
       };
-    }
+    },
   );
 }
 ```
@@ -190,7 +187,9 @@ await server.notification({
 ```
 
 <Callout type="info">
-Subscriptions are only meaningful when your server has a persistent connection to the client, such as with Streamable HTTP or SSE transport. Stdio servers that terminate after each interaction cannot maintain subscription state. See [Transport Selection](./transports) for details.
+  Subscriptions are only meaningful when your server has a persistent connection to the client, such
+  as with Streamable HTTP or SSE transport. Stdio servers that terminate after each interaction
+  cannot maintain subscription state. See [Transport Selection](./transports) for details.
 </Callout>
 
 ## When to Use Resources
@@ -229,9 +228,7 @@ export function registerBillingAssistant(server: McpServer): void {
       },
     ],
     async (args) => {
-      const scope = args.customer_id
-        ? `for customer ${args.customer_id}`
-        : "across all customers";
+      const scope = args.customer_id ? `for customer ${args.customer_id}` : "across all customers";
 
       return {
         messages: [
@@ -248,7 +245,7 @@ export function registerBillingAssistant(server: McpServer): void {
           },
         ],
       };
-    }
+    },
   );
 }
 ```
@@ -270,5 +267,8 @@ Does this seed a conversation with initial context? Yes        Prompt
 ```
 
 <Callout type="warn">
-Do not use resources as a workaround for tools with large responses. If an agent needs to search for data dynamically, that is a tool. Resources are for application-controlled, URI-addressable data — not for query results that depend on runtime parameters beyond what a URI template can express.
+  Do not use resources as a workaround for tools with large responses. If an agent needs to search
+  for data dynamically, that is a tool. Resources are for application-controlled, URI-addressable
+  data — not for query results that depend on runtime parameters beyond what a URI template can
+  express.
 </Callout>

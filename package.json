@@ -2,7 +2,6 @@
   "name": "agentsurface",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@9.0.0",
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3900",
@@ -11,7 +10,10 @@
     "deploy:preview": "pnpm env:check && set -a && . ./.env && set +a && vercel deploy . -y",
     "build": "next build",
     "start": "next start",
-    "postinstall": "fumadocs-mdx"
+    "postinstall": "fumadocs-mdx",
+    "lint": "howells-ox-check --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
+    "lint:fix": "howells-ox-fix --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
+    "format": "howells-oxfmt --write src scripts templates disciplines docs public next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts README.md AGENTS.md CHANGELOG.md CLAUDE.md INSTALL.md"
   },
   "dependencies": {
     "@howells/envy": "^0.3.7",
@@ -35,8 +37,10 @@
     "zod": "^4.4.2"
   },
   "devDependencies": {
+    "@howells/lint": "^0.2.1",
     "@types/node": "25.6.0"
   },
+  "packageManager": "pnpm@9.0.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

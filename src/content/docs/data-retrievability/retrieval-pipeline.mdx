@@ -41,28 +41,28 @@ For most production knowledge search, start with this shape:
 
 ## Stage decisions
 
-| Stage | Default | Use more complexity when | Failure signal |
-|-------|---------|--------------------------|----------------|
-| Chunking | 512-1024 tokens, 10-30% overlap, structural metadata | Sections, tables, PDFs, or legal/technical docs lose meaning | Correct doc retrieved, wrong passage selected |
-| Context enrichment | Short document-aware chunk summaries | Chunks contain pronouns, local references, or repeated headings | Retrieved text is true but ambiguous |
-| Sparse retrieval | BM25 or equivalent full-text search | Exact IDs, filenames, API names, tickets, or error codes matter | User sees obvious keyword misses |
-| Dense retrieval | Embedding search over normalized chunks | Queries use synonyms, paraphrases, or fuzzy intent | Keyword search misses semantic matches |
-| Fusion | RRF across sparse and dense lists | Native hybrid search exists and is easy to tune | One retriever dominates good results |
-| Reranking | Retrieve 50-100, rerank to 5-10 | Top-k contains near misses or duplicate passages | Generation context is noisy |
-| Agentic planning | Rule-based first, model-planned only for complex queries | Multi-hop, SQL plus vectors, graph traversal, or validation required | Single query cannot gather enough context |
-| Evaluation | Recall@k, nDCG, MRR, faithfulness, latency, cost | Business-critical answers or regulated domains | Retrieval changes ship without a quality signal |
+| Stage              | Default                                                  | Use more complexity when                                             | Failure signal                                  |
+| ------------------ | -------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
+| Chunking           | 512-1024 tokens, 10-30% overlap, structural metadata     | Sections, tables, PDFs, or legal/technical docs lose meaning         | Correct doc retrieved, wrong passage selected   |
+| Context enrichment | Short document-aware chunk summaries                     | Chunks contain pronouns, local references, or repeated headings      | Retrieved text is true but ambiguous            |
+| Sparse retrieval   | BM25 or equivalent full-text search                      | Exact IDs, filenames, API names, tickets, or error codes matter      | User sees obvious keyword misses                |
+| Dense retrieval    | Embedding search over normalized chunks                  | Queries use synonyms, paraphrases, or fuzzy intent                   | Keyword search misses semantic matches          |
+| Fusion             | RRF across sparse and dense lists                        | Native hybrid search exists and is easy to tune                      | One retriever dominates good results            |
+| Reranking          | Retrieve 50-100, rerank to 5-10                          | Top-k contains near misses or duplicate passages                     | Generation context is noisy                     |
+| Agentic planning   | Rule-based first, model-planned only for complex queries | Multi-hop, SQL plus vectors, graph traversal, or validation required | Single query cannot gather enough context       |
+| Evaluation         | Recall@k, nDCG, MRR, faithfulness, latency, cost         | Business-critical answers or regulated domains                       | Retrieval changes ship without a quality signal |
 
 ## Chunking
 
 Chunking splits documents into retrieval units. The goal is not uniform size; it is retrievable, attributable context.
 
-| Pattern | Use when | Notes |
-|---------|----------|-------|
-| Fixed-size | You need a fast baseline | Start around 512-1024 tokens with 10-30% overlap. |
-| Semantic | Documents have useful headings, paragraphs, or sections | Prefer this for docs, policies, specs, and support articles. |
-| Parent-child | Small chunks need document-level context | Retrieve child passages but include parent title, section, and summary. |
-| Contextual | Chunks lose meaning outside the source document | Prepend a short generated summary before indexing. Verify cost and provider behavior. |
-| Late interaction | PDFs, tables, or visual layout matter | Use a late-interaction or multimodal retriever rather than flattening everything to text. |
+| Pattern          | Use when                                                | Notes                                                                                     |
+| ---------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Fixed-size       | You need a fast baseline                                | Start around 512-1024 tokens with 10-30% overlap.                                         |
+| Semantic         | Documents have useful headings, paragraphs, or sections | Prefer this for docs, policies, specs, and support articles.                              |
+| Parent-child     | Small chunks need document-level context                | Retrieve child passages but include parent title, section, and summary.                   |
+| Contextual       | Chunks lose meaning outside the source document         | Prepend a short generated summary before indexing. Verify cost and provider behavior.     |
+| Late interaction | PDFs, tables, or visual layout matter                   | Use a late-interaction or multimodal retriever rather than flattening everything to text. |
 
 Keep this metadata with every chunk:
 
@@ -94,7 +94,10 @@ function fixedChunk(text: string, chunkSize = 800, overlap = 0.2) {
   const chunks: string[] = [];
 
   for (let i = 0; i < tokens.length; i += step) {
-    const chunk = tokens.slice(i, i + chunkSize).join(" ").trim();
+    const chunk = tokens
+      .slice(i, i + chunkSize)
+      .join(" ")
+      .trim();
     if (chunk) chunks.push(chunk);
   }
 
@@ -115,11 +118,7 @@ type SearchResult = {
   source: "dense" | "sparse";
 };
 
-function reciprocalRankFusion(
-  resultLists: SearchResult[][],
-  limit = 50,
-  k = 60
-) {
+function reciprocalRankFusion(resultLists: SearchResult[][], limit = 50, k = 60) {
   const scores = new Map<string, { score: number; result: SearchResult }>();
 
   for (const results of resultLists) {
@@ -139,23 +138,23 @@ function reciprocalRankFusion(
 
 Tune hybrid search against query classes, not instinct:
 
-| Query type | Sparse weight | Dense weight | Notes |
-|------------|---------------|--------------|-------|
-| Error code, API, filename | Higher | Lower | Exact match should not be buried. |
-| Conceptual question | Lower | Higher | Semantics matter more than literal terms. |
-| Compliance or policy | Balanced | Balanced | Exact section names and paraphrases both matter. |
-| Multi-tenant support | Balanced | Balanced | Filters are mandatory before ranking. |
+| Query type                | Sparse weight | Dense weight | Notes                                            |
+| ------------------------- | ------------- | ------------ | ------------------------------------------------ |
+| Error code, API, filename | Higher        | Lower        | Exact match should not be buried.                |
+| Conceptual question       | Lower         | Higher       | Semantics matter more than literal terms.        |
+| Compliance or policy      | Balanced      | Balanced     | Exact section names and paraphrases both matter. |
+| Multi-tenant support      | Balanced      | Balanced     | Filters are mandatory before ranking.            |
 
 ## Reranking
 
 Reranking is a second stage that sorts broad retrieval candidates by query relevance. It is usually cheaper than sending too much noisy context to generation, but it still adds latency and provider dependency.
 
-| Option | Best for | Tradeoff |
-|--------|----------|----------|
-| Hosted reranker | Fast integration, multilingual or enterprise needs | Provider pricing and model names change. |
-| Open-source reranker | Cost control and data locality | You own latency, batching, and serving. |
+| Option                     | Best for                                            | Tradeoff                                    |
+| -------------------------- | --------------------------------------------------- | ------------------------------------------- |
+| Hosted reranker            | Fast integration, multilingual or enterprise needs  | Provider pricing and model names change.    |
+| Open-source reranker       | Cost control and data locality                      | You own latency, batching, and serving.     |
 | Late-interaction retriever | PDF, table, image-heavy, or long document retrieval | More storage and implementation complexity. |
-| No reranker | Very small candidate sets or strict latency budgets | Requires stronger first-stage retrieval. |
+| No reranker                | Very small candidate sets or strict latency budgets | Requires stronger first-stage retrieval.    |
 
 ```typescript
 async function retrieveForAnswer(query: string) {
@@ -240,16 +239,16 @@ Put hard bounds around agentic retrieval:
 
 Retrieval evaluation needs both system metrics and answer-quality metrics.
 
-| Metric | What it measures | Good first gate |
-|--------|------------------|-----------------|
-| Recall@k | Whether known-relevant docs appear in the top k | `recall_at_10 >= 0.8` |
-| nDCG@k | Whether more relevant docs rank higher | `ndcg_at_10 >= 0.8` |
-| MRR | How quickly the first relevant result appears | `mrr >= 0.7` |
-| Context precision | Whether retrieved context is mostly useful | Track per corpus and query type |
-| Context recall | Whether enough evidence was retrieved | Track against labelled examples |
-| Faithfulness | Whether the answer is supported by context | Gate high-risk answers |
-| Latency p95 | Whether retrieval fits the product SLA | Set per endpoint |
-| Cost per query | Whether agentic loops remain affordable | Set budget per workflow |
+| Metric            | What it measures                                | Good first gate                 |
+| ----------------- | ----------------------------------------------- | ------------------------------- |
+| Recall@k          | Whether known-relevant docs appear in the top k | `recall_at_10 >= 0.8`           |
+| nDCG@k            | Whether more relevant docs rank higher          | `ndcg_at_10 >= 0.8`             |
+| MRR               | How quickly the first relevant result appears   | `mrr >= 0.7`                    |
+| Context precision | Whether retrieved context is mostly useful      | Track per corpus and query type |
+| Context recall    | Whether enough evidence was retrieved           | Track against labelled examples |
+| Faithfulness      | Whether the answer is supported by context      | Gate high-risk answers          |
+| Latency p95       | Whether retrieval fits the product SLA          | Set per endpoint                |
+| Cost per query    | Whether agentic loops remain affordable         | Set budget per workflow         |
 
 ```typescript
 function recallAtK(retrievedIds: string[], relevantIds: Set<string>, k = 10) {
@@ -259,11 +258,9 @@ function recallAtK(retrievedIds: string[], relevantIds: Set<string>, k = 10) {
 }
 
 function ndcgAtK(relevances: number[], k = 10) {
-  const dcg = relevances
-    .slice(0, k)
-    .reduce((sum, relevance, index) => {
-      return sum + relevance / Math.log2(index + 2);
-    }, 0);
+  const dcg = relevances.slice(0, k).reduce((sum, relevance, index) => {
+    return sum + relevance / Math.log2(index + 2);
+  }, 0);
 
   const ideal = [...relevances]
     .sort((a, b) => b - a)
@@ -286,7 +283,12 @@ describe("retrieval quality", () => {
 
     for (const item of cases) {
       const results = await retrieveForAnswer(item.query);
-      scores.push(recallAtK(results.map((result) => result.id), item.relevantIds));
+      scores.push(
+        recallAtK(
+          results.map((result) => result.id),
+          item.relevantIds,
+        ),
+      );
     }
 
     const meanRecall = scores.reduce((sum, score) => sum + score, 0) / scores.length;

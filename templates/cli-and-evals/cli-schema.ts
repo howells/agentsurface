@@ -25,9 +25,9 @@
  * - OpenAPI 3.1: https://spec.openapis.org/oas/v3.1.0
  */
 
-import { Command, Option } from 'commander';
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { Command, Option } from "commander";
+import type { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
  * Describes a single CLI command with input/output schemas
@@ -37,13 +37,13 @@ export interface CommandSchema {
   description?: string;
   usage?: string;
   input: {
-    type: 'object';
+    type: "object";
     properties: Record<string, any>;
     required?: string[];
     additionalProperties: boolean;
   };
   output: {
-    type: 'object';
+    type: "object";
     properties: Record<string, any>;
     description?: string;
   };
@@ -60,7 +60,7 @@ export function generateCLISchema(program: Command): {
 } {
   const commands: CommandSchema[] = [];
 
-  function traverseCommands(cmd: Command, parentPath: string = '') {
+  function traverseCommands(cmd: Command, parentPath: string = "") {
     const cmdName = parentPath ? `${parentPath} ${cmd.name()}` : cmd.name();
 
     // Extract options/arguments as schema
@@ -72,58 +72,62 @@ export function generateCLISchema(program: Command): {
       const isRequired = opt.required ?? false;
 
       properties[propName] = {
-        type: inferTypeFromOption(opt),
-        description: opt.description || `Option: ${opt.flags}`,
         default: opt.defaultValue,
+        description: opt.description || `Option: ${opt.flags}`,
+        type: inferTypeFromOption(opt),
       };
 
-      if (isRequired) required.push(propName);
+      if (isRequired) {
+        required.push(propName);
+      }
     });
 
     cmd.arguments.forEach((arg) => {
       properties[arg.name()] = {
-        type: 'string',
         description: arg.description,
+        type: "string",
       };
 
-      if (!arg.optional) required.push(arg.name());
+      if (!arg.optional) {
+        required.push(arg.name());
+      }
     });
 
     // <CUSTOMISE>: Add output schema based on your domain
     const outputProperties = {
-      success: {
-        type: 'boolean',
-        description: 'Whether the command succeeded',
-      },
       data: {
-        type: 'object',
-        description: 'Command result (varies by command)',
+        description: "Command result (varies by command)",
+        type: "object",
       },
       error: {
-        type: 'object',
+        description: "Error details if command failed",
         properties: {
-          code: { type: 'string' },
-          message: { type: 'string' },
+          code: { type: "string" },
+          message: { type: "string" },
         },
-        description: 'Error details if command failed',
+        type: "object",
+      },
+      success: {
+        description: "Whether the command succeeded",
+        type: "boolean",
       },
     };
 
     commands.push({
-      name: cmdName,
       description: cmd.description(),
-      usage: cmd.usage() || `${cmdName} [options]`,
       input: {
-        type: 'object',
+        additionalProperties: false,
         properties,
         required: required.length > 0 ? required : undefined,
-        additionalProperties: false,
+        type: "object",
       },
+      name: cmdName,
       output: {
-        type: 'object',
+        description: "Standard CLI response envelope",
         properties: outputProperties,
-        description: 'Standard CLI response envelope',
+        type: "object",
       },
+      usage: cmd.usage() || `${cmdName} [options]`,
     });
 
     // Recurse into subcommands
@@ -133,10 +137,10 @@ export function generateCLISchema(program: Command): {
   program.commands.forEach((cmd) => traverseCommands(cmd));
 
   return {
-    version: program.version?.() || '1.0.0',
-    name: program.name?.() || 'cli',
-    schema_version: '1.0',
     commands,
+    name: program.name?.() || "cli",
+    schema_version: "1.0",
+    version: program.version?.() || "1.0.0",
   };
 }
 
@@ -144,19 +148,29 @@ export function generateCLISchema(program: Command): {
  * Infer JSON Schema type from commander Option
  */
 function inferTypeFromOption(opt: Option): string {
-  const flags = opt.flags;
+  const { flags } = opt;
 
   // Heuristics
-  if (flags.includes('no-')) return 'boolean';
-  if (opt.short === undefined && !flags.includes('<')) return 'boolean';
+  if (flags.includes("no-")) {
+    return "boolean";
+  }
+  if (opt.short === undefined && !flags.includes("<")) {
+    return "boolean";
+  }
 
   // <value> pattern: string, int, float
-  if (flags.includes('<string>') || flags.includes('<url>') || flags.includes('<path>')) return 'string';
-  if (flags.includes('<number>') || flags.includes('<int>')) return 'integer';
-  if (flags.includes('<float>')) return 'number';
+  if (flags.includes("<string>") || flags.includes("<url>") || flags.includes("<path>")) {
+    return "string";
+  }
+  if (flags.includes("<number>") || flags.includes("<int>")) {
+    return "integer";
+  }
+  if (flags.includes("<float>")) {
+    return "number";
+  }
 
   // Default to string
-  return 'string';
+  return "string";
 }
 
 /**
@@ -166,12 +180,12 @@ export function generateZodCommandSchema(
   name: string,
   description: string,
   inputSchema: z.ZodType,
-  outputSchema: z.ZodType
+  outputSchema: z.ZodType,
 ): CommandSchema {
   return {
-    name,
     description,
     input: zodToJsonSchema(inputSchema) as any,
+    name,
     output: zodToJsonSchema(outputSchema) as any,
   };
 }
@@ -180,7 +194,7 @@ export function generateZodCommandSchema(
  * Middleware: Add `--schema` to any command
  */
 export function addSchemaFlag(cmd: Command, schema: CommandSchema): void {
-  cmd.option('--schema', 'Print command schema as JSON and exit', function (this: Command) {
+  cmd.option("--schema", "Print command schema as JSON and exit", function (this: Command) {
     console.log(JSON.stringify(schema, null, 2));
     process.exit(0);
   });

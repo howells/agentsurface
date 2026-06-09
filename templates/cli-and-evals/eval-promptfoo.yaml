@@ -32,7 +32,7 @@ providers:
   - id: claude-opus
     config:
       model: claude-opus-4-7
-      temperature: 0  # Deterministic routing
+      temperature: 0 # Deterministic routing
       maxTokens: 1000
     label: Claude Opus 4.7
 
@@ -118,7 +118,7 @@ derivedMetrics:
   - id: pass_rate
     description: "Percentage of tests passed"
     type: pass-rate
-    threshold: 0.8  # Fail if < 80%
+    threshold: 0.8 # Fail if < 80%
 
   - id: avg_latency_ms
     description: "Average response latency in milliseconds"
@@ -147,7 +147,7 @@ output:
 # <CUSTOMISE>: Uncomment and configure for adversarial testing
 redTeam:
   enabled: false
-  numTests: 10  # Generate N adversarial inputs
+  numTests: 10 # Generate N adversarial inputs
   plugins:
     - id: "prompt-injection"
       config:

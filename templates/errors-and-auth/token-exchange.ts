@@ -10,18 +10,18 @@
  * </CUSTOMISE>
  */
 
-import { jwtVerify, createRemoteJWKSet, SignJWT } from 'jose';
+import { jwtVerify, createRemoteJWKSet, SignJWT } from "jose";
 
 /**
  * Token Exchange Request per RFC 8693 section 2.1
  */
 interface TokenExchangeRequest {
-  grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange';
+  grant_type: "urn:ietf:params:oauth:grant-type:token-exchange";
   subject_token: string; // JWT of the user authorizing the delegation
-  subject_token_type: 'urn:ietf:params:oauth:token-type:jwt';
+  subject_token_type: "urn:ietf:params:oauth:token-type:jwt";
   actor_token: string; // JWT of the agent acting on behalf of the user
-  actor_token_type: 'urn:ietf:params:oauth:token-type:jwt';
-  requested_token_use: 'access_token' | 'refresh_token';
+  actor_token_type: "urn:ietf:params:oauth:token-type:jwt";
+  requested_token_use: "access_token" | "refresh_token";
   audience: string; // Service that will accept the token
   scope?: string; // Space-separated scopes (narrower than either input token)
   resource?: string; // Optional: specific resource URI
@@ -32,8 +32,8 @@ interface TokenExchangeRequest {
  */
 interface TokenExchangeResponse {
   access_token: string;
-  issued_token_type: 'urn:ietf:params:oauth:token-type:access_token';
-  token_type: 'Bearer';
+  issued_token_type: "urn:ietf:params:oauth:token-type:access_token";
+  token_type: "Bearer";
   expires_in: number;
   scope?: string;
   refresh_token?: string;
@@ -48,11 +48,7 @@ export class TokenExchangeClient {
   private expectedIssuer: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-  constructor(opts: {
-    tokenExchangeEndpoint: string;
-    jwksUri: string;
-    expectedIssuer: string;
-  }) {
+  constructor(opts: { tokenExchangeEndpoint: string; jwksUri: string; expectedIssuer: string }) {
     this.tokenExchangeEndpoint = opts.tokenExchangeEndpoint;
     this.jwksUri = opts.jwksUri;
     this.expectedIssuer = opts.expectedIssuer;
@@ -63,7 +59,7 @@ export class TokenExchangeClient {
    */
   private async validateJWT(
     token: string,
-    expectedAudience?: string
+    expectedAudience?: string,
   ): Promise<Record<string, unknown>> {
     if (!this.jwks) {
       this.jwks = createRemoteJWKSet(new URL(this.jwksUri));
@@ -76,9 +72,9 @@ export class TokenExchangeClient {
       });
 
       return verified.payload as Record<string, unknown>;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`JWT validation failed: ${message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`JWT validation failed: ${message}`, { cause: error });
     }
   }
 
@@ -95,7 +91,7 @@ export class TokenExchangeClient {
     subjectToken: string,
     actorToken: string,
     audience: string,
-    scope?: string
+    scope?: string,
   ): Promise<TokenExchangeResponse> {
     // Validate input tokens
     const subjectPayload = await this.validateJWT(subjectToken);
@@ -105,31 +101,31 @@ export class TokenExchangeClient {
     const agentId = actorPayload.sub as string;
 
     console.log(
-      `[TokenExchange] Exchanging token: user=${userId}, agent=${agentId}, audience=${audience}`
+      `[TokenExchange] Exchanging token: user=${userId}, agent=${agentId}, audience=${audience}`,
     );
 
     // Prepare token exchange request
     const body = new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-      subject_token: subjectToken,
-      subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
       actor_token: actorToken,
-      actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-      requested_token_use: 'access_token',
+      actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
       audience,
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      requested_token_use: "access_token",
+      subject_token: subjectToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     });
 
     if (scope) {
-      body.append('scope', scope);
+      body.append("scope", scope);
     }
 
     // Send to token exchange endpoint
     const response = await fetch(this.tokenExchangeEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
       body: body.toString(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      method: "POST",
     });
 
     if (!response.ok) {
@@ -140,7 +136,7 @@ export class TokenExchangeClient {
     const exchanged = (await response.json()) as TokenExchangeResponse;
 
     console.log(
-      `[TokenExchange] Token exchanged successfully, expires in ${exchanged.expires_in}s`
+      `[TokenExchange] Token exchanged successfully, expires in ${exchanged.expires_in}s`,
     );
 
     return exchanged;

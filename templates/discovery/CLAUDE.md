@@ -1,7 +1,7 @@
 <!--
 CLAUDE.md — Claude Code-specific context overrides.
 
-What: A focused markdown file that augments AGENTS.md with Claude Code-only settings: 
+What: A focused markdown file that augments AGENTS.md with Claude Code-only settings:
 slash commands, subagents, MCP servers, skills, model preference, thinking budget.
 
 When to use: When you want Claude Code to behave differently from other tools reading AGENTS.md.
@@ -16,7 +16,7 @@ What to customize:
 6. Extended thinking budget (for reasoning-intensive tasks)
 7. Permission mode (default, acceptEdits, bypassPermissions, plan, dontAsk, auto)
 
-Rule: Start with "See AGENTS.md for commands, testing, and boundaries." 
+Rule: Start with "See AGENTS.md for commands, testing, and boundaries."
 Only override where Claude differs. Keep <150 lines.
 
 Citation: https://code.claude.com/docs/en/claude-code
@@ -37,6 +37,7 @@ This file documents Claude Code-specific settings only.
 **Default:** `claude-opus-4-7` for agent-related tasks (high reasoning, tool use, code generation).
 
 **Override for specific tasks:**
+
 - Lightweight refactoring, docs: `claude-sonnet-4-6`
 - Very fast turnaround (prototypes): `claude-haiku-4-5-20251001`
 
@@ -51,13 +52,13 @@ Subagents are ephemeral, isolated contexts for side tasks. Use to keep parent co
 **Available subagents:**
 
 - **reviewer.md** — Code review only. Reads PR, checks linting + test coverage, returns summary. Read-only tools.
-  
+
   ```
   Invoke: /review (Claude Code recognizes this)
   ```
 
 - **tester.md** — Test runner. Runs `pnpm test`, analyzes failures, suggests fixes. Can modify test files only.
-  
+
   ```
   Invoke: /test (automatic on test failure)
   ```
@@ -65,6 +66,7 @@ Subagents are ephemeral, isolated contexts for side tasks. Use to keep parent co
 - **types.md** — TypeScript type checker. Runs `pnpm type-check`, reports errors with file + line. Read-only.
 
 **Pattern:** Use subagents when:
+
 - Task is orthogonal (review, testing, type-checking)
 - Parent context is already large
 - You want cheaper model (Sonnet 4.6) for side task
@@ -75,6 +77,7 @@ Subagents are ephemeral, isolated contexts for side tasks. Use to keep parent co
 ## MCP servers
 
 Claude Code auto-discovers MCP servers in:
+
 1. `.claude/mcp.json` (local config)
 2. `.claude/agents/*.md` (inline `mcp_servers:` field)
 3. Workspace-level servers (IDE preference)
@@ -95,7 +98,7 @@ Claude Code auto-discovers MCP servers in:
 }
 ```
 
-The local MCP server exposes all tools from `packages/mcp-server/src/tools/`. 
+The local MCP server exposes all tools from `packages/mcp-server/src/tools/`.
 Test with: `pnpm --filter=@acme/mcp-server start`
 
 **Remote servers:**
@@ -119,8 +122,9 @@ Test with: `pnpm --filter=@acme/mcp-server start`
 
 ## Skills
 
-Project-scoped skills are stored in `.claude/skills/`. They persist in the session and auto-compact 
+Project-scoped skills are stored in `.claude/skills/`. They persist in the session and auto-compact
 to ~5k tokens. Use for:
+
 - Reusable agent workflows (e.g., "run tests and generate coverage report")
 - Domain-specific helpers (e.g., "validate agent schema against MCP spec")
 - Custom CLI wrappers (e.g., "deploy to staging + smoke test")
@@ -137,9 +141,10 @@ Invoke: `/schema-validate`, `/test-summary`, etc.
 
 ## Extended thinking
 
-Claude Code supports extended thinking on Opus 4.7 (adaptive reasoning). 
+Claude Code supports extended thinking on Opus 4.7 (adaptive reasoning).
 
 Enable for complex tasks:
+
 ```
 @task analyze-agent-bottleneck
 Think deeply about why agent tool calls are slow. Profile, trace, suggest optimizations.
@@ -172,12 +177,14 @@ Built-in Claude Code commands:
 **Default mode:** `default` (ask-first for destructive actions; always for read/test).
 
 **Enforced by Claude Code:**
+
 - Never deploy to production without explicit confirmation
 - Never rotate secrets or modify .env
 - Never force-push to main
 - Always ask before installing new dependencies (can break things)
 
 **By task:**
+
 - Read files + run tests: always
 - Modify code + create PRs: always (but PR is draft by default)
 - Install deps / DB migrations: ask-first
@@ -193,26 +200,27 @@ permission_mode: plan  # Show plan, ask for confirmation once
 
 ## Known issues / gotchas (Claude Code-specific)
 
-**MCP server lifecycle:** If you restart the MCP server (e.g., `pnpm --filter=@acme/mcp-server start`), 
+**MCP server lifecycle:** If you restart the MCP server (e.g., `pnpm --filter=@acme/mcp-server start`),
 Claude Code may keep stale tool definitions in memory. Workaround: refresh the IDE tab or start a new session.
 
-**Type narrowing on optional fields:** Zod schema exports from `@acme/shared` sometimes show as `unknown` 
+**Type narrowing on optional fields:** Zod schema exports from `@acme/shared` sometimes show as `unknown`
 in Claude's type-checking pass. Workaround: Use `.parse()` before tool call; Claude then infers the shape.
 
-**Monorepo filter commands:** `pnpm --filter=@acme/api dev` works in Claude Code terminal, but 
+**Monorepo filter commands:** `pnpm --filter=@acme/api dev` works in Claude Code terminal, but
 IDE debugging (breakpoints) only works if you `cd packages/api/` first.
 
-**Extended thinking token count:** Thinking tokens count toward your 1M-token context on Opus 4.7. 
+**Extended thinking token count:** Thinking tokens count toward your 1M-token context on Opus 4.7.
 For long thinking sessions, use `model: claude-sonnet-4-6` to save on cost (no thinking).
 
 ---
 
 ## Context engineering (Claude-specific)
 
-Claude Code caches `AGENTS.md` + `CLAUDE.md` at session start. Updates within a session are reflected 
+Claude Code caches `AGENTS.md` + `CLAUDE.md` at session start. Updates within a session are reflected
 immediately; changes persist across sessions.
 
 **Prompt caching optimization:**
+
 - Root layout + JSON-LD cached (doesn't change often)
 - Test files cached (improves cache hit rate for test-heavy workflows)
 - Tool schemas from MCP cached (refresh via IDE preference if needed)

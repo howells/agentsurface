@@ -12,6 +12,7 @@ Freshness note: last reviewed 2026-06-02. Managed database features, pricing, la
 Choose serverless vector databases for hands-off operations, pgvector for cost-sensitive Postgres-backed systems, Qdrant for fine-grained control, or Weaviate for native hybrid search. Timescale's 50M-vector benchmark reported lower p95 latency and lower self-hosted cost for pgvector + pgvectorscale than Pinecone s1, but vendor pricing and workloads vary.
 
 **Key takeaways:**
+
 - **Pinecone serverless:** Managed, hybrid + rerank, auto-scaling.
 - **pgvector + pgvectorscale:** Self-hosted PostgreSQL path for teams that can operate Postgres.
 - **Qdrant:** HNSW + quantization, self-host or cloud. $0.20/1M RUs.
@@ -21,28 +22,28 @@ Choose serverless vector databases for hands-off operations, pgvector for cost-s
 
 ## Selection matrix
 
-| DB | Dims | Latency (p95) | Cost/vector | Self-host | Hybrid | Rerank | Best for |
-|----|------|---------------|-------------|-----------|--------|--------|----------|
-| **Pinecone** | Any | 50–100ms | $16/1M RUs | No | Yes | Yes | Managed, variable workloads |
-| **pgvector + pgvectorscale** | Any | 5–15ms | $70/mo (EC2) | Yes | No (use FTS) | No | Cost-sensitive, high-throughput |
-| **Qdrant** | Any | 10–30ms | $0.20/1M RUs | Yes | Sparse+dense | No | Control + quantization |
-| **Weaviate** | Any | 50–100ms | $0.50/1k reads | Yes | Yes (native) | No | Native hybrid |
-| **LanceDB** | Any | 20–50ms | Free (OSS) | Yes | No | No | Multi-vector (ColBERT) |
-| **Milvus** | Any | 50–100ms | Infrastructure | Yes | No | No | Large-scale distributed |
-| **MongoDB Atlas** | Any | 100–300ms | $0.02/1M | No | No | No | MongoDB integration |
-| **Turbopuffer** | Any | 50–100ms | Serverless | No | No | No | Serverless, agentic |
-| **Redis Vector** | Any | `<10ms` | $0.07/GB | No (managed) | No | No | Low-latency sessions |
+| DB                           | Dims | Latency (p95) | Cost/vector    | Self-host    | Hybrid       | Rerank | Best for                        |
+| ---------------------------- | ---- | ------------- | -------------- | ------------ | ------------ | ------ | ------------------------------- |
+| **Pinecone**                 | Any  | 50–100ms      | $16/1M RUs     | No           | Yes          | Yes    | Managed, variable workloads     |
+| **pgvector + pgvectorscale** | Any  | 5–15ms        | $70/mo (EC2)   | Yes          | No (use FTS) | No     | Cost-sensitive, high-throughput |
+| **Qdrant**                   | Any  | 10–30ms       | $0.20/1M RUs   | Yes          | Sparse+dense | No     | Control + quantization          |
+| **Weaviate**                 | Any  | 50–100ms      | $0.50/1k reads | Yes          | Yes (native) | No     | Native hybrid                   |
+| **LanceDB**                  | Any  | 20–50ms       | Free (OSS)     | Yes          | No           | No     | Multi-vector (ColBERT)          |
+| **Milvus**                   | Any  | 50–100ms      | Infrastructure | Yes          | No           | No     | Large-scale distributed         |
+| **MongoDB Atlas**            | Any  | 100–300ms     | $0.02/1M       | No           | No           | No     | MongoDB integration             |
+| **Turbopuffer**              | Any  | 50–100ms      | Serverless     | No           | No           | No     | Serverless, agentic             |
+| **Redis Vector**             | Any  | `<10ms`       | $0.07/GB       | No (managed) | No           | No     | Low-latency sessions            |
 
 ## Pinecone serverless
 
 ```typescript
-import { Pinecone } from '@pinecone-database/pinecone';
+import { Pinecone } from "@pinecone-database/pinecone";
 
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
 // Upsert with metadata
 async function indexDocs(docs: any[], embeddings: number[][]) {
-  const index = pinecone.index('main');
+  const index = pinecone.index("main");
 
   await index.upsert(
     docs.map((doc, i) => ({
@@ -53,19 +54,19 @@ async function indexDocs(docs: any[], embeddings: number[][]) {
         source: doc.source,
         createdAt: new Date().toISOString(),
       },
-    }))
+    })),
   );
 }
 
 // Query with metadata filter
 async function search(query: string, embedding: number[]) {
-  const index = pinecone.index('main').namespace('tenant-1'); // Multi-tenant
+  const index = pinecone.index("main").namespace("tenant-1"); // Multi-tenant
 
   const results = await index.query({
     vector: embedding,
     topK: 10,
     filter: {
-      source: { $eq: 'legal' }, // Metadata filter
+      source: { $eq: "legal" }, // Metadata filter
     },
     includeMetadata: true,
   });
@@ -111,21 +112,21 @@ CREATE INDEX fts_idx ON documents USING GIN(
 TypeScript client (Drizzle ORM):
 
 ```typescript
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import { pgTable, serial, text, timestamp, jsonb } from 'drizzle-orm/pg-core';
-import { vector } from 'pgvector/drizzle';
-import { sql } from 'drizzle-orm';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { pgTable, serial, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { vector } from "pgvector/drizzle";
+import { sql } from "drizzle-orm";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
 
-const documents = pgTable('documents', {
-  id: serial('id').primaryKey(),
-  text: text('text').notNull(),
-  embedding: vector('embedding', { dimensions: 1536 }),
-  metadata: jsonb('metadata'),
-  createdAt: timestamp('created_at').defaultNow(),
+const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  text: text("text").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Insert
@@ -149,11 +150,7 @@ async function vectorSearch(queryEmbedding: number[], limit: number = 10) {
 }
 
 // Hybrid: FTS + vector
-async function hybridSearch(
-  query: string,
-  queryEmbedding: number[],
-  limit: number = 10
-) {
+async function hybridSearch(query: string, queryEmbedding: number[], limit: number = 10) {
   const ftsResults = await db
     .select()
     .from(documents)
@@ -177,8 +174,7 @@ async function hybridSearch(
 
   return Array.from(merged.values()).sort(
     (a, b) =>
-      ((a.ftsRank ?? 999) + (a.vectorRank ?? 999)) -
-      ((b.ftsRank ?? 999) + (b.vectorRank ?? 999))
+      (a.ftsRank ?? 999) + (a.vectorRank ?? 999) - ((b.ftsRank ?? 999) + (b.vectorRank ?? 999)),
   );
 }
 ```
@@ -186,16 +182,16 @@ async function hybridSearch(
 ## Qdrant
 
 ```typescript
-import { QdrantClient } from '@qdrant/js-client-rest';
+import { QdrantClient } from "@qdrant/js-client-rest";
 
-const client = new QdrantClient({ url: 'http://localhost:6333' });
+const client = new QdrantClient({ url: "http://localhost:6333" });
 
 // Create collection with binary quantization
 async function setupCollection() {
-  await client.recreateCollection('docs', {
+  await client.recreateCollection("docs", {
     vectors: {
       size: 1536,
-      distance: 'Cosine',
+      distance: "Cosine",
     },
     quantization_config: {
       binary: {
@@ -216,7 +212,7 @@ async function indexDocs(docs: any[]) {
     },
   }));
 
-  await client.upsert('docs', {
+  await client.upsert("docs", {
     wait: true,
     points,
   });
@@ -224,15 +220,15 @@ async function indexDocs(docs: any[]) {
 
 // Search with metadata filter
 async function search(query: string, embedding: number[]) {
-  const results = await client.search('docs', {
+  const results = await client.search("docs", {
     vector: embedding,
     limit: 10,
     filter: {
       must: [
         {
-          key: 'source',
+          key: "source",
           match: {
-            value: 'legal',
+            value: "legal",
           },
         },
       ],
@@ -250,31 +246,31 @@ async function search(query: string, embedding: number[]) {
 ## Weaviate: native hybrid
 
 ```typescript
-import weaviate from 'weaviate-ts-client';
+import weaviate from "weaviate-ts-client";
 
 const client = weaviate.client({
-  scheme: 'http',
-  host: 'localhost:8080',
+  scheme: "http",
+  host: "localhost:8080",
 });
 
 // Hybrid search (BM25 + dense)
 async function hybridSearch(query: string, embedding: number[]) {
   const where = {
-    path: ['source'],
-    operator: 'Equal',
-    valueString: 'legal',
+    path: ["source"],
+    operator: "Equal",
+    valueString: "legal",
   };
 
   const result = await client.graphql
     .get()
-    .withClassName('Document')
+    .withClassName("Document")
     .withWhere(where)
     .withHybrid({
       query: query,
       vector: embedding,
       alpha: 0.5, // 50/50 BM25 + dense
     })
-    .withFields(['text', 'source', '_additional {score, certainty}'])
+    .withFields(["text", "source", "_additional {score, certainty}"])
     .withLimit(10)
     .do();
 
@@ -285,18 +281,21 @@ async function hybridSearch(query: string, embedding: number[]) {
 ## LanceDB: multi-vector native
 
 ```typescript
-import * as lancedb from '@lancedb/lancedb';
+import * as lancedb from "@lancedb/lancedb";
 
-const db = await lancedb.connect(':memory:');
+const db = await lancedb.connect(":memory:");
 
 // Multi-vector table (ColBERT)
 async function createMultiVectorTable() {
-  const table = await db.createTable('docs', [
+  const table = await db.createTable("docs", [
     {
       id: 1,
-      text: 'example',
-      token_embeddings: [[0.1, 0.2], [0.3, 0.4]], // Token-level embeddings
-      metadata: { source: 'legal' },
+      text: "example",
+      token_embeddings: [
+        [0.1, 0.2],
+        [0.3, 0.4],
+      ], // Token-level embeddings
+      metadata: { source: "legal" },
     },
   ]);
 
@@ -305,7 +304,7 @@ async function createMultiVectorTable() {
 
 // Search by token-level similarity
 async function tokenSearch(queryTokens: number[][], limit: number = 10) {
-  const table = await db.openTable('docs');
+  const table = await db.openTable("docs");
 
   // MaxSim operator (approximate)
   const results = await table
@@ -357,7 +356,7 @@ async function indexDocs(
     text: string;
     source: string;
     embedding: number[];
-  }>
+  }>,
 ) {
   await ns.write({
     upsert_rows: docs.map((doc) => ({

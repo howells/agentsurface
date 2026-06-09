@@ -42,18 +42,18 @@ Every score MUST cite specific evidence:
 
 - **File paths**: "openapi.yaml:45 — description is 4 words"
 - **Grep results**: "No files contain 'isError' or 'is_retriable'"
-- **Glob findings**: "0 files match **/llms.txt"
+- **Glob findings**: "0 files match \*\*/llms.txt"
 - **Command output**: "`mytool --help --json` returns exit code 2 with no output"
 
 Scores without evidence are guesses. Guesses drift high (optimism bias).
 
 ## Confidence Levels
 
-| Level | Meaning | When to Use |
-|-------|---------|-------------|
-| High | Examined >80% of relevant code | Small projects, focused dimensions |
-| Medium | Examined key files and patterns | Large projects, sampled representatively |
-| Low | Examined <30% or inferred from structure | Very large projects, quick scans |
+| Level  | Meaning                                  | When to Use                              |
+| ------ | ---------------------------------------- | ---------------------------------------- |
+| High   | Examined >80% of relevant code           | Small projects, focused dimensions       |
+| Medium | Examined key files and patterns          | Large projects, sampled representatively |
+| Low    | Examined <30% or inferred from structure | Very large projects, quick scans         |
 
 Low-confidence scores should be flagged for manual verification.
 

@@ -27,8 +27,8 @@ Drift detection catches this via CI checks and automated audits.
 ```markdown
 # AGENTS.md (outdated)
 
-pnpm dev       # But package.json has "dev" removed; now it's "start"
-npm install    # But migrated to pnpm; npm install will fail
+pnpm dev # But package.json has "dev" removed; now it's "start"
+npm install # But migrated to pnpm; npm install will fail
 ```
 
 ### Deleted Directories
@@ -36,7 +36,7 @@ npm install    # But migrated to pnpm; npm install will fail
 ```markdown
 # AGENTS.md (outdated)
 
-See src/components/    # But moved to packages/web/components/
+See src/components/ # But moved to packages/web/components/
 ```
 
 ### Outdated Tech
@@ -44,8 +44,8 @@ See src/components/    # But moved to packages/web/components/
 ```markdown
 # AGENTS.md (outdated)
 
-Framework: Next.js 12  # But upgraded to Next.js 15
-Database: MySQL        # But migrated to PostgreSQL
+Framework: Next.js 12 # But upgraded to Next.js 15
+Database: MySQL # But migrated to PostgreSQL
 ```
 
 ### Removed Conventions
@@ -53,8 +53,8 @@ Database: MySQL        # But migrated to PostgreSQL
 ```markdown
 # AGENTS.md (outdated)
 
-Testing: Jest          # Migrated to Vitest 6 months ago
-Linter: ESLint v7      # Upgraded to ESLint v9
+Testing: Jest # Migrated to Vitest 6 months ago
+Linter: ESLint v7 # Upgraded to ESLint v9
 ```
 
 ## Detection Strategies
@@ -67,14 +67,14 @@ Tag entries with last-verified dates:
 # AGENTS.md
 
 Commands (verified 2026-04-15):
-  pnpm dev        # Last verified 2026-04-15
-  pnpm test       # Last verified 2026-04-15
-  pnpm build      # Last verified 2026-04-01 — STALE, verify soon
+pnpm dev # Last verified 2026-04-15
+pnpm test # Last verified 2026-04-15
+pnpm build # Last verified 2026-04-01 — STALE, verify soon
 
 Tech Stack (verified 2026-03-01):
-  TypeScript      # Last verified 2026-03-01
-  Next.js 15      # Last verified 2026-04-10 — recently updated
-  PostgreSQL      # Last verified 2026-02-15 — STALE, mark verified
+TypeScript # Last verified 2026-03-01
+Next.js 15 # Last verified 2026-04-10 — recently updated
+PostgreSQL # Last verified 2026-02-15 — STALE, mark verified
 ```
 
 Red-flag entries older than 3 months. Require re-verification before merge.
@@ -225,12 +225,13 @@ Every 3 months, re-verify AGENTS.md sections:
 ## Quick Start
 
 Commands (verified 2026-04-17):
-  pnpm dev        # ✓ 2026-04-17
-  pnpm test       # ✓ 2026-04-17
-  pnpm build      # ✗ 2026-01-15 — RE-VERIFY
+pnpm dev # ✓ 2026-04-17
+pnpm test # ✓ 2026-04-17
+pnpm build # ✗ 2026-01-15 — RE-VERIFY
 
 ## Boundaries (verified 2026-04-01)
-  - Last verified when changed; no recent updates
+
+- Last verified when changed; no recent updates
 ```
 
 Create quarterly reminder task:
@@ -290,7 +291,7 @@ Remove sections that are no longer relevant:
 ## Legacy Setup
 
 If using Node `` `<18` ``, install node-gyp separately:
-  npm install -g node-gyp
+npm install -g node-gyp
 
 (Node `` `<18` `` no longer supported; .nvmrc enforces 18+)
 ```
@@ -336,16 +337,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Validate commands
         run: bash scripts/validate-agents.sh
-      
+
       - name: Check directories
         run: bash scripts/check-paths.sh
-      
+
       - name: Check structure
         run: bash scripts/validate-agents-content.sh
-      
+
       - name: Run surface audit
         run: |
           npm install -g agentsurface
@@ -393,14 +394,14 @@ interface ContextMetrics {
 }
 
 function calculateMetrics(): ContextMetrics {
-  const content = readFile('AGENTS.md');
-  
-  const lines = content.split('\n').length;
+  const content = readFile("AGENTS.md");
+
+  const lines = content.split("\n").length;
   const verified = (content.match(/✓ \d{4}-\d{2}-\d{2}/g) || []).length;
   const stale = (content.match(/✗ \d{4}-\d{2}-\d{2}/g) || []).length;
-  
+
   const stalenessScore = (verified / (verified + stale)) * 100;
-  
+
   return {
     agentsMdLines: lines,
     commandsVerified: verified,

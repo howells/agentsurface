@@ -30,19 +30,13 @@ import { z } from "zod";
  * Action definition: one capability of an external app.
  */
 export const ExternalActionSchema = z.object({
-  id: z.string().describe("Unique action ID (e.g., gmail_send_email)"),
-  appName: z.string().describe("App name (e.g., Gmail, Slack, Notion)"),
   actionName: z.string().describe("Human-readable action (e.g., Send Email)"),
+  appName: z.string().describe("App name (e.g., Gmail, Slack, Notion)"),
   description: z.string().describe("What this action does"),
+  id: z.string().describe("Unique action ID (e.g., gmail_send_email)"),
+  isConnectionRequired: z.boolean().default(true).describe("User must have app connected"),
+  isDangerous: z.boolean().default(false).describe("Flag for delete/revoke/cancel actions"),
   parameterSchema: z.record(z.string(), z.unknown()).describe("Input parameters (JSON schema)"),
-  isConnectionRequired: z
-    .boolean()
-    .default(true)
-    .describe("User must have app connected"),
-  isDangerous: z
-    .boolean()
-    .default(false)
-    .describe("Flag for delete/revoke/cancel actions"),
 });
 
 export type ExternalAction = z.infer<typeof ExternalActionSchema>;
@@ -85,40 +79,6 @@ const EXTERNAL_APPS: Record<string, ExternalAction[]> = {
       isConnectionRequired: true,
     },
   ],
-  Slack: [
-    {
-      id: "slack_send_message",
-      appName: "Slack",
-      actionName: "Send Message",
-      description: "Post a message to a channel or DM",
-      parameterSchema: {
-        type: "object" as const,
-        properties: {
-          channel: { type: "string", description: "Channel name or ID" },
-          text: { type: "string", description: "Message text" },
-          blocks: {
-            type: "array",
-            description: "Slack Block Kit JSON",
-          },
-        },
-        required: ["channel", "text"],
-      },
-      isConnectionRequired: true,
-    },
-    {
-      id: "slack_list_channels",
-      appName: "Slack",
-      actionName: "List Channels",
-      description: "Get all accessible channels",
-      parameterSchema: {
-        type: "object" as const,
-        properties: {
-          limit: { type: "number", description: "Max results" },
-        },
-      },
-      isConnectionRequired: true,
-    },
-  ],
   "Google Calendar": [
     {
       id: "calendar_create_event",
@@ -155,6 +115,40 @@ const EXTERNAL_APPS: Record<string, ExternalAction[]> = {
           },
         },
         required: ["databaseId", "properties"],
+      },
+      isConnectionRequired: true,
+    },
+  ],
+  Slack: [
+    {
+      id: "slack_send_message",
+      appName: "Slack",
+      actionName: "Send Message",
+      description: "Post a message to a channel or DM",
+      parameterSchema: {
+        type: "object" as const,
+        properties: {
+          channel: { type: "string", description: "Channel name or ID" },
+          text: { type: "string", description: "Message text" },
+          blocks: {
+            type: "array",
+            description: "Slack Block Kit JSON",
+          },
+        },
+        required: ["channel", "text"],
+      },
+      isConnectionRequired: true,
+    },
+    {
+      id: "slack_list_channels",
+      appName: "Slack",
+      actionName: "List Channels",
+      description: "Get all accessible channels",
+      parameterSchema: {
+        type: "object" as const,
+        properties: {
+          limit: { type: "number", description: "Max results" },
+        },
       },
       isConnectionRequired: true,
     },
@@ -213,38 +207,38 @@ export async function executeExternalAction(
   // Mock responses by action type
   if (actionId === "gmail_send_email") {
     return {
-      success: true,
       messageId: `msg-${Date.now()}`,
+      success: true,
       to: input.to,
     };
   }
 
   if (actionId === "slack_send_message") {
     return {
-      success: true,
-      messageId: `slack-${Date.now()}`,
       channel: input.channel,
+      messageId: `slack-${Date.now()}`,
+      success: true,
       timestamp: Date.now(),
     };
   }
 
   if (actionId === "calendar_create_event") {
     return {
-      success: true,
       eventId: `event-${Date.now()}`,
+      success: true,
       title: input.title,
     };
   }
 
   if (actionId === "notion_create_page") {
     return {
-      success: true,
       pageId: `page-${Date.now()}`,
+      success: true,
       url: `https://notion.so/page-${Date.now()}`,
     };
   }
 
-  return { success: false, error: "Unknown action" };
+  return { error: "Unknown action", success: false };
 }
 
 /**
@@ -256,18 +250,6 @@ export const searchToolsMetaTool: Tool = {
     "Search for available external app actions. " +
     "Returns list of apps (Gmail, Slack, Notion, etc.) and their capabilities. " +
     "Query format: 'gmail send email', 'slack post message', 'create calendar event'",
-  parameters: z.object({
-    query: z
-      .string()
-      .describe("Search query: app name + desired action (e.g., 'gmail send email')"),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Max results to return"),
-  }),
   execute: async ({ query, limit }) => {
     // <CUSTOMISE> Get user's connected apps from context
     const userConnectedApps = ["Gmail", "Slack", "Google Calendar", "Notion"];
@@ -283,11 +265,17 @@ export const searchToolsMetaTool: Tool = {
         actionName: action.actionName,
         description: action.description,
       })),
-      notConnected: Array.from(new Set(
-        Object.keys(EXTERNAL_APPS).filter((app) => !userConnectedApps.includes(app)),
-      )),
+      notConnected: Array.from(
+        new Set(Object.keys(EXTERNAL_APPS).filter((app) => !userConnectedApps.includes(app))),
+      ),
     };
   },
+  parameters: z.object({
+    query: z
+      .string()
+      .describe("Search query: app name + desired action (e.g., 'gmail send email')"),
+    limit: z.number().int().min(1).max(50).default(10).describe("Max results to return"),
+  }),
 };
 
 /**
@@ -299,16 +287,6 @@ export const multiExecuteMetaTool: Tool = {
     "Execute one or more external app actions. " +
     "Takes action IDs (from search_tools results) and their input parameters. " +
     "Executes in parallel; fails gracefully if one action fails.",
-  parameters: z.object({
-    actions: z
-      .array(
-        z.object({
-          id: z.string().describe("Action ID from search_tools"),
-          input: z.record(z.string(), z.unknown()).describe("Input parameters for this action"),
-        }),
-      )
-      .describe("List of actions to execute"),
-  }),
   execute: async ({ actions }) => {
     const results = await Promise.allSettled(
       actions.map(({ id, input }) => executeExternalAction(id, input)),
@@ -321,13 +299,12 @@ export const multiExecuteMetaTool: Tool = {
           success: true,
           result: result.value,
         };
-      } else {
-        return {
-          actionId: actions[idx]!.id,
-          success: false,
-          error: String(result.reason),
-        };
       }
+      return {
+        actionId: actions[idx]!.id,
+        success: false,
+        error: String(result.reason),
+      };
     });
 
     return {
@@ -336,6 +313,16 @@ export const multiExecuteMetaTool: Tool = {
       responses,
     };
   },
+  parameters: z.object({
+    actions: z
+      .array(
+        z.object({
+          id: z.string().describe("Action ID from search_tools"),
+          input: z.record(z.string(), z.unknown()).describe("Input parameters for this action"),
+        }),
+      )
+      .describe("List of actions to execute"),
+  }),
 };
 
 /**
@@ -378,8 +365,8 @@ export async function exampleExternalAppFlow() {
   // Step 1: Agent calls search_tools
   console.log("\n[Step 1] Searching for Gmail send action...");
   const searchResult = await searchToolsMetaTool.execute({
-    query: "gmail send email",
     limit: 5,
+    query: "gmail send email",
   });
   console.log("Search result:", searchResult);
 
@@ -392,9 +379,9 @@ export async function exampleExternalAppFlow() {
       {
         id: actionId,
         input: {
-          to: "recipient@example.com",
-          subject: "Meeting Tomorrow",
           body: "<p>Hi, let's sync at 2pm tomorrow.</p>",
+          subject: "Meeting Tomorrow",
+          to: "recipient@example.com",
         },
       },
     ],

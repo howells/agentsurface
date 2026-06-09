@@ -20,10 +20,10 @@ MCP tool definitions support an `annotations` object:
 
 ```typescript
 interface ToolAnnotations {
-  readOnlyHint?: boolean;        // True: no state change
-  destructiveHint?: boolean;     // True: irreversible
-  idempotentHint?: boolean;      // True: safe to retry
-  openWorldHint?: boolean;       // True: external data (web search, APIs)
+  readOnlyHint?: boolean; // True: no state change
+  destructiveHint?: boolean; // True: irreversible
+  idempotentHint?: boolean; // True: safe to retry
+  openWorldHint?: boolean; // True: external data (web search, APIs)
 }
 ```
 
@@ -72,13 +72,21 @@ export const registerCustomerTools: RegisterTools = (server, ctx) => {
 
   // Only register tools the caller has access to
   if (hasReadScope) {
-    server.registerTool("customers_list", { /* ... */ });
-    server.registerTool("customers_get", { /* ... */ });
+    server.registerTool("customers_list", {
+      /* ... */
+    });
+    server.registerTool("customers_get", {
+      /* ... */
+    });
   }
 
   if (hasWriteScope) {
-    server.registerTool("customer_create", { /* ... */ });
-    server.registerTool("customer_delete", { /* ... */ });
+    server.registerTool("customer_create", {
+      /* ... */
+    });
+    server.registerTool("customer_delete", {
+      /* ... */
+    });
   }
 };
 ```
@@ -105,28 +113,34 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
     {
       title: "List Customers",
       description: "Get all customers for the team. Filter by name or status.",
-      inputSchema: z.object({
-        status: z.enum(["active", "inactive", "archived"]).optional(),
-      }).strict(),
+      inputSchema: z
+        .object({
+          status: z.enum(["active", "inactive", "archived"]).optional(),
+        })
+        .strict(),
       outputSchema: z.object({
-        data: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          status: z.string(),
-        })),
+        data: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            status: z.string(),
+          }),
+        ),
       }),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     async (params) => {
       const customers = await db.getCustomers(ctx.teamId, params.status);
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify(customers),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(customers),
+          },
+        ],
         structuredContent: { data: customers },
       };
-    }
+    },
   );
 
   // WRITE: State change, but idempotent (retryable)
@@ -135,11 +149,13 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
     {
       title: "Create Customer",
       description: "Create a new customer. Idempotent by name (will not create duplicate).",
-      inputSchema: z.object({
-        name: z.string().min(1),
-        email: z.string().email().optional(),
-        taxId: z.string().optional(),
-      }).strict(),
+      inputSchema: z
+        .object({
+          name: z.string().min(1),
+          email: z.string().email().optional(),
+          taxId: z.string().optional(),
+        })
+        .strict(),
       outputSchema: z.object({
         customerId: z.string(),
         name: z.string(),
@@ -151,10 +167,12 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
       const existing = await db.getCustomerByName(ctx.teamId, params.name);
       if (existing) {
         return {
-          content: [{
-            type: "text",
-            text: `Customer ${params.name} already exists (ID: ${existing.id})`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Customer ${params.name} already exists (ID: ${existing.id})`,
+            },
+          ],
           structuredContent: { customerId: existing.id, name: existing.name, created: false },
         };
       }
@@ -166,13 +184,15 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
       });
 
       return {
-        content: [{
-          type: "text",
-          text: `Created customer ${customer.name} (ID: ${customer.id})`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Created customer ${customer.name} (ID: ${customer.id})`,
+          },
+        ],
         structuredContent: { customerId: customer.id, name: customer.name, created: true },
       };
-    }
+    },
   );
 
   // DESTRUCTIVE: Irreversible; should require model-side confirmation
@@ -181,9 +201,11 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
     {
       title: "Delete Customer",
       description: "Permanently delete a customer and all associated records. Cannot be undone.",
-      inputSchema: z.object({
-        customerId: z.string(),
-      }).strict(),
+      inputSchema: z
+        .object({
+          customerId: z.string(),
+        })
+        .strict(),
       outputSchema: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -194,10 +216,12 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
       const customer = await db.getCustomer(ctx.teamId, params.customerId);
       if (!customer) {
         return {
-          content: [{
-            type: "text",
-            text: "Customer not found",
-          }],
+          content: [
+            {
+              type: "text",
+              text: "Customer not found",
+            },
+          ],
           structuredContent: { success: false, message: "Customer not found" },
         };
       }
@@ -205,13 +229,15 @@ export function registerCustomerTools(server: McpServer, ctx: McpContext) {
       await db.deleteCustomer(ctx.teamId, params.customerId);
 
       return {
-        content: [{
-          type: "text",
-          text: `Deleted customer ${customer.name}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Deleted customer ${customer.name}`,
+          },
+        ],
         structuredContent: { success: true, message: `Deleted customer ${customer.name}` },
       };
-    }
+    },
   );
 }
 ```
@@ -228,17 +254,19 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 export function withErrorHandling<Args extends any[]>(
   handler: (...args: Args) => Promise<CallToolResult>,
-  fallbackMessage: string
+  fallbackMessage: string,
 ): (...args: Args) => Promise<CallToolResult> {
   return async (...args: Args) => {
     try {
       return await handler(...args);
     } catch (error) {
       return {
-        content: [{
-          type: "text",
-          text: error instanceof Error ? error.message : fallbackMessage,
-        }],
+        content: [
+          {
+            type: "text",
+            text: error instanceof Error ? error.message : fallbackMessage,
+          },
+        ],
         isError: true,
       };
     }
@@ -248,11 +276,11 @@ export function withErrorHandling<Args extends any[]>(
 // Usage in tool registration
 server.registerTool(
   "customers_list",
-  { title: "List Customers", annotations: READ_ONLY_ANNOTATIONS, /* ... */ },
+  { title: "List Customers", annotations: READ_ONLY_ANNOTATIONS /* ... */ },
   withErrorHandling(async (params) => {
     const result = await db.getCustomers(ctx.teamId, params);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  }, "Failed to list customers")
+  }, "Failed to list customers"),
 );
 ```
 
@@ -314,11 +342,13 @@ The system prompt reads annotations and generates safety rules dynamically:
 // chat/prompt.ts
 export function buildSystemPrompt(ctx: UserContext, tools: ToolDefinition[]): string {
   // Separate tools by annotation
-  const readOnlyTools = tools.filter(t => t.annotations?.readOnlyHint);
-  const writeTools = tools.filter(t => !t.annotations?.readOnlyHint && !t.annotations?.destructiveHint);
-  const destructiveTools = tools.filter(t => t.annotations?.destructiveHint);
+  const readOnlyTools = tools.filter((t) => t.annotations?.readOnlyHint);
+  const writeTools = tools.filter(
+    (t) => !t.annotations?.readOnlyHint && !t.annotations?.destructiveHint,
+  );
+  const destructiveTools = tools.filter((t) => t.annotations?.destructiveHint);
 
-  const destructiveList = destructiveTools.map(t => `- ${t.name}: ${t.description}`).join("\n");
+  const destructiveList = destructiveTools.map((t) => `- ${t.name}: ${t.description}`).join("\n");
 
   return `
 You are an AI assistant for a SaaS application.
@@ -328,10 +358,10 @@ You are an AI assistant for a SaaS application.
 You have ${tools.length} tools organized by safety level:
 
 ### Read-only (safe to call anytime)
-${readOnlyTools.map(t => `- ${t.name}: ${t.description}`).join("\n")}
+${readOnlyTools.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
 
 ### Write (state-changing, but idempotent)
-${writeTools.map(t => `- ${t.name}: ${t.description}`).join("\n")}
+${writeTools.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
 
 ### Destructive (irreversible; requires explicit user confirmation)
 ${destructiveList}
@@ -469,16 +499,19 @@ export function buildPrepareStep(options: {
 ## Annotation Guidelines
 
 ### When to Use READ_ONLY
+
 - List/search/fetch operations: `customers_list`, `transactions_search`, `orders_get`.
 - Computation with no side effects: `calculate_tax`, `forecast_spending`.
 - Safe to call multiple times in a row without concern.
 
 ### When to Use WRITE
+
 - Create/update operations that don't destroy data: `customer_create`, `order_update_status`, `invoice_update_draft`.
 - Should be **idempotent** — calling twice with the same params should produce the same result (no duplicate creates).
 - OK for model to call with minimal explicit confirmation; can explain afterward.
 
 ### When to Use DESTRUCTIVE
+
 - Deletes: `customer_delete`, `order_cancel`.
 - Bulk mutations: `bulk_archive_old_records`.
 - Irreversible state changes: `finalize_invoice` (can't be undone), `close_account`.
@@ -499,7 +532,7 @@ server.registerTool(
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: false, // Results may vary over time
-      openWorldHint: true,   // External data source
+      openWorldHint: true, // External data source
     },
   },
   // ...
@@ -521,7 +554,7 @@ test("all read-only tools have correct annotations", () => {
   const tools = getRegisteredTools();
   const readOnlyTools = ["customers_list", "customers_get", "transactions_list"];
 
-  readOnlyTools.forEach(name => {
+  readOnlyTools.forEach((name) => {
     const tool = tools[name];
     expect(tool.annotations).toEqual(READ_ONLY_ANNOTATIONS);
   });
@@ -531,7 +564,7 @@ test("destructive tools are marked as destructive", () => {
   const tools = getRegisteredTools();
   const destructiveTools = ["customer_delete", "order_cancel"];
 
-  destructiveTools.forEach(name => {
+  destructiveTools.forEach((name) => {
     const tool = tools[name];
     expect(tool.annotations?.destructiveHint).toBe(true);
   });

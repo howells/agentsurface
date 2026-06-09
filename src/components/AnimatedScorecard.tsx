@@ -13,7 +13,7 @@ const scores = [
 
 export function AnimatedScorecard() {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const inView = useInView(ref, { margin: "-40px", once: true });
 
   return (
     <div
@@ -26,18 +26,16 @@ export function AnimatedScorecard() {
       <div className="space-y-2 px-4 py-3">
         {scores.map((item, i) => (
           <div key={item.name} className="flex items-center gap-3">
-            <span className="w-28 shrink-0 text-fd-muted-foreground">
-              {item.name}
-            </span>
+            <span className="w-28 shrink-0 text-fd-muted-foreground">{item.name}</span>
             <span className="flex gap-0.5">
               {[0, 1, 2].map((seg) => (
                 <motion.span
                   key={seg}
                   className="block h-1.5 w-3 rounded-sm"
-                  initial={{ opacity: 0.3, backgroundColor: "var(--color-fd-border)" }}
+                  initial={{ backgroundColor: "var(--color-fd-border)", opacity: 0.3 }}
                   animate={
                     inView && seg < item.score
-                      ? { opacity: 1, backgroundColor: "var(--color-fd-foreground)" }
+                      ? { backgroundColor: "var(--color-fd-foreground)", opacity: 1 }
                       : inView
                         ? { opacity: 1 }
                         : {}

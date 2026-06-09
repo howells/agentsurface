@@ -27,9 +27,9 @@
  * - Tune model + max iterations
  */
 
-import { Annotation, StateGraph, START, END, Command } from '@langchain/langgraph';
-import { MemorySaver } from '@langchain/langgraph';
-import { Anthropic } from '@anthropic-ai/sdk';
+import { Annotation, StateGraph, START, END, Command } from "@langchain/langgraph";
+import { MemorySaver } from "@langchain/langgraph";
+import { Anthropic } from "@anthropic-ai/sdk";
 
 // ============================================================================
 // STATE SCHEMA (shared across all agents)
@@ -37,41 +37,41 @@ import { Anthropic } from '@anthropic-ai/sdk';
 
 const SwarmState = Annotation.Root({
   task: Annotation<string>({
-    description: 'Original task or code review request',
+    description: "Original task or code review request",
   }),
 
   // Code being reviewed/tested/deployed
   code_diff: Annotation<string>({
-    description: 'Git diff or code snippet',
-    default: '',
+    default: "",
+    description: "Git diff or code snippet",
   }),
 
   // Agent-specific outputs (accumulated)
   review_comments: Annotation<string>({
-    description: 'Code review feedback from reviewer agent',
-    default: '',
+    default: "",
+    description: "Code review feedback from reviewer agent",
   }),
   test_results: Annotation<string>({
-    description: 'Test execution results from test agent',
-    default: '',
+    default: "",
+    description: "Test execution results from test agent",
   }),
   deploy_status: Annotation<string>({
-    description: 'Deployment status from deploy agent',
-    default: '',
+    default: "",
+    description: "Deployment status from deploy agent",
   }),
 
   // Shared context
   current_agent: Annotation<string>({
-    description: 'Name of agent currently handling task',
-    default: 'reviewer',
+    default: "reviewer",
+    description: "Name of agent currently handling task",
   }),
-  messages: Annotation<Array<{ role: 'user' | 'assistant'; content: string }>>({
-    description: 'Conversation history for agent context',
+  messages: Annotation<{ role: "user" | "assistant"; content: string }[]>({
     default: [],
+    description: "Conversation history for agent context",
   }),
   step_count: Annotation<number>({
-    description: 'Prevent infinite loops',
     default: 0,
+    description: "Prevent infinite loops",
   }),
 });
 
@@ -102,41 +102,34 @@ Format: [DECISION] [optional context]`;
   const userMessage = `Review this code:\n\n${state.code_diff}\n\nPrevious feedback:\n${state.review_comments}`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-7',
     max_tokens: 800,
+    messages: [...state.messages, { role: "user", content: userMessage }],
+    model: "claude-opus-4-7",
     system: systemPrompt,
-    messages: [
-      ...state.messages,
-      { role: 'user', content: userMessage },
-    ],
   });
 
-  const responseText =
-    response.content[0]?.type === 'text' ? response.content[0].text : '';
+  const responseText = response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  const newReviewComments = state.review_comments + '\n---\n' + responseText;
+  const newReviewComments = `${state.review_comments}\n---\n${responseText}`;
 
   // Parse decision from response
   let nextNode = END;
-  if (responseText.includes('CONTINUE_REVIEW')) {
-    nextNode = 'reviewer'; // Stay on this agent
-  } else if (responseText.includes('HANDOFF:test_runner')) {
-    nextNode = 'test_runner';
-  } else if (responseText.includes('HANDOFF:deployer')) {
-    nextNode = 'deployer';
+  if (responseText.includes("CONTINUE_REVIEW")) {
+    nextNode = "reviewer"; // Stay on this agent
+  } else if (responseText.includes("HANDOFF:test_runner")) {
+    nextNode = "test_runner";
+  } else if (responseText.includes("HANDOFF:deployer")) {
+    nextNode = "deployer";
   }
 
   return new Command({
+    goto: nextNode,
     update: {
+      current_agent: "reviewer",
+      messages: [...state.messages, { role: "assistant", content: responseText }],
       review_comments: newReviewComments,
-      current_agent: 'reviewer',
-      messages: [
-        ...state.messages,
-        { role: 'assistant', content: responseText },
-      ],
       step_count: state.step_count + 1,
     },
-    goto: nextNode,
   });
 }
 
@@ -161,40 +154,33 @@ Format: [DECISION] [reason]`;
   const userMessage = `Code to test:\n${state.code_diff}\n\nReview feedback so far:\n${state.review_comments}`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
     max_tokens: 500,
+    messages: [...state.messages, { role: "user", content: userMessage }],
+    model: "claude-sonnet-4-6",
     system: systemPrompt,
-    messages: [
-      ...state.messages,
-      { role: 'user', content: userMessage },
-    ],
   });
 
-  const responseText =
-    response.content[0]?.type === 'text' ? response.content[0].text : '';
+  const responseText = response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  const newTestResults = state.test_results + '\n---\n' + responseText;
+  const newTestResults = `${state.test_results}\n---\n${responseText}`;
 
   let nextNode = END;
-  if (responseText.includes('HANDOFF:deployer')) {
-    nextNode = 'deployer';
-  } else if (responseText.includes('HANDOFF:reviewer')) {
-    nextNode = 'reviewer';
-  } else if (responseText.includes('MANUAL_APPROVAL')) {
+  if (responseText.includes("HANDOFF:deployer")) {
+    nextNode = "deployer";
+  } else if (responseText.includes("HANDOFF:reviewer")) {
+    nextNode = "reviewer";
+  } else if (responseText.includes("MANUAL_APPROVAL")) {
     nextNode = END; // Escalate to human
   }
 
   return new Command({
-    update: {
-      test_results: newTestResults,
-      current_agent: 'test_runner',
-      messages: [
-        ...state.messages,
-        { role: 'assistant', content: responseText },
-      ],
-      step_count: state.step_count + 1,
-    },
     goto: nextNode,
+    update: {
+      current_agent: "test_runner",
+      messages: [...state.messages, { role: "assistant", content: responseText }],
+      step_count: state.step_count + 1,
+      test_results: newTestResults,
+    },
   });
 }
 
@@ -215,35 +201,28 @@ Format: [DECISION] [reason]`;
   const userMessage = `Final check before deployment:\nReview: ${state.review_comments}\nTests: ${state.test_results}`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-7',
     max_tokens: 300,
+    messages: [...state.messages, { role: "user", content: userMessage }],
+    model: "claude-opus-4-7",
     system: systemPrompt,
-    messages: [
-      ...state.messages,
-      { role: 'user', content: userMessage },
-    ],
   });
 
-  const responseText =
-    response.content[0]?.type === 'text' ? response.content[0].text : '';
+  const responseText = response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  const deployStatus = responseText.includes('DEPLOY')
-    ? 'SUCCESS: Deployed to production'
-    : responseText.includes('ABORT')
-      ? 'FAILED: Deployment aborted'
-      : 'PENDING: Awaiting manual approval';
+  const deployStatus = responseText.includes("DEPLOY")
+    ? "SUCCESS: Deployed to production"
+    : responseText.includes("ABORT")
+      ? "FAILED: Deployment aborted"
+      : "PENDING: Awaiting manual approval";
 
   return new Command({
+    goto: END,
     update: {
+      current_agent: "deployer",
       deploy_status: deployStatus,
-      current_agent: 'deployer',
-      messages: [
-        ...state.messages,
-        { role: 'assistant', content: responseText },
-      ],
+      messages: [...state.messages, { role: "assistant", content: responseText }],
       step_count: state.step_count + 1,
     },
-    goto: END,
   });
 }
 
@@ -254,12 +233,12 @@ Format: [DECISION] [reason]`;
 export function createSwarmWorkflow() {
   const workflow = new StateGraph(SwarmState)
     // Add agent nodes
-    .addNode('reviewer', codeReviewerAgent)
-    .addNode('test_runner', testRunnerAgent)
-    .addNode('deployer', deployerAgent)
+    .addNode("reviewer", codeReviewerAgent)
+    .addNode("test_runner", testRunnerAgent)
+    .addNode("deployer", deployerAgent)
 
     // Entry point: always start with code reviewer
-    .addEdge(START, 'reviewer')
+    .addEdge(START, "reviewer")
 
     // Agents emit Command with goto; no explicit edges needed
     // LangGraph follows the Command's goto field
@@ -292,8 +271,8 @@ diff --git a/src/auth.ts b/src/auth.ts
   `;
 
   const input = {
-    task: 'Review, test, and deploy code change to production',
     code_diff: codeDiff,
+    task: "Review, test, and deploy code change to production",
   };
 
   const threadId = `swarm-${Date.now()}`;
@@ -304,11 +283,11 @@ diff --git a/src/auth.ts b/src/auth.ts
     configurable: { thread_id: threadId },
   });
 
-  console.log('=== Swarm Workflow Complete ===');
-  console.log('Steps executed:', result.step_count);
-  console.log('Review feedback:', result.review_comments);
-  console.log('Test results:', result.test_results);
-  console.log('Deploy status:', result.deploy_status);
+  console.log("=== Swarm Workflow Complete ===");
+  console.log("Steps executed:", result.step_count);
+  console.log("Review feedback:", result.review_comments);
+  console.log("Test results:", result.test_results);
+  console.log("Deploy status:", result.deploy_status);
 
   return result;
 }

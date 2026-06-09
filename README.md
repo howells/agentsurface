@@ -104,8 +104,8 @@ pnpm start
 Notes:
 
 - `postinstall` runs `fumadocs-mdx`
-- the current `package.json` does not define dedicated `test` or `lint` scripts
-- Biome configuration lives in [`biome.json`](./biome.json)
+- the current `package.json` does not define a dedicated `test` script
+- linting and formatting configuration lives in [`oxlint.config.ts`](./oxlint.config.ts) and [`oxfmt.config.ts`](./oxfmt.config.ts)
 
 ## Using The Skill
 

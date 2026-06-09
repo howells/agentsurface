@@ -5,9 +5,9 @@ const BASE_URL = "https://agentsurface.dev";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const docs = source.getPages().map((page) => ({
-    url: `${BASE_URL}${page.url}`,
     lastModified: new Date(),
+    url: `${BASE_URL}${page.url}`,
   }));
 
-  return [{ url: BASE_URL, lastModified: new Date() }, ...docs];
+  return [{ lastModified: new Date(), url: BASE_URL }, ...docs];
 }

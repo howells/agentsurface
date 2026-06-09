@@ -96,13 +96,13 @@ Retrieval quality fails silently. Measure obsessively and avoid these pitfalls.
 // Bad: no overlap
 const chunks = [];
 for (let i = 0; i < tokens.length; i += 512) {
-  chunks.push(tokens.slice(i, i + 512).join(' '));
+  chunks.push(tokens.slice(i, i + 512).join(" "));
 }
 
 // Good: 20% overlap
 const overlapTokens = 102; // 20% of 512
 for (let i = 0; i < tokens.length; i += 512 - overlapTokens) {
-  chunks.push(tokens.slice(i, i + 512).join(' '));
+  chunks.push(tokens.slice(i, i + 512).join(" "));
 }
 ```
 
@@ -114,13 +114,17 @@ for (let i = 0; i < tokens.length; i += 512 - overlapTokens) {
 
 ```typescript
 // Bad: returns only IDs
-{ results: ['user_123', 'user_456'] }
+{
+  results: ["user_123", "user_456"];
+}
 
 // Good: includes semantic content
-{ results: [
-  { id: 'user_123', name: 'Alice', email: 'alice@co.com' },
-  { id: 'user_456', name: 'Bob', email: 'bob@co.com' }
-] }
+{
+  results: [
+    { id: "user_123", name: "Alice", email: "alice@co.com" },
+    { id: "user_456", name: "Bob", email: "bob@co.com" },
+  ];
+}
 ```
 
 **Impact:** Agent must make follow-up calls to resolve IDs; inefficient.
@@ -131,10 +135,11 @@ for (let i = 0; i < tokens.length; i += 512 - overlapTokens) {
 
 ```typescript
 // Bad: same model for all
-const embed = (text) => openai.embeddings.create({
-  model: 'text-embedding-3-large',
-  input: text
-});
+const embed = (text) =>
+  openai.embeddings.create({
+    model: "text-embedding-3-large",
+    input: text,
+  });
 
 // Good: specialized per modality
 if (isCode(text)) return codeEmbedding(text);
@@ -157,18 +162,20 @@ return genericEmbedding(text);
 ```typescript
 // Bad: discard source
 const chunks = splitDoc(doc);
-chunks.forEach(c => db.store({ text: c }));
+chunks.forEach((c) => db.store({ text: c }));
 
 // Good: preserve metadata
-chunks.forEach((c, i) => db.store({
-  text: c,
-  metadata: {
-    docId: doc.id,
-    docTitle: doc.title,
-    section: doc.sections[i],
-    page: doc.pageNumbers[i]
-  }
-}));
+chunks.forEach((c, i) =>
+  db.store({
+    text: c,
+    metadata: {
+      docId: doc.id,
+      docTitle: doc.title,
+      section: doc.sections[i],
+      page: doc.pageNumbers[i],
+    },
+  }),
+);
 ```
 
 **Impact:** Can't filter by section or date. Lost lineage for citations.
@@ -219,7 +226,7 @@ console.log(`Monthly embedding cost: $${estimatedCost}`);
 ```typescript
 const results = await hybridSearch(query);
 if (results.length === 0) {
-  return { error: 'No relevant documents found', suggestion: 'Try a different query' };
+  return { error: "No relevant documents found", suggestion: "Try a different query" };
 }
 ```
 

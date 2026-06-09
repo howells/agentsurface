@@ -31,23 +31,19 @@ import { z } from "zod";
  * Describes the event and related entities that triggered a notification.
  */
 export const NotificationContextPayloadSchema = z.object({
-  eventKind: z
-    .enum(["match", "alert", "reminder", "digest", "custom"])
-    .describe("Type of event"),
   entityIds: z
     .array(z.string())
     .describe("IDs of affected entities (invoice IDs, ticket IDs, etc.)"),
-  summary: z.string().describe("Plaintext summary of the event"),
+  eventKind: z.enum(["match", "alert", "reminder", "digest", "custom"]).describe("Type of event"),
   metadata: z
     .record(z.unknown())
     .optional()
     .describe("Additional context (counts, amounts, names)"),
+  summary: z.string().describe("Plaintext summary of the event"),
   timestamp: z.number().describe("Unix timestamp when event occurred"),
 });
 
-export type NotificationContextPayload = z.infer<
-  typeof NotificationContextPayloadSchema
->;
+export type NotificationContextPayload = z.infer<typeof NotificationContextPayloadSchema>;
 
 /**
  * In-memory or Redis-backed notification context store.
@@ -55,11 +51,11 @@ export type NotificationContextPayload = z.infer<
  */
 export class NotificationContextStore {
   // <CUSTOMISE> Replace with Redis client (ioredis or node-redis)
-  private memory: Map<string, NotificationContextPayload> = new Map();
-  private ttls: Map<string, number> = new Map();
+  private memory = new Map<string, NotificationContextPayload>();
+  private ttls = new Map<string, number>();
 
   constructor(
-    private ttlSeconds: number = 86400, // 24 hours default
+    private ttlSeconds: number = 86_400, // 24 hours default
     private redisClient?: { get: Function; set: Function },
   ) {}
 
@@ -89,9 +85,7 @@ export class NotificationContextStore {
     // <CUSTOMISE> Persist to Redis:
     // await this.redisClient?.set(key, JSON.stringify(context), 'EX', this.ttlSeconds);
 
-    console.log(
-      `[notification-context] stored context for user=${userId} platform=${platform}`,
-    );
+    console.log(`[notification-context] stored context for user=${userId} platform=${platform}`);
   }
 
   /**
@@ -124,10 +118,7 @@ export class NotificationContextStore {
   /**
    * Clear context for a user+platform (e.g., after notification is read).
    */
-  async clearNotificationContext(
-    userId: string,
-    platform: string,
-  ): Promise<void> {
+  async clearNotificationContext(userId: string, platform: string): Promise<void> {
     const key = this.cacheKey(userId, platform);
     this.memory.delete(key);
     this.ttls.delete(key);
@@ -178,14 +169,14 @@ ${context.metadata ? `- Details: ${JSON.stringify(context.metadata)}` : ""}
 
 Use this context to understand what happened and why the user is interacting with you now.`;
 
-  return systemPrompt + "\n" + contextBlock;
+  return `${systemPrompt}\n${contextBlock}`;
 }
 
 /**
  * Example: Building a notification context from multiple events.
  */
 export function buildNotificationContextFromEvents(
-  events: Array<{ kind: string; entityId: string; amount?: number }>,
+  events: { kind: string; entityId: string; amount?: number }[],
 ): NotificationContextPayload {
   const eventKinds = [...new Set(events.map((e) => e.kind))];
   const entityIds = [...new Set(events.map((e) => e.entityId))];
@@ -195,14 +186,14 @@ export function buildNotificationContextFromEvents(
       : `You have ${events.length} events`;
 
   return {
-    eventKind: "custom",
     entityIds,
-    summary,
+    eventKind: "custom",
     metadata: {
-      eventKinds,
       eventCount: events.length,
+      eventKinds,
       totalAmount: events.reduce((sum, e) => sum + (e.amount || 0), 0),
     },
+    summary,
     timestamp: Date.now(),
   };
 }
@@ -216,14 +207,14 @@ export function createMatchNotificationContext(
   summary: string,
 ): NotificationContextPayload {
   return {
-    eventKind: "match",
     entityIds: [inboxId, transactionId],
-    summary,
+    eventKind: "match",
     metadata: {
       inboxId,
-      transactionId,
       matchType: "high_confidence",
+      transactionId,
     },
+    summary,
     timestamp: Date.now(),
   };
 }
@@ -237,14 +228,14 @@ export function createAlertNotificationContext(
   amount?: number,
 ): NotificationContextPayload {
   return {
-    eventKind: "alert",
     entityIds: [invoiceId],
-    summary: `Invoice is ${daysOverdue} day(s) overdue${amount ? ` ($${amount})` : ""}`,
+    eventKind: "alert",
     metadata: {
-      invoiceId,
-      daysOverdue,
       amount,
+      daysOverdue,
+      invoiceId,
     },
+    summary: `Invoice is ${daysOverdue} day(s) overdue${amount ? ` ($${amount})` : ""}`,
     timestamp: Date.now(),
   };
 }
@@ -252,20 +243,18 @@ export function createAlertNotificationContext(
 /**
  * Example: Daily digest notification context.
  */
-export function createDigestNotificationContext(
-  digest: {
-    newOrders: number;
-    overdueInvoices: number;
-    totalRevenue: number;
-  },
-): NotificationContextPayload {
+export function createDigestNotificationContext(digest: {
+  newOrders: number;
+  overdueInvoices: number;
+  totalRevenue: number;
+}): NotificationContextPayload {
   return {
-    eventKind: "digest",
     entityIds: [],
-    summary: `Daily summary: ${digest.newOrders} new order(s), ${digest.overdueInvoices} overdue invoice(s)`,
+    eventKind: "digest",
     metadata: {
       ...digest,
     },
+    summary: `Daily summary: ${digest.newOrders} new order(s), ${digest.overdueInvoices} overdue invoice(s)`,
     timestamp: Date.now(),
   };
 }
@@ -286,8 +275,6 @@ export async function withNotificationContext(
 /**
  * Periodic cleanup task (e.g., run every hour).
  */
-export async function cleanupExpiredContexts(
-  store: NotificationContextStore,
-): Promise<void> {
+export async function cleanupExpiredContexts(store: NotificationContextStore): Promise<void> {
   await store.evictExpired();
 }

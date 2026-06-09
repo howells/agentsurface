@@ -9,7 +9,7 @@ Tool-specific overrides layered on AGENTS.md. Cursor reads `.cursor/rules/*.mdc`
 
 - **Cursor rules**: `.cursor/rules/*.mdc` with globs metadata
 - **Copilot instructions**: `.github/copilot-instructions.md` (single file)
-- **Glob scoping**: Apply rules per file pattern (src/**/*.ts)
+- **Glob scoping**: Apply rules per file pattern (src/\*_/_.ts)
 - **Reference AGENTS.md**: "See AGENTS.md for project conventions"
 - **Add tool-only**: Cursor/Copilot-specific guidance
 - **Avoid duplication**: Don't repeat AGENTS.md content
@@ -36,15 +36,17 @@ See AGENTS.md for project conventions.
 ## TypeScript-Specific Rules
 
 Always:
-  - Use strict: true in tsconfig
-  - Define function return types explicitly (no inference)
-  - Use const for all immutable bindings
-  - Avoid any; use unknown and narrow
+
+- Use strict: true in tsconfig
+- Define function return types explicitly (no inference)
+- Use const for all immutable bindings
+- Avoid any; use unknown and narrow
 
 Never:
-  - Use var
-  - Use null; prefer undefined
-  - Use ! non-null assertion without comment
+
+- Use var
+- Use null; prefer undefined
+- Use ! non-null assertion without comment
 ```
 
 The `globs` frontmatter tells Cursor when to apply these rules (TypeScript files only).
@@ -55,6 +57,7 @@ The `globs` frontmatter tells Cursor when to apply these rules (TypeScript files
 ---
 globs: src/components/**/*.tsx
 ---
+
 # React Component Rules
 
 Applies only to React component files.
@@ -64,6 +67,7 @@ Applies only to React component files.
 ---
 globs: "*.test.ts,*.spec.ts"
 ---
+
 # Test Rules
 
 Applies only to test files.
@@ -103,54 +107,58 @@ Files: kebab-case
 ## TypeScript
 
 Always:
-  - strict: true (tsconfig.json)
-  - Explicit return types on exported functions
-  - Use const for all bindings
-  - Import types: import type { T } from '...'
+
+- strict: true (tsconfig.json)
+- Explicit return types on exported functions
+- Use const for all bindings
+- Import types: import type { T } from '...'
 
 Never:
-  - any type; use unknown and narrow
-  - null; use undefined
-  - non-null assertion (!) without comment
-  - Function expressions; use const fn = () => {}
+
+- any type; use unknown and narrow
+- null; use undefined
+- non-null assertion (!) without comment
+- Function expressions; use const fn = () => {}
 
 ## Imports
 
 Order:
-  1. External packages (react, next, zod, etc.)
-  2. Internal absolute paths (src/...)
-  3. Relative paths (../)
+
+1. External packages (react, next, zod, etc.)
+2. Internal absolute paths (src/...)
+3. Relative paths (../)
 
 Example:
-  import React from 'react';
-  import { z } from 'zod';
-  import { useAuth } from 'src/hooks/useAuth';
-  import { Button } from './Button';
+import React from 'react';
+import { z } from 'zod';
+import { useAuth } from 'src/hooks/useAuth';
+import { Button } from './Button';
 
 ## Comments
 
 Use JSDoc for:
-  - Public functions and types
-  - Non-obvious logic
-  - Why, not what
+
+- Public functions and types
+- Non-obvious logic
+- Why, not what
 
 Avoid:
-  - Stating the obvious (// increment x)
-  - Stale comments (update on code change)
+
+- Stating the obvious (// increment x)
+- Stale comments (update on code change)
 
 ## Error Handling
 
 Return errors, don't throw (in tools):
-  return {
-    success: false,
-    error: { code: 'INVALID_INPUT', message: '...' }
-  };
+return {
+success: false,
+error: { code: 'INVALID_INPUT', message: '...' }
+};
 
 ## Testing
 
 Test file location: src/components/Button.test.tsx (alongside component)
 Test structure: describe, it, expect
-
 ```
 
 ## GitHub Copilot Instructions
@@ -307,6 +315,7 @@ Top-level `.github/copilot-instructions.md` applies to all packages.
 # AGENTS.md
 
 ...
+
 ## Testing
 
 Unit: Vitest (pnpm test)
@@ -330,8 +339,9 @@ See AGENTS.md > Testing for test patterns.
 ## Cursor-Specific Test Rules
 
 Never:
-  - Use .skip or .only (should not be committed)
-  - Test implementation; test behavior
+
+- Use .skip or .only (should not be committed)
+- Test implementation; test behavior
 ```
 
 **.github/copilot-instructions.md (summarizing):**
@@ -343,7 +353,7 @@ See AGENTS.md for full conventions.
 
 ## Testing
 
-- Tests: src/**/*.test.ts (Vitest)
+- Tests: src/\*_/_.test.ts (Vitest)
 - Run: pnpm test
 - Structure: describe, it, expect
 - Test behavior, not implementation
@@ -390,12 +400,13 @@ Sync fails. Use pre-commit hook to prevent this.
 # BAD: Cursor rules
 
 Always:
-  - Use PascalCase for types
-  - Use camelCase for functions
-  - Use const
-  - Use async/await
-  - Use arrow functions
-  - ...30 more rules
+
+- Use PascalCase for types
+- Use camelCase for functions
+- Use const
+- Use async/await
+- Use arrow functions
+- ...30 more rules
 ```
 
 Too long. Keep rules focused on non-obvious patterns. AGENTS.md covers the rest.

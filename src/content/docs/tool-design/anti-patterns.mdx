@@ -28,10 +28,10 @@ Well-designed tools are silent—agents use them and succeed. Poorly-designed to
 
 ```typescript
 server.tool(
-  'search_issues',
-  'Searches for issues.',  // Too vague
+  "search_issues",
+  "Searches for issues.", // Too vague
   schema,
-  handler
+  handler,
 );
 ```
 
@@ -41,11 +41,11 @@ The agent has no signal for when to use this tool vs similar ones, what the edge
 
 ```typescript
 server.tool(
-  'search_issues',
-  'Search for existing issues by text, assignee, or status. Use when finding tickets matching criteria. ' +
-  'Do not use for creating new issues (use create_issue). Returns paginated results; use next_offset for subsequent pages.',
+  "search_issues",
+  "Search for existing issues by text, assignee, or status. Use when finding tickets matching criteria. " +
+    "Do not use for creating new issues (use create_issue). Returns paginated results; use next_offset for subsequent pages.",
   schema,
-  handler
+  handler,
 );
 ```
 
@@ -98,9 +98,9 @@ const agent = new Agent({ tools: toolsForDeveloper });
 // Tool returns
 {
   results: [
-    { user_id: 'usr_123', status: 'active' },
-    { user_id: 'usr_456', status: 'active' },
-  ]
+    { user_id: "usr_123", status: "active" },
+    { user_id: "usr_456", status: "active" },
+  ];
 }
 
 // Agent cannot resolve what 'usr_123' is—no lookup tool
@@ -114,17 +114,17 @@ The agent cannot do anything with the result because it cannot resolve the ID to
 // Return semantic content alongside IDs
 {
   results: [
-    { user_id: 'usr_123', name: 'Alice', email: 'alice@example.com', status: 'active' },
-    { user_id: 'usr_456', name: 'Bob', email: 'bob@example.com', status: 'active' },
-  ]
+    { user_id: "usr_123", name: "Alice", email: "alice@example.com", status: "active" },
+    { user_id: "usr_456", name: "Bob", email: "bob@example.com", status: "active" },
+  ];
 }
 
 // Or provide a lookup tool
 server.tool(
-  'get_user',
-  'Fetch user by ID. Required when search_users returns only IDs.',
+  "get_user",
+  "Fetch user by ID. Required when search_users returns only IDs.",
   schema,
-  handler
+  handler,
 );
 ```
 
@@ -139,8 +139,8 @@ server.tool(
 ```typescript
 const schema = z.object({
   result: z.union([
-    z.object({ type: z.literal('success'), data: z.any() }),
-    z.object({ type: z.literal('error'), message: z.string() }),
+    z.object({ type: z.literal("success"), data: z.any() }),
+    z.object({ type: z.literal("error"), message: z.string() }),
   ]),
 });
 ```
@@ -172,7 +172,7 @@ server.tool('operation_execute', ...);  // Returns result
 
 ```typescript
 const schema = z.object({
-  assignee: z.string().nullable().optional(),  // Both null and undefined
+  assignee: z.string().nullable().optional(), // Both null and undefined
 });
 ```
 
@@ -182,7 +182,7 @@ Different frameworks handle null differently. OpenAI requires explicit omission,
 
 ```typescript
 const schema = z.object({
-  assignee: z.string().optional(),  // Omit entirely if not needed
+  assignee: z.string().optional(), // Omit entirely if not needed
 });
 ```
 
@@ -222,10 +222,10 @@ server.tool('get_user', ...);
 async (params) => {
   const user = await db.users.findById(params.id);
   if (!user) {
-    throw new Error(`User not found`);  // Unhandled exception
+    throw new Error(`User not found`); // Unhandled exception
   }
   // ...
-}
+};
 ```
 
 Uncaught exceptions produce MCP protocol errors with generic messages. Agents cannot recover.
@@ -238,14 +238,16 @@ async (params) => {
   if (!user) {
     return {
       isError: true,
-      content: [{
-        type: 'text',
-        text: `User ${params.id} not found. Call list_users to find the correct ID.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `User ${params.id} not found. Call list_users to find the correct ID.`,
+        },
+      ],
     };
   }
   // ...
-}
+};
 ```
 
 **Pattern:** Return errors in the response body so agents can reason about recovery.
@@ -258,10 +260,10 @@ async (params) => {
 
 ```typescript
 server.tool(
-  'delete_invoice',
-  'Deletes an invoice.',
+  "delete_invoice",
+  "Deletes an invoice.",
   schema,
-  handler
+  handler,
   // No annotations
 );
 ```
@@ -272,15 +274,15 @@ Downstream systems cannot tell this tool is dangerous.
 
 ```typescript
 server.tool(
-  'delete_invoice',
-  'Permanently deletes an invoice. This cannot be undone. ' +
-  'Use only when the invoice was created in error.',
+  "delete_invoice",
+  "Permanently deletes an invoice. This cannot be undone. " +
+    "Use only when the invoice was created in error.",
   schema,
   handler,
   {
-    destructiveHint: true,    // Signals danger
-    idempotentHint: false,    // Not safe to retry
-  }
+    destructiveHint: true, // Signals danger
+    idempotentHint: false, // Not safe to retry
+  },
 );
 ```
 
@@ -305,12 +307,11 @@ Four tools that do nearly the same thing. Agent has no signal for which to use.
 
 ```typescript
 // One search tool with clear disambig
-search_issues: 'Search for existing issues by text, assignee, or status. ' +
-  'Use for finding tickets matching criteria. Returns paginated results.',
-
-// If variants are needed, be explicit
-search_issues_simple(query);       // Fast, limited filters
-search_issues_advanced(filters);   // Full filter surface
+search_issues: ("Search for existing issues by text, assignee, or status. " +
+  "Use for finding tickets matching criteria. Returns paginated results.",
+  // If variants are needed, be explicit
+  search_issues_simple(query)); // Fast, limited filters
+search_issues_advanced(filters); // Full filter surface
 ```
 
 **Pattern:** Have one primary tool per intent. Variants (simple/advanced) are acceptable if each is unambiguous.
@@ -323,8 +324,7 @@ search_issues_advanced(filters);   // Full filter surface
 
 ```typescript
 const schema = z.object({
-  date_range: z.string()
-    .describe('The date range to filter by'),
+  date_range: z.string().describe("The date range to filter by"),
 });
 ```
 
@@ -334,9 +334,12 @@ What format is "date_range"? "2025-01-01 to 2025-01-31"? An ISO interval? A Slac
 
 ```typescript
 const schema = z.object({
-  date_range: z.string()
+  date_range: z
+    .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{4}-\d{2}-\d{2}$/)
-    .describe('Date range in ISO format. Examples: "2025-01-01T2025-01-31", "2025-02-01T2025-02-28".'),
+    .describe(
+      'Date range in ISO format. Examples: "2025-01-01T2025-01-31", "2025-02-01T2025-02-28".',
+    ),
 });
 ```
 
@@ -349,8 +352,8 @@ const schema = z.object({
 **Mistake:**
 
 ```typescript
-'Harness the power of our best-in-class document management system ' +
-'to unlock the potential of your knowledge management workflows.'
+"Harness the power of our best-in-class document management system " +
+  "to unlock the potential of your knowledge management workflows.";
 ```
 
 Not a prompt. The agent learns nothing about when to call this tool.
@@ -358,9 +361,9 @@ Not a prompt. The agent learns nothing about when to call this tool.
 **Fix:**
 
 ```typescript
-'Search internal documents by keyword or metadata. Use for finding ' +
-'runbooks, architecture guides, and troubleshooting steps. ' +
-'Do not use for general knowledge (use web search). Returns snippets ranked by relevance.'
+"Search internal documents by keyword or metadata. Use for finding " +
+  "runbooks, architecture guides, and troubleshooting steps. " +
+  "Do not use for general knowledge (use web search). Returns snippets ranked by relevance.";
 ```
 
 **Pattern:** Write descriptions as instructions, not marketing copy.

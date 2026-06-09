@@ -84,7 +84,7 @@ pnpm start
 Notes:
 
 - `postinstall` runs `fumadocs-mdx`
-- formatting and linting configuration lives in [`./biome.json`](./biome.json)
+- formatting and linting configuration lives in [`./oxlint.config.ts`](./oxlint.config.ts) and [`./oxfmt.config.ts`](./oxfmt.config.ts)
 
 ## How To Navigate This Repo
 

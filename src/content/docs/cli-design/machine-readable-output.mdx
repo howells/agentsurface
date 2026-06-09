@@ -42,10 +42,10 @@ In code, this means every interactive UI element must write to stderr:
 
 ```typescript
 // Node.js example
-process.stderr.write('\r⠋ Creating user...');
+process.stderr.write("\r⠋ Creating user...");
 
 // After operation completes, the result goes to stdout
-process.stdout.write(JSON.stringify(result) + '\n');
+process.stdout.write(JSON.stringify(result) + "\n");
 ```
 
 ## TTY Detection
@@ -55,7 +55,7 @@ The output mode should adapt automatically based on whether stdout is a terminal
 Use `isatty(1)` (or the equivalent in your language) to detect this:
 
 ```typescript
-import { isatty } from 'tty';
+import { isatty } from "tty";
 
 const isTTY = isatty(process.stdout.fd);
 
@@ -64,7 +64,7 @@ if (isTTY) {
   printTable(results);
 } else {
   // Machine-readable: plain JSON to stdout
-  process.stdout.write(JSON.stringify(results) + '\n');
+  process.stdout.write(JSON.stringify(results) + "\n");
 }
 ```
 
@@ -121,7 +121,7 @@ The common mistake is bolting JSON output onto an existing human-readable implem
 // Wrong — serializing the display object, not the data object
 function listUsers(flags) {
   const users = await api.getUsers();
-  const table = buildTable(users);  // formats for display
+  const table = buildTable(users); // formats for display
 
   if (flags.json) {
     // Serializing a display-oriented structure, not a data structure
@@ -144,7 +144,7 @@ function listUsers(flags) {
     output(JSON.stringify(users));
   } else {
     // Format the same data for display
-    printTable(users, ['id', 'name', 'email', 'created_at']);
+    printTable(users, ["id", "name", "email", "created_at"]);
   }
 }
 ```
@@ -190,7 +190,7 @@ function print(text: string, color?: string) {
   if (useColor && color) {
     process.stdout.write(`\x1b[${color}m${text}\x1b[0m\n`);
   } else {
-    process.stdout.write(text + '\n');
+    process.stdout.write(text + "\n");
   }
 }
 ```
@@ -246,7 +246,7 @@ async function* streamUsers(api: API): AsyncGenerator<User> {
 async function listUsersCommand(flags: Flags) {
   if (flags.all && (flags.json || !isTTY())) {
     for await (const user of streamUsers(api)) {
-      process.stdout.write(JSON.stringify(user) + '\n');
+      process.stdout.write(JSON.stringify(user) + "\n");
     }
   } else {
     // ... paginated human-readable output
@@ -276,12 +276,12 @@ Always exit with a non-zero code when outputting a structured error. The exit co
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | Human-only output (tables, color codes, prose). No structured format available. |
-| 1 | `--output json` or equivalent exists but is incomplete or inconsistent across commands. |
-| 2 | Consistent JSON output across all commands. Errors also return structured JSON. |
-| 3 | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
+| Score | Criteria                                                                                              |
+| ----- | ----------------------------------------------------------------------------------------------------- |
+| 0     | Human-only output (tables, color codes, prose). No structured format available.                       |
+| 1     | `--output json` or equivalent exists but is incomplete or inconsistent across commands.               |
+| 2     | Consistent JSON output across all commands. Errors also return structured JSON.                       |
+| 3     | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
 
 ## Checklist
 

@@ -99,7 +99,7 @@ app.get("/.well-known/mcp/server-card.json", (req, res) => {
     version: "1.0.0",
     transport: {
       type: "streamable-http",
-      url: "https://api.example.com/mcp"
+      url: "https://api.example.com/mcp",
     },
     auth: {
       type: "oauth2",
@@ -228,9 +228,7 @@ export async function getMcpServer(userId?: string, teamId?: string) {
   const server = new Server({ name: "my-agent-server" });
 
   // Load user's scopes/permissions
-  const scopes = userId && teamId 
-    ? await getUserScopes(userId, teamId)
-    : ["api:read"]; // Anonymous clients get read-only access
+  const scopes = userId && teamId ? await getUserScopes(userId, teamId) : ["api:read"]; // Anonymous clients get read-only access
 
   // Register only tools they have access to
   if (scopes.includes("customers:read") || scopes.includes("api:all")) {
@@ -312,32 +310,35 @@ app.get("/mcp/openapi.json", async (req, res) => {
       version: "1.0.0",
     },
     servers: [{ url: "https://api.example.com/mcp" }],
-    paths: tools.reduce((acc, tool) => {
-      acc[`/tools/${tool.name}`] = {
-        post: {
-          summary: tool.title,
-          description: tool.description,
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: tool.inputSchema,
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Success",
+    paths: tools.reduce(
+      (acc, tool) => {
+        acc[`/tools/${tool.name}`] = {
+          post: {
+            summary: tool.title,
+            description: tool.description,
+            requestBody: {
               content: {
                 "application/json": {
-                  schema: tool.outputSchema,
+                  schema: tool.inputSchema,
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: tool.outputSchema,
+                  },
                 },
               },
             },
           },
-        },
-      };
-      return acc;
-    }, {} as Record<string, any>),
+        };
+        return acc;
+      },
+      {} as Record<string, any>,
+    ),
   };
 
   res.json(spec);
@@ -370,7 +371,7 @@ const limiter = new RateLimiter({
 
 app.post("/mcp/jsonrpc", async (req, res, next) => {
   const userId = (req as any).userId;
-  
+
   const limit = await limiter.check(userId, {
     max: 1000, // Requests per day
     window: 24 * 60 * 60, // 24 hours

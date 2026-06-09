@@ -44,17 +44,17 @@ Noun-verb ordering has two properties that matter for agents:
 
 Use these verbs consistently across all resource types:
 
-| Verb | Meaning |
-|------|---------|
-| `create` | Create a new resource |
-| `get` | Retrieve a single resource by ID |
-| `list` | Retrieve a collection of resources |
-| `update` | Modify an existing resource |
-| `delete` | Remove a resource permanently |
-| `archive` | Soft-delete or deactivate a resource |
-| `restore` | Reverse an archive operation |
-| `trigger` | Initiate an asynchronous operation |
-| `cancel` | Stop an in-progress operation |
+| Verb       | Meaning                                          |
+| ---------- | ------------------------------------------------ |
+| `create`   | Create a new resource                            |
+| `get`      | Retrieve a single resource by ID                 |
+| `list`     | Retrieve a collection of resources               |
+| `update`   | Modify an existing resource                      |
+| `delete`   | Remove a resource permanently                    |
+| `archive`  | Soft-delete or deactivate a resource             |
+| `restore`  | Reverse an archive operation                     |
+| `trigger`  | Initiate an asynchronous operation               |
+| `cancel`   | Stop an in-progress operation                    |
 | `describe` | Return the schema for a command or command group |
 
 Do not introduce synonyms. If you use `delete` for users, do not use `remove` for DNS records. The agent will not infer they are equivalent.
@@ -150,14 +150,14 @@ Exit codes are the primary signal an agent uses to determine whether a command s
 
 Use these exit codes consistently:
 
-| Code | Meaning | When to use |
-|------|---------|-------------|
-| `0` | Success | Command completed as expected |
-| `1` | Failure | Operation failed (API error, network error, internal error) |
-| `2` | Usage error | Invalid flags, missing required arguments, malformed input |
-| `3` | Not found | Resource does not exist |
-| `4` | Permission denied | Insufficient permissions or authentication failure |
-| `5` | Conflict | Resource already exists or state prevents the operation |
+| Code | Meaning           | When to use                                                 |
+| ---- | ----------------- | ----------------------------------------------------------- |
+| `0`  | Success           | Command completed as expected                               |
+| `1`  | Failure           | Operation failed (API error, network error, internal error) |
+| `2`  | Usage error       | Invalid flags, missing required arguments, malformed input  |
+| `3`  | Not found         | Resource does not exist                                     |
+| `4`  | Permission denied | Insufficient permissions or authentication failure          |
+| `5`  | Conflict          | Resource already exists or state prevents the operation     |
 
 ```typescript
 const EXIT_CODES = {
@@ -176,18 +176,18 @@ async function getUser(userId: string, flags: Flags) {
     process.exit(EXIT_CODES.SUCCESS);
   } catch (err) {
     if (err.status === 404) {
-      outputError({ error: 'not_found', message: `User ${userId} does not exist` }, flags);
+      outputError({ error: "not_found", message: `User ${userId} does not exist` }, flags);
       process.exit(EXIT_CODES.NOT_FOUND);
     }
     if (err.status === 403 || err.status === 401) {
-      outputError({ error: 'permission_denied', message: 'Insufficient permissions' }, flags);
+      outputError({ error: "permission_denied", message: "Insufficient permissions" }, flags);
       process.exit(EXIT_CODES.PERMISSION_DENIED);
     }
     if (err.status === 409) {
-      outputError({ error: 'conflict', message: err.message }, flags);
+      outputError({ error: "conflict", message: err.message }, flags);
       process.exit(EXIT_CODES.CONFLICT);
     }
-    outputError({ error: 'api_error', message: err.message, status: err.status }, flags);
+    outputError({ error: "api_error", message: err.message, status: err.status }, flags);
     process.exit(EXIT_CODES.FAILURE);
   }
 }
@@ -223,15 +223,15 @@ The rule is simple: if the command has all required information, run without ask
 
 ```typescript
 async function runCommand(flags: Flags, required: FlagDefinition[]) {
-  const missing = required.filter(def => flags[def.name] === undefined);
+  const missing = required.filter((def) => flags[def.name] === undefined);
 
   if (missing.length > 0) {
     if (!isTTY()) {
       // Non-interactive: structured error
       outputError({
-        error: 'missing_required_flags',
-        message: 'Required flags are missing',
-        missing: missing.map(def => ({
+        error: "missing_required_flags",
+        message: "Required flags are missing",
+        missing: missing.map((def) => ({
           flag: `--${def.name}`,
           type: def.type,
           description: def.description,
@@ -324,9 +324,9 @@ $ mytool user create --help --json
     "$ref": "#/components/schemas/User"
   },
   "related": [
-    {"command": "user list", "description": "List user accounts"},
-    {"command": "user update", "description": "Update a user's profile"},
-    {"command": "user delete", "description": "Delete a user permanently"}
+    { "command": "user list", "description": "List user accounts" },
+    { "command": "user update", "description": "Update a user's profile" },
+    { "command": "user delete", "description": "Delete a user permanently" }
   ],
   "examples": [
     {

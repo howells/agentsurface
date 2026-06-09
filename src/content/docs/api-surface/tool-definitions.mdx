@@ -19,11 +19,11 @@ MCP, Vercel AI SDK, Mastra, LangChain, OpenAI tools, CrewAI, Semantic Kernel, an
 
 Every tool in every framework requires exactly three things:
 
-| Field | Purpose |
-|-------|---------|
-| `name` | Machine identifier; the function name in generated code |
+| Field         | Purpose                                                                |
+| ------------- | ---------------------------------------------------------------------- |
+| `name`        | Machine identifier; the function name in generated code                |
 | `description` | Natural language instructions telling the agent when to call this tool |
-| `schema` | JSON Schema or equivalent defining the input parameters |
+| `schema`      | JSON Schema or equivalent defining the input parameters                |
 
 Some frameworks add optional fields (output schema, annotations, execution handler), but these three are universal. Get them right before adding anything else.
 
@@ -69,7 +69,8 @@ Agent frameworks route tool calls by semantic similarity between the user's requ
 If your API has 100 endpoints, do not generate 100 tools. Group, filter, and compose. The agent that does one job well is more reliable than the one that can do everything.
 
 <Callout type="info">
-When you need to expose a large API surface, use dynamic tool selection rather than loading all tools at once. See the [Dynamic Tool Selection](#dynamic-tool-selection) section below.
+  When you need to expose a large API surface, use dynamic tool selection rather than loading all
+  tools at once. See the [Dynamic Tool Selection](#dynamic-tool-selection) section below.
 </Callout>
 
 ## Separation of Interface from Execution
@@ -153,8 +154,8 @@ Anthropic's recommended pattern searches a tool registry using BM25 ranking befo
 ```typescript
 // Conceptual pattern — search tool registry before injecting tools
 async function selectTools(userQuery: string, allTools: Tool[]): Promise<Tool[]> {
-  const ranked = bm25Search(userQuery, allTools, { topK: 5 })
-  return ranked
+  const ranked = bm25Search(userQuery, allTools, { topK: 5 });
+  return ranked;
 }
 ```
 
@@ -167,8 +168,8 @@ const result = await generateText({
   model,
   tools: allTools,
   activeTools: ["get_order", "list_orders", "cancel_order"], // only these are active
-  prompt: userMessage
-})
+  prompt: userMessage,
+});
 ```
 
 ### OpenAI `defer_loading`
@@ -217,7 +218,10 @@ MCP tool definitions include `name`, `description`, `inputSchema`, an optional `
     "type": "object",
     "properties": {
       "id": { "type": "string" },
-      "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+      "status": {
+        "type": "string",
+        "enum": ["pending", "processing", "shipped", "delivered", "cancelled"]
+      },
       "total": { "type": "number" },
       "line_items": {
         "type": "array",
@@ -234,34 +238,34 @@ MCP tool definitions include `name`, `description`, `inputSchema`, an optional `
 
 MCP `annotations` signal behavioral properties to the client:
 
-| Annotation | Meaning |
-|------------|---------|
-| `readOnlyHint: true` | Tool does not modify server state |
-| `idempotentHint: true` | Calling multiple times with same inputs has same effect |
-| `destructiveHint: true` | Tool may delete or irreversibly modify data |
-| `openWorldHint: true` | Tool interacts with external systems beyond the server |
+| Annotation              | Meaning                                                 |
+| ----------------------- | ------------------------------------------------------- |
+| `readOnlyHint: true`    | Tool does not modify server state                       |
+| `idempotentHint: true`  | Calling multiple times with same inputs has same effect |
+| `destructiveHint: true` | Tool may delete or irreversibly modify data             |
+| `openWorldHint: true`   | Tool interacts with external systems beyond the server  |
 
 ### Vercel AI SDK
 
 The AI SDK `tool()` function takes a description, a Zod input schema, and an execute function. The `toModelOutput` field shapes what the model sees after execution.
 
 ```typescript
-import { tool } from "ai"
-import { z } from "zod"
+import { tool } from "ai";
+import { z } from "zod";
 
 const getOrder = tool({
   description: `Retrieves full details for a single order including line items,
     payment status, and shipping information. Use when you have a specific order ID.
     For searching orders by customer or date, use searchOrders instead.`,
   parameters: z.object({
-    orderId: z.string().describe("The order ID returned by listOrders or createOrder")
+    orderId: z.string().describe("The order ID returned by listOrders or createOrder"),
   }),
   execute: async ({ orderId }) => {
-    const order = await db.orders.findUnique({ where: { id: orderId } })
-    if (!order) throw new Error(`Order ${orderId} not found`)
-    return order
-  }
-})
+    const order = await db.orders.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error(`Order ${orderId} not found`);
+    return order;
+  },
+});
 ```
 
 For human-in-the-loop patterns, set `needsApproval` to pause execution before the tool runs:
@@ -270,18 +274,18 @@ For human-in-the-loop patterns, set `needsApproval` to pause execution before th
 const deleteOrder = tool({
   description: "Permanently deletes an order. This cannot be undone.",
   parameters: z.object({
-    orderId: z.string()
+    orderId: z.string(),
   }),
   needsApproval: async ({ orderId }) => {
     // Return true to require human approval before execution
-    const order = await db.orders.findUnique({ where: { id: orderId } })
-    return order?.status === "completed" // Require approval for completed orders
+    const order = await db.orders.findUnique({ where: { id: orderId } });
+    return order?.status === "completed"; // Require approval for completed orders
   },
   execute: async ({ orderId }) => {
-    await db.orders.delete({ where: { id: orderId } })
-    return { deleted: true, orderId }
-  }
-})
+    await db.orders.delete({ where: { id: orderId } });
+    return { deleted: true, orderId };
+  },
+});
 ```
 
 ### Mastra
@@ -289,8 +293,8 @@ const deleteOrder = tool({
 Mastra tools use `createTool` with Zod schemas and a typed execute context. The `toModelOutput` field lets you transform tool results before they re-enter the model context.
 
 ```typescript
-import { createTool } from "@mastra/core/tools"
-import { z } from "zod"
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
 
 export const getOrderTool = createTool({
   id: "get-order",
@@ -298,23 +302,25 @@ export const getOrderTool = createTool({
     specific order ID and need complete information including line items and status.
     For searching or listing orders, use the search-orders tool instead.`,
   inputSchema: z.object({
-    orderId: z.string().describe("Order ID from a prior list-orders or create-order call")
+    orderId: z.string().describe("Order ID from a prior list-orders or create-order call"),
   }),
   outputSchema: z.object({
     id: z.string(),
     status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"]),
     total: z.number(),
-    lineItems: z.array(z.object({
-      productId: z.string(),
-      quantity: z.number(),
-      unitPrice: z.number()
-    }))
+    lineItems: z.array(
+      z.object({
+        productId: z.string(),
+        quantity: z.number(),
+        unitPrice: z.number(),
+      }),
+    ),
   }),
   execute: async ({ context }) => {
-    const order = await fetchOrder(context.orderId)
-    return order
-  }
-})
+    const order = await fetchOrder(context.orderId);
+    return order;
+  },
+});
 ```
 
 Mastra also supports MCP annotations via `mcp.annotations`:
@@ -350,7 +356,7 @@ class GetOrderInput(BaseModel):
 @tool("get_order", args_schema=GetOrderInput)
 def get_order(order_id: str) -> dict:
     """Retrieves full details for a single order including line items and status.
-    
+
     Use when you have a specific order ID. For searching orders by customer
     or date range, use search_orders instead. Returns 404 error if the order
     does not exist or belongs to a different account.
@@ -389,11 +395,11 @@ from openai.lib._tools import function_tool
 @function_tool
 def get_order(order_id: str) -> dict:
     """Retrieves full details for a single order.
-    
+
     Use when you have a specific order ID and need complete order information
     including line items, payment status, and shipping details. For searching
     orders by customer or date, use search_orders instead.
-    
+
     Args:
         order_id: The order identifier returned by list_orders or create_order
     """
@@ -521,7 +527,7 @@ Before shipping tool definitions to production:
 - [ ] Every tool has a description that includes positive and negative trigger conditions
 - [ ] No tool has more than 10 parameters
 - [ ] Context parameters (auth, session IDs) are injected at runtime, not passed through tool arguments
-- [ ] Tool names are unique, unambiguous, and use verb\_noun format
+- [ ] Tool names are unique, unambiguous, and use verb_noun format
 - [ ] Destructive or irreversible tools are annotated appropriately
 - [ ] Paired read/write tools exist where write operations require prior state
 - [ ] Idempotency behavior is documented in the description

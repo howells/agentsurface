@@ -56,11 +56,11 @@ Each dimension scores from 0 to 3:
 
 Every score includes a confidence marker:
 
-| Level | Meaning | When Appropriate |
-|-------|---------|-----------------|
-| **High** | Examined >80% of relevant code | Small projects, focused dimensions |
-| **Medium** | Examined key files representatively | Large projects, sampled intelligently |
-| **Low** | Examined `<30%` or inferred from structure | Very large projects, time-constrained |
+| Level      | Meaning                                    | When Appropriate                      |
+| ---------- | ------------------------------------------ | ------------------------------------- |
+| **High**   | Examined >80% of relevant code             | Small projects, focused dimensions    |
+| **Medium** | Examined key files representatively        | Large projects, sampled intelligently |
+| **Low**    | Examined `<30%` or inferred from structure | Very large projects, time-constrained |
 
 Low-confidence scores should be flagged for manual re-verification.
 
@@ -81,7 +81,7 @@ Every score must cite specific evidence:
 - **File paths with line numbers**: `openapi.yaml:45 — description is 4 words`
 - **Grep findings**: `No files match /isError|is_retriable/`
 - **Glob results**: `0 files found matching **/*.mcp.json`
-- **Command output**: `` mytool --help --json `` returns exit code 2 with no structured output
+- **Command output**: `mytool --help --json` returns exit code 2 with no structured output
 
 Scores without evidence are guesses. Guesses drift high due to optimism bias. Always ground scores in concrete findings from the codebase.
 
@@ -89,12 +89,12 @@ Scores without evidence are guesses. Guesses drift high due to optimism bias. Al
 
 Once all applicable dimensions are scored, the total is scaled to 0–30 and mapped to a human-readable rating:
 
-| Total | Rating | Meaning |
-|-------|--------|---------|
-| 0–7 | **Human-only** | Built for humans. Agents will struggle. |
-| 8–14 | **Agent-tolerant** | Usable with heavy prompt engineering. Requires context injections. |
-| 15–22 | **Agent-ready** | Solid agent support. Most use cases work reliably. Few gaps. |
-| 23–30 | **Agent-first** | Purpose-built for agents. Best in class. Minimal friction. |
+| Total | Rating             | Meaning                                                            |
+| ----- | ------------------ | ------------------------------------------------------------------ |
+| 0–7   | **Human-only**     | Built for humans. Agents will struggle.                            |
+| 8–14  | **Agent-tolerant** | Usable with heavy prompt engineering. Requires context injections. |
+| 15–22 | **Agent-ready**    | Solid agent support. Most use cases work reliably. Few gaps.       |
+| 23–30 | **Agent-first**    | Purpose-built for agents. Best in class. Minimal friction.         |
 
 ## What's Next
 

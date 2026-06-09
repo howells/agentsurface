@@ -51,7 +51,7 @@ async function scoreQuality(output: string, expected: string) {
   // Code-based checks
   if (output.length < 10) return 0;
   if (output.includes("ERROR")) return 0;
-  
+
   // LLM-as-judge for quality
   const grade = await Braintrust.scoreCompletion({
     prompt: `
@@ -61,7 +61,7 @@ Expected tone: ${expected}
     `,
     model: "claude-opus-4-7",
   });
-  
+
   return grade.score;
 }
 
@@ -81,7 +81,7 @@ async function runEval() {
       },
     },
   });
-  
+
   console.log(`Eval complete. Pass rate: ${results.summary.scores.quality}`);
   // Braintrust CLI shows link: https://www.braintrust.dev/app/...
 }
@@ -135,7 +135,7 @@ async function compareModels() {
     },
     scores: { quality: scoreQuality },
   });
-  
+
   // Variant: Claude Opus
   const opusResults = await Braintrust.eval({
     projectName: "model_comparison",
@@ -156,7 +156,7 @@ async function compareModels() {
     },
     scores: { quality: scoreQuality },
   });
-  
+
   // Braintrust web UI shows: Haiku 0.72 → Opus 0.89 (+17%)
 }
 ```
@@ -173,15 +173,15 @@ async function evalWithHumanReview() {
     task: async (input) => agent.summarize(input.text),
     scores: { quality: scoreQuality },
   });
-  
+
   // Export results for human review
-  const lowScores = results.results.filter(r => r.scores.quality < 0.5);
-  
+  const lowScores = results.results.filter((r) => r.scores.quality < 0.5);
+
   await Braintrust.exportForHumanReview({
     experimentId: results.experimentId,
     cases: lowScores,
   });
-  
+
   // In Braintrust UI: manually update scores, add comments
   // Re-run eval with human-corrected scores
   const revisedResults = await Braintrust.eval({
@@ -208,17 +208,20 @@ Braintrust integrates with OpenTelemetry. Traces from your agent are captured an
 import { trace } from "@braintrust/browser";
 
 async function tracedTask(input) {
-  return await trace({
-    name: "summarize",
-  }, async (span) => {
-    span.setTag("model", "claude-opus-4-7");
-    span.setTag("input_length", input.text.length);
-    
-    const summary = await agent.summarize(input.text);
-    
-    span.setTag("output_length", summary.length);
-    return summary;
-  });
+  return await trace(
+    {
+      name: "summarize",
+    },
+    async (span) => {
+      span.setTag("model", "claude-opus-4-7");
+      span.setTag("input_length", input.text.length);
+
+      const summary = await agent.summarize(input.text);
+
+      span.setTag("output_length", summary.length);
+      return summary;
+    },
+  );
 }
 
 // In Braintrust UI: click eval result → inspect trace

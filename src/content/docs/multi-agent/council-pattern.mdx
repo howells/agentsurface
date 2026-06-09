@@ -61,11 +61,7 @@ export async function runCouncilReview(change: string) {
     runAgent("product-reviewer", change, reviewSchema),
   ]);
 
-  return runAgent(
-    "review-synthesizer",
-    { security, reliability, product },
-    synthesizeOutput,
-  );
+  return runAgent("review-synthesizer", { security, reliability, product }, synthesizeOutput);
 }
 ```
 
@@ -73,12 +69,12 @@ The exact framework can vary. In Mastra, this maps naturally to a workflow with 
 
 ## Synthesis Strategies
 
-| Strategy | Use when | Risk |
-|---|---|---|
-| Majority vote | The answer is categorical and low nuance | Minority concerns can be real blockers |
-| Weighted score | Reviewers have known authority by domain | Weights can hide weak evidence |
-| LLM synthesis | Findings need to become prose or a plan | The synthesizer can over-smooth disagreement |
-| Human approval | The consequence of a wrong answer is high | Slower, but often the right product shape |
+| Strategy       | Use when                                  | Risk                                         |
+| -------------- | ----------------------------------------- | -------------------------------------------- |
+| Majority vote  | The answer is categorical and low nuance  | Minority concerns can be real blockers       |
+| Weighted score | Reviewers have known authority by domain  | Weights can hide weak evidence               |
+| LLM synthesis  | Findings need to become prose or a plan   | The synthesizer can over-smooth disagreement |
+| Human approval | The consequence of a wrong answer is high | Slower, but often the right product shape    |
 
 When a council is used for review, default to preserving disagreement. A final answer that lists the blocking minority opinion is usually more useful than a polished consensus that erases risk.
 

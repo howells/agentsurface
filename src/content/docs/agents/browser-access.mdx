@@ -9,16 +9,16 @@ It is also one of the highest-risk tools an agent can receive. A browser can rea
 
 ## Decision Matrix
 
-| Need | Prefer | Why |
-|---|---|---|
-| Deterministic web automation in your own code | Playwright or Puppeteer | Stable selectors, explicit waits, and testable scripts beat model-driven clicking. |
-| Python agent that should decide browser steps | Browser Use | Good when the browser loop itself is the product and a Python agent owns planning and recovery. |
-| TypeScript automation with occasional AI decisions | Stagehand | Bridges Playwright-style code with `act`, `extract`, and `observe` calls for brittle pages. |
-| Hosted cloud browser infrastructure | Browserbase, Kernel, or browserless | Keeps browsers, sessions, recordings, proxies, and scaling outside the app server. |
-| Workers-native browser access | Cloudflare Browser Run | Fits Cloudflare Agents, Workers, Browser Rendering, and edge-hosted MCP/tool surfaces. |
-| Fast browser sessions colocated with agent code | Kernel | Useful when CDP-compatible browsers, pools, profiles, live view, and app-hosted agent loops matter. |
-| Search, scrape, crawl, or Markdown extraction | Firecrawl, Tavily, Exa, Jina Reader, or Apify | Prefer extraction/search APIs when clicking through a live browser is unnecessary. |
-| Visual computer-use loop | Kernel Computer Controls, Bedrock AgentCore Browser, or provider-native computer use | Use when the model predicts screen actions from screenshots rather than DOM selectors. |
+| Need                                               | Prefer                                                                               | Why                                                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Deterministic web automation in your own code      | Playwright or Puppeteer                                                              | Stable selectors, explicit waits, and testable scripts beat model-driven clicking.                  |
+| Python agent that should decide browser steps      | Browser Use                                                                          | Good when the browser loop itself is the product and a Python agent owns planning and recovery.     |
+| TypeScript automation with occasional AI decisions | Stagehand                                                                            | Bridges Playwright-style code with `act`, `extract`, and `observe` calls for brittle pages.         |
+| Hosted cloud browser infrastructure                | Browserbase, Kernel, or browserless                                                  | Keeps browsers, sessions, recordings, proxies, and scaling outside the app server.                  |
+| Workers-native browser access                      | Cloudflare Browser Run                                                               | Fits Cloudflare Agents, Workers, Browser Rendering, and edge-hosted MCP/tool surfaces.              |
+| Fast browser sessions colocated with agent code    | Kernel                                                                               | Useful when CDP-compatible browsers, pools, profiles, live view, and app-hosted agent loops matter. |
+| Search, scrape, crawl, or Markdown extraction      | Firecrawl, Tavily, Exa, Jina Reader, or Apify                                        | Prefer extraction/search APIs when clicking through a live browser is unnecessary.                  |
+| Visual computer-use loop                           | Kernel Computer Controls, Bedrock AgentCore Browser, or provider-native computer use | Use when the model predicts screen actions from screenshots rather than DOM selectors.              |
 
 ## Browser Use
 

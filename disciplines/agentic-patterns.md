@@ -9,7 +9,8 @@ This document indexes the 10 most transferable agentic patterns: recurring, prov
 ## The 10 Patterns
 
 ### 1. **Tool Composition**
-*Chain simpler tools into more complex behaviors; let the agent orchestrate.*
+
+_Chain simpler tools into more complex behaviors; let the agent orchestrate._
 
 An agent with 5 focused tools (create_invoice, get_customer, validate_vat, send_email, log_event) can compose them into higher-order workflows (approve_invoice_batch, reconcile_account, audit_trail) without adding new tools. The agent does the reasoning; tools do the work.
 
@@ -20,13 +21,15 @@ An agent with 5 focused tools (create_invoice, get_customer, validate_vat, send_
 ---
 
 ### 2. **Reflection and Self-Correction**
-*Ask the agent to review its own work before committing.*
+
+_Ask the agent to review its own work before committing._
 
 After composing a draft (e.g., invoice text), prompt the agent to review: "Does this invoice match the customer's account? Are the dates sensible? Could this confuse the customer?" The agent often catches mistakes it made in the first pass.
 
 **When to use**: High-stakes tasks (financial, legal, compliance) where errors are costly.
 
 **Pattern**:
+
 ```
 1. Agent reasons and drafts result
 2. Tool: review_draft(draft, constraints) → { approved: bool, issues: [] }
@@ -38,9 +41,11 @@ After composing a draft (e.g., invoice text), prompt the agent to review: "Does 
 ---
 
 ### 3. **Hierarchical Decomposition**
-*Break large goals into sub-goals; assign each to an agent or tool.*
+
+_Break large goals into sub-goals; assign each to an agent or tool._
 
 Goal: "Reconcile Q1 accounts." Agent breaks into:
+
 - "Pull transactions for Jan–Mar"
 - "Match transactions to invoices"
 - "Calculate discrepancies"
@@ -55,9 +60,11 @@ Each sub-goal is a focused task, easier to reason about and measure.
 ---
 
 ### 4. **Few-Shot Prompting via Tool Traces**
-*Show the agent examples of how tools should be called.*
+
+_Show the agent examples of how tools should be called._
 
 Instead of describing tools in prose, show traces:
+
 ```
 Goal: "Categorize this transaction"
 Example 1:
@@ -79,9 +86,11 @@ Models learn from examples better than from descriptions.
 ---
 
 ### 5. **Constraint-Driven Reasoning**
-*Encode hard constraints (budget limits, compliance rules) in tools, not prompts.*
+
+_Encode hard constraints (budget limits, compliance rules) in tools, not prompts._
 
 Don't prompt: "Don't exceed the user's budget." Instead:
+
 ```typescript
 const createInvoiceSchema = z.object({
   amount: z.number().min(0.01).max(userBudget), // Constraint built-in
@@ -97,7 +106,8 @@ The tool enforces the constraint; the agent never violates it (or gets a clear e
 ---
 
 ### 6. **Error Recovery Loops**
-*When a tool fails, give the agent a chance to recover before giving up.*
+
+_When a tool fails, give the agent a chance to recover before giving up._
 
 ```
 1. Try tool A (create_invoice)
@@ -119,7 +129,8 @@ Each error type has a recovery path. Only unrecoverable errors escalate.
 ---
 
 ### 7. **Retrieval-Augmented Generation (RAG)**
-*Ground agent reasoning in external data (documents, database queries, real-time APIs).*
+
+_Ground agent reasoning in external data (documents, database queries, real-time APIs)._
 
 Agent goal: "Should we approve this loan?" Tool: retrieve_customer_credit_history(customer_id). Agent reasons over the retrieved history, not just general knowledge.
 
@@ -130,7 +141,8 @@ Agent goal: "Should we approve this loan?" Tool: retrieve_customer_credit_histor
 ---
 
 ### 8. **Multi-Turn Dialogue with Context Accumulation**
-*Keep a conversation history; agent refines its understanding across turns.*
+
+_Keep a conversation history; agent refines its understanding across turns._
 
 User: "I had $5000 last month. Now I have $3000. What happened?"
 Agent (turn 1): Retrieves transactions, says "Transferred $2000 to savings."
@@ -146,9 +158,11 @@ Context (user corrections) accumulates; agent adapts.
 ---
 
 ### 9. **Agentic Loops with Tool Telemetry**
-*Instrument every tool call; measure what the agent is doing.*
+
+_Instrument every tool call; measure what the agent is doing._
 
 Log:
+
 ```json
 {
   "timestamp": "2026-04-17T12:34:56Z",
@@ -171,7 +185,8 @@ Over time, you see: which tools are called most often, which are slow, which fai
 ---
 
 ### 10. **Staged Reasoning with Confidence Thresholds**
-*Ask the agent to express confidence; only act on high-confidence decisions.*
+
+_Ask the agent to express confidence; only act on high-confidence decisions._
 
 ```
 1. Agent analyzes transaction, outputs: { category: "Office", confidence: 0.72 }
@@ -197,6 +212,7 @@ Confidence gates determine routing. High-confidence outputs bypass humans; low-c
 **Resilience is often implicit**: Patterns 6, 8, 9 build robustness via recovery, context, and observation.
 
 **Typical agent architecture**:
+
 ```
 Input → Decompose (Pattern 3)
       → Compose tools (Pattern 1)

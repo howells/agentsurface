@@ -9,9 +9,7 @@ export default function Error({
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <p className="font-mono text-sm text-fd-muted-foreground">500</p>
-      <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-        Something went wrong
-      </h1>
+      <h1 className="mt-3 text-2xl font-semibold tracking-tight">Something went wrong</h1>
       <p className="mt-2 text-sm text-fd-muted-foreground">
         An unexpected error occurred. Please try again.
       </p>

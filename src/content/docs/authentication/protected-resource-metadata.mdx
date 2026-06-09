@@ -23,9 +23,7 @@ Publish this metadata at `/.well-known/oauth-protected-resource` to allow client
 ```json
 {
   "resource": "https://api.example.com",
-  "authorization_servers": [
-    "https://auth.example.com/"
-  ],
+  "authorization_servers": ["https://auth.example.com/"],
   "scopes_supported": [
     "invoices:read",
     "invoices:write",
@@ -89,34 +87,32 @@ Use [auth.md](/docs/authentication/auth-md) for the full registration model. Tre
 
 ```typescript
 // pages/api/.well-known/oauth-protected-resource.ts
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiRequest, NextApiResponse } from "next";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const metadata = {
-    resource: 'https://api.example.com',
-    authorization_servers: [
-      'https://auth.example.com/',
-    ],
+    resource: "https://api.example.com",
+    authorization_servers: ["https://auth.example.com/"],
     scopes_supported: [
-      'invoices:read',
-      'invoices:write',
-      'customers:read',
-      'customers:write',
-      'payments:read',
-      'payments:write',
+      "invoices:read",
+      "invoices:write",
+      "customers:read",
+      "customers:write",
+      "payments:read",
+      "payments:write",
     ],
-    jwks_uri: 'https://auth.example.com/.well-known/jwks.json',
-    bearer_methods_supported: ['header'],
-    resource_signing_alg_values_supported: ['RS256', 'ES256'],
-    resource_name: 'Example API',
+    jwks_uri: "https://auth.example.com/.well-known/jwks.json",
+    bearer_methods_supported: ["header"],
+    resource_signing_alg_values_supported: ["RS256", "ES256"],
+    resource_name: "Example API",
   };
 
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "public, max-age=3600");
   return res.status(200).json(metadata);
 }
 ```
@@ -145,11 +141,12 @@ When an MCP server calls your resource server, it:
 // MCP client example (simplified)
 async function callResourceServer(token: string, endpoint: string) {
   // Fetch metadata
-  const metadata = await fetch('https://api.example.com/.well-known/oauth-protected-resource')
-    .then(r => r.json());
+  const metadata = await fetch("https://api.example.com/.well-known/oauth-protected-resource").then(
+    (r) => r.json(),
+  );
 
   // Fetch JWKS
-  const jwks = await fetch(metadata.jwks_uri).then(r => r.json());
+  const jwks = await fetch(metadata.jwks_uri).then((r) => r.json());
 
   // Validate token before sending
   // (server-side validation happens too)
@@ -157,14 +154,14 @@ async function callResourceServer(token: string, endpoint: string) {
   // If DPoP is required by this resource or token, generate a proof
   let dpopProof = null;
   if (requiresDpop(metadata)) {
-    dpopProof = await generateDPopProof('GET', endpoint);
+    dpopProof = await generateDPopProof("GET", endpoint);
   }
 
   const headers: Record<string, string> = {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
   };
   if (dpopProof) {
-    headers['DPoP'] = dpopProof;
+    headers["DPoP"] = dpopProof;
   }
 
   const res = await fetch(endpoint, { headers });
@@ -179,13 +176,8 @@ If you're not using DPoP or token exchange yet, a minimal metadata document is a
 ```json
 {
   "resource": "https://api.example.com",
-  "authorization_servers": [
-    "https://auth.example.com/"
-  ],
-  "scopes_supported": [
-    "read",
-    "write"
-  ],
+  "authorization_servers": ["https://auth.example.com/"],
+  "scopes_supported": ["read", "write"],
   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
   "bearer_methods_supported": ["header"]
 }
@@ -218,7 +210,7 @@ paths:
       security:
         - oauth2: [invoices:read]
       responses:
-        '200':
+        "200":
           description: List of invoices
 
 x-oauth-protected-resource: /.well-known/oauth-protected-resource
@@ -229,6 +221,7 @@ This allows OpenAPI tools to automatically discover your OAuth requirements.
 ## Cache and Update Strategy
 
 The metadata document is relatively stable but can change when you:
+
 - Add new scopes
 - Support DPoP
 - Add token exchange support

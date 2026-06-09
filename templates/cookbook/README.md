@@ -4,18 +4,18 @@ Production-grade TypeScript templates for building agentic SaaS with Vercel AI S
 
 ## Templates
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `tool-loop-vercel-ai.ts` | 184 | Minimal `generateText` and `streamText` tool loops with `smoothStream()` and `stepCountIs(10)` |
-| `toolpick.ts` | 218 | Embedding-based tool selection: OpenAI text-embedding-3-small, cosine similarity, lazy re-indexing |
-| `system-prompt-builder.ts` | 248 | Composable prompt blocks: identity, safety rules, tool routing, platform instructions, versioning |
-| `platform-adapter.ts` | 203 | Normalize messages from web/Slack/WhatsApp/Telegram; format responses; resolve identity across platforms |
-| `notification-context.ts` | 194 | Redis-backed (or in-memory) store for notification contexts with TTL; inject into system prompt |
-| `draft-then-confirm.ts` | 219 | MCP tool pair for human-in-the-loop: `prepare_draft_*` + `confirm_send_*` with idempotency |
-| `autonomous-worker.ts` | 291 | Temporal workflows for scheduled work: weekly insights, hourly jobs, per-minute flushers; Inngest/Bun cron variants |
-| `tool-registry-with-annotations.ts` | 320 | Tool registry with READ_ONLY/WRITE/DESTRUCTIVE annotations; role-based filtering; audit logging |
-| `external-app-meta-tools.ts` | 308 | Composio-style `search_tools` + `multi_execute` for discovering and executing external app actions |
-| `mcp-server-public.ts` | 326 | Public MCP HTTP server with OAuth 2.1 + DPoP; multi-tenant rate limiting; Claude Desktop / ChatGPT integration |
+| File                                | Lines | Purpose                                                                                                             |
+| ----------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------- |
+| `tool-loop-vercel-ai.ts`            | 184   | Minimal `generateText` and `streamText` tool loops with `smoothStream()` and `stepCountIs(10)`                      |
+| `toolpick.ts`                       | 218   | Embedding-based tool selection: OpenAI text-embedding-3-small, cosine similarity, lazy re-indexing                  |
+| `system-prompt-builder.ts`          | 248   | Composable prompt blocks: identity, safety rules, tool routing, platform instructions, versioning                   |
+| `platform-adapter.ts`               | 203   | Normalize messages from web/Slack/WhatsApp/Telegram; format responses; resolve identity across platforms            |
+| `notification-context.ts`           | 194   | Redis-backed (or in-memory) store for notification contexts with TTL; inject into system prompt                     |
+| `draft-then-confirm.ts`             | 219   | MCP tool pair for human-in-the-loop: `prepare_draft_*` + `confirm_send_*` with idempotency                          |
+| `autonomous-worker.ts`              | 291   | Temporal workflows for scheduled work: weekly insights, hourly jobs, per-minute flushers; Inngest/Bun cron variants |
+| `tool-registry-with-annotations.ts` | 320   | Tool registry with READ_ONLY/WRITE/DESTRUCTIVE annotations; role-based filtering; audit logging                     |
+| `external-app-meta-tools.ts`        | 308   | Composio-style `search_tools` + `multi_execute` for discovering and executing external app actions                  |
+| `mcp-server-public.ts`              | 326   | Public MCP HTTP server with OAuth 2.1 + DPoP; multi-tenant rate limiting; Claude Desktop / ChatGPT integration      |
 
 **Total: 2,611 lines of template code (plus 998 lines of comments and docstrings).**
 

@@ -52,21 +52,24 @@ async function deleteUsers(flags: Flags) {
 
   if (flags.dryRun) {
     const warnings = await checkDeletionWarnings(targets);
-    output({
-      dry_run: true,
-      operation: 'users delete',
-      would_affect: targets.length,
-      preview: targets.slice(0, 5),
-      preview_truncated_at: Math.min(5, targets.length),
-      total_affected: targets.length,
-      warnings,
-    }, flags);
+    output(
+      {
+        dry_run: true,
+        operation: "users delete",
+        would_affect: targets.length,
+        preview: targets.slice(0, 5),
+        preview_truncated_at: Math.min(5, targets.length),
+        total_affected: targets.length,
+        warnings,
+      },
+      flags,
+    );
     return;
   }
 
   // Actual deletion only runs without --dry-run
-  const results = await Promise.all(targets.map(t => api.deleteUser(t.id)));
-  output({ deleted: results.length, ids: results.map(r => r.id) }, flags);
+  const results = await Promise.all(targets.map((t) => api.deleteUser(t.id)));
+  output({ deleted: results.length, ids: results.map((r) => r.id) }, flags);
 }
 ```
 
@@ -101,7 +104,7 @@ The non-interactive detection matters because agents often run in pseudo-TTY con
 async function confirmDestructiveOperation(
   flags: Flags,
   message: string,
-  affectedCount: number
+  affectedCount: number,
 ): Promise<void> {
   if (flags.yes || flags.force) {
     return; // Confirmed
@@ -109,10 +112,10 @@ async function confirmDestructiveOperation(
 
   if (!isTTY()) {
     exitWithError({
-      error: 'confirmation_required',
+      error: "confirmation_required",
       message: `${message} Pass --yes to confirm.`,
       would_affect: affectedCount,
-      flag_required: '--yes',
+      flag_required: "--yes",
       code: 2,
     });
   }
@@ -120,7 +123,7 @@ async function confirmDestructiveOperation(
   // Interactive confirmation for TTY users
   const confirmed = await prompt(`${message} Continue? [y/N] `);
   if (!confirmed) {
-    exitWithError({ error: 'cancelled', message: 'Operation cancelled by user', code: 1 });
+    exitWithError({ error: "cancelled", message: "Operation cancelled by user", code: 1 });
   }
 }
 ```
@@ -165,13 +168,13 @@ The `missing_required_flags` error shape is important: it tells the agent exactl
 
 ```typescript
 function validateRequiredFlags(flags: Flags, required: FlagDefinition[]): void {
-  const missing = required.filter(def => flags[def.name] === undefined);
+  const missing = required.filter((def) => flags[def.name] === undefined);
 
   if (missing.length > 0 && !isTTY()) {
     exitWithError({
-      error: 'missing_required_flags',
-      message: 'Required flags are missing',
-      missing: missing.map(def => ({
+      error: "missing_required_flags",
+      message: "Required flags are missing",
+      missing: missing.map((def) => ({
         flag: `--${def.name}`,
         description: def.description,
         type: def.type,
@@ -214,11 +217,11 @@ function sanitizeForAgentContext(value: string): string {
 
 function sanitizeRecord(
   record: Record<string, unknown>,
-  stringFields: string[]
+  stringFields: string[],
 ): Record<string, unknown> {
   const sanitized = { ...record };
   for (const field of stringFields) {
-    if (typeof sanitized[field] === 'string') {
+    if (typeof sanitized[field] === "string") {
       sanitized[field] = sanitizeForAgentContext(sanitized[field] as string);
     }
   }
@@ -237,13 +240,13 @@ The full request→response loop defense covers:
 ```typescript
 async function getUser(userId: string, flags: Flags) {
   // 1. Harden input
-  const safeId = validateResourceId(userId, 'user_id');
+  const safeId = validateResourceId(userId, "user_id");
 
   // 2. Fetch from API
   const user = await api.getUser(safeId);
 
   // 3. Sanitize response content before returning to agent context
-  const safeUser = sanitizeRecord(user, ['name', 'display_name', 'bio', 'comment']);
+  const safeUser = sanitizeRecord(user, ["name", "display_name", "bio", "comment"]);
 
   output(safeUser, flags);
 }
@@ -274,12 +277,12 @@ This pattern is optional but powerful — it ensures the agent is executing prec
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria |
-|-------|----------|
-| 0 | No dry-run mode. No response sanitization. |
-| 1 | `--dry-run` exists for some mutating commands. |
-| 2 | `--dry-run` for all mutating commands. Agent can validate requests without side effects. |
-| 3 | Dry-run plus response sanitization to defend against prompt injection embedded in API data. The full request→response loop is defended. |
+| Score | Criteria                                                                                                                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No dry-run mode. No response sanitization.                                                                                              |
+| 1     | `--dry-run` exists for some mutating commands.                                                                                          |
+| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                |
+| 3     | Dry-run plus response sanitization to defend against prompt injection embedded in API data. The full request→response loop is defended. |
 
 ## Checklist
 

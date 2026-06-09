@@ -40,13 +40,13 @@ The format has become widespread. The `application/problem+json` content type si
 }
 ```
 
-| Field | Required | Description |
-|---|---|---|
-| `type` | Recommended | A URI that uniquely identifies the error type. Should dereference to human-readable documentation. |
-| `title` | Recommended | A short, human-readable summary of the problem type. Does not change between occurrences. |
-| `status` | Optional | The HTTP status code. Mirrors the response's actual status code. |
-| `detail` | Optional | A human-readable explanation specific to this occurrence of the problem. |
-| `instance` | Optional | A URI reference that identifies the specific occurrence of the problem. |
+| Field      | Required    | Description                                                                                        |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `type`     | Recommended | A URI that uniquely identifies the error type. Should dereference to human-readable documentation. |
+| `title`    | Recommended | A short, human-readable summary of the problem type. Does not change between occurrences.          |
+| `status`   | Optional    | The HTTP status code. Mirrors the response's actual status code.                                   |
+| `detail`   | Optional    | A human-readable explanation specific to this occurrence of the problem.                           |
+| `instance` | Optional    | A URI reference that identifies the specific occurrence of the problem.                            |
 
 `type` is the most critical field for agents. It is the stable, parseable identifier that agents can branch on:
 
@@ -70,7 +70,7 @@ if (!response.ok) {
       // Fix the request and retry
       break;
     default:
-      // Unknown error type: log and escalate
+    // Unknown error type: log and escalate
   }
 }
 ```
@@ -174,14 +174,8 @@ A correlation ID linking this error to a specific request in the service's obser
 Always include the `Content-Type: application/problem+json` header on error responses. This signals to clients and agents that the body is a parseable problem document:
 
 ```typescript
-function problemResponse(
-  res: Response,
-  status: number,
-  problem: ProblemDetails
-): void {
-  res.status(status)
-     .setHeader("Content-Type", "application/problem+json")
-     .json(problem);
+function problemResponse(res: Response, status: number, problem: ProblemDetails): void {
+  res.status(status).setHeader("Content-Type", "application/problem+json").json(problem);
 }
 ```
 

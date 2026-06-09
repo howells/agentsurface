@@ -154,7 +154,7 @@ export function normalizeSlackMessage(raw: SlackMessage): NormalizedMessage {
     userId: raw.user,
     teamId: raw.team_id,
     text: raw.text || "",
-    attachments: raw.files?.map(f => ({
+    attachments: raw.files?.map((f) => ({
       type: f.mimetype?.split("/")[0] || "file",
       url: f.url_private,
     })),
@@ -294,9 +294,9 @@ export function formatForWhatsApp(text: string): string {
   // Remove markdown
   let formatted = text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Remove links
-    .replace(/\*\*([^\*]+)\*\*/g, "*$1*")    // Bold: ** → *
-    .replace(/###\s+/g, "")                   // Remove headings
-    .replace(/\n- /g, "\n• ");               // Bullet to unicode
+    .replace(/\*\*([^\*]+)\*\*/g, "*$1*") // Bold: ** → *
+    .replace(/###\s+/g, "") // Remove headings
+    .replace(/\n- /g, "\n• "); // Bullet to unicode
 
   // Truncate to SMS limit
   if (formatted.length > 1600) {
@@ -316,12 +316,12 @@ export function formatForSlack(text: string): SlackBlock[] {
   for (const para of paragraphs) {
     if (para.startsWith("- ") || para.startsWith("* ")) {
       // Bullet list
-      const items = para.split("\n").map(l => l.replace(/^[-*]\s+/, ""));
+      const items = para.split("\n").map((l) => l.replace(/^[-*]\s+/, ""));
       blocks.push({
         type: "section",
         text: {
           type: "mrkdwn",
-          text: items.map(i => `• ${i}`).join("\n"),
+          text: items.map((i) => `• ${i}`).join("\n"),
         },
       });
     } else if (para.includes("|")) {
@@ -408,7 +408,7 @@ Adapters load platform-specific user context:
 export async function getUserContext(
   userId: string,
   teamId: string,
-  platform?: string
+  platform?: string,
 ): Promise<UserContext> {
   const user = await db.getUser(userId);
   const team = await db.getTeam(teamId);
@@ -419,7 +419,7 @@ export async function getUserContext(
 
   if (platform === "telegram") {
     // Telegram provides timezone in updates
-    timezone = await telegramApi.getUserTimezone(userId) || timezone;
+    timezone = (await telegramApi.getUserTimezone(userId)) || timezone;
   }
 
   return {
@@ -493,4 +493,3 @@ test("core agent handles web and mobile prompts differently", async () => {
 - [System Prompt as Configuration](/docs/cookbook/system-prompt-as-config) — dynamic prompt composition.
 - [Notification-to-Conversation](/docs/cookbook/notification-to-conversation) — conversation continuity across platforms.
 - [Agentic Loop](/docs/cookbook/agentic-loop) — core agent loop.
-

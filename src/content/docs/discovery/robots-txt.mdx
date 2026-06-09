@@ -23,20 +23,20 @@ cohere-ai               (various)
 
 Most AI companies run at least two bot types: a training crawler that indexes content for future model training, and a retrieval bot that fetches content in real time during inference.
 
-| Bot Name | Operator | Type | Default Stance |
-|----------|----------|------|---------------|
-| `GPTBot` | OpenAI | Training | Block to exclude from training data |
-| `ChatGPT-User` | OpenAI | Retrieval | Allow to appear in ChatGPT browsing |
-| `ClaudeBot` | Anthropic | Training | Block to exclude from training data |
-| `Claude-SearchBot` | Anthropic | Retrieval | Allow to appear in Claude answers |
-| `Google-Extended` | Google | Training | Block to exclude from Gemini training |
-| `Googlebot` | Google | Search + retrieval | Allow for search ranking and AI Overviews |
-| `PerplexityBot` | Perplexity | Retrieval | Allow to appear in Perplexity answers |
-| `Applebot-Extended` | Apple | Training | Block to exclude from Apple AI training |
-| `Applebot` | Apple | Search + retrieval | Allow for Spotlight and Siri |
-| `cohere-ai` | Cohere | Training | Block to exclude from Cohere training |
-| `YouBot` | You.com | Retrieval | Allow to appear in You.com answers |
-| `Diffbot` | Diffbot | Retrieval/structured | Case by case |
+| Bot Name            | Operator   | Type                 | Default Stance                            |
+| ------------------- | ---------- | -------------------- | ----------------------------------------- |
+| `GPTBot`            | OpenAI     | Training             | Block to exclude from training data       |
+| `ChatGPT-User`      | OpenAI     | Retrieval            | Allow to appear in ChatGPT browsing       |
+| `ClaudeBot`         | Anthropic  | Training             | Block to exclude from training data       |
+| `Claude-SearchBot`  | Anthropic  | Retrieval            | Allow to appear in Claude answers         |
+| `Google-Extended`   | Google     | Training             | Block to exclude from Gemini training     |
+| `Googlebot`         | Google     | Search + retrieval   | Allow for search ranking and AI Overviews |
+| `PerplexityBot`     | Perplexity | Retrieval            | Allow to appear in Perplexity answers     |
+| `Applebot-Extended` | Apple      | Training             | Block to exclude from Apple AI training   |
+| `Applebot`          | Apple      | Search + retrieval   | Allow for Spotlight and Siri              |
+| `cohere-ai`         | Cohere     | Training             | Block to exclude from Cohere training     |
+| `YouBot`            | You.com    | Retrieval            | Allow to appear in You.com answers        |
+| `Diffbot`           | Diffbot    | Retrieval/structured | Case by case                              |
 
 The key insight: blocking `GPTBot` does not prevent your content from appearing in ChatGPT answers — that is `ChatGPT-User`. Blocking `ClaudeBot` does not prevent Claude from reading your docs — that is `Claude-SearchBot`. These are separate decisions that require separate entries.
 

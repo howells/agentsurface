@@ -50,8 +50,8 @@ class ToolIndex {
     this.tools = toolMap;
 
     const descriptions = Object.entries(toolMap).map(([name, tool]) => ({
-      name,
       description: tool.description || name,
+      name,
     }));
 
     // Compute hash of tool registry to detect changes
@@ -65,9 +65,7 @@ class ToolIndex {
 
     descriptions.forEach((desc, idx) => {
       this.embeddings[desc.name] = embeddingResults.embeddings[idx] || [];
-      this.toolHashes[desc.name] = createHash("sha256")
-        .update(desc.description)
-        .digest("hex");
+      this.toolHashes[desc.name] = createHash("sha256").update(desc.description).digest("hex");
     });
 
     this.isWarmingUp = false;
@@ -80,8 +78,8 @@ class ToolIndex {
   async ensureFresh(toolMap: Record<string, Tool>): Promise<void> {
     const newRegistryStr = JSON.stringify(
       Object.entries(toolMap).map(([name, tool]) => ({
-        name,
         description: tool.description || name,
+        name,
       })),
     );
     const newHash = createHash("sha256").update(newRegistryStr).digest("hex");
@@ -132,12 +130,12 @@ class ToolIndex {
     options.alwaysActive.forEach((name) => selected.add(name));
 
     similarities
-      .sort((a, b) => b.score - a.score)
+      .toSorted((a, b) => b.score - a.score)
       .slice(0, options.maxTools)
       .forEach(({ name }) => selected.add(name));
 
     return Object.fromEntries(
-      Array.from(selected)
+      [...selected]
         .filter((name) => name in allTools)
         .map((name) => [name, allTools[name as keyof T]]),
     ) as Partial<T>;
@@ -149,13 +147,17 @@ class ToolIndex {
  * Result in [-1, 1]; higher = more similar.
  */
 function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
+  if (a.length !== b.length) {
+    return 0;
+  }
 
   const dotProduct = a.reduce((sum, val, idx) => sum + val * b[idx]!, 0);
   const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
   const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
 
-  if (magnitudeA === 0 || magnitudeB === 0) return 0;
+  if (magnitudeA === 0 || magnitudeB === 0) {
+    return 0;
+  }
   return dotProduct / (magnitudeA * magnitudeB);
 }
 
@@ -172,9 +174,7 @@ export function buildToolpickPrepareStep<T extends Record<string, Tool>>(
 ): PrepareStepFunction<T> {
   return async (input) => {
     // Extract user message from conversation history
-    const lastUserMsg = [...input.messages]
-      .reverse()
-      .find((m) => m.role === "user");
+    const lastUserMsg = [...input.messages].toReversed().find((m) => m.role === "user");
 
     const userQuery = lastUserMsg?.content ? String(lastUserMsg.content) : "";
 
@@ -199,17 +199,17 @@ export async function runAgentWithToolpick(
   await toolIndex.registerTools(availableTools);
 
   const agent = new ToolLoopAgent({
-    model: openai("gpt-4.1-mini"),
     instructions: "You are a helpful assistant. Use the provided tools to help the user.",
-    tools: availableTools as Record<string, Tool>,
+    model: openai("gpt-4.1-mini"),
     prepareStep: buildToolpickPrepareStep(toolIndex, {
       maxTools: 12,
       alwaysActive: ["web_search", "search_tools"],
     }),
     stopWhen: stepCountIs(10),
+    tools: availableTools as Record<string, Tool>,
   });
 
-  const messages: ModelMessage[] = [{ role: "user", content: userMessage }];
+  const messages: ModelMessage[] = [{ content: userMessage, role: "user" }];
 
   const result = await agent.stream({
     messages,
@@ -222,13 +222,13 @@ export async function runAgentWithToolpick(
  * Zod schema for tool registry (optional, for validation).
  */
 export const ToolRegistrySchema = z.object({
-  name: z.string().describe("Tool identifier"),
-  description: z.string().describe("Human-readable description"),
-  parameters: z.record(z.string(), z.unknown()).describe("Input schema (Zod or JSON schema)"),
   category: z
     .enum(["read", "write", "destructive", "external"])
     .optional()
     .describe("Tool classification for filtering"),
+  description: z.string().describe("Human-readable description"),
+  name: z.string().describe("Tool identifier"),
+  parameters: z.record(z.string(), z.unknown()).describe("Input schema (Zod or JSON schema)"),
 });
 
 export type ToolRegistry = z.infer<typeof ToolRegistrySchema>;

@@ -25,13 +25,7 @@
 
 import { openai } from "@ai-sdk/openai";
 import type { ModelMessage, Tool } from "ai";
-import {
-  ToolLoopAgent,
-  generateText,
-  smoothStream,
-  stepCountIs,
-  streamText,
-} from "ai";
+import { ToolLoopAgent, generateText, smoothStream, stepCountIs, streamText } from "ai";
 import { z } from "zod";
 
 /**
@@ -40,10 +34,6 @@ import { z } from "zod";
  */
 const searchToolDefinition: Tool = {
   description: "Search for information across records and documents",
-  parameters: z.object({
-    query: z.string().describe("Search query string"),
-    limit: z.number().int().min(1).max(50).optional().default(10),
-  }),
   execute: async ({ query, limit }) => {
     // <CUSTOMISE> Replace with real search backend
     console.log(`[search] query="${query}" limit=${limit}`);
@@ -59,6 +49,10 @@ const searchToolDefinition: Tool = {
       total: 1,
     };
   },
+  parameters: z.object({
+    query: z.string().describe("Search query string"),
+    limit: z.number().int().min(1).max(50).optional().default(10),
+  }),
 };
 
 /**
@@ -67,11 +61,6 @@ const searchToolDefinition: Tool = {
  */
 const createRecordTool: Tool = {
   description: "Create a new record (ticket, order, task, etc.)",
-  parameters: z.object({
-    type: z.enum(["ticket", "order", "task"]),
-    title: z.string(),
-    description: z.string().optional(),
-  }),
   execute: async ({ type, title, description }) => {
     // <CUSTOMISE> Replace with real database insert
     const recordId = `${type}-${Date.now()}`;
@@ -85,6 +74,11 @@ const createRecordTool: Tool = {
       },
     };
   },
+  parameters: z.object({
+    type: z.enum(["ticket", "order", "task"]),
+    title: z.string(),
+    description: z.string().optional(),
+  }),
 };
 
 /**
@@ -92,22 +86,20 @@ const createRecordTool: Tool = {
  * Useful for batch workflows or server-side processing.
  */
 export async function runToolLoopSync(userMessage: string): Promise<string> {
-  const messages: ModelMessage[] = [
-    { role: "user", content: userMessage },
-  ];
+  const messages: ModelMessage[] = [{ content: userMessage, role: "user" }];
 
   const result = await generateText({
+    maxSteps: 10,
+    messages,
     model: openai("gpt-4.1-mini"),
+    stopWhen: stepCountIs(10), // Halt after 10 steps
     system:
       "You are a helpful assistant. Use tools to search and create records. " +
       "Always call search_tool first to gather information before creating records.",
-    messages,
     tools: {
-      search_tool: searchToolDefinition,
       create_record: createRecordTool,
+      search_tool: searchToolDefinition,
     },
-    stopWhen: stepCountIs(10), // Halt after 10 steps
-    maxSteps: 10,
   });
 
   return result.text;
@@ -118,23 +110,21 @@ export async function runToolLoopSync(userMessage: string): Promise<string> {
  * Wraps result in smoothStream() to merge token and tool events.
  */
 export async function runToolLoopStream(userMessage: string) {
-  const messages: ModelMessage[] = [
-    { role: "user", content: userMessage },
-  ];
+  const messages: ModelMessage[] = [{ content: userMessage, role: "user" }];
 
   const result = await streamText({
+    experimental_transform: smoothStream(),
+    maxSteps: 10,
+    messages,
     model: openai("gpt-4.1-mini"),
+    stopWhen: stepCountIs(10),
     system:
       "You are a helpful assistant. Use tools to search and create records. " +
       "Always call search_tool first to gather information before creating records.",
-    messages,
     tools: {
-      search_tool: searchToolDefinition,
       create_record: createRecordTool,
+      search_tool: searchToolDefinition,
     },
-    stopWhen: stepCountIs(10),
-    maxSteps: 10,
-    experimental_transform: smoothStream(),
   });
 
   return result;
@@ -166,7 +156,7 @@ export function buildDynamicPrepareStep<T extends Record<string, Tool>>(
 
     return {
       tools: Object.fromEntries(
-        Array.from(active).map((name) => [name, input.tools[name as keyof T]]),
+        [...active].map((name) => [name, input.tools[name as keyof T]]),
       ) as T,
     };
   };
@@ -177,33 +167,30 @@ export function buildDynamicPrepareStep<T extends Record<string, Tool>>(
  * The agent only "sees" up to `maxTools` tools per step.
  */
 export async function runToolLoopWithWindowing(userMessage: string) {
-  const messages: ModelMessage[] = [
-    { role: "user", content: userMessage },
-  ];
+  const messages: ModelMessage[] = [{ content: userMessage, role: "user" }];
 
-  type ToolMap = {
+  interface ToolMap {
     search_tool: typeof searchToolDefinition;
     create_record: typeof createRecordTool;
-  };
+  }
 
   const agent = new ToolLoopAgent<ToolMap>({
+    instructions: "You are a helpful assistant. Use tools to search and create records.",
     model: openai("gpt-4.1-mini"),
-    instructions:
-      "You are a helpful assistant. Use tools to search and create records.",
-    tools: {
-      search_tool: searchToolDefinition,
-      create_record: createRecordTool,
+    onFinish: async () => {
+      console.log("[agent] finished");
     },
     prepareStep: buildDynamicPrepareStep(2, ["search_tool"]),
     stopWhen: stepCountIs(10),
-    onFinish: async () => {
-      console.log("[agent] finished");
+    tools: {
+      create_record: createRecordTool,
+      search_tool: searchToolDefinition,
     },
   });
 
   const result = await agent.stream({
-    messages,
     experimental_transform: smoothStream(),
+    messages,
   });
 
   return result;
@@ -213,37 +200,37 @@ export async function runToolLoopWithWindowing(userMessage: string) {
  * Error handling: RFC 9457 Problem Detail response.
  * When a tool execution fails, wrap the error as a structured problem object.
  */
-export type ProblemDetail = {
+export interface ProblemDetail {
   type: string; // e.g., "https://example.com/errors/invalid-input"
   title: string; // e.g., "Invalid Input"
   status: number; // e.g., 400
   detail: string; // e.g., "The 'query' parameter is required"
   instance?: string; // Optional: URI identifying the specific occurrence
-};
+}
 
 export function toolErrorToProblemDetail(error: unknown): ProblemDetail {
   if (error instanceof z.ZodError) {
     return {
-      type: "https://api.example.com/errors/validation",
-      title: "Validation Error",
-      status: 400,
       detail: error.errors[0]?.message || "Input validation failed",
+      status: 400,
+      title: "Validation Error",
+      type: "https://api.example.com/errors/validation",
     };
   }
 
   if (error instanceof Error) {
     return {
-      type: "https://api.example.com/errors/tool-execution",
-      title: "Tool Execution Failed",
-      status: 500,
       detail: error.message,
+      status: 500,
+      title: "Tool Execution Failed",
+      type: "https://api.example.com/errors/tool-execution",
     };
   }
 
   return {
-    type: "https://api.example.com/errors/unknown",
-    title: "Unknown Error",
-    status: 500,
     detail: "An unexpected error occurred",
+    status: 500,
+    title: "Unknown Error",
+    type: "https://api.example.com/errors/unknown",
   };
 }

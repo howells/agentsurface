@@ -53,13 +53,7 @@ Maximum file size: 64 KB.
   "name": "Acme Platform",
   "description": "Developer platform for building and deploying applications",
   "url": "https://example.com",
-  "capabilities": [
-    "api",
-    "mcp",
-    "llms-txt",
-    "openapi",
-    "webhooks"
-  ],
+  "capabilities": ["api", "mcp", "llms-txt", "openapi", "webhooks"],
   "api": {
     "base_url": "https://api.example.com/v2",
     "spec": "https://api.example.com/openapi.json",
@@ -412,6 +406,7 @@ The NLWeb reference implementation is available at `github.com/microsoft/NLWeb`.
 Once you have published well-known files, reference them from:
 
 **Your `llms.txt`:**
+
 ```markdown
 ## API & Integration
 
@@ -427,6 +422,7 @@ Once you have published well-known files, reference them from:
 ```
 
 **Your `robots.txt`:**
+
 ```
 # AI discovery files
 # ai-discovery: https://example.com/.well-known/ai
@@ -435,6 +431,7 @@ Once you have published well-known files, reference them from:
 ```
 
 **Your OpenAPI spec:**
+
 ```yaml
 info:
   x-mcp-server: https://mcp.example.com

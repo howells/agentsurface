@@ -12,7 +12,7 @@ delay = base * 2^attempt + random(0, base)  (capped at 60s)
 ```
 
 - Exponential backoff: 1s, 2s, 4s, 8s, 16s (with jitter and 60s cap)
-- Full jitter: random(0, base * 2^attempt) for large populations
+- Full jitter: random(0, base \* 2^attempt) for large populations
 - Circuit breaker: stop after N consecutive failures, cool down, probe
 - Rate limit handling: use Retry-After header and X-RateLimit-Remaining
 - Idempotency-Key required for write operations
@@ -43,7 +43,7 @@ function backoffDelay(attempt: number, base = 1000): number {
 
 async function withRetry<T>(
   fn: () => Promise<T>,
-  options: { maxAttempts?: number; base?: number } = {}
+  options: { maxAttempts?: number; base?: number } = {},
 ): Promise<T> {
   const { maxAttempts = 4, base = 1000 } = options;
 
@@ -99,12 +99,12 @@ async def with_retry(
 The delay sequence for a 1-second base:
 
 | Attempt | Exponential | Jitter (max) | Total (max) |
-|---|---|---|---|
-| 0 | 1s | 1s | 2s |
-| 1 | 2s | 1s | 3s |
-| 2 | 4s | 1s | 5s |
-| 3 | 8s | 1s | 9s |
-| 4 | 16s | 1s | 17s |
+| ------- | ----------- | ------------ | ----------- |
+| 0       | 1s          | 1s           | 2s          |
+| 1       | 2s          | 1s           | 3s          |
+| 2       | 4s          | 1s           | 5s          |
+| 3       | 8s          | 1s           | 9s          |
+| 4       | 16s         | 1s           | 17s         |
 
 With a 60-second cap, delays plateau rather than growing indefinitely.
 
@@ -143,7 +143,7 @@ class CircuitBreaker {
 
   constructor(
     private readonly failureThreshold: number = 5,
-    private readonly cooldownMs: number = 30 * 1000
+    private readonly cooldownMs: number = 30 * 1000,
   ) {}
 
   async call<T>(fn: () => Promise<T>): Promise<T> {
@@ -151,7 +151,7 @@ class CircuitBreaker {
       const elapsed = Date.now() - (this.lastFailureTime ?? 0);
       if (elapsed < this.cooldownMs) {
         throw new CircuitOpenError(
-          `Circuit open. Retry after ${Math.ceil((this.cooldownMs - elapsed) / 1000)}s`
+          `Circuit open. Retry after ${Math.ceil((this.cooldownMs - elapsed) / 1000)}s`,
         );
       }
       // Cooldown elapsed — allow one probe request
@@ -186,9 +186,7 @@ class CircuitBreaker {
 const invoiceServiceBreaker = new CircuitBreaker(5, 30_000);
 
 async function getInvoice(id: string) {
-  return invoiceServiceBreaker.call(() =>
-    fetch(`https://invoices.example.com/invoices/${id}`)
-  );
+  return invoiceServiceBreaker.call(() => fetch(`https://invoices.example.com/invoices/${id}`));
 }
 ```
 
@@ -199,9 +197,7 @@ When the circuit is open, `CircuitOpenError` carries the remaining cooldown time
 Rate limits are a specific class of retriable error with explicit timing information. The `Retry-After` header on a 429 response specifies exactly how long to wait.
 
 ```typescript
-async function withRateLimitHandling(
-  fn: () => Promise<Response>
-): Promise<Response> {
+async function withRateLimitHandling(fn: () => Promise<Response>): Promise<Response> {
   const response = await fn();
 
   if (response.status === 429) {
@@ -266,14 +262,14 @@ const idempotencyKey = randomUUID();
 
 async function createInvoiceIdempotent(
   data: InvoiceData,
-  key: string = randomUUID()
+  key: string = randomUUID(),
 ): Promise<Invoice> {
   return withRetry(async () => {
     const response = await fetch("https://api.example.com/invoices", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": key,  // Same key on every retry
+        "Idempotency-Key": key, // Same key on every retry
       },
       body: JSON.stringify(data),
     });

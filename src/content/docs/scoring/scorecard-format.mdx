@@ -32,89 +32,91 @@ A scorecard captures:
 ## TypeScript Zod Schema
 
 ```typescript
-import { z } from 'zod';
+import { z } from "zod";
 
 const DimensionName = z.enum([
-  'api-surface',
-  'cli-design',
-  'mcp-server',
-  'discovery-aeo',
-  'authentication',
-  'error-handling',
-  'tool-design',
-  'context-files',
-  'multi-agent',
-  'testing',
-  'data-retrievability',
+  "api-surface",
+  "cli-design",
+  "mcp-server",
+  "discovery-aeo",
+  "authentication",
+  "error-handling",
+  "tool-design",
+  "context-files",
+  "multi-agent",
+  "testing",
+  "data-retrievability",
 ]);
 
-const ConfidenceLevel = z.enum(['high', 'medium', 'low']);
+const ConfidenceLevel = z.enum(["high", "medium", "low"]);
 
 const EvidenceItem = z.object({
-  type: z.enum(['file', 'grep', 'glob', 'command']),
+  type: z.enum(["file", "grep", "glob", "command"]),
   description: z.string(),
-  location: z.string().describe('File path, grep pattern, glob pattern, or command'),
-  result: z.string().describe('Quoted output or finding'),
+  location: z.string().describe("File path, grep pattern, glob pattern, or command"),
+  result: z.string().describe("Quoted output or finding"),
 });
 
 const Finding = z.object({
-  what: z.string().describe('Specific issue with file:line reference'),
-  why: z.string().describe('Why this matters for agent consumption'),
-  fix: z.string().describe('Concrete steps to resolve'),
+  what: z.string().describe("Specific issue with file:line reference"),
+  why: z.string().describe("Why this matters for agent consumption"),
+  fix: z.string().describe("Concrete steps to resolve"),
   dimension: DimensionName,
   currentScore: z.number().int().min(0).max(3),
   targetScore: z.number().int().min(0).max(3),
-  severity: z.enum(['critical', 'high', 'medium', 'low']),
+  severity: z.enum(["critical", "high", "medium", "low"]),
 });
 
 const FindingCluster = z.object({
-  name: z.string().describe('Descriptive cluster name'),
-  rationale: z.string().describe('Why these findings belong together'),
+  name: z.string().describe("Descriptive cluster name"),
+  rationale: z.string().describe("Why these findings belong together"),
   findings: z.array(Finding),
-  suggestedApproach: z.string().describe('1-2 sentences on how to tackle'),
-  dependencies: z.array(z.string()).describe('Other cluster names to complete first'),
+  suggestedApproach: z.string().describe("1-2 sentences on how to tackle"),
+  dependencies: z.array(z.string()).describe("Other cluster names to complete first"),
 });
 
 const Dimension = z.object({
   name: DimensionName,
-  score: z.number().int().min(0).max(3).nullable().describe('null if N/A'),
-  confidence: ConfidenceLevel.nullable().describe('null if N/A'),
+  score: z.number().int().min(0).max(3).nullable().describe("null if N/A"),
+  confidence: ConfidenceLevel.nullable().describe("null if N/A"),
   evidence: z.array(EvidenceItem),
-  findings: z.array(z.string()).describe('Finding IDs referencing FindingCluster.findings'),
+  findings: z.array(z.string()).describe("Finding IDs referencing FindingCluster.findings"),
   notes: z.string().optional(),
 });
 
-const OverallRating = z.enum([
-  'human-only',
-  'agent-tolerant',
-  'agent-ready',
-  'agent-first',
-]);
+const OverallRating = z.enum(["human-only", "agent-tolerant", "agent-ready", "agent-first"]);
 
 const Scorecard = z.object({
-  version: z.literal('1.0'),
+  version: z.literal("1.0"),
   project: z.object({
     name: z.string(),
     repository: z.string().url().optional(),
     description: z.string().optional(),
   }),
-  date: z.string().datetime().describe('ISO 8601, e.g., 2026-04-17T15:30:00Z'),
+  date: z.string().datetime().describe("ISO 8601, e.g., 2026-04-17T15:30:00Z"),
   auditor: z.string().optional(),
   dimensions: z.array(Dimension).length(11),
   findingClusters: z.array(FindingCluster),
   overall: z.object({
     rawScore: z.number().int().min(0).max(33),
     maxApplicable: z.number().int().min(1).max(33),
-    scaledScore: z.number().int().min(0).max(30).describe('Raw score scaled to 30 after excluding N/A dimensions'),
+    scaledScore: z
+      .number()
+      .int()
+      .min(0)
+      .max(30)
+      .describe("Raw score scaled to 30 after excluding N/A dimensions"),
     rating: OverallRating,
     percentile: z.number().min(0).max(100).optional(),
   }),
-  trend: z.object({
-    previousDate: z.string().datetime().optional(),
-    previousScore: z.number().int().optional(),
-    delta: z.number().int().optional(),
-    status: z.enum(['improved', 'stable', 'regressed']).optional(),
-  }).optional(),
+  trend: z
+    .object({
+      previousDate: z.string().datetime().optional(),
+      previousScore: z.number().int().optional(),
+      delta: z.number().int().optional(),
+      status: z.enum(["improved", "stable", "regressed"]).optional(),
+    })
+    .optional(),
 });
 
 export type Scorecard = z.infer<typeof Scorecard>;
@@ -465,7 +467,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
 ## Parsing the Scorecard in Code
 
 ```typescript
-import { Scorecard } from './scorecard-schema';
+import { Scorecard } from "./scorecard-schema";
 
 async function loadScorecard(filePath: string): Promise<Scorecard> {
   const raw = await Deno.readTextFile(filePath);
@@ -484,14 +486,14 @@ Scores:
 ${scorecard.dimensions
   .filter((d) => d.score !== null)
   .map((d) => `  ${d.name}: ${d.score}/3 (${d.confidence})`)
-  .join('\n')}
+  .join("\n")}
   `);
 }
 
 function findHighSeverityIssues(scorecard: Scorecard): Finding[] {
   return scorecard.findingClusters
     .flatMap((cluster) => cluster.findings)
-    .filter((f) => f.severity === 'critical' || f.severity === 'high')
+    .filter((f) => f.severity === "critical" || f.severity === "high")
     .sort((a, b) => {
       const severity = { critical: 3, high: 2, medium: 1, low: 0 };
       return severity[b.severity] - severity[a.severity];

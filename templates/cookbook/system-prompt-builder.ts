@@ -29,32 +29,6 @@ import { z } from "zod";
  * Zod schema for prompt context (all required inputs).
  */
 export const PromptContextSchema = z.object({
-  userId: z.string().describe("Unique user identifier"),
-  userEmail: z.string().email().nullable().describe("User email or null"),
-  userName: z.string().nullable().describe("User full name or null"),
-  tenantId: z.string().describe("Workspace/organization ID"),
-  tenantName: z.string().nullable().describe("Workspace name or null"),
-  locale: z.string().default("en-US").describe("User locale (e.g., en-US)"),
-  timezone: z.string().default("UTC").describe("User timezone (e.g., America/New_York)"),
-  currency: z.string().default("USD").describe("Base currency code (e.g., USD)"),
-  countryCode: z.string().nullable().describe("ISO 3166-1 alpha-2 country code"),
-  platform: z
-    .enum(["web", "slack", "whatsapp", "telegram", "sendblue", "dashboard"])
-    .describe("Deployment platform"),
-  dateFormat: z.string().nullable().describe("Date format string (e.g., DD/MM/YYYY)"),
-  timeFormat: z.number().int().default(24).describe("12 or 24 hour clock"),
-  recentUploadSummaries: z
-    .array(z.string())
-    .optional()
-    .describe("OCR/extraction summaries of recent uploads"),
-  connectedApps: z
-    .array(z.string())
-    .optional()
-    .describe("Names of connected external services"),
-  internalToolNames: z
-    .array(z.string())
-    .optional()
-    .describe("Available internal tool names"),
   capabilities: z
     .object({
       canCreateRecords: z.boolean().default(true),
@@ -64,6 +38,26 @@ export const PromptContextSchema = z.object({
     })
     .optional()
     .describe("Feature flags for permission control"),
+  connectedApps: z.array(z.string()).optional().describe("Names of connected external services"),
+  countryCode: z.string().nullable().describe("ISO 3166-1 alpha-2 country code"),
+  currency: z.string().default("USD").describe("Base currency code (e.g., USD)"),
+  dateFormat: z.string().nullable().describe("Date format string (e.g., DD/MM/YYYY)"),
+  internalToolNames: z.array(z.string()).optional().describe("Available internal tool names"),
+  locale: z.string().default("en-US").describe("User locale (e.g., en-US)"),
+  platform: z
+    .enum(["web", "slack", "whatsapp", "telegram", "sendblue", "dashboard"])
+    .describe("Deployment platform"),
+  recentUploadSummaries: z
+    .array(z.string())
+    .optional()
+    .describe("OCR/extraction summaries of recent uploads"),
+  tenantId: z.string().describe("Workspace/organization ID"),
+  tenantName: z.string().nullable().describe("Workspace name or null"),
+  timeFormat: z.number().int().default(24).describe("12 or 24 hour clock"),
+  timezone: z.string().default("UTC").describe("User timezone (e.g., America/New_York)"),
+  userEmail: z.string().email().nullable().describe("User email or null"),
+  userId: z.string().describe("Unique user identifier"),
+  userName: z.string().nullable().describe("User full name or null"),
 });
 
 export type PromptContext = z.infer<typeof PromptContextSchema>;
@@ -73,10 +67,10 @@ export type PromptContext = z.infer<typeof PromptContextSchema>;
  */
 export function getDateContext(timezone: string, now = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
     timeZone: timezone,
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
   });
 
   const parts = formatter.formatToParts(now);
@@ -87,15 +81,16 @@ export function getDateContext(timezone: string, now = new Date()) {
   const date = `${year}-${month}-${day}`;
   const monthStart = `${year}-${month}-01`;
   const quarterNum = Math.floor((Number.parseInt(month) - 1) / 3) + 1;
-  const quarterStart = `${year}-${(quarterNum - 1) * 3 + 1:02d}-01`;
+  const quarterStartMonth = String((quarterNum - 1) * 3 + 1).padStart(2, "0");
+  const quarterStart = `${year}-${quarterStartMonth}-01`;
   const yearStart = `${year}-01-01`;
 
   return {
-    timezone,
     date,
     monthStart,
     quarter: quarterNum,
     quarterStart,
+    timezone,
     year: Number.parseInt(year),
     yearStart,
   };
@@ -184,24 +179,18 @@ function getPlatformInstructions(platform: PromptContext["platform"]): string {
 - Use markdown tables, entity links, and rich formatting.
 - Acknowledge file uploads and continue helping with follow-up actions.`,
 
-    web: `
-## Platform: Web
-- Emit one short sentence (under 10 words) before tool calls.
-- Use markdown tables, entity links, and rich formatting.
-- Acknowledge file uploads and continue helping with follow-up actions.`,
+    sendblue: `
+## Platform: iMessage
+- Plain text only. NO markdown, code blocks, tables, or links.
+- Produce ZERO text output until you have the final result.
+- After creating a draft, ONE message: details + plain URL + ask to send.
+- Keep responses under 3 sentences.`,
 
     slack: `
 ## Platform: Slack
 - Use Slack blocks and markdown tables when helpful.
 - Do NOT use entity links (they only work on dashboard).
 - Keep responses concise; use threading for long discussions.`,
-
-    whatsapp: `
-## Platform: WhatsApp
-- Produce ZERO text output until you have the final result.
-- NO markdown, tables, or entity links. Use plain text only.
-- After creating a draft, respond with ONE message: details + preview link + confirmation.
-- Keep responses under 3 sentences.`,
 
     telegram: `
 ## Platform: Telegram
@@ -210,11 +199,17 @@ function getPlatformInstructions(platform: PromptContext["platform"]): string {
 - NO entity links. When previews are available, include plain URLs.
 - Keep responses under 3 sentences.`,
 
-    sendblue: `
-## Platform: iMessage
-- Plain text only. NO markdown, code blocks, tables, or links.
+    web: `
+## Platform: Web
+- Emit one short sentence (under 10 words) before tool calls.
+- Use markdown tables, entity links, and rich formatting.
+- Acknowledge file uploads and continue helping with follow-up actions.`,
+
+    whatsapp: `
+## Platform: WhatsApp
 - Produce ZERO text output until you have the final result.
-- After creating a draft, ONE message: details + plain URL + ask to send.
+- NO markdown, tables, or entity links. Use plain text only.
+- After creating a draft, respond with ONE message: details + preview link + confirmation.
 - Keep responses under 3 sentences.`,
   };
 
@@ -238,9 +233,7 @@ When the user references these files, use the extracted data to create or update
 /**
  * Build capabilities block (feature flags for permission control).
  */
-function buildCapabilitiesBlock(
-  capabilities?: PromptContext["capabilities"],
-): string {
+function buildCapabilitiesBlock(capabilities?: PromptContext["capabilities"]): string {
   if (!capabilities) {
     return "## Capabilities\nAll features enabled.";
   }
@@ -302,29 +295,27 @@ export function validatePrompt(prompt: string): boolean {
  */
 export async function exampleUsage() {
   const ctx: PromptContext = {
-    userId: "user-123",
-    userEmail: "alice@example.com",
-    userName: "Alice Smith",
-    tenantId: "org-456",
-    tenantName: "Acme Corp",
-    locale: "en-US",
-    timezone: "America/New_York",
-    currency: "USD",
-    countryCode: "US",
-    platform: "web",
-    dateFormat: "MM/DD/YYYY",
-    timeFormat: 12,
-    recentUploadSummaries: [
-      "Invoice #1234, amount: $5,000, customer: Acme Inc",
-    ],
-    connectedApps: ["Gmail", "Slack", "Google Calendar"],
-    internalToolNames: ["tickets_create", "orders_list", "customers_search"],
     capabilities: {
       canCreateRecords: true,
       canDeleteRecords: false,
       canIntegrate: true,
       canSearch: true,
     },
+    connectedApps: ["Gmail", "Slack", "Google Calendar"],
+    countryCode: "US",
+    currency: "USD",
+    dateFormat: "MM/DD/YYYY",
+    internalToolNames: ["tickets_create", "orders_list", "customers_search"],
+    locale: "en-US",
+    platform: "web",
+    recentUploadSummaries: ["Invoice #1234, amount: $5,000, customer: Acme Inc"],
+    tenantId: "org-456",
+    tenantName: "Acme Corp",
+    timeFormat: 12,
+    timezone: "America/New_York",
+    userEmail: "alice@example.com",
+    userId: "user-123",
+    userName: "Alice Smith",
   };
 
   const prompt = buildSystemPrompt(ctx);

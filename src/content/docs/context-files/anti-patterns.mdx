@@ -138,13 +138,13 @@ Link to deeper docs instead of inlining everything.
 ```markdown
 # AGENTS.md
 
-Commands (verified 2025-06-01):  ← 10+ months stale
-  npm install
-  npm run dev    ← Migrated to pnpm 6 months ago
-  npm test
+Commands (verified 2025-06-01): ← 10+ months stale
+npm install
+npm run dev ← Migrated to pnpm 6 months ago
+npm test
 
-Framework: Next.js 12  ← Upgraded to 15
-Database: MongoDB      ← Migrated to PostgreSQL
+Framework: Next.js 12 ← Upgraded to 15
+Database: MongoDB ← Migrated to PostgreSQL
 ```
 
 Agents follow outdated instructions. Commands fail, directories don't exist, conventions no longer apply.
@@ -156,15 +156,15 @@ Add verification dates and stale-checking:
 ```markdown
 # AGENTS.md
 
-Commands (verified 2026-04-17):  ← Recent
-  pnpm dev
-  pnpm test
-  pnpm build
+Commands (verified 2026-04-17): ← Recent
+pnpm dev
+pnpm test
+pnpm build
 
 Tech Stack (verified 2026-04-15):
-  TypeScript
-  Next.js 15
-  PostgreSQL
+TypeScript
+Next.js 15
+PostgreSQL
 ```
 
 Use `surface score --dimension=context` to detect stale files automatically.
@@ -177,19 +177,22 @@ Use `surface score --dimension=context` to detect stale files automatically.
 
 ```markdown
 # AGENTS.md
+
 Commands (verified 2026-04-17):
-  pnpm dev
-  pnpm test
+pnpm dev
+pnpm test
 
 # CLAUDE.md
+
 Commands:
-  pnpm dev       # ← Same commands, duplicated
-  pnpm test
+pnpm dev # ← Same commands, duplicated
+pnpm test
 
 # .cursor/rules/commands.mdc
+
 Commands:
-  pnpm dev       # ← Same commands, tripled
-  pnpm test
+pnpm dev # ← Same commands, tripled
+pnpm test
 ```
 
 Files drift out of sync. One gets updated; others stay stale. Agents see conflicting guidance.
@@ -200,17 +203,21 @@ Single source of truth. AGENTS.md is canonical; others reference it:
 
 ```markdown
 # AGENTS.md
+
 Commands (verified 2026-04-17):
-  pnpm dev
-  pnpm test
+pnpm dev
+pnpm test
 
 # CLAUDE.md
+
 See AGENTS.md > Commands.
 
 Claude-specific:
-  - Use claude-opus-4-7 for complex tasks
+
+- Use claude-opus-4-7 for complex tasks
 
 # .cursor/rules/commands.mdc
+
 See AGENTS.md > Commands for command reference.
 This file adds Cursor-specific tips.
 ```
@@ -241,18 +248,21 @@ Rules, not aspirations:
 ## Boundaries
 
 Always:
-  - Read files
-  - Run tests
-  - Open draft PRs
+
+- Read files
+- Run tests
+- Open draft PRs
 
 Ask first:
-  - Install dependencies
-  - Run migrations
+
+- Install dependencies
+- Run migrations
 
 Never:
-  - Deploy to production
-  - Rotate credentials
-  - Delete branches
+
+- Deploy to production
+- Rotate credentials
+- Delete branches
 ```
 
 Explicit. Enforceable. No guessing.
@@ -288,10 +298,11 @@ See AGENTS.md for core conventions.
 ## Project-Specific
 
 This codebase has:
-  - Monorepo with 4 packages
-  - Strict TypeScript (no any)
-  - Memory tool for cross-session learnings
-  - Extended thinking for architecture decisions
+
+- Monorepo with 4 packages
+- Strict TypeScript (no any)
+- Memory tool for cross-session learnings
+- Extended thinking for architecture decisions
 ```
 
 Write from experience. Update when friction arises.
