@@ -27,13 +27,13 @@ interface CachedToken {
  * OAuth 2.0 Client Credentials client
  */
 export class ClientCredentialsClient {
-  private tokenEndpoint: string;
-  private clientId: string;
-  private clientSecret: string;
-  private scopes: string[];
-  private tokenCache = new Map<string, CachedToken>();
-  private maxRetries: number = 3;
-  private retryBackoffMs: number = 100;
+  private readonly tokenEndpoint: string;
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  private readonly scopes: string[];
+  private readonly tokenCache = new Map<string, CachedToken>();
+  private readonly maxRetries: number = 3;
+  private readonly retryBackoffMs: number = 100;
 
   constructor(opts: {
     tokenEndpoint: string;
@@ -129,7 +129,7 @@ export class ClientCredentialsClient {
       throw new Error(`Token endpoint returned ${response.status}: ${errorBody.slice(0, 200)}`);
     }
 
-    return response.json() as Promise<TokenResponse>;
+    return await (response.json() as Promise<TokenResponse>);
   }
 
   /**
@@ -159,7 +159,7 @@ export class ClientCredentialsClient {
       const newToken = await this.getAccessToken();
       headers.set("Authorization", `Bearer ${newToken}`);
 
-      return fetch(url, { ...options, headers }).then((r) => r.json());
+      return await fetch(url, { ...options, headers }).then(async (r) => await r.json());
     }
 
     if (!response.ok) {
@@ -167,7 +167,7 @@ export class ClientCredentialsClient {
       throw new Error(`HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
     }
 
-    return response.json() as Promise<T>;
+    return await (response.json() as Promise<T>);
   }
 }
 

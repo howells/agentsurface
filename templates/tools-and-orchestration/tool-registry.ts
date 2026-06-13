@@ -117,7 +117,7 @@ async function deployToProductionHandler(input: unknown) {
 // ============================================================================
 
 export class ToolRegistry {
-  private tools = new Map<string, ToolDefinition>();
+  private readonly tools = new Map<string, ToolDefinition>();
 
   /**
    * Register a tool. Validates unique naming.
@@ -140,7 +140,9 @@ export class ToolRegistry {
    * Register multiple tools at once.
    */
   registerBatch(tools: ToolDefinition[]) {
-    tools.forEach((t) => this.register(t));
+    tools.forEach((t) => {
+      this.register(t);
+    });
   }
 
   /**

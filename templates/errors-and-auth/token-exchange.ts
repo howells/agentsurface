@@ -43,9 +43,9 @@ interface TokenExchangeResponse {
  * Agent token exchange client
  */
 export class TokenExchangeClient {
-  private tokenExchangeEndpoint: string;
-  private jwksUri: string;
-  private expectedIssuer: string;
+  private readonly tokenExchangeEndpoint: string;
+  private readonly jwksUri: string;
+  private readonly expectedIssuer: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
   constructor(opts: { tokenExchangeEndpoint: string; jwksUri: string; expectedIssuer: string }) {

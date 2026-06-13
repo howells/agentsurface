@@ -40,7 +40,7 @@ class ToolIndex {
   private registryHash: string = "";
   private isWarmingUp: boolean = false;
 
-  constructor(private embeddingModel = openai.embeddingModel("text-embedding-3-small")) {}
+  constructor(private readonly embeddingModel = openai.embeddingModel("text-embedding-3-small")) {}
 
   /**
    * Register tools and compute their embeddings.
@@ -151,7 +151,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
     return 0;
   }
 
-  const dotProduct = a.reduce((sum, val, idx) => sum + val * b[idx]!, 0);
+  const dotProduct = a.reduce((sum, val, idx) => sum + val * b[idx], 0);
   const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
   const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
 
@@ -206,7 +206,7 @@ export async function runAgentWithToolpick(
       alwaysActive: ["web_search", "search_tools"],
     }),
     stopWhen: stepCountIs(10),
-    tools: availableTools as Record<string, Tool>,
+    tools: availableTools,
   });
 
   const messages: ModelMessage[] = [{ content: userMessage, role: "user" }];
@@ -239,7 +239,7 @@ export type ToolRegistry = z.infer<typeof ToolRegistrySchema>;
  */
 export class EmbeddingCache {
   private cache: Record<string, number[]> = {};
-  private lastFlush: number = Date.now();
+  private readonly lastFlush: number = Date.now();
 
   async save(key: string, embedding: number[]): Promise<void> {
     this.cache[key] = embedding;

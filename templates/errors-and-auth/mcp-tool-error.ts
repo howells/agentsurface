@@ -42,10 +42,10 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
   const message = err instanceof Error ? err.message : String(err);
 
   // Detect error patterns
-  const isValidation = message.match(/validation|invalid|required/i);
-  const isNotFound = message.match(/not found|not exist|404/i);
-  const isNetwork = message.match(/timeout|econnrefused|network/i);
-  const isAuth = message.match(/unauthorized|forbidden|auth/i);
+  const isValidation = /validation|invalid|required/i.exec(message);
+  const isNotFound = /not found|not exist|404/i.exec(message);
+  const isNetwork = /timeout|econnrefused|network/i.exec(message);
+  const isAuth = /unauthorized|forbidden|auth/i.exec(message);
 
   let statusCode = 500;
   let code = "ERR_INTERNAL";

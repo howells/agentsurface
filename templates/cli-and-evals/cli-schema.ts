@@ -131,10 +131,14 @@ export function generateCLISchema(program: Command): {
     });
 
     // Recurse into subcommands
-    cmd.commands.forEach((subcmd) => traverseCommands(subcmd, cmdName));
+    cmd.commands.forEach((subcmd) => {
+      traverseCommands(subcmd, cmdName);
+    });
   }
 
-  program.commands.forEach((cmd) => traverseCommands(cmd));
+  program.commands.forEach((cmd) => {
+    traverseCommands(cmd);
+  });
 
   return {
     commands,

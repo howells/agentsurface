@@ -46,7 +46,9 @@ function GlossaryCard({
   return (
     <motion.button
       layoutId={`card-${term.id}`}
-      onClick={() => onOpen(term.id)}
+      onClick={() => {
+        onOpen(term.id);
+      }}
       className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
       style={{
         boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)",
@@ -85,7 +87,9 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
       }
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
   }, [onClose]);
 
   return createPortal(
@@ -210,7 +214,9 @@ function FilterPills({
       {[ALL, ...categories].map((cat) => (
         <button
           key={cat}
-          onClick={() => onChange(cat)}
+          onClick={() => {
+            onChange(cat);
+          }}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             active === cat
               ? "border-fd-foreground bg-fd-foreground text-fd-background"
@@ -300,7 +306,14 @@ export function GlossaryGrid({
       )}
 
       <AnimatePresence>
-        {activeTerm && <GlossaryOverlay term={activeTerm} onClose={() => setActiveId(null)} />}
+        {activeTerm && (
+          <GlossaryOverlay
+            term={activeTerm}
+            onClose={() => {
+              setActiveId(null);
+            }}
+          />
+        )}
       </AnimatePresence>
     </>
   );

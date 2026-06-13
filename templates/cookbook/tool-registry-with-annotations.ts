@@ -88,8 +88,8 @@ export const ROLE_PERMISSIONS: Record<string, ToolAnnotation[]> = {
  * Central tool registry.
  */
 export class ToolRegistry {
-  private tools = new Map<string, AnnotatedTool>();
-  private implementations = new Map<string, Tool>();
+  private readonly tools = new Map<string, AnnotatedTool>();
+  private readonly implementations = new Map<string, Tool>();
 
   /**
    * Register a tool with annotations.
@@ -310,7 +310,7 @@ export interface AuditLog {
 }
 
 export class AuditLogger {
-  private logs: AuditLog[] = [];
+  private readonly logs: AuditLog[] = [];
 
   log(entry: Omit<AuditLog, "timestamp">): void {
     this.logs.push({

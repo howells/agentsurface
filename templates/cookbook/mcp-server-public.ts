@@ -174,7 +174,7 @@ function validateToken(
  * MCP Server implementation.
  */
 class PublicMCPServer {
-  private server: Server;
+  private readonly server: Server;
 
   constructor() {
     this.server = new Server({
@@ -303,7 +303,7 @@ export async function setupPublicMCPServer() {
         const tenantId = params.get("tenant_id") || "default";
 
         // Check DPoP header
-        const dpopHeader = req.headers["dpop"];
+        const dpopHeader = req.headers.dpop;
         const dpopThumbprint = dpopHeader
           ? createHash("sha256").update(String(dpopHeader)).digest("hex").slice(0, 8)
           : undefined;

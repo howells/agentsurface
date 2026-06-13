@@ -59,7 +59,7 @@ const server = new McpServer(
 // ===== Structured Logging =====
 
 class Logger {
-  private context: string;
+  private readonly context: string;
 
   constructor(context: string) {
     this.context = context;

@@ -47,7 +47,7 @@ export type DraftRecord = z.infer<typeof DraftRecordSchema>;
  * In-memory draft store (in production, use Redis with TTL).
  */
 export class DraftRecordStore {
-  private drafts = new Map<string, DraftRecord>();
+  private readonly drafts = new Map<string, DraftRecord>();
 
   /**
    * Save a draft and return its ID.
@@ -315,7 +315,7 @@ export const DESTRUCTIVE_ANNOTATIONS = {
  * Composite tool pair for seamless draft-then-confirm workflow.
  */
 export class DraftThenConfirmToolSet {
-  private store: DraftRecordStore;
+  private readonly store: DraftRecordStore;
 
   constructor() {
     this.store = new DraftRecordStore();
@@ -329,11 +329,11 @@ export class DraftThenConfirmToolSet {
   }
 
   async prepare(input: PrepareDraftInvoiceInput): Promise<unknown> {
-    return handlePrepareDraftInvoice(input, this.store);
+    return await handlePrepareDraftInvoice(input, this.store);
   }
 
   async confirm(input: ConfirmSendInvoiceInput): Promise<unknown> {
-    return handleConfirmSendInvoice(input, this.store);
+    return await handleConfirmSendInvoice(input, this.store);
   }
 
   /**

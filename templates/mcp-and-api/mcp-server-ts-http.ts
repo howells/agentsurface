@@ -50,7 +50,7 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:*").sp
 // ===== Structured Logging =====
 
 class Logger {
-  private context: string;
+  private readonly context: string;
 
   constructor(context: string) {
     this.context = context;
@@ -88,7 +88,7 @@ const logger = new Logger("mcp-http-server");
 // ===== Rate Limiting =====
 
 class RateLimiter {
-  private buckets = new Map<string, { count: number; resetAt: number }>();
+  private readonly buckets = new Map<string, { count: number; resetAt: number }>();
   private readonly requestsPerMinute: number;
 
   constructor(requestsPerMinute: number = 60) {

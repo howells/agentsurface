@@ -254,7 +254,8 @@ if (require.main === module) {
   runEval().catch(console.error);
 }
 
-export { runEval, loadDataset, runAgent, TestCase, AgentResponse };
+export type { TestCase, AgentResponse };
+export { runEval, loadDataset, runAgent };
 
 /**
  * Usage:

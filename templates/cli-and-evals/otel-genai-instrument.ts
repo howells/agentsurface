@@ -197,7 +197,10 @@ export async function withToolSpan<T>(
       "gen_ai.tool.name": toolName,
     });
 
-    const result = await context.with(trace.setSpan(context.active(), span), () => fn());
+    const result = await context.with(
+      trace.setSpan(context.active(), span),
+      async () => await fn(),
+    );
 
     span.setStatus({ code: SpanStatusCode.OK });
     return result;

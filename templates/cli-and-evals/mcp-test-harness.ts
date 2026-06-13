@@ -239,7 +239,9 @@ describe("MCP server test suite", () => {
               }),
               { numRuns: MAX_CALLS_PER_TOOL },
             )
-              .then(() => resolve())
+              .then(() => {
+                resolve();
+              })
               .catch(reject);
           });
 

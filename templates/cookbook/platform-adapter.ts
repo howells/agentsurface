@@ -272,7 +272,7 @@ export class TelegramAdapter implements PlatformAdapter {
  * In production, use Redis or a database.
  */
 export class IdentityLinkStore {
-  private links = new Map<string, string>();
+  private readonly links = new Map<string, string>();
 
   /**
    * Generate a linking code (QR code or short code).
@@ -346,8 +346,6 @@ export async function processMessage(
  * Example: Format a response back to platform.
  */
 export async function formatResponse(msg: CanonicalMessage): Promise<unknown> {
-  const adapter = getPlatformAdapter(
-    msg.platform as "web" | "slack" | "whatsapp" | "telegram" | "sendblue",
-  );
-  return adapter.format(msg);
+  const adapter = getPlatformAdapter(msg.platform);
+  return await adapter.format(msg);
 }

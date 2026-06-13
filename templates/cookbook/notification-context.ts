@@ -51,12 +51,12 @@ export type NotificationContextPayload = z.infer<typeof NotificationContextPaylo
  */
 export class NotificationContextStore {
   // <CUSTOMISE> Replace with Redis client (ioredis or node-redis)
-  private memory = new Map<string, NotificationContextPayload>();
-  private ttls = new Map<string, number>();
+  private readonly memory = new Map<string, NotificationContextPayload>();
+  private readonly ttls = new Map<string, number>();
 
   constructor(
-    private ttlSeconds: number = 86_400, // 24 hours default
-    private redisClient?: { get: Function; set: Function },
+    private readonly ttlSeconds: number = 86_400, // 24 hours default
+    private readonly redisClient?: { get: Function; set: Function },
   ) {}
 
   /**

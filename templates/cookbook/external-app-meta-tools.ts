@@ -289,7 +289,7 @@ export const multiExecuteMetaTool: Tool = {
     "Executes in parallel; fails gracefully if one action fails.",
   execute: async ({ actions }) => {
     const results = await Promise.allSettled(
-      actions.map(({ id, input }) => executeExternalAction(id, input)),
+      actions.map(async ({ id, input }) => await executeExternalAction(id, input)),
     );
 
     const responses = results.map((result, idx) => {

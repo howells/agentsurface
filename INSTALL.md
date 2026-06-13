@@ -11,6 +11,7 @@ Agent Surface ships a single local skill:
 ### Option 1: Plugin Marketplace (Easiest)
 
 In Claude Code, type:
+
 ```
 /plugin install agentsurface
 ```
@@ -46,7 +47,7 @@ Codex reads `AGENTS.md` at your project root. To use the Agent Surface skill wit
 
 ### 1. Create an AGENTS.md (if you don't have one)
 
-~~~markdown
+```markdown
 # Your Project Name
 
 Describe your project here.
@@ -54,7 +55,7 @@ Describe your project here.
 ## Skills and Tools
 
 - [surface](https://github.com/howells/agentsurface/blob/main/skills/surface/SKILL.md) — Audit, transform, scaffold, and manage agent systems
-~~~
+```
 
 ### 2. Point to surface
 
@@ -73,12 +74,14 @@ Or use the remote GitHub URL (Codex can fetch it):
 ### 3. Use with Codex
 
 In Codex CLI, type:
+
 ```bash
 codex "Audit this project with surface. Focus on API design and error handling."
 codex "Use the surface skill to add memory to this Mastra project."
 ```
 
 Codex will:
+
 1. Read your AGENTS.md
 2. Discover the skill reference
 3. Fetch the SKILL.md if needed
@@ -113,6 +116,7 @@ See the [skills.sh CLI docs](https://skills.sh/docs/cli) for the current command
 For sharing via tarball or zip:
 
 1. **Create the package:**
+
    ```bash
    cd agentsurface
    zip -r surface-1.0.0.skill skills/surface/ -x "*.git*"
@@ -127,6 +131,7 @@ For sharing via tarball or zip:
 ### For Claude Code
 
 In any project, type:
+
 ```
 /surface
 ```

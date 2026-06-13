@@ -43,10 +43,10 @@ const NDJSONEventSchema = z.object({
 export type NDJSONEvent = z.infer<typeof NDJSONEventSchema>;
 
 export class NDJSONStream {
-  private stream: WriteStream;
+  private readonly stream: WriteStream;
   private buffer: NDJSONEvent[] = [];
-  private bufferSize = 50; // Flush after N events
-  private traceId: string;
+  private readonly bufferSize = 50; // Flush after N events
+  private readonly traceId: string;
 
   constructor(output?: string, traceId?: string) {
     this.stream = output ? createWriteStream(output, { flags: "a" }) : process.stdout;

@@ -65,10 +65,10 @@ export enum ExitCode {
 
 // Builder for responses
 export class CLIResponse {
-  private startTime = Date.now();
-  private traceId: string;
-  private command: string;
-  private useJson: boolean;
+  private readonly startTime = Date.now();
+  private readonly traceId: string;
+  private readonly command: string;
+  private readonly useJson: boolean;
 
   constructor(command: string, useJson: boolean = false) {
     this.command = command;

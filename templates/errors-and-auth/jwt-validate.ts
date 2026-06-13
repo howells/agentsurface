@@ -36,11 +36,11 @@ interface AgentJWTPayload extends JWTPayload {
  * JWT validator with JWKS caching
  */
 export class JWTValidator {
-  private jwksUri: string;
-  private expectedIssuer: string;
-  private expectedAudience: string | string[];
-  private allowedAlgorithms: string[];
-  private jwksCacheTtlMs: number;
+  private readonly jwksUri: string;
+  private readonly expectedIssuer: string;
+  private readonly expectedAudience: string | string[];
+  private readonly allowedAlgorithms: string[];
+  private readonly jwksCacheTtlMs: number;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
   private jwksCacheExpiry: number = 0;
 

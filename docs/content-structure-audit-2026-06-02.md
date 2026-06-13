@@ -55,15 +55,15 @@ What does not work yet:
 
 These checks used current public sources on 2026-06-02.
 
-| Area | Current finding | Docs impact |
-| --- | --- | --- |
-| MCP | The `modelcontextprotocol/modelcontextprotocol` repo lists release `2025-11-25` as latest. | Current MCP spec claims are okay. |
-| A2A | Linux Foundation reported on 2026-04-09 that A2A has 150+ supporting organizations and active production deployments. | Treat A2A as production-relevant, not merely an RC/watch item. |
-| ACP | Stripe docs now describe ACP as an open standard created by Stripe, OpenAI, and Meta, with spec path `spec/2026-04-17`. | Update pages saying only OpenAI + Stripe or beta 2025. |
-| Arazzo | OpenAPI latest page now shows Arazzo `v1.1.0`, not `v1.0.1`. | Update `api-surface/arazzo-workflows` and `protocols/emerging-standards`. |
-| OpenTelemetry GenAI | OpenTelemetry docs still mark GenAI semantic conventions as Development and say the transition plan will be updated before stable. | Remove "stable" language from `protocols/emerging-standards` and soften `testing/observability`. |
-| auth.md | WorkOS released auth.md on 2026-05-21 as an open protocol and Markdown discovery layer for agent registration. | Current auth.md coverage is timely, but should be marked new/emerging. |
-| AGENTS.md | Public reporting cites Linux Foundation/AAIF adoption and roughly 60,000 public projects/frameworks. | AGENTS.md current claims are broadly supported, but cite the source and avoid over-claiming exact tool counts. |
+| Area                | Current finding                                                                                                                    | Docs impact                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| MCP                 | The `modelcontextprotocol/modelcontextprotocol` repo lists release `2025-11-25` as latest.                                         | Current MCP spec claims are okay.                                                                              |
+| A2A                 | Linux Foundation reported on 2026-04-09 that A2A has 150+ supporting organizations and active production deployments.              | Treat A2A as production-relevant, not merely an RC/watch item.                                                 |
+| ACP                 | Stripe docs now describe ACP as an open standard created by Stripe, OpenAI, and Meta, with spec path `spec/2026-04-17`.            | Update pages saying only OpenAI + Stripe or beta 2025.                                                         |
+| Arazzo              | OpenAPI latest page now shows Arazzo `v1.1.0`, not `v1.0.1`.                                                                       | Update `api-surface/arazzo-workflows` and `protocols/emerging-standards`.                                      |
+| OpenTelemetry GenAI | OpenTelemetry docs still mark GenAI semantic conventions as Development and say the transition plan will be updated before stable. | Remove "stable" language from `protocols/emerging-standards` and soften `testing/observability`.               |
+| auth.md             | WorkOS released auth.md on 2026-05-21 as an open protocol and Markdown discovery layer for agent registration.                     | Current auth.md coverage is timely, but should be marked new/emerging.                                         |
+| AGENTS.md           | Public reporting cites Linux Foundation/AAIF adoption and roughly 60,000 public projects/frameworks.                               | AGENTS.md current claims are broadly supported, but cite the source and avoid over-claiming exact tool counts. |
 
 Sources checked:
 
@@ -251,28 +251,28 @@ This keeps the current pages but turns the site into:
 
 ## Section-Level Recommendations
 
-| Section | Status | Recommendation |
-| --- | --- | --- |
-| Root docs | Clear but too brief as a router. | Add a stronger "choose your path" decision table that presents Agent Surface as a guide, not an audit workflow. |
-| Agents | Clear and useful. | Move `runtime-boundaries` beside this section and make framework selection downstream of runtime choice. |
-| Runtime Boundaries | Strong standalone page. | Promote earlier in nav. |
-| Agentic UI | Strong and concise. | Keep as a build-system chapter. |
-| API Surface | Strong but overlaps with Tool Design and MCP. | Keep focused on HTTP/OpenAPI contracts. Move general tool guidance to Tool Design. |
-| Tool Design | Strong and concise. | Make it the cross-framework tool chapter. |
-| CLI Design | Strong. | Add more leaf cross-links to Tool Design, Error Handling, and Context Files. |
-| MCP Servers | Strong. | Add related links to all leaves and keep MCP-specific content here. |
-| Discovery | Valuable but overlaps Context Files. | Split web discovery from repo context. |
-| Context Files | Good material, but some pages are code-heavy and thin after code removal. | Deduplicate with Discovery and tighten examples. |
-| Data Retrievability | Conceptually important, but uneven page depth and high freshness risk. | Consolidate thin pages or label quick references. Add last verified dates. |
-| Protocols | Important but fast-moving. | Update Arazzo, ACP, A2A, OTel status language. |
-| Authentication | Strong and timely. | Fix duplicate Summary heading and mark auth.md as emerging. |
-| Error Handling | Strong. | Add related links to MCP/API/CLI surfaces. |
-| Testing | Good but several pages are quick-reference length. | Decide whether this is an eval guide or a tool reference set. |
-| Multi-Agent | Strong applied architecture section. | Keep with build-system journey. |
-| Cookbook | Useful, memorable, production-shaped. | Promote from appendix to Patterns. |
-| Scoring | Strong operational framework. | Position as "Evaluate And Improve" after the core guide material, not as the product spine. |
-| Reference Links | Useful. | Keep as source appendix. |
-| Tooling Catalog | Valuable but oversized. | Split or make it a separate catalog experience. |
+| Section             | Status                                                                    | Recommendation                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Root docs           | Clear but too brief as a router.                                          | Add a stronger "choose your path" decision table that presents Agent Surface as a guide, not an audit workflow. |
+| Agents              | Clear and useful.                                                         | Move `runtime-boundaries` beside this section and make framework selection downstream of runtime choice.        |
+| Runtime Boundaries  | Strong standalone page.                                                   | Promote earlier in nav.                                                                                         |
+| Agentic UI          | Strong and concise.                                                       | Keep as a build-system chapter.                                                                                 |
+| API Surface         | Strong but overlaps with Tool Design and MCP.                             | Keep focused on HTTP/OpenAPI contracts. Move general tool guidance to Tool Design.                              |
+| Tool Design         | Strong and concise.                                                       | Make it the cross-framework tool chapter.                                                                       |
+| CLI Design          | Strong.                                                                   | Add more leaf cross-links to Tool Design, Error Handling, and Context Files.                                    |
+| MCP Servers         | Strong.                                                                   | Add related links to all leaves and keep MCP-specific content here.                                             |
+| Discovery           | Valuable but overlaps Context Files.                                      | Split web discovery from repo context.                                                                          |
+| Context Files       | Good material, but some pages are code-heavy and thin after code removal. | Deduplicate with Discovery and tighten examples.                                                                |
+| Data Retrievability | Conceptually important, but uneven page depth and high freshness risk.    | Consolidate thin pages or label quick references. Add last verified dates.                                      |
+| Protocols           | Important but fast-moving.                                                | Update Arazzo, ACP, A2A, OTel status language.                                                                  |
+| Authentication      | Strong and timely.                                                        | Fix duplicate Summary heading and mark auth.md as emerging.                                                     |
+| Error Handling      | Strong.                                                                   | Add related links to MCP/API/CLI surfaces.                                                                      |
+| Testing             | Good but several pages are quick-reference length.                        | Decide whether this is an eval guide or a tool reference set.                                                   |
+| Multi-Agent         | Strong applied architecture section.                                      | Keep with build-system journey.                                                                                 |
+| Cookbook            | Useful, memorable, production-shaped.                                     | Promote from appendix to Patterns.                                                                              |
+| Scoring             | Strong operational framework.                                             | Position as "Evaluate And Improve" after the core guide material, not as the product spine.                     |
+| Reference Links     | Useful.                                                                   | Keep as source appendix.                                                                                        |
+| Tooling Catalog     | Valuable but oversized.                                                   | Split or make it a separate catalog experience.                                                                 |
 
 ## Page-Level Pass
 
@@ -284,146 +284,146 @@ Legend:
 - Update: factual freshness issue.
 - Split: page is too large for one docs page.
 
-| Page | Verdict | Notes |
-| --- | --- | --- |
-| `index.mdx` | Tighten | Good mission statement; add stronger path routing. |
-| `getting-started.mdx` | Tighten | Useful but very short; turn into a guided triage checklist. |
-| `agentic-ui/index.mdx` | Keep | Clear, concise, good checklist. |
-| `agents/index.mdx` | Keep | Good scaffold entry point. |
-| `agents/design-principles.mdx` | Keep | Strong principles page. |
-| `agents/framework-selection.mdx` | Keep | Strong, but should follow runtime boundary choice. |
-| `agents/anthropic-platform.mdx` | Update | Fast-moving vendor page; add last verified date and related links. |
-| `agents/browser-access.mdx` | Keep | Good decision matrix. |
-| `runtime-boundaries/index.mdx` | Keep | Promote in nav. |
-| `api-surface/index.mdx` | Tighten | Short, needs better next-step routing. |
-| `api-surface/openapi-for-agents.mdx` | Keep | Strong practical page. |
-| `api-surface/tool-definitions.mdx` | Merge | Overlaps Tool Design; keep only API-specific framing here. |
-| `api-surface/arazzo-workflows.mdx` | Update | Update latest Arazzo version. |
-| `api-surface/openapi-extensions.mdx` | Update | Good page, but verify current extension examples. |
-| `api-surface/api-versioning.mdx` | Keep | Strong agent-specific framing. |
-| `api-surface/webhooks-events.mdx` | Keep | Clear and scoped. |
-| `tool-design/index.mdx` | Keep | Good section overview. |
-| `tool-design/naming-and-descriptions.mdx` | Keep | Strong, concise. |
-| `tool-design/schemas.mdx` | Keep | Strong. |
-| `tool-design/idempotency-and-safety.mdx` | Keep | Strong. |
-| `tool-design/tool-curation.mdx` | Keep | Useful and concise. |
-| `tool-design/cross-framework-portability.mdx` | Keep | Good architecture pattern. |
-| `tool-design/token-budget.mdx` | Keep | Useful agent-specific material. |
-| `tool-design/anti-patterns.mdx` | Keep | Good quick-reference page. |
-| `cli-design/index.mdx` | Tighten | Add next-step links. |
-| `cli-design/command-structure.mdx` | Keep | Strong. |
-| `cli-design/machine-readable-output.mdx` | Keep | Strong. |
-| `cli-design/raw-payload-input.mdx` | Keep | Strong. |
-| `cli-design/schema-introspection.mdx` | Keep | Strong. |
-| `cli-design/context-window-discipline.mdx` | Keep | Strong. |
-| `cli-design/input-hardening.mdx` | Keep | Strong. |
-| `cli-design/safety-rails.mdx` | Keep | Strong. |
-| `cli-design/agent-knowledge-packaging.mdx` | Keep | Useful bridge to context files and skills. |
-| `cli-design/cli-scale.mdx` | Keep | Good scoring aid. |
-| `mcp-servers/index.mdx` | Tighten | Add related links and stronger section decision tree. |
-| `mcp-servers/architecture.mdx` | Keep | Clear. |
-| `mcp-servers/tool-best-practices.mdx` | Keep | Strong MCP-specific tool page. |
-| `mcp-servers/resources-prompts.mdx` | Keep | Clear. |
-| `mcp-servers/transports.mdx` | Keep | Clear. |
-| `mcp-servers/authentication.mdx` | Update | Verify OAuth language against latest MCP auth spec. |
-| `mcp-servers/annotations.mdx` | Keep | Clear. |
-| `mcp-servers/testing.mdx` | Keep | Clear. |
-| `mcp-servers/nextjs-integration.mdx` | Update | Vendor/tooling page; add last verified date. |
-| `mcp-servers/auto-generation.mdx` | Keep | Strong warning against naive generation. |
-| `mcp-servers/real-world-examples.mdx` | Update | Public server behavior changes; add last verified date. |
-| `discovery/index.mdx` | Tighten | Needs web-discovery vs repo-context distinction. |
-| `discovery/llms-txt.mdx` | Update | Make adoption/support claims conservative. |
-| `discovery/agents-md.mdx` | Merge | Overlaps `context-files/agents-md`. Keep one canonical AGENTS.md page. |
-| `discovery/agent-skills.mdx` | Keep | Concise and useful. |
-| `discovery/structured-data.mdx` | Update | Validate AI Overview and JSON-LD impact claims. |
-| `discovery/content-negotiation.mdx` | Keep | Clear. |
-| `discovery/well-known-endpoints.mdx` | Update | Fast-moving draft standards. Add last verified date. |
-| `discovery/robots-txt.mdx` | Update | Keep training vs retrieval split, cite current crawler names. |
-| `discovery/content-structure.mdx` | Keep | Good content guidance. |
-| `discovery/aeo-checklist.mdx` | Split | Long checklist; consider tier pages or accordion/checklist component. |
-| `context-files/index.mdx` | Keep | Good dimension page. |
-| `context-files/agents-md.mdx` | Merge | Make this the canonical AGENTS.md page and link from Discovery. |
-| `context-files/claude-md.mdx` | Keep | Good overlay framing. |
-| `context-files/cursor-and-copilot.mdx` | Keep | Useful but verify current tool behavior periodically. |
-| `context-files/monorepos.mdx` | Tighten | Thin after examples; add more decision guidance or merge into AGENTS.md. |
-| `context-files/drift-detection.mdx` | Keep | Useful and practical. |
-| `context-files/anti-patterns.mdx` | Keep | Strong. |
-| `data-retrievability/index.mdx` | Update | High freshness risk; add last verified date. |
-| `data-retrievability/rag-patterns.mdx` | Keep | Strong taxonomy page. |
-| `data-retrievability/embeddings.mdx` | Update | Current model/leaderboard claims need dated verification. |
-| `data-retrievability/multimodal-embeddings.mdx` | Update | Current model claims need dated verification. |
-| `data-retrievability/chunking.mdx` | Merge | Too thin; fold into RAG patterns or make a quick-reference card. |
-| `data-retrievability/vector-databases.mdx` | Update | Vendor/cost claims need verification. |
-| `data-retrievability/hybrid-search.mdx` | Merge | Too thin; combine with RAG patterns or retrieval pipeline page. |
-| `data-retrievability/reranking.mdx` | Merge | Too thin; combine with retrieval pipeline. |
-| `data-retrievability/knowledge-graphs.mdx` | Update | Verify GraphRAG/LightRAG and vendor claims. |
-| `data-retrievability/agentic-rag.mdx` | Merge | Too thin; combine with RAG patterns. |
-| `data-retrievability/evaluation.mdx` | Merge | Too thin; could live under Testing or retrieval pipeline. |
-| `data-retrievability/anti-patterns.mdx` | Keep | Useful. |
-| `protocols/index.mdx` | Update | A2A/ACP status should reflect 2026 state. |
-| `protocols/mcp.mdx` | Keep | Current MCP version claim checks out. |
-| `protocols/a2a.mdx` | Update | Treat as production-relevant; verify Agent Card path. |
-| `protocols/acp.mdx` | Update | Add Meta and 2026-04-17 spec references. |
-| `protocols/comparison.mdx` | Update | Re-rank maturity table for A2A and ACP. |
-| `protocols/emerging-standards.mdx` | Update | Fix Arazzo version and OpenTelemetry GenAI stability language; remove duplicate heading. |
-| `authentication/index.mdx` | Keep | Strong decision tree. |
-| `authentication/api-keys.mdx` | Keep | Clear. |
-| `authentication/oauth-for-agents.mdx` | Keep | Good core page; keep OAuth 2.1 as draft/current wording precise. |
-| `authentication/agent-identity.mdx` | Keep | Clear. |
-| `authentication/token-exchange.mdx` | Keep | Clear. |
-| `authentication/dpop.mdx` | Keep | Clear. |
-| `authentication/protected-resource-metadata.mdx` | Keep | Strong and timely. |
-| `authentication/mcp-auth-model.mdx` | Keep | Strong. |
-| `authentication/auth-md.mdx` | Update | Mark as new/emerging WorkOS protocol. |
-| `authentication/idempotency-and-replay.mdx` | Keep | Clear. |
-| `authentication/anti-patterns.mdx` | Tighten | Remove duplicate Summary heading. |
-| `error-handling/index.mdx` | Keep | Clear. |
-| `error-handling/rfc-9457.mdx` | Keep | Strong. |
-| `error-handling/agent-extensions.mdx` | Keep | Concise. |
-| `error-handling/errors-for-agents.mdx` | Keep | Strong. |
-| `error-handling/retry-patterns.mdx` | Keep | Strong. |
-| `error-handling/idempotency.mdx` | Keep | Clear. |
-| `error-handling/cli-errors.mdx` | Keep | Strong. |
-| `testing/index.mdx` | Tighten | Add a clearer testing journey. |
-| `testing/evaluation-framework.mdx` | Keep | Strong. |
-| `testing/metrics.mdx` | Keep | Good reference. |
-| `testing/llm-as-judge.mdx` | Keep | Strong. |
-| `testing/vitest-harness.mdx` | Tighten | Short; okay if positioned as quick implementation guide. |
-| `testing/promptfoo.mdx` | Update | OpenAI ecosystem/acquisition claim needs source or softer wording. |
-| `testing/braintrust.mdx` | Tighten | Short; useful as tool guide. |
-| `testing/observability.mdx` | Update | Fix OpenTelemetry GenAI stability wording. |
-| `testing/ci-integration.mdx` | Tighten | Short; useful as implementation guide. |
-| `testing/red-teaming.mdx` | Keep | Clear. |
-| `multi-agent/index.mdx` | Keep | Clear. |
-| `multi-agent/orchestration-patterns.mdx` | Keep | Strong. |
-| `multi-agent/supervisor-pattern.mdx` | Keep | Strong. |
-| `multi-agent/council-pattern.mdx` | Keep | Concise and useful. |
-| `multi-agent/swarm-pattern.mdx` | Keep | Strong. |
-| `multi-agent/human-in-the-loop.mdx` | Keep | Strong. |
-| `multi-agent/memory-patterns.mdx` | Keep | Strong. |
-| `multi-agent/tool-sprawl.mdx` | Keep | Strong. |
-| `cookbook/index.mdx` | Keep | Promote to Patterns. |
-| `cookbook/agentic-loop.mdx` | Keep | Strong. |
-| `cookbook/platform-agnostic-core.mdx` | Tighten | Short, but useful; consider combining with external app routing. |
-| `cookbook/system-prompt-as-config.mdx` | Keep | Strong pattern. |
-| `cookbook/tool-annotations.mdx` | Keep | Strong. |
-| `cookbook/semantic-tool-selection.mdx` | Keep | Strong. |
-| `cookbook/external-app-routing.mdx` | Keep | Useful applied pattern. |
-| `cookbook/mcp-as-external-api.mdx` | Update | ACP/MCP client support claims may need fresh verification. |
-| `cookbook/notification-to-conversation.mdx` | Keep | Strong pattern. |
-| `cookbook/autonomous-background-agents.mdx` | Keep | Clear. |
-| `cookbook/cloudflare-agent-stack.mdx` | Update | Vendor page; add last verified date. |
-| `cookbook/two-step-confirmation.mdx` | Keep | Strong pattern despite compact length. |
-| `scoring/index.mdx` | Keep | Move near top. |
-| `scoring/rubric.mdx` | Split | Authoritative but long; consider one page per dimension or collapsible sections. |
-| `scoring/evidence.mdx` | Keep | Strong. |
-| `scoring/scorecard-format.mdx` | Tighten | Very short; maybe fold into scoring index or keep as schema reference. |
-| `scoring/delta-scorecard.mdx` | Keep | Useful. |
-| `scoring/clustering.mdx` | Keep | Strong. |
-| `scoring/calibration.mdx` | Tighten | Good but should be lower-priority advanced material. |
-| `reference-links/index.mdx` | Keep | Source appendix. |
-| `reference-links/coverage-map.mdx` | Keep | Useful internal maintenance page. |
-| `tooling-catalog/index.mdx` | Split | 9k+ words; move to catalog-style route or split by category. |
+| Page                                             | Verdict | Notes                                                                                    |
+| ------------------------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| `index.mdx`                                      | Tighten | Good mission statement; add stronger path routing.                                       |
+| `getting-started.mdx`                            | Tighten | Useful but very short; turn into a guided triage checklist.                              |
+| `agentic-ui/index.mdx`                           | Keep    | Clear, concise, good checklist.                                                          |
+| `agents/index.mdx`                               | Keep    | Good scaffold entry point.                                                               |
+| `agents/design-principles.mdx`                   | Keep    | Strong principles page.                                                                  |
+| `agents/framework-selection.mdx`                 | Keep    | Strong, but should follow runtime boundary choice.                                       |
+| `agents/anthropic-platform.mdx`                  | Update  | Fast-moving vendor page; add last verified date and related links.                       |
+| `agents/browser-access.mdx`                      | Keep    | Good decision matrix.                                                                    |
+| `runtime-boundaries/index.mdx`                   | Keep    | Promote in nav.                                                                          |
+| `api-surface/index.mdx`                          | Tighten | Short, needs better next-step routing.                                                   |
+| `api-surface/openapi-for-agents.mdx`             | Keep    | Strong practical page.                                                                   |
+| `api-surface/tool-definitions.mdx`               | Merge   | Overlaps Tool Design; keep only API-specific framing here.                               |
+| `api-surface/arazzo-workflows.mdx`               | Update  | Update latest Arazzo version.                                                            |
+| `api-surface/openapi-extensions.mdx`             | Update  | Good page, but verify current extension examples.                                        |
+| `api-surface/api-versioning.mdx`                 | Keep    | Strong agent-specific framing.                                                           |
+| `api-surface/webhooks-events.mdx`                | Keep    | Clear and scoped.                                                                        |
+| `tool-design/index.mdx`                          | Keep    | Good section overview.                                                                   |
+| `tool-design/naming-and-descriptions.mdx`        | Keep    | Strong, concise.                                                                         |
+| `tool-design/schemas.mdx`                        | Keep    | Strong.                                                                                  |
+| `tool-design/idempotency-and-safety.mdx`         | Keep    | Strong.                                                                                  |
+| `tool-design/tool-curation.mdx`                  | Keep    | Useful and concise.                                                                      |
+| `tool-design/cross-framework-portability.mdx`    | Keep    | Good architecture pattern.                                                               |
+| `tool-design/token-budget.mdx`                   | Keep    | Useful agent-specific material.                                                          |
+| `tool-design/anti-patterns.mdx`                  | Keep    | Good quick-reference page.                                                               |
+| `cli-design/index.mdx`                           | Tighten | Add next-step links.                                                                     |
+| `cli-design/command-structure.mdx`               | Keep    | Strong.                                                                                  |
+| `cli-design/machine-readable-output.mdx`         | Keep    | Strong.                                                                                  |
+| `cli-design/raw-payload-input.mdx`               | Keep    | Strong.                                                                                  |
+| `cli-design/schema-introspection.mdx`            | Keep    | Strong.                                                                                  |
+| `cli-design/context-window-discipline.mdx`       | Keep    | Strong.                                                                                  |
+| `cli-design/input-hardening.mdx`                 | Keep    | Strong.                                                                                  |
+| `cli-design/safety-rails.mdx`                    | Keep    | Strong.                                                                                  |
+| `cli-design/agent-knowledge-packaging.mdx`       | Keep    | Useful bridge to context files and skills.                                               |
+| `cli-design/cli-scale.mdx`                       | Keep    | Good scoring aid.                                                                        |
+| `mcp-servers/index.mdx`                          | Tighten | Add related links and stronger section decision tree.                                    |
+| `mcp-servers/architecture.mdx`                   | Keep    | Clear.                                                                                   |
+| `mcp-servers/tool-best-practices.mdx`            | Keep    | Strong MCP-specific tool page.                                                           |
+| `mcp-servers/resources-prompts.mdx`              | Keep    | Clear.                                                                                   |
+| `mcp-servers/transports.mdx`                     | Keep    | Clear.                                                                                   |
+| `mcp-servers/authentication.mdx`                 | Update  | Verify OAuth language against latest MCP auth spec.                                      |
+| `mcp-servers/annotations.mdx`                    | Keep    | Clear.                                                                                   |
+| `mcp-servers/testing.mdx`                        | Keep    | Clear.                                                                                   |
+| `mcp-servers/nextjs-integration.mdx`             | Update  | Vendor/tooling page; add last verified date.                                             |
+| `mcp-servers/auto-generation.mdx`                | Keep    | Strong warning against naive generation.                                                 |
+| `mcp-servers/real-world-examples.mdx`            | Update  | Public server behavior changes; add last verified date.                                  |
+| `discovery/index.mdx`                            | Tighten | Needs web-discovery vs repo-context distinction.                                         |
+| `discovery/llms-txt.mdx`                         | Update  | Make adoption/support claims conservative.                                               |
+| `discovery/agents-md.mdx`                        | Merge   | Overlaps `context-files/agents-md`. Keep one canonical AGENTS.md page.                   |
+| `discovery/agent-skills.mdx`                     | Keep    | Concise and useful.                                                                      |
+| `discovery/structured-data.mdx`                  | Update  | Validate AI Overview and JSON-LD impact claims.                                          |
+| `discovery/content-negotiation.mdx`              | Keep    | Clear.                                                                                   |
+| `discovery/well-known-endpoints.mdx`             | Update  | Fast-moving draft standards. Add last verified date.                                     |
+| `discovery/robots-txt.mdx`                       | Update  | Keep training vs retrieval split, cite current crawler names.                            |
+| `discovery/content-structure.mdx`                | Keep    | Good content guidance.                                                                   |
+| `discovery/aeo-checklist.mdx`                    | Split   | Long checklist; consider tier pages or accordion/checklist component.                    |
+| `context-files/index.mdx`                        | Keep    | Good dimension page.                                                                     |
+| `context-files/agents-md.mdx`                    | Merge   | Make this the canonical AGENTS.md page and link from Discovery.                          |
+| `context-files/claude-md.mdx`                    | Keep    | Good overlay framing.                                                                    |
+| `context-files/cursor-and-copilot.mdx`           | Keep    | Useful but verify current tool behavior periodically.                                    |
+| `context-files/monorepos.mdx`                    | Tighten | Thin after examples; add more decision guidance or merge into AGENTS.md.                 |
+| `context-files/drift-detection.mdx`              | Keep    | Useful and practical.                                                                    |
+| `context-files/anti-patterns.mdx`                | Keep    | Strong.                                                                                  |
+| `data-retrievability/index.mdx`                  | Update  | High freshness risk; add last verified date.                                             |
+| `data-retrievability/rag-patterns.mdx`           | Keep    | Strong taxonomy page.                                                                    |
+| `data-retrievability/embeddings.mdx`             | Update  | Current model/leaderboard claims need dated verification.                                |
+| `data-retrievability/multimodal-embeddings.mdx`  | Update  | Current model claims need dated verification.                                            |
+| `data-retrievability/chunking.mdx`               | Merge   | Too thin; fold into RAG patterns or make a quick-reference card.                         |
+| `data-retrievability/vector-databases.mdx`       | Update  | Vendor/cost claims need verification.                                                    |
+| `data-retrievability/hybrid-search.mdx`          | Merge   | Too thin; combine with RAG patterns or retrieval pipeline page.                          |
+| `data-retrievability/reranking.mdx`              | Merge   | Too thin; combine with retrieval pipeline.                                               |
+| `data-retrievability/knowledge-graphs.mdx`       | Update  | Verify GraphRAG/LightRAG and vendor claims.                                              |
+| `data-retrievability/agentic-rag.mdx`            | Merge   | Too thin; combine with RAG patterns.                                                     |
+| `data-retrievability/evaluation.mdx`             | Merge   | Too thin; could live under Testing or retrieval pipeline.                                |
+| `data-retrievability/anti-patterns.mdx`          | Keep    | Useful.                                                                                  |
+| `protocols/index.mdx`                            | Update  | A2A/ACP status should reflect 2026 state.                                                |
+| `protocols/mcp.mdx`                              | Keep    | Current MCP version claim checks out.                                                    |
+| `protocols/a2a.mdx`                              | Update  | Treat as production-relevant; verify Agent Card path.                                    |
+| `protocols/acp.mdx`                              | Update  | Add Meta and 2026-04-17 spec references.                                                 |
+| `protocols/comparison.mdx`                       | Update  | Re-rank maturity table for A2A and ACP.                                                  |
+| `protocols/emerging-standards.mdx`               | Update  | Fix Arazzo version and OpenTelemetry GenAI stability language; remove duplicate heading. |
+| `authentication/index.mdx`                       | Keep    | Strong decision tree.                                                                    |
+| `authentication/api-keys.mdx`                    | Keep    | Clear.                                                                                   |
+| `authentication/oauth-for-agents.mdx`            | Keep    | Good core page; keep OAuth 2.1 as draft/current wording precise.                         |
+| `authentication/agent-identity.mdx`              | Keep    | Clear.                                                                                   |
+| `authentication/token-exchange.mdx`              | Keep    | Clear.                                                                                   |
+| `authentication/dpop.mdx`                        | Keep    | Clear.                                                                                   |
+| `authentication/protected-resource-metadata.mdx` | Keep    | Strong and timely.                                                                       |
+| `authentication/mcp-auth-model.mdx`              | Keep    | Strong.                                                                                  |
+| `authentication/auth-md.mdx`                     | Update  | Mark as new/emerging WorkOS protocol.                                                    |
+| `authentication/idempotency-and-replay.mdx`      | Keep    | Clear.                                                                                   |
+| `authentication/anti-patterns.mdx`               | Tighten | Remove duplicate Summary heading.                                                        |
+| `error-handling/index.mdx`                       | Keep    | Clear.                                                                                   |
+| `error-handling/rfc-9457.mdx`                    | Keep    | Strong.                                                                                  |
+| `error-handling/agent-extensions.mdx`            | Keep    | Concise.                                                                                 |
+| `error-handling/errors-for-agents.mdx`           | Keep    | Strong.                                                                                  |
+| `error-handling/retry-patterns.mdx`              | Keep    | Strong.                                                                                  |
+| `error-handling/idempotency.mdx`                 | Keep    | Clear.                                                                                   |
+| `error-handling/cli-errors.mdx`                  | Keep    | Strong.                                                                                  |
+| `testing/index.mdx`                              | Tighten | Add a clearer testing journey.                                                           |
+| `testing/evaluation-framework.mdx`               | Keep    | Strong.                                                                                  |
+| `testing/metrics.mdx`                            | Keep    | Good reference.                                                                          |
+| `testing/llm-as-judge.mdx`                       | Keep    | Strong.                                                                                  |
+| `testing/vitest-harness.mdx`                     | Tighten | Short; okay if positioned as quick implementation guide.                                 |
+| `testing/promptfoo.mdx`                          | Update  | OpenAI ecosystem/acquisition claim needs source or softer wording.                       |
+| `testing/braintrust.mdx`                         | Tighten | Short; useful as tool guide.                                                             |
+| `testing/observability.mdx`                      | Update  | Fix OpenTelemetry GenAI stability wording.                                               |
+| `testing/ci-integration.mdx`                     | Tighten | Short; useful as implementation guide.                                                   |
+| `testing/red-teaming.mdx`                        | Keep    | Clear.                                                                                   |
+| `multi-agent/index.mdx`                          | Keep    | Clear.                                                                                   |
+| `multi-agent/orchestration-patterns.mdx`         | Keep    | Strong.                                                                                  |
+| `multi-agent/supervisor-pattern.mdx`             | Keep    | Strong.                                                                                  |
+| `multi-agent/council-pattern.mdx`                | Keep    | Concise and useful.                                                                      |
+| `multi-agent/swarm-pattern.mdx`                  | Keep    | Strong.                                                                                  |
+| `multi-agent/human-in-the-loop.mdx`              | Keep    | Strong.                                                                                  |
+| `multi-agent/memory-patterns.mdx`                | Keep    | Strong.                                                                                  |
+| `multi-agent/tool-sprawl.mdx`                    | Keep    | Strong.                                                                                  |
+| `cookbook/index.mdx`                             | Keep    | Promote to Patterns.                                                                     |
+| `cookbook/agentic-loop.mdx`                      | Keep    | Strong.                                                                                  |
+| `cookbook/platform-agnostic-core.mdx`            | Tighten | Short, but useful; consider combining with external app routing.                         |
+| `cookbook/system-prompt-as-config.mdx`           | Keep    | Strong pattern.                                                                          |
+| `cookbook/tool-annotations.mdx`                  | Keep    | Strong.                                                                                  |
+| `cookbook/semantic-tool-selection.mdx`           | Keep    | Strong.                                                                                  |
+| `cookbook/external-app-routing.mdx`              | Keep    | Useful applied pattern.                                                                  |
+| `cookbook/mcp-as-external-api.mdx`               | Update  | ACP/MCP client support claims may need fresh verification.                               |
+| `cookbook/notification-to-conversation.mdx`      | Keep    | Strong pattern.                                                                          |
+| `cookbook/autonomous-background-agents.mdx`      | Keep    | Clear.                                                                                   |
+| `cookbook/cloudflare-agent-stack.mdx`            | Update  | Vendor page; add last verified date.                                                     |
+| `cookbook/two-step-confirmation.mdx`             | Keep    | Strong pattern despite compact length.                                                   |
+| `scoring/index.mdx`                              | Keep    | Move near top.                                                                           |
+| `scoring/rubric.mdx`                             | Split   | Authoritative but long; consider one page per dimension or collapsible sections.         |
+| `scoring/evidence.mdx`                           | Keep    | Strong.                                                                                  |
+| `scoring/scorecard-format.mdx`                   | Tighten | Very short; maybe fold into scoring index or keep as schema reference.                   |
+| `scoring/delta-scorecard.mdx`                    | Keep    | Useful.                                                                                  |
+| `scoring/clustering.mdx`                         | Keep    | Strong.                                                                                  |
+| `scoring/calibration.mdx`                        | Tighten | Good but should be lower-priority advanced material.                                     |
+| `reference-links/index.mdx`                      | Keep    | Source appendix.                                                                         |
+| `reference-links/coverage-map.mdx`               | Keep    | Useful internal maintenance page.                                                        |
+| `tooling-catalog/index.mdx`                      | Split   | 9k+ words; move to catalog-style route or split by category.                             |
 
 ## Immediate Fix List
 

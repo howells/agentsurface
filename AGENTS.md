@@ -104,13 +104,13 @@ If you are an agent entering this repository cold, the usual read order is:
 
 This repository is designed to be understood by multiple agent runtimes:
 
-| Runtime | Discovery Path |
-|---------|---------------|
-| **Claude Code** | Reads this `AGENTS.md` + loads `skills/surface/SKILL.md` as a skill |
-| **Codex CLI** | Reads this `AGENTS.md`, follows link to `SKILL.md` for instructions |
-| **Cursor** | Reads this `AGENTS.md` for project context |
-| **GitHub Copilot** | Reads this `AGENTS.md` for project context |
-| **Devin / Jules** | Reads this `AGENTS.md` for project context |
+| Runtime            | Discovery Path                                                      |
+| ------------------ | ------------------------------------------------------------------- |
+| **Claude Code**    | Reads this `AGENTS.md` + loads `skills/surface/SKILL.md` as a skill |
+| **Codex CLI**      | Reads this `AGENTS.md`, follows link to `SKILL.md` for instructions |
+| **Cursor**         | Reads this `AGENTS.md` for project context                          |
+| **GitHub Copilot** | Reads this `AGENTS.md` for project context                          |
+| **Devin / Jules**  | Reads this `AGENTS.md` for project context                          |
 
 For any runtime, the entry point is this file. The skill instructions in `SKILL.md` are plain markdown and can be followed by any agent that reads files.
 

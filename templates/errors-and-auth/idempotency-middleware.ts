@@ -175,7 +175,7 @@ export function withIdempotency(
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
     if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
-      return handler(req);
+      return await handler(req);
     }
 
     const idempotencyKey = req.headers.get(IDEMPOTENCY_KEY_HEADER);

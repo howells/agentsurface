@@ -17,10 +17,10 @@ import * as crypto from "node:crypto";
  * DPoP keypair manager
  */
 export class DPoP {
-  private publicKeyPEM: string;
-  private privateKeyPEM: string;
+  private readonly publicKeyPEM: string;
+  private readonly privateKeyPEM: string;
   private publicKeyJWK: { kty: string; crv: string; x: string; y: string } | null = null;
-  private claimTtlSeconds: number;
+  private readonly claimTtlSeconds: number;
 
   constructor(opts: { publicKeyPEM: string; privateKeyPEM: string; claimTtlSeconds?: number }) {
     this.publicKeyPEM = opts.publicKeyPEM;
@@ -162,7 +162,7 @@ export class DPoP {
       throw new Error(`HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
     }
 
-    return response.json() as Promise<T>;
+    return await (response.json() as Promise<T>);
   }
 }
 

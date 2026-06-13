@@ -176,7 +176,8 @@ async function main() {
   }
 }
 
-export { embedDocuments, EmbeddedDocument, truncateEmbedding, estimateCost };
+export type { EmbeddedDocument };
+export { embedDocuments, truncateEmbedding, estimateCost };
 
 if (import.meta.main) {
   main().catch(console.error);
