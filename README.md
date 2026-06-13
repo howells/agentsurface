@@ -71,6 +71,7 @@ Core outputs:
 
 High-signal parts of the repo:
 
+- [`docs/agent-surface-product-vision.md`](./docs/agent-surface-product-vision.md) - strategic product vision for Agent Surface as a standard, scorecard, and transformation toolkit
 - [`skills/surface/`](./skills/surface/) - main skill entrypoint, scoring references, specialist agents, and agent system scaffolding
 - [`src/content/docs/agents/framework-selection.mdx`](./src/content/docs/agents/framework-selection.mdx) - current framework selection guidance
 - [`src/content/docs/agents/anthropic-platform.mdx`](./src/content/docs/agents/anthropic-platform.mdx) - Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, and Anthropic platform notes
