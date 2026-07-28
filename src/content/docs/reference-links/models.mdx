@@ -1,39 +1,43 @@
 ---
 title: Model Reference
 description: Canonical July 2026 model IDs for every provider — the single source of truth for the model-ID integrity check.
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 This is the canonical list of model IDs Agent Surface uses in examples. Every model-ID string in the docs and in the template kits must appear here. `scripts/check-docs-integrity.mjs` parses this page's code-formatted IDs into an allowlist and flags any model-ID-shaped string elsewhere in the corpus that is not on it. Update this page first, then run the sweep.
 
-Verified against provider documentation on 2026-07-06.
+Verified against provider documentation on 2026-07-28.
 
 ## Anthropic
 
-| Model     | API ID                      | Role                | Notes                                                                               |
-| --------- | --------------------------- | ------------------- | ----------------------------------------------------------------------------------- |
-| Fable 5   | `claude-fable-5`            | Flagship            | Highest-capability model; deep reasoning and long tasks.                            |
-| Opus 4.8  | `claude-opus-4-8`           | Recommended default | Best general default for complex agent work.                                        |
-| Sonnet 5  | `claude-sonnet-5`           | Balanced            | Fast iteration and everyday agent loops.                                            |
-| Haiku 4.5 | `claude-haiku-4-5-20251001` | Fast / low cost     | Cheap evals, classification, high-volume calls. Dateless alias: `claude-haiku-4-5`. |
+| Model     | API ID                      | Role                | Notes                                                                                     |
+| --------- | --------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| Fable 5   | `claude-fable-5`            | Flagship            | Highest-capability model; deep reasoning and long tasks.                                  |
+| Opus 5    | `claude-opus-5`             | Recommended default | Released 2026-07-24. Near-Fable capability at half the price; 1M context, effort control. |
+| Sonnet 5  | `claude-sonnet-5`           | Balanced            | Fast iteration and everyday agent loops.                                                  |
+| Haiku 4.5 | `claude-haiku-4-5-20251001` | Fast / low cost     | Cheap evals, classification, high-volume calls. Dateless alias: `claude-haiku-4-5`.       |
 
-**Retired 2026-06-15:** Opus 4 and Sonnet 4. Older pins from that era — Opus 4.7 and Sonnet 4.6 — are no longer valid; the model-ID check flags any that remain in examples. Replace flagship pins with `claude-opus-4-8` and balanced pins with `claude-sonnet-5`.
+**Retired 2026-06-15:** Opus 4 and Sonnet 4. Older pins from that era — Opus 4.7 and Sonnet 4.6 — are no longer valid. **Superseded 2026-07-24:** Opus 4.8 remains available in the API but is no longer the recommended default; the model-ID check flags remaining Opus 4.8 pins in examples. Replace default pins with `claude-opus-5` and balanced pins with `claude-sonnet-5`.
 
 ## OpenAI
 
-| Model   | API ID    | Role       | Notes                                                                      |
-| ------- | --------- | ---------- | -------------------------------------------------------------------------- |
-| GPT-5.5 | `gpt-5.5` | Flagship   | Use where an example calls for OpenAI's most capable model.                |
-| GPT-5.4 | `gpt-5.4` | Value tier | Cost-efficient default; correct wherever a cheaper OpenAI model is wanted. |
+| Model         | API ID          | Role       | Notes                                                                          |
+| ------------- | --------------- | ---------- | ------------------------------------------------------------------------------ |
+| GPT-5.6 Sol   | `gpt-5.6-sol`   | Flagship   | GA 2026-07-09. Deepest reasoning tier; the bare alias `gpt-5.6` routes to Sol. |
+| GPT-5.6 Terra | `gpt-5.6-terra` | Balanced   | Mid tier — most capability per dollar for everyday agent work.                 |
+| GPT-5.6 Luna  | `gpt-5.6-luna`  | Value tier | Fastest and cheapest; correct wherever a cheaper OpenAI model is wanted.       |
 
-The o-series reasoning models (o1, o3, o4 family) were deprecated in June 2026, with removal scheduled for December 2026. Do not use them in examples.
+**Superseded 2026-07-09:** GPT-5.5 and GPT-5.4 remain available but the GPT-5.6 tiers replace them in examples — the model-ID check flags remaining GPT-5.5/5.4 pins. The o-series reasoning models (o1, o3, o4 family) were deprecated in June 2026, with removal scheduled for December 2026. Do not use them in examples.
 
 ## Google
 
-| Model                    | API ID                   | Role    | Notes                                               |
-| ------------------------ | ------------------------ | ------- | --------------------------------------------------- |
-| Gemini 3.5 Flash         | `gemini-3.5-flash`       | Current | Default Google model for agent and eval examples.   |
-| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview | Higher-capability preview; pin the full preview ID. |
+| Model                    | API ID                   | Role    | Notes                                                                        |
+| ------------------------ | ------------------------ | ------- | ---------------------------------------------------------------------------- |
+| Gemini 3.6 Flash         | `gemini-3.6-flash`       | Current | GA 2026-07-21. Default Google model for agent and eval examples.             |
+| Gemini 3.5 Flash-Lite    | `gemini-3.5-flash-lite`  | Fast    | GA 2026-07-21. Fastest 3.5-series model for high-volume, low-cost calls.     |
+| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview | Higher-capability preview; still preview as of 2026-07-28 — pin the full ID. |
+
+**Superseded 2026-07-21:** Gemini 3.5 Flash is replaced by Gemini 3.6 Flash as the example default; the model-ID check flags remaining 3.5 Flash pins. (Gemini 3.5 Pro has not reached GA.)
 
 ## Embeddings
 

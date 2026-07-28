@@ -1,7 +1,7 @@
 ---
 title: Well-Known Discovery Endpoints
 description: Standardized /.well-known/ paths that let agents and protocols discover your capabilities programmatically
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -210,7 +210,7 @@ This format is still evolving. If you publish it, use it as a compatibility poin
 
 ### WebMCP — Tools Exposed In-Browser
 
-The well-known MCP files above advertise a _remote_ MCP server. WebMCP is the in-browser counterpart: a W3C proposal that lets a site expose callable tools to an agent running inside the page through a `navigator.modelContext` browser API, rather than pointing at a separate server. It shipped a Chrome 149 origin trial, so you can experiment behind a flag, but the API surface is unstable and there is no cross-browser commitment yet. Track it on the [emerging standards watchlist](/docs/protocols/emerging-standards); publish a server card for anything you need agents to reach today.
+The well-known MCP files above advertise a _remote_ MCP server. WebMCP is the in-browser counterpart: a W3C proposal that lets a site expose callable tools to an agent running inside the page through a `navigator.modelContext` browser API, rather than pointing at a separate server. It shipped a Chrome origin trial spanning Chrome 149–156, so you can experiment behind a flag, but the API surface is unstable and there is no cross-browser commitment yet. Track it on the [emerging standards watchlist](/docs/protocols/emerging-standards); publish a server card for anything you need agents to reach today.
 
 ## /.well-known/agent-skills/index.json
 

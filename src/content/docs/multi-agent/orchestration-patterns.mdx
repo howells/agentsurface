@@ -259,21 +259,21 @@ from autogen import ConversableAgent, GroupChat, GroupChatManager
 writer = ConversableAgent(
     name="Writer",
     system_message="You write first drafts based on the brief provided.",
-    llm_config={"model": "gpt-5.5"}
+    llm_config={"model": "gpt-5.6-sol"}
 )
 
 critic = ConversableAgent(
     name="Critic",
     system_message="You review drafts and provide specific, actionable feedback. "
                    "Identify gaps, inaccuracies, and structural problems.",
-    llm_config={"model": "gpt-5.5"}
+    llm_config={"model": "gpt-5.6-sol"}
 )
 
 editor = ConversableAgent(
     name="Editor",
     system_message="You apply the critic's feedback to improve the draft. "
                    "Preserve the writer's voice while addressing all critique points.",
-    llm_config={"model": "gpt-5.5"}
+    llm_config={"model": "gpt-5.6-sol"}
 )
 
 groupchat = GroupChat(
@@ -285,7 +285,7 @@ groupchat = GroupChat(
 
 manager = GroupChatManager(
     groupchat=groupchat,
-    llm_config={"model": "gpt-5.5"}
+    llm_config={"model": "gpt-5.6-sol"}
 )
 
 # Initiate with the brief

@@ -1,7 +1,7 @@
 ---
 title: Real-World MCP Patterns
 description: Recurring patterns in GitHub, Stripe, and Vercel MCP server designs
-lastVerified: 2026-06-02
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -12,7 +12,7 @@ The examples below use recurring implementation patterns: toolset grouping, envi
 - Startup configuration: load toolsets/features at server start
 - Environment-based: use env vars for API keys, endpoints, features
 - Error recovery: structured errors guide agents toward retry or alternate paths
-- Logging: use MCP logging facilities, write to stderr
+- Logging: write to stderr on stdio, OpenTelemetry on HTTP — the MCP logging facility is Deprecated in `2026-07-28`
 - GitHub, Stripe, Vercel all use 10-60 tools per server (not 300)
 
 Production MCP servers from major platforms go beyond the spec in similar ways. The GitHub MCP server, Stripe's agent toolkit, and Vercel's MCP server each deal with tool explosion, auth flexibility, and deployment variety.

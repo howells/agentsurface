@@ -392,6 +392,34 @@ server.registerTool("search_tools", ..., async (params) => {
 
 ---
 
+## Messaging Channels Are a Separate Axis
+
+Everything above routes _outbound_ actions: the agent decides to do something in an external app and needs to find the right action to call. Slack, Teams, Discord, Telegram, and WhatsApp look like more of the same — "post a message" is an action in a catalog — but treating them that way misses what they actually are. They are _inbound_ surfaces: places a user talks to the agent, with threads, mentions, interactive components, and their own delivery and session rules.
+
+Historically that meant a separate bot layer. You built a Slack app, normalized its events, forwarded them to the agent over HTTP, and wrote the reverse path back. The bot layer owned the platform quirks; the agent owned the reasoning; the seam between them owned all the bugs.
+
+That layer has moved inside the frameworks. The pattern now is a **channel adapter** configured on the agent itself, with the framework mounting the webhook route and handling the platform-shaped work — signature verification, thread and message identity, streaming into an editable message, interactive components:
+
+```typescript
+// The agent declares which surfaces it speaks on, not which bot forwards to it.
+const agent = new Agent({
+  // ...
+  channels: {
+    adapters: {
+      slack: createSlackAdapter(),
+      telegram: createTelegramAdapter(),
+    },
+  },
+});
+// Framework mounts: /api/agents/<agentId>/channels/<platform>/webhook
+```
+
+Two reference points, both shipped rather than proposed. [Mastra](/docs/agents/framework-selection) has channels as a first-class agent capability since `@mastra/core@1.22.0`, covering Slack, Microsoft Teams, Discord, Telegram, and WhatsApp directly, and reaching further platforms — GitHub, Linear — through compatible Chat SDK adapters. Vercel's [Chat SDK](https://chat-sdk.dev/) is the other: a single codebase targeting Slack, Microsoft Teams, Google Chat, Discord, Telegram, WhatsApp, GitHub, and Linear through one adapter interface, usable standalone or as the layer a framework builds on.
+
+The tradeoff is real, so make it deliberately. In-framework adapters collapse the seam and stop you re-solving thread identity per platform; they also couple your conversational surface to the framework's release cadence and give you less room when a platform needs behavior the adapter did not anticipate. Two things stay yours either way: platform session rules — WhatsApp's 24-hour free-form window is the usual one — and the [notification-to-conversation](/docs/cookbook/notification-to-conversation) context that makes a reply on any of these surfaces resolvable.
+
+---
+
 ## Checklist
 
 - [ ] Replace pre-registered external tools with `search_tools` + `multi_execute_tool`.
@@ -411,3 +439,4 @@ server.registerTool("search_tools", ..., async (params) => {
 - [Agentic Loop](/docs/cookbook/agentic-loop) — where tools are called.
 - [Tool Design](/docs/tool-design) — tool schema and descriptions.
 - [Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — another scaling pattern for large tool counts.
+- [Notification-to-Conversation Continuity](/docs/cookbook/notification-to-conversation) — making a reply on a messaging channel resolvable.

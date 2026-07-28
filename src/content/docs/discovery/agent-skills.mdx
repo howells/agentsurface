@@ -87,6 +87,24 @@ Publish it at:
 
 Only publish skills that are real, reviewed, and kept current with the product.
 
+## Runtime Consumption
+
+Skills started as a coding-CLI convention: a folder an assistant reads off disk while you work in a repository. That is no longer the only consumer. The [Agent Skills specification](https://agentskills.io) is now loaded at runtime by agent frameworks, which point a workspace at one or more skill directories and expose the library to the agent as tools.
+
+The tool surface is small and consistent, and it is progressive disclosure made concrete:
+
+| Tool           | What it does                                                                     |
+| -------------- | -------------------------------------------------------------------------------- |
+| `skill`        | Loads one skill's full instructions and returns them in the tool result.         |
+| `skill_read`   | Reads a file from a skill's `references/`, `scripts/`, or `assets/` directory.   |
+| `skill_search` | Searches across all skill content, via BM25 or vectors where those are wired up. |
+
+Only the catalog — each skill's `name` and `description` — goes into the system message. The body of a skill costs nothing until the agent calls `skill` for it, and a skill's supporting files cost nothing until it calls `skill_read`. This is the same economics that made the format work in a CLI, applied to a long-running server-side agent.
+
+Two things follow. First, the metadata discipline above is now load-bearing in a second place: `description` is what a running agent routes on, not only what a human scans. Second, the same folder can serve a coding assistant on a laptop and a deployed agent in a workspace without a translation layer — which is the strongest available evidence that the format has outgrown its origin.
+
+[Mastra](/docs/agents/framework-selection) Workspaces is one implementation, loading skill folders from configured directories or glob patterns and exposing `skill`, `skill_read`, and `skill_search` while listing the available skills in the system message. The format is the portable part.
+
 ## Skills Vs Other Files
 
 | File            | Role                                                         |
@@ -103,5 +121,6 @@ Skills complement MCP. MCP exposes callable tools; skills teach an agent when an
 
 - [Reference Links](/docs/reference-links)
 - [Well-Known Endpoints](/docs/discovery/well-known-endpoints)
+- [Sandboxes and Workspaces](/docs/agents/sandboxes-and-workspaces)
 - [Agent Knowledge Packaging](/docs/cli-design/agent-knowledge-packaging)
 - [Context Files](/docs/context-files)

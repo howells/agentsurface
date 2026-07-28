@@ -36,7 +36,7 @@ Research from Zheng et al. (MT-Bench) and Anthropic's evaluation posts identifie
 
 ### Self-preference bias
 
-A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.4 to judge outputs from Claude Opus 4.8, the judge may systematically overrate outputs that look like GPT-style reasoning.
+A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.6 to judge outputs from Claude Opus 5, the judge may systematically overrate outputs that look like GPT-style reasoning.
 
 **Mitigation:** Use a judge from a different model family and calibrate it against human-labeled examples. For pairwise comparisons, run at least some cross-provider checks so style similarity does not become a hidden scoring advantage.
 
@@ -150,7 +150,7 @@ async function calibratedJudge(
     .join("\n\n");
 
   const score = await callLLM({
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     prompt: `
 You are grading agent outputs on a scale of 0-1.
 
@@ -233,7 +233,7 @@ async function pairwiseRank(
       : [outputB, outputA, "B", "A"];
 
     const result = await callLLM({
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       prompt: `
 Task: ${task}
 

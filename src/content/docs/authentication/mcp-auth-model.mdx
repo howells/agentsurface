@@ -1,6 +1,7 @@
 ---
 title: MCP Authorization
 description: OAuth protected-resource metadata, client registration, and token handling for HTTP MCP servers
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -20,7 +21,7 @@ Key pieces:
 - Protected-resource metadata advertises which authorization server protects the MCP endpoint.
 - MCP clients must use protected-resource metadata for authorization-server discovery.
 - Authorization servers and MCP clients should support OAuth Client ID Metadata Documents.
-- Dynamic client registration remains a fallback option.
+- RFC 7591 dynamic client registration is Deprecated in `2026-07-28` in favor of Client ID Metadata Documents; it remains available for backward compatibility.
 - Access tokens must be sent in the `Authorization: Bearer <token>` header and must not be placed in URLs.
 - Tokens must be audience-bound to the MCP server resource.
 
@@ -84,13 +85,21 @@ https://auth.example.com/tenant1/.well-known/openid-configuration
 
 MCP supports three client registration approaches:
 
-| Approach                           | Use when                                                                                                                              |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre-registration                   | The client and authorization server already have a relationship.                                                                      |
-| OAuth Client ID Metadata Documents | The client and authorization server do not have a prior relationship, and the authorization server supports URL-formatted client IDs. |
-| Dynamic client registration        | The authorization server supports RFC 7591 and dynamic registration is appropriate.                                                   |
+| Approach                                 | Use when                                                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-registration                         | The client and authorization server already have a relationship.                                                                      |
+| OAuth Client ID Metadata Documents       | The client and authorization server do not have a prior relationship, and the authorization server supports URL-formatted client IDs. |
+| Dynamic client registration (deprecated) | The authorization server supports RFC 7591 and no better option is available.                                                         |
 
 When several options exist, clients should prefer pre-registered client details, then Client ID Metadata Documents when supported, then dynamic client registration as a fallback.
+
+<Callout type="warn">
+  Changing in `2026-07-28`: RFC 7591 dynamic client registration is Deprecated in favor of Client ID
+  Metadata Documents, under the same 12-month minimum deprecation window as the rest of the new
+  lifecycle policy. It keeps working for backward compatibility, but new clients and authorization
+  servers should implement Client ID Metadata Documents instead. Where you must still support DCR,
+  the `application_type` field becomes required in the registration request (SEP-837).
+</Callout>
 
 ## Client ID Metadata Documents
 
@@ -152,6 +161,20 @@ When a request lacks sufficient scope, the server should use normal OAuth error 
 
 Clients should treat a challenged scope as authoritative for satisfying that request. They should not assume it is always identical to the full `scopes_supported` list.
 
+## Changing in 2026-07-28
+
+The `2026-07-28` revision — the newest, with its release candidate locked 2026-05-21 and final publication scheduled for 2026-07-28 — hardens this model in four places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
+
+**Issuer validation (SEP-2468)** — clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer.
+
+**Credentials bound to their issuing authorization server (SEP-2352)** — client credentials must be stored keyed by issuer, used only with the authorization server that issued them, and re-registered when a server's issuer changes. A credential cached against an MCP server URL rather than an issuer is the bug this closes.
+
+**`application_type` required in dynamic client registration (SEP-837)** — where you still support RFC 7591 registration, the request must declare `application_type`. Registration requests that omit it are no longer well-formed.
+
+**Dynamic client registration Deprecated** — RFC 7591 registration is Deprecated in favor of Client ID Metadata Documents, as described above.
+
+Two structural changes also touch authorization even though they are not auth features. Sessions are removed, so there is no connect-time authentication step and every request must carry and be validated against its own token — which is what this page already requires. And Streamable HTTP POSTs must carry `Mcp-Method` and `Mcp-Name` headers, which gives a gateway or proxy enough information to apply per-method authorization policy without parsing the JSON-RPC body.
+
 ## Checklist
 
 - [ ] HTTP MCP endpoint uses HTTPS.
@@ -159,7 +182,9 @@ Clients should treat a challenged scope as authoritative for satisfying that req
 - [ ] Protected-resource metadata includes `authorization_servers`.
 - [ ] MCP client discovers authorization server metadata through OAuth or OIDC discovery.
 - [ ] Client supports pre-registration and Client ID Metadata Documents where relevant.
-- [ ] Dynamic client registration is only used where the authorization server supports it.
+- [ ] Dynamic client registration is only used where no better option exists, and sends `application_type`.
+- [ ] Client validates the `iss` parameter on the authorization response against the discovered issuer.
+- [ ] Client credentials are stored keyed by issuer and re-registered when an issuer changes.
 - [ ] Access tokens are sent with `Authorization: Bearer`.
 - [ ] Access tokens are audience-bound with the OAuth `resource` parameter.
 - [ ] Server rejects tokens issued for a different resource.
@@ -171,4 +196,5 @@ Clients should treat a challenged scope as authoritative for satisfying that req
 - [Protected Resource Metadata](/docs/authentication/protected-resource-metadata)
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents)
 - [auth.md](/docs/authentication/auth-md)
-- [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+- [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) — the revision this page describes
+- [MCP draft changelog](https://modelcontextprotocol.io/specification/draft/changelog) — the `2026-07-28` authorization changes, SEP by SEP

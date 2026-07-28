@@ -1,7 +1,7 @@
 ---
 title: Anthropic Platform
 description: "Current Claude platform surfaces for agent systems: Managed Agents, Claude Code, the Claude Agent SDK, Agent Skills, the MCP connector, built-in tools, and July 2026 model and runtime changes."
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -100,10 +100,10 @@ Prefer custom tools or MCP when the capability is product-specific, authenticate
 
 ## Model Guidance
 
-Use current model discovery and migration docs rather than hard-coding old IDs. As of 2026-07-06:
+Use current model discovery and migration docs rather than hard-coding old IDs. As of 2026-07-28:
 
 - **Fable 5** (`claude-fable-5`) is the flagship, GA since 2026-06-09.
-- **Opus 4.8** (`claude-opus-4-8`) is the recommended default for most agent and coding work.
+- **Opus 5** (`claude-opus-5`) released 2026-07-24 and is the recommended default for most agent and coding work — 1M context, effort control, $5/$25 per million tokens (input/output). It superseded Opus 4.8, which is still API-available but no longer the default.
 - **Sonnet 5** (`claude-sonnet-5`) released 2026-06-30 as the mid-tier workhorse.
 - **Haiku 4.5** remains the low-latency, low-cost option.
 - **Sonnet 4 and Opus 4 were retired on 2026-06-15** — that retirement is executed, not pending. Do not scaffold against those IDs.
@@ -111,7 +111,7 @@ Use current model discovery and migration docs rather than hard-coding old IDs. 
 
 Runtime changes that affect cost, latency, and request shape:
 
-- From the 4.6 generation onward, pinned model IDs are **dateless** (for example `claude-opus-4-8`). Do not append a date suffix to current IDs.
+- From the 4.6 generation onward, pinned model IDs are **dateless** (for example `claude-opus-5`). Do not append a date suffix to current IDs.
 - A **new tokenizer** ships on Opus 4.7 and later, Fable 5, and Sonnet 5. The same text produces roughly 30% more tokens, so recompute cost and context budgets instead of reusing older estimates.
 - On **Opus 4.7 and later**, `temperature`, `top_p`, and `top_k` are deprecated and return a 400 error. Use the effort and thinking controls to tune cost and latency instead.
 - Prefer model discovery over hard-coded assumptions where the app can query available models and their capabilities.

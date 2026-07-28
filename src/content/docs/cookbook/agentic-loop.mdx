@@ -48,7 +48,7 @@ export async function streamAssistant(params: {
   maxSteps?: number;
 }) {
   const agent = new ToolLoopAgent({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-luna"),
     instructions: params.systemPrompt,
     tools: {
       ...params.tools,
@@ -111,7 +111,7 @@ export async function generateMonthlyInsights(params: {
   monthData: TransactionData[];
 }): Promise<string> {
   const { text } = await generateText({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-luna"),
     system: buildInsightsPrompt(params.userId),
     messages: [
       {
@@ -202,7 +202,7 @@ const client = new OpenAI({
 async function runOpenAIAgent(userMessage: string) {
   const stream = await client.agents.stream({
     name: "my-agent",
-    model: "gpt-5.5",
+    model: "gpt-5.6-sol",
     instructions: "You are a helpful assistant...",
     tools: [
       {
@@ -246,7 +246,7 @@ Production agents hold connections (MCP clients, database pools, Redis) that mus
 
 ```typescript
 const agent = new ToolLoopAgent({
-  model: openai("gpt-5.4"),
+  model: openai("gpt-5.6-luna"),
   instructions: systemPrompt,
   tools: allTools,
   stopWhen: stepCountIs(10),
@@ -394,7 +394,7 @@ async function chatLoop(userMessage: string) {
 
   for (let step = 0; step < 10; step++) {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-5.6-luna",
       messages,
       tools: Object.entries(toolDefs).map(([name, def]) => ({
         type: "function",
@@ -429,7 +429,7 @@ async function chatLoop(userMessage: string) {
 ```typescript
 async function chatLoop(userMessage: string) {
   const agent = new ToolLoopAgent({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-luna"),
     instructions: systemPrompt,
     tools,
     stopWhen: stepCountIs(10),

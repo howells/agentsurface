@@ -44,7 +44,7 @@ describe("Agent Evals", () => {
 
   beforeEach(() => {
     agent = new MyAgent({
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       temperature: 0, // Deterministic for evals
       maxRetries: 1,
     });
@@ -117,7 +117,7 @@ For reproducibility, pin the LLM seed. Most providers support `seed` parameter:
 
 ```typescript
 const agent = new MyAgent({
-  model: "claude-opus-4-8",
+  model: "claude-opus-5",
   seed: 12345, // Fixed seed for reproducible routing
   temperature: 0,
 });
@@ -286,7 +286,7 @@ const agentRouting = new MyAgent({
 });
 
 const agentQuality = new MyAgent({
-  model: "claude-opus-4-8",
+  model: "claude-opus-5",
 });
 
 // Routing tests: fast + cheap
@@ -297,7 +297,7 @@ const agentQuality = new MyAgent({
 
 - Template: `/templates/cli-and-evals/eval-vitest-harness.ts` — full working example
 - Vitest docs: https://vitest.dev/
-- Claude Code SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
+- Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
 
 ## See also
 

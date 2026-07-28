@@ -1,11 +1,12 @@
 ---
 title: MCP Authentication
 description: Securing MCP servers with bearer tokens, identity proxies, and OAuth 2.1
+lastVerified: 2026-07-28
 ---
 
 ## Summary
 
-MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers (November 2025 spec). Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
+MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers, from the `2025-11-25` revision onward. Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
 
 ```
 Use Case              Approach
@@ -24,7 +25,7 @@ Public servers        OAuth 2.1
 
 An unauthenticated MCP server is an unauthenticated API. Any tool it exposes — including destructive ones — is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
 
-The November 2025 MCP specification mandates OAuth 2.1 for publicly accessible servers. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
+The `2025-11-25` MCP specification mandates OAuth 2.1 for publicly accessible servers, and the newer `2026-07-28` revision keeps that requirement while hardening it. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
 
 ## Approach 1: Bearer Token
 
@@ -120,9 +121,20 @@ app.post("/mcp", (req, res, next) => {
 
 ## Approach 3: OAuth 2.1 with PKCE
 
-OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers as of the November 2025 MCP specification. It is the only authentication method that supports delegated authorization — where an agent acts on behalf of a user without the user handing over their credentials.
+OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers as of the `2025-11-25` MCP specification. It is the only authentication method that supports delegated authorization — where an agent acts on behalf of a user without the user handing over their credentials.
 
 The protocol-level model — protected-resource metadata discovery, authorization-server discovery, client registration options, and token audience binding — lives in [MCP Authorization](/docs/authentication/mcp-auth-model). This section is the server-implementer view: the endpoints you expose, PKCE, token validation, scope enforcement, and the on-behalf-of flow. Read the canonical page first if you need the full OAuth 2.1 discovery and registration flow; use this page to implement it.
+
+<Callout type="info">
+  Changing in `2026-07-28`: clients must validate the authorization response's `iss` parameter per
+  RFC 9207 (SEP-2468) and must key stored client credentials by issuer, using them only with the
+  authorization server that issued them and re-registering when an issuer changes (SEP-2352). RFC
+  7591 dynamic client registration is Deprecated in favor of Client ID Metadata Documents, and where
+  you still accept DCR the `application_type` field becomes required (SEP-837). The server-side work
+  on this page is unaffected — you validate a bearer token per request either way, which is exactly
+  what the stateless core assumes now that sessions are gone. See [MCP
+  Authorization](/docs/authentication/mcp-auth-model) for the full list.
+</Callout>
 
 ### Required .well-known Endpoints
 

@@ -1,7 +1,7 @@
 ---
 title: Agentic Commerce Protocol (ACP)
 description: Open commerce standard from OpenAI and Stripe for transactions between AI agents, buyers, and merchants
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 <Callout type="warn">
@@ -388,10 +388,27 @@ Generate idempotency keys from the conversation context — for example, a hash 
 
 ACP is appropriate for controlled pilots where agent-initiated commerce requires explicit payment boundaries and audit trails. Treat it as Beta and deflating: after the March 2026 Instant Checkout shutdown, broader industry momentum has moved to Google's UCP. For mission-critical payments, evaluate current merchant support, tooling maturity, and your risk controls carefully, and weigh the foundation-backed alternatives before committing.
 
+## The Other ACP: Agent Client Protocol as a Delegation Interface
+
+Nothing in this section applies to the commerce protocol above. It covers the second entry in the disambiguation callout — the Zed-originated [Agent Client Protocol](https://agentclientprotocol.com/overview/introduction) — because that protocol has picked up a use case worth recording, and the name collision makes it easy to miss.
+
+ACP was designed so an editor could talk to a coding agent: the editor is the client, the agent is a subprocess, and they exchange newline-delimited JSON over stdin/stdout. The newer use is the same wire protocol pointed the other way. An agent framework acts as the client, and a coding agent — Claude Code, Amp, Codex, or anything else that speaks ACP over stdio — becomes a **callable subagent**: a delegate the parent agent hands a task to and reads results back from, rather than a tool a human drives from an editor pane.
+
+This makes ACP a delegation interface with properties that a plain shell-out does not have:
+
+- **Sessions, not one-shot invocations.** The child process is kept alive across calls so the delegate accumulates context, instead of re-reading the repository on every request. Isolating each prompt in a fresh process is the opt-out, not the default.
+- **Permission requests are structured events.** When the delegate wants to write a file, that arrives as a request the parent answers — auto-approve, prompt a human, or apply a policy — rather than as a side effect discovered afterward. This is the seam where [human-in-the-loop](/docs/multi-agent/human-in-the-loop) controls attach.
+- **The transport is already implemented on both sides.** Coding agents ship ACP support to serve editors; a framework that speaks the client half gets every one of them without per-vendor adapters.
+
+Compare with the alternatives before reaching for it. [A2A](/docs/protocols/a2a) is the choice for delegation across a network boundary between separately deployed agents. [MCP](/docs/protocols/mcp) is the choice when the delegate is a tool rather than an agent. ACP fits the narrow, real case in between: a full coding agent running as a local child process, driven programmatically.
+
+[Mastra](/docs/agents/framework-selection) is a shipped implementation, wrapping an ACP agent as a subagent (`AcpAgent`, with `generate()` and `stream()`, `persistSession` on by default, and an `onPermissionRequest` hook) or packaging one as a callable tool via `createACPTool()`. The protocol is the portable part.
+
 ## Spec References
 
 - [ACP specification and documentation](https://agenticcommerce.dev)
 - [OpenAPI specs under `spec/2026-04-17`](https://github.com/agentic-commerce-protocol/agentic-commerce-protocol/tree/main/spec/2026-04-17/openapi)
+- [Agent Client Protocol](https://agentclientprotocol.com/overview/introduction) — the unrelated editor-to-agent standard discussed above
 
 ## Related Pages
 

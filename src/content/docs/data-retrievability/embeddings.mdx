@@ -37,7 +37,7 @@ Dense embeddings transform text into fixed-length vectors suitable for nearest-n
 Matryoshka embeddings allow storing full dimensions (1,536) but using smaller dimensions (256, 512) at query time:
 
 ```typescript
-import { Pinecone } from "@pinecone-client/web";
+import { Pinecone } from "@pinecone-database/pinecone";
 import OpenAI from "openai";
 
 const openai = new OpenAI();

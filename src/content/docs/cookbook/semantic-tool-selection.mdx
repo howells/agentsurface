@@ -20,7 +20,7 @@ Passing 50+ tool definitions to the model per request wastes tokens and dilutes 
 ```typescript
 // ❌ Don't do this at scale
 const agent = new ToolLoopAgent({
-  model: openai("gpt-5.4"),
+  model: openai("gpt-5.6-luna"),
   instructions: systemPrompt,
   tools: {
     // 50+ tools, all passed to every request
@@ -152,7 +152,7 @@ export async function streamAssistant(params: {
   });
 
   const agent = new ToolLoopAgent({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-luna"),
     instructions: params.systemPrompt,
     tools: allTools,
     prepareStep, // ← Filter tools per turn

@@ -38,7 +38,7 @@ async function runAgent(prompt: string) {
   const span = tracer.startSpan("llm.completion", {
     attributes: {
       "gen_ai.provider.name": "anthropic",
-      "gen_ai.request.model": "claude-opus-4-8",
+      "gen_ai.request.model": "claude-opus-5",
       "gen_ai.input.messages": JSON.stringify([{ role: "user", content: prompt }]),
       "gen_ai.usage.input_tokens": 150,
       "gen_ai.usage.output_tokens": 300,
@@ -48,7 +48,7 @@ async function runAgent(prompt: string) {
 
   try {
     const response = await callClaude({
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -70,7 +70,7 @@ async function runAgentWithTools(prompt: string) {
   const span = tracer.startSpan("agent.run", {
     attributes: {
       "gen_ai.provider.name": "anthropic",
-      "gen_ai.request.model": "claude-opus-4-8",
+      "gen_ai.request.model": "claude-opus-5",
     },
   });
 
@@ -111,7 +111,7 @@ async function runAgentWithTools(prompt: string) {
 **Core attributes** (on every LLM span):
 
 - `gen_ai.provider.name` — "anthropic", "openai", "google"
-- `gen_ai.request.model` — e.g., "claude-opus-4-8"
+- `gen_ai.request.model` — e.g., "claude-opus-5"
 - `gen_ai.input.messages` — JSON array of messages (or hash if large)
 - `gen_ai.output.messages` — model's response
 - `gen_ai.usage.input_tokens` — prompt tokens
@@ -151,7 +151,7 @@ traceloop.initialize({
 // Automatic instrumentation for Claude SDK
 const client = new Anthropic();
 const response = await client.messages.create({
-  model: "claude-opus-4-8",
+  model: "claude-opus-5",
   messages: [{ role: "user", content: "Hello" }],
 });
 // Traceloop automatically sends a span with gen_ai attributes

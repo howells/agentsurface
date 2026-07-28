@@ -327,7 +327,7 @@ When `needsApproval` returns true, the AI SDK pauses the tool loop and returns a
 ```typescript
 // Server-side: stream with tool approval support
 const { textStream, toolCalls, toolResults } = await streamText({
-  model: openai("gpt-5.5"),
+  model: openai("gpt-5.6-sol"),
   tools: { sendNotification: sendNotificationTool, deploy: deployTool },
   messages: conversationHistory,
   experimental_toolCallStreaming: true,

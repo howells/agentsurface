@@ -1,6 +1,7 @@
 ---
 title: Cross-Framework Portability
 description: Defining tools once and exporting adapters for MCP, Claude Code SDK, and OpenAI
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -404,6 +405,8 @@ server.tool(
 );
 ```
 
+The MCP adapter is also the layer where schema dialect differences bite. MCP's `2026-07-28` revision widens `inputSchema` and `outputSchema` to any JSON Schema 2020-12 keyword including `$ref` (SEP-2106), while several other frameworks still accept only a flat subset. Keep the shared registry on the narrowest dialect all your targets accept and let each adapter widen from there, rather than authoring `$ref`-heavy schemas that only the MCP adapter can carry.
+
 ### Dynamic Tool Selection (Anthropic/OpenAI)
 
 For agents with >20 tools, use framework-specific dynamic loading:
@@ -523,7 +526,7 @@ src/
 
 - `/templates/tools-and-orchestration/tool-definition.ts` — starter template
 - `/templates/tools-and-orchestration/tool-registry.ts` — registry pattern for >10 tools
-- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)) — see the [2026-07-28 changelog](https://modelcontextprotocol.io/specification/draft/changelog) for the JSON Schema 2020-12 widening
 - ([Claude Code SDK](https://docs.anthropic.com/en/docs/claude-code/sdk))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Vercel AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/))

@@ -240,7 +240,7 @@ export async function streamAssistant(params: {
   }
 
   const agent = new ToolLoopAgent({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-luna"),
     instructions: params.systemPrompt,
     tools: params.tools,
     stopWhen: stepCountIs(10),
@@ -514,8 +514,41 @@ test("agent uses context when replying to notification", async () => {
 
 ---
 
+## Upstream: Signal Providers
+
+Everything above starts after something decided a notification was warranted. That decision has its own shape, and it has stopped being bespoke plumbing: agent frameworks now ship an **event-subscription provider** interface that turns external activity into an agent wake-up, with the same four operations regardless of source.
+
+```typescript
+interface SignalProvider {
+  // Bind a thread to an external resource (a PR, a project, a mailbox).
+  subscribe(threadId: string, resourceId: string): Promise<void>;
+  unsubscribe(threadId: string, resourceId: string): Promise<void>;
+
+  // Pull-based sources: called on an interval with the active subscriptions.
+  poll(subscriptions: Subscription[]): Promise<void>;
+
+  // Push-based sources: parse the payload, match it to subscriptions.
+  handleWebhook(request: Request): Promise<void>;
+
+  // Deliver the matched event into the subscribed thread.
+  notify(threadId: string, signal: Signal): Promise<void>;
+}
+```
+
+The shape matters more than any one implementation. `subscribe` records which threads care about which resource, `poll` and `handleWebhook` are the two ingestion modes (pull for sources without webhooks, push for those with them), and `notify` is the single funnel through which every source reaches the agent. Adding a new event source means implementing one provider, not rewiring the notification path.
+
+This is shipped framework capability rather than a proposal. [Mastra](/docs/agents/framework-selection) exposes exactly this interface, with a generic `WebhookSignalProvider` that needs only a resource-ID extractor plus an optional notification builder, and a `@mastra/github-signals` provider that watches pull requests and notifies subscribed threads about comments, review state, CI status, and merges. Signals themselves are beta (added in `@mastra/core@1.39.0`): they enter a running agent loop directly when the thread is active, and wake the agent into a new run when it is idle.
+
+Two things follow for this page's pattern:
+
+- **A wake-up is a notification with a thread already attached.** The provider knows which thread subscribed, so the `NotificationContext` above can be written at `notify` time rather than reconstructed later from a user ID.
+- **Batch windows belong between the provider and the notification, not inside the provider.** A PR that receives six comments in a minute should produce one wake-up. Keep the provider dumb about urgency and let the batching table above decide when the agent actually runs.
+
+---
+
 ## Checklist
 
+- [ ] Route external event sources through one signal-provider interface, not per-source glue.
 - [ ] Create `NotificationContext` interface.
 - [ ] Store context in Redis (or DB) with 24h TTL.
 - [ ] On notification dispatch, call `storeNotificationContext`.

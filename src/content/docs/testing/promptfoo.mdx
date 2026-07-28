@@ -1,12 +1,12 @@
 ---
 title: Promptfoo Evals
 description: YAML-driven evaluations with strong red-teaming; OpenAI announced the Promptfoo acquisition on 2026-03-09
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 ## Summary
 
-CLI-first evaluation framework (YAML-driven, no code) optimized for red-teaming and quick iteration. OpenAI announced the acquisition of Promptfoo on 2026-03-09; promptfoo.dev now describes itself as part of OpenAI, though a formal close has not been confirmed publicly. The open-source project stays active under its existing license (v0.121.x releases shipping through June 2026 at a steady cadence). Provider-agnostic (Claude, GPT, Gemini, local models). Built-in attack templates (prompt injection, jailbreak, data exfiltration). Assertion framework for pattern matching, scoring, custom checks. CI-friendly with exit codes and JSON output.
+CLI-first evaluation framework (YAML-driven, no code) optimized for red-teaming and quick iteration. OpenAI announced the acquisition of Promptfoo on 2026-03-09; promptfoo.dev now describes itself as part of OpenAI, though a formal close has still not been confirmed publicly as of late July 2026. The open-source project stays active under its existing license (v0.121.x releases shipping through mid-July 2026 at a steady cadence). Provider-agnostic (Claude, GPT, Gemini, local models). Built-in attack templates (prompt injection, jailbreak, data exfiltration). Assertion framework for pattern matching, scoring, custom checks. CI-friendly with exit codes and JSON output.
 
 - **YAML configuration**: Version control friendly, no code
 - **Provider-agnostic**: Test multiple models in one config
@@ -17,7 +17,7 @@ CLI-first evaluation framework (YAML-driven, no code) optimized for red-teaming 
 
 ---
 
-Promptfoo ([promptfoo.dev](https://www.promptfoo.dev)) is a CLI-first evaluation framework for red-teaming and quick iteration. Configuration is YAML, making it easy to version in git and share. OpenAI announced the acquisition of Promptfoo on 2026-03-09, and the site now banners itself as part of OpenAI; a formal close has not been confirmed publicly. The open-source project remains active under its existing license, with v0.121.x releases shipping through June 2026 at a steady cadence — so continue treating the CLI as provider-agnostic and verify provider-specific behavior in your own evals.
+Promptfoo ([promptfoo.dev](https://www.promptfoo.dev)) is a CLI-first evaluation framework for red-teaming and quick iteration. Configuration is YAML, making it easy to version in git and share. OpenAI announced the acquisition of Promptfoo on 2026-03-09, and the site now banners itself as part of OpenAI; a formal close has still not been confirmed publicly as of late July 2026. The open-source project remains active under its existing license, with v0.121.x releases shipping through mid-July 2026 at a steady cadence — so continue treating the CLI as provider-agnostic and verify provider-specific behavior in your own evals.
 
 ## Why Promptfoo
 
@@ -36,7 +36,7 @@ A basic Promptfoo config defines providers, test cases, and assertions:
 providers:
   - id: claude-opus
     config:
-      model: claude-opus-4-8
+      model: claude-opus-5
 
   - id: claude-haiku
     config:
@@ -87,17 +87,17 @@ Test multiple models in parallel:
 providers:
   - id: claude
     config:
-      model: claude-opus-4-8
+      model: claude-opus-5
 
   - id: gpt
     config:
       provider: openai
-      model: gpt-5.4
+      model: gpt-5.6-luna
 
   - id: gemini
     config:
       provider: google
-      model: gemini-3.5-flash
+      model: gemini-3.6-flash
 
 # Run all test cases against all 3 providers
 testCases:

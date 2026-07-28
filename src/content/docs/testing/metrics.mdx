@@ -13,6 +13,7 @@ Quantitative measures that bridge "the agent works" and "the agent reliably solv
 - **Schema conformance**: Output conforms to declared type/structure
 - **Trajectory correctness**: Agent steps in right order, correct tool params
 - **Latency & token**: Cost efficiency, speed benchmarks
+- **Deterministic checks**: Zero-cost micro-scorers that gate the expensive judges in the same run
 
 ---
 
@@ -232,6 +233,36 @@ console.log(`Hallucination rate: ${hallucinationRate(badCalls, tools, schemas).t
 // 0.67 (2 of 3 are hallucinations)
 ```
 
+## Deterministic checks
+
+The metrics above are computed from a run; a judge model is asked about one. Below both sits a third tier that is easy to overlook because it looks too simple to name: **micro-scorers** that answer a single narrow question about a run, deterministically, in microseconds, for zero tokens.
+
+| Check           | Question it answers                          |
+| --------------- | -------------------------------------------- |
+| String contains | Did the output include this exact substring? |
+| Called tool     | Was this tool invoked at all?                |
+| Tool order      | Were these tools invoked in this sequence?   |
+| Max tool calls  | Did the run stay under N tool calls?         |
+| No tool errors  | Did every tool call return without erroring? |
+
+Individually these are assertions you could write by hand in any test file. Naming them as a tier buys two things.
+
+The first is that they belong in the same eval run as the expensive scorers, not in a separate test suite. A single run over a dataset can carry both a string-contains check and a judge-scored helpfulness rating, and the checks act as gates: if the agent never called the tool the task required, the judge's opinion of the prose is not the interesting result.
+
+The second is cost shape. Judges are the dominant line in an eval budget, and every question you can move down to a deterministic check is a question you stop paying for on every dataset row and every CI run. Push assertions down as far as they will go — a check if the answer is exact, a computed metric if it is countable, a judge only when the question is genuinely qualitative.
+
+```typescript
+// Cheap gates and an expensive judge in one run over the same dataset.
+const scorers = [
+  contains("Brooklyn"), // deterministic, zero cost
+  calledTool("get_weather"), // deterministic, zero cost
+  noToolErrors(), // deterministic, zero cost
+  helpfulnessJudge(), // model call, per-row cost
+];
+```
+
+[Mastra](/docs/agents/framework-selection) ships this tier as Quick Checks — `checks.includes`, `checks.excludes`, `checks.equals`, `checks.matches`, `checks.similarity`, `checks.calledTool`, `checks.didNotCall`, `checks.toolOrder`, `checks.maxToolCalls`, `checks.usedNoTools`, and `checks.noToolErrors` — documented as zero-LLM micro-scorers that plug into the same `scorers` array as any judge and compose with them in a single `runEvals` call. Other eval frameworks expose the same idea under different names; the tier is the portable part.
+
 ## Composite metrics
 
 ### Cost per task
@@ -273,7 +304,7 @@ console.log(`p99: ${percentile(latencies, 99)}ms`);
 ## When to measure what
 
 - **Capability evals** — use pass@k, F1, schema conformance to benchmark agent ability on new features
-- **Regression evals** — use pass@1 (or pass^5 for critical systems) to detect breakage in CI
+- **Regression evals** — use pass@1 (or pass^5 for critical systems) to detect breakage in CI, with deterministic checks as the cheap gate that runs on every commit
 - **Production monitoring** — track pass@1, MTTR, cost, hallucination rate in real time
 - **Debugging** — capture full traces with tool-routing accuracy and parameter details to understand failure modes
 

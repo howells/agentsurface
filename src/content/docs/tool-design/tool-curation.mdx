@@ -254,14 +254,14 @@ const auditAgent = agent({
 // Data migration — read + write
 const migrationAgent = agent({
   tools: mutatingKit.tools.map((name) => toolRegistry[name]),
-  model: "claude-opus-4-8",
+  model: "claude-opus-5",
   requiresHumanApproval: true,
 });
 
 // Admin — dangerous operations (requires approval)
 const adminAgent = agent({
   tools: dangerousKit.tools.map((name) => toolRegistry[name]),
-  model: "claude-opus-4-8",
+  model: "claude-opus-5",
   requiresHumanApproval: (toolName) => toolRegistry[toolName].category === "dangerous",
 });
 ```

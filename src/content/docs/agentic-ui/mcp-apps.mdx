@@ -1,7 +1,7 @@
 ---
 title: MCP Apps
 description: Interactive UI delivered through MCP — how a server ships rich, sandboxed interfaces to any supporting client via tool results, when to use it over plain structured output, and its client support matrix.
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -11,18 +11,20 @@ Chat-only tool results flatten rich interactions. When a tool returns a table, a
 Reach for MCP Apps when the value is in the interaction — selecting, filtering, previewing, confirming — and plain structured output when the client or the model can act on the data directly. Because client support is uneven, every MCP App must degrade gracefully to text.
 
 <Callout type="info">
-  MCP Apps is the first official MCP extension (SEP-1865), Stable at version `2026-01-26`. It merges
-  the earlier MCP-UI and OpenAI Apps SDK lineages into one standard; the reference SDK is v1.7.4
-  (2026-06-05). Supporting clients include ChatGPT, Claude, VS Code, Goose, Postman, and Microsoft
-  365 Copilot, and OpenAI now directs new ChatGPT apps to the MCP Apps standard keys rather than a
-  proprietary surface.
+  MCP Apps is the first official MCP extension (SEP-1865, extension id
+  `io.modelcontextprotocol/ui`), Stable at version `2026-01-26`. It merges the earlier MCP-UI and
+  OpenAI Apps SDK lineages into one standard; the reference SDK is v1.7.5 (2026-07-23). Supporting
+  clients include ChatGPT, Claude, VS Code, Goose, Postman, and Microsoft 365 Copilot, and OpenAI
+  now directs new ChatGPT apps to the MCP Apps standard keys rather than a proprietary surface.
 </Callout>
 
 <Callout type="warn">
-  This page tracks the MCP Apps extension, which is normalized against the paths already public in
-  the `2026-07-28` MCP specification release candidate. That RC — the largest MCP revision since
-  launch — lands in roughly three weeks. Recheck this page after the release; the extension
-  framework it rides on is stabilizing alongside it.
+  This page tracks the MCP Apps extension, which is normalized against the paths in the `2026-07-28`
+  MCP specification — the newest revision, whose release candidate has been locked since 2026-05-21
+  with final publication scheduled for 2026-07-28. The extension framework MCP Apps rides on lands
+  with that revision, and SDK support arrives across the RC's ten-week validation window, so hosts
+  will support the extension over `2025-11-25` connections for some time yet. Pin to the Stable
+  `2026-01-26` extension and recheck the client matrix as hosts move over.
 </Callout>
 
 ## When to Use It
@@ -52,6 +54,8 @@ MCP Apps extend the normal tool-call flow with a UI resource. The shape is **too
 
 Because the UI travels as a resource attached to a tool result, MCP Apps reuse MCP's existing transport, capability negotiation, and authorization rather than defining a parallel channel.
 
+ChatGPT has been fully MCP-Apps-compatible since 2026-02-22, and OpenAI directs new apps to the standard MCP Apps keys with a bridge over the older `window.openai` surface. One proprietary key is still in circulation: `_meta["openai/visibility"]` was deprecated on 2026-07-21 in favor of the standard `_meta.ui.visibility`. Emit the standard key; keep the OpenAI-prefixed one only as long as you need to support hosts that have not migrated.
+
 ## Tool-UI Lifecycle
 
 The lifecycle runs alongside the ordinary tool call:
@@ -78,7 +82,8 @@ Treat interactive results with the same posture as any other tool output: the UI
 - **No graceful degradation:** The tool returns only a UI resource, so an unsupporting client shows nothing useful. Every MCP App must carry a text representation of the same result.
 - **UI as the source of truth:** Trusting values the sandboxed UI sends back without server-side validation. The UI is untrusted input; validate its events like any other tool arguments.
 - **Privilege leakage:** Expecting the sandbox to grant the UI access to client internals or user credentials. The sandbox exists precisely to deny that; design the UI to work within the constrained channel.
-- **Drifting with the spec:** Building against extension behavior that shifts when the 2026-07-28 RC lands. Pin to the Stable `2026-01-26` extension and recheck after release.
+- **Drifting with the spec:** Building against extension behavior that shifts as hosts move onto `2026-07-28`. Pin to the Stable `2026-01-26` extension and recheck the client matrix as SDK support lands.
+- **Writing deprecated vendor keys:** Emitting only `_meta["openai/visibility"]`, deprecated 2026-07-21, instead of the standard `_meta.ui.visibility`. Vendor-prefixed metadata is a compatibility shim, not the contract.
 
 ## Related
 

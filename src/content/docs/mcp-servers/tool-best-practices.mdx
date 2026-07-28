@@ -1,6 +1,7 @@
 ---
 title: Tool Definition Best Practices
 description: Writing tool names, descriptions, and schemas that agents can reason about reliably
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -207,6 +208,15 @@ server.tool(
   Declaring `outputSchema` enables downstream agents to receive your tool's output as typed
   structured data rather than free-form text. Use it for tools whose output will be consumed by
   other tools or stored in agent state.
+</Callout>
+
+<Callout type="info">
+  Changing in `2026-07-28` (SEP-2106): `inputSchema` and `outputSchema` accept any JSON Schema
+  2020-12 keywords, including `$ref`, so shared definitions no longer have to be inlined, and
+  `structuredContent` may be any JSON value rather than only an object. This loosens a constraint
+  rather than breaking anything — schemas written against the current subset stay valid — so keep
+  authoring conservative schemas until the clients you care about have caught up, since a client
+  that cannot resolve `$ref` will simply fail to validate your tool.
 </Callout>
 
 ## Response Leanness

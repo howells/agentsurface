@@ -51,7 +51,7 @@ This file adds Claude Code-specific guidance only.
 ```markdown
 ## Model
 
-Default: claude-opus-4-8 (best for complex analysis and coding)
+Default: claude-opus-5 (best for complex analysis and coding)
 
 Use claude-sonnet-5 for:
 
@@ -110,7 +110,7 @@ Disable:
 - /schedule — not useful for this codebase
 ```
 
-See https://docs.anthropic.com/en/docs/claude-code/skills for the skill reference.
+See https://code.claude.com/docs/en/skills for the skill reference.
 
 ### 5. Memory Patterns
 
@@ -174,7 +174,7 @@ Use dontAsk for:
 - Draft PR creation
 ```
 
-See https://docs.anthropic.com/en/docs/claude-code/sdk for permission mode details.
+See https://code.claude.com/docs/en/agent-sdk/overview for permission mode details.
 
 ### 8. Session Hints
 
@@ -198,7 +198,7 @@ See AGENTS.md for core conventions, commands, and boundaries.
 
 ## Model
 
-Default: claude-opus-4-8
+Default: claude-opus-5
 
 Use claude-sonnet-5 for fast iteration on simple tasks.
 
@@ -227,7 +227,7 @@ See AGENTS.md for core conventions, commands, and boundaries.
 
 ## Model
 
-Default: claude-opus-4-8 (complex analysis)
+Default: claude-opus-5 (complex analysis)
 Use claude-sonnet-5 for: fast iteration, simple refactoring
 Use claude-haiku-4-5 for: code search, summarization
 
@@ -334,5 +334,5 @@ For monorepos, optional CLAUDE.md at package level (packages/api/CLAUDE.md) for 
 
 - `/docs/context-files/agents-md` — AGENTS.md spec
 - `/docs/context-files/cursor-and-copilot` — Cursor/Copilot variants
-- ([Claude Code docs](https://docs.anthropic.com/en/docs/claude-code/overview))
+- ([Claude Code docs](https://code.claude.com/docs/en/claude-code))
 - `/templates/discovery/CLAUDE.md` — starter template

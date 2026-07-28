@@ -1,6 +1,7 @@
 ---
 title: Tool Annotations
 description: Communicating tool behavior hints to clients through MCP annotations
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -273,13 +274,16 @@ The value of annotations comes from the combination of correct implementation on
 
 <Callout type="info">
   Annotations are part of the tool definition and are returned in the `tools/list` response. Clients
-  read them once during capability negotiation and cache them for the session. If you change an
-  annotation on a running server, connected clients will not see the change until they re-fetch the
-  tool list.
+  read them once and cache them, so if you change an annotation on a running server, connected
+  clients will not see the change until they re-fetch the tool list. Under `2026-07-28` there is no
+  session to cache against: sessions are removed, `tools/list` results no longer vary per
+  connection, and cache lifetime becomes explicit through the required `ttlMs` and `cacheScope`
+  fields on list results (SEP-2549). Set a `ttlMs` you can live with, because it is the window in
+  which a stale annotation stays in circulation.
 </Callout>
 
 ## Related
 
 - [Tool Annotations (READ_ONLY/WRITE/DESTRUCTIVE)](/docs/cookbook/tool-annotations) — applied registry pattern: presets driving system prompts, client UI, and tool selection
 - [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) — designing tools to be safely retryable and clearly classified
-- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) — the tool annotation definitions
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) — the tool annotation definitions; unchanged by the newer `2026-07-28` revision

@@ -1,6 +1,7 @@
 ---
 title: Resources and Prompts
 description: Exposing contextual data and reusable prompt templates through MCP
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -190,6 +191,19 @@ await server.notification({
   Subscriptions are only meaningful when your server has a persistent connection to the client, such
   as with Streamable HTTP or SSE transport. Stdio servers that terminate after each interaction
   cannot maintain subscription state. See [Transport Selection](./transports) for details.
+</Callout>
+
+<Callout type="warn">
+  Changing in `2026-07-28` (SEP-2575): `resources/subscribe` and `resources/unsubscribe` are
+  removed, along with the HTTP GET endpoint that carried server-to-client notifications. Both are
+  replaced by a single `subscriptions/listen` request that opens one long-lived POST-response
+  stream, with the client opting in per notification type — `resourcesListChanged` and
+  `resourceSubscriptions` are the two that apply here — and each notification tagged with
+  `io.modelcontextprotocol/subscriptionId`. The notifications you emit keep the same method names
+  and payloads, so the server-side change is where the stream is established rather than what
+  travels on it. List and read results also gain required `ttlMs` and `cacheScope` fields
+  (SEP-2549), which give clients a defensible reason to poll less. The code above is correct for
+  `2025-11-25` and today's SDKs.
 </Callout>
 
 ## When to Use Resources

@@ -1,7 +1,7 @@
 ---
 title: Emerging Standards Watchlist
-description: Draft and early-stage agent standards worth tracking — WebMCP, Web Bot Auth, A2UI, AG-UI, AIPREF, NLWeb, OASF, ANP — plus pointers to standards that have graduated to stable coverage elsewhere in Agent Surface.
-lastVerified: 2026-07-06
+description: Draft and early-stage agent standards worth tracking — WebMCP, Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP — plus pointers to standards that have graduated to stable coverage elsewhere in Agent Surface.
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -10,7 +10,7 @@ This page is a watchlist for draft and early-stage standards in the agent ecosys
 
 Standards that have stabilized enough to earn dedicated coverage no longer live here — they moved to their canonical homes and are listed in "Graduated to stable coverage" below.
 
-- Watch, do not depend: WebMCP, Web Bot Auth, A2UI, AG-UI, AIPREF, NLWeb, OASF, ANP
+- Watch, do not depend: WebMCP, Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP
 - Payment-network protocols are watchlist-only; substantive agentic commerce protocols get their own page
 - Everything on this page carries a status and a date so you can judge staleness
 
@@ -28,7 +28,7 @@ These were once tracked here as emerging. They are now stable enough to have can
 
 ### WebMCP — MCP for the Browser
 
-A W3C proposal co-authored by Google and Microsoft (February 2026) that exposes page-scoped tools to agents through a `navigator.modelContext` browser API, letting a site publish MCP-style tools that run in the page context rather than on a remote server. It shipped a Chrome 149 origin trial, so you can experiment behind a flag, but the API surface is unstable and no cross-browser commitment exists yet. Watch for whether Safari and Firefox engage.
+A W3C proposal co-authored by Google and Microsoft (February 2026) that exposes page-scoped tools to agents through a `navigator.modelContext` browser API, letting a site publish MCP-style tools that run in the page context rather than on a remote server. It shipped a Chrome origin trial spanning Chrome 149–156, so you can experiment behind a flag, but the API surface is unstable and no cross-browser commitment exists yet. Watch for whether Safari and Firefox engage.
 
 ### Web Bot Auth — Signed Bot Identity
 
@@ -41,6 +41,14 @@ A Google generative-UI specification (v0.9, July 2026) for agents that emit UI r
 ### AG-UI — Defined by Adoption, Not a Version
 
 AG-UI is an agent-to-UI event protocol that originated at CopilotKit and has no canonical pinned spec version — its status is best read through its SDK adoption. Implementations span Microsoft Agent Framework, Google ADK, AWS Strands, Mastra, Pydantic AI, LangGraph, and CrewAI. The multi-vendor SDK support makes it the current de facto layer for streaming agent state to a UI, but the absence of a versioned specification means the contract can shift under you. Adopt via a maintained SDK, not by hand-implementing the wire format.
+
+### OpenUI — Vendor-Authored Generative-UI Standard
+
+OpenUI ([openui.com](https://openui.com)) is an open generative-UI standard from Thesys, MIT-licensed and unversioned: a compact streaming UI language that a model emits as a component tree, plus a renderer-agnostic runtime with first-party React support and community Vue and Svelte ports. Its pitch is efficiency against the obvious alternative — Thesys claims roughly 3x faster rendering and about 67% fewer tokens than streaming equivalent JSON — which is a real problem, since JSON component trees are an expensive way to spend an output budget.
+
+It does not define its own transport. Framework integrations ride AG-UI, the entry above: an AG-UI adapter emits the event stream and OpenUI's client-side `agUIAdapter()` parses it, the same layering A2UI uses. That makes it a peer of A2UI rather than a competitor to AG-UI, and it means AG-UI's missing version pin is inherited here too.
+
+Status: single-vendor, no published spec version, real download volume but no cross-vendor governance. Watch it as the second serious attempt to standardize what an agent emits when it emits UI; if you adopt it, pin the packages yourself, because upstream ships unpinned.
 
 ### AIPREF — Content-Usage Preferences
 

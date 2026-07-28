@@ -136,7 +136,7 @@ document_extension = Extension.from_hub("document-tools@v1")
 
 # Agents declare which extensions they use — not inline tool definitions
 agent = reasoning_engines.LangchainAgent(
-    model="gemini-3.5-flash",
+    model="gemini-3.6-flash",
     extensions=[billing_extension],  # only billing tools available
     system_instruction="You are a billing specialist..."
 )

@@ -1,17 +1,19 @@
 ---
 title: Transport Selection
 description: Choosing and configuring the right transport for your MCP server deployment
+lastVerified: 2026-07-28
 ---
 
 ## Summary
 
-The transport layer affects latency, deployment, scalability, and state management. Stdio is simplest (subprocess, no network), best for local development. SSE and HTTP enable distributed deployment and horizontal scaling. Critical rule: write logs to stderr only; stdout is reserved for MCP JSON-RPC frames. Choose transport early — rearchitecting for a different one is painful.
+The transport layer affects latency, deployment, scalability, and state management. Stdio is simplest (subprocess, no network), best for local development. Streamable HTTP enables distributed deployment and horizontal scaling; the older standalone HTTP+SSE transport has been deprecated since the `2025-03-26` revision. Critical rule: write logs to stderr only; stdout is reserved for MCP JSON-RPC frames. Choose transport early — rearchitecting for a different one is painful.
 
 - Stdio: simplest, no network, logs to stderr
-- SSE: one-way server-to-client stream, good for simple cases
-- HTTP (Streamable HTTP): bidirectional, most scalable
+- HTTP (Streamable HTTP): bidirectional, most scalable, the only supported remote transport
+- Standalone HTTP+SSE: deprecated since the `2025-03-26` revision — migration path only
 - Select early in design — transport affects lifecycle and state management
 - Always write logs to stderr, never stdout
+- Prefer stateless mode: `2026-07-28` removes sessions and the `Mcp-Session-Id` header entirely
 
 The transport layer determines how messages flow between the MCP client and your server. The choice affects latency, deployment model, horizontal scalability, and how you handle authentication. Getting it wrong early is painful to unwind — a server designed for stdio cannot be trivially converted to HTTP without rethinking connection lifecycle and state management.
 
@@ -43,13 +45,21 @@ console.log("Server started");
 // CORRECT: stderr is safe for diagnostic output
 console.error("Server started");
 
-// BETTER: use the MCP logging facility
+// ALTERNATIVE (2025-11-25): the MCP logging facility
 await server.sendLoggingMessage({
   level: "info",
   logger: "billing-mcp",
   data: "Server started",
 });
 ```
+
+<Callout type="warn">
+  Changing in `2026-07-28`: the Logging feature is Deprecated (SEP-2577) and `logging/setLevel` is
+  removed, with log level moving to a per-request `io.modelcontextprotocol/logLevel` value in
+  `_meta`. The MCP logging facility keeps working through the 12-month deprecation window, but new
+  servers should write diagnostics to stderr on stdio and emit OpenTelemetry spans on HTTP instead.
+  The stderr rule above is unaffected and remains the safest default on either revision.
+</Callout>
 
 **Client configuration for stdio (Claude Desktop example):**
 
@@ -142,6 +152,17 @@ app.delete("/mcp", async (req, res) => {
 app.listen(3000);
 ```
 
+<Callout type="warn">
+  Changing in `2026-07-28`: sessions are removed from the protocol (SEP-2567). The `Mcp-Session-Id`
+  header disappears, the GET endpoint that carried the server-to-client stream is replaced by a
+  `subscriptions/listen` request, and the DELETE endpoint that terminated a session has nothing left
+  to terminate. Cross-call state moves to explicit server-minted handles that the client passes back
+  as ordinary tool arguments. POSTs also gain two required headers, `Mcp-Method` and `Mcp-Name`
+  (SEP-2243), with custom headers namespaced under `x-mcp-header`. The code above is the correct
+  shape for `2025-11-25` and the SDKs deployed today; the stateless pattern in the next section is
+  the one that survives the migration, so prefer it for new servers.
+</Callout>
+
 ## Stateless Mode for Horizontal Scaling
 
 The stateful session map above does not scale horizontally — sessions created on one instance are not visible to another. For serverless deployments and horizontally scaled services, use stateless mode by setting `sessionIdGenerator: undefined`:
@@ -152,9 +173,9 @@ const transport = new StreamableHTTPServerTransport({
 });
 ```
 
-In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process.
+In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process — and it is the model `2026-07-28` makes mandatory, so a server written this way needs no rework when sessions disappear.
 
-For operations that require state across calls — maintaining context between tool invocations in a multi-turn session — store state externally in Redis or another shared store, keyed on a session identifier the client provides in a request header:
+For operations that require state across calls — maintaining context between tool invocations in a multi-turn conversation — store state externally in Redis or another shared store, keyed on an identifier the client provides. The example below reads it from a request header; under `2026-07-28` the same state is keyed on a server-minted handle the client passes back as an ordinary tool argument, which works on both revisions and does not depend on transport-level session tracking:
 
 ```typescript
 app.post("/mcp", async (req, res) => {
@@ -187,7 +208,7 @@ app.post("/mcp", async (req, res) => {
 
 ## SSE as a Standalone Transport
 
-The older SSE transport (`/sse` for the stream, `/message` for posting) is deprecated as of the November 2024 MCP specification update. Do not build new servers against it. Streamable HTTP supersedes it and supports SSE as an optional response mode when the server needs to stream a long-running tool result.
+The older HTTP+SSE transport (`/sse` for the stream, `/message` for posting) has been deprecated since the `2025-03-26` MCP specification revision, and is formally Deprecated under the feature lifecycle policy introduced in `2026-07-28`. Do not build new servers against it. Streamable HTTP supersedes it and supports SSE as an optional response mode when the server needs to stream a long-running tool result.
 
 If you have clients that only support the legacy SSE transport, you can run both side by side during a migration period, but plan to remove the SSE-only endpoint.
 

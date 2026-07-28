@@ -1,7 +1,7 @@
 ---
 title: Durable Execution
 description: "Running non-deterministic agent loops inside durable workflow engines: LLM calls as replay-safe steps, checkpointing partial state, suspend/resume, and mid-run steering."
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -15,6 +15,7 @@ Durable execution reconciles the two. The model calls and tool invocations run a
 - **Long pauses are first-class** — suspend for hours-long human approval without holding a process open.
 - **Runs can be steered mid-flight** — new instructions inject into a running loop through workflow events.
 - **History is the debugger** — replay reconstructs exactly what the agent saw and did.
+- **Objectives can outlive runs** — a standing goal persists in thread state across iterations and restarts.
 
 ## When An Agent Needs Durable Execution
 
@@ -66,6 +67,22 @@ async function agentRun(ctx, input) {
 
 **Replay as time-travel debugging.** Because history records every input the agent saw, a failed run can be replayed step by step against current code — the payoff that justifies the constraints above.
 
+## Standing Objectives
+
+Durable execution keeps a _run_ alive. A standing objective keeps a _goal_ alive, and it is a separate primitive. An objective is a durable, thread-scoped instruction the agent keeps working toward across loop iterations — evaluated after each iteration by a judge, bounded by a run budget, and re-read at the top of every turn.
+
+The distinction from a task or a workflow is who owns the lifetime. A workflow run completes. A task is dispatched, executed, and closed. An objective outlives any single run: the agent finishes a run, the objective is still open, and the next wake-up picks it up where the judge left it. Because it lives in thread state rather than in the run's memory, it also survives a restart that the run itself does not.
+
+Three parts make the primitive work:
+
+- **A judge** — a model, or a custom scorer, that reads the conversation against the objective after each iteration and returns a satisfied/not-satisfied verdict. Without one, "keep working toward X" has no terminating condition except the budget, and the loop either stops early or never stops.
+- **A run budget** — a hard cap on iterations. Exhausting it should _pause_ the objective rather than fail it, so raising the cap resumes work instead of restarting it.
+- **Completion criteria the judge can actually check** — "only mark this complete when the tests pass" is checkable; "make the code good" is not. The criteria are the objective's real contract, not the prose that opens it.
+
+An objective is not a substitute for durable execution; it sits above it. The recorded steps still keep each run replay-safe, and the objective decides whether another run should happen at all. Pair the two when the work is open-ended — monitor this repository until the release is green, keep this migration moving until it lands — rather than when a single bounded run would finish the job.
+
+[Mastra](/docs/agents/framework-selection) Goals is the current shipped example: a `maxRuns` budget (default 50) with an LLM-as-judge that gates the loop each iteration and an objective persisted in thread state, in beta since `@mastra/core@1.42.0` and requiring configured storage plus a memory-backed thread. The primitive is not framework-specific; the requirements are a judge, a budget, and somewhere durable to keep the goal.
+
 ## Engine Anchors
 
 Each engine solves the same problem with its own primitives. Treat these as equal-weight options, not a ranking.
@@ -104,6 +121,7 @@ inngest.createFunction({ id: "agent-run" }, { event: "agent/start" }, async ({ s
 - **Non-replay-safe side effects in workflow code.** A wall-clock read, a random value, a direct network call, or a UUID generated in the deterministic loop body diverges on replay. Every such call must move into a recorded step.
 - **Unbounded history growth.** A chatty agent loop with hundreds of steps bloats workflow history until replay is slow or the engine rejects it. Cap steps, summarize and restart the run (continue-as-new), or offload large payloads to storage and record references instead.
 - **Checkpoint staleness against long tool calls.** A tool that runs for minutes while the checkpoint still reflects pre-call state means a crash mid-tool loses that progress. Checkpoint before starting irreversible work and make the tool itself idempotent.
+- **An objective the judge can never pass.** A standing goal with unfalsifiable completion criteria burns its entire run budget every time and pauses without progress. Write criteria a judge can verify from the conversation, and treat budget exhaustion as an alert, not a routine outcome.
 - **Signal races.** A steer signal that arrives between a model call and its tool execution can be read too late or applied to a stale decision. Define exactly where in the loop signals are drained, and make injected instructions idempotent against double-delivery.
 
 ## Related

@@ -207,7 +207,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm install -g agentsurface
+      - run: npx skills add https://github.com/howells/agentsurface
       - run: surface score --dimension=context --fail-below 2
 ```
 
@@ -349,7 +349,7 @@ jobs:
 
       - name: Run surface audit
         run: |
-          npm install -g agentsurface
+          npx skills add https://github.com/howells/agentsurface
           surface score --dimension=context --fail-below 2
 ```
 

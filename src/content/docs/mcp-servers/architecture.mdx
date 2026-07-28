@@ -1,6 +1,7 @@
 ---
 title: Server Architecture
 description: Structuring MCP servers for testability, maintainability, and production reliability
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -256,6 +257,17 @@ Declaring `resources.subscribe: true` without implementing the `resources/subscr
   Never declare `experimental_sampling` in capabilities unless you have implemented the full
   sampling request handler. Clients that send sampling requests to an unimplemented handler will
   receive protocol errors that are difficult to debug.
+</Callout>
+
+<Callout type="info">
+  Changing in `2026-07-28`: capabilities are no longer negotiated once at connect time. The
+  `initialize` handshake is removed, clients send their capabilities in `_meta` on every request,
+  and servers advertise theirs through a mandatory `server/discover` method. The `logging`
+  capability is Deprecated (SEP-2577), and `resources.subscribe` gives way to opting into
+  `resourceSubscriptions` on a `subscriptions/listen` stream. Capability objects also gain an
+  `extensions` field carrying reverse-DNS identifiers such as `io.modelcontextprotocol/tasks`. The
+  declaration above is correct for `2025-11-25` and today's SDKs; the discipline of declaring only
+  what you implement carries over unchanged.
 </Callout>
 
 ## Environment Variable Conventions

@@ -1,7 +1,7 @@
 ---
 title: Sandboxes and Workspaces
 description: "Choosing and scaffolding isolated execution and persistent workspaces for agents: when a sandbox is needed, how strong its isolation must be, and what a durable agent workspace adds on top."
-lastVerified: 2026-07-06
+lastVerified: 2026-07-28
 ---
 
 An agent that writes and runs code, manipulates files, or executes model-generated logic needs isolation the host process cannot safely provide. Generated code can loop forever, exhaust memory, read environment secrets, write outside its intended directory, or reach the network. Running it inside the app server puts all of that on the same process that holds your database credentials and serves user traffic.
@@ -41,16 +41,30 @@ Treat these as roughly interchangeable starting points and choose by where your 
 - **AWS Bedrock AgentCore** — managed Runtime and Code Interpreter for AgentCore agents; the right choice when the agent stack is intentionally AWS-native.
 - **Anthropic Managed Agents** — self-hosted sandboxes are part of the Managed Agents platform, keeping execution inside your own boundary while Anthropic manages the agent runtime.
 
-## Workspaces Beyond The Sandbox
+## Workspace Surfaces
 
-An ephemeral sandbox is enough for a one-shot execution. A long-running agent needs a workspace: durable state that outlives any single session and makes the agent more capable over time. Frame this vendor-neutrally — the capabilities matter more than the product.
+An ephemeral sandbox is enough for a one-shot execution. A long-running agent needs a workspace: durable state that outlives any single session and makes the agent more capable over time. A workspace is best understood as a set of **surfaces** — distinct primitives the agent queries, each with its own tools — rather than as one big mounted directory. Frame them vendor-neutrally; the capabilities matter more than the product.
 
 - **Persistent agent filesystems** — provider-backed storage (S3/GCS-style object mounts, or layered agent-fs snapshots) that the sandbox mounts on each session, so a coding agent resumes on the same working tree instead of re-cloning. Persistence needs a lifecycle: what is kept, for how long, and who can read it.
-- **LSP-backed code inspection** — a language server in the workspace lets the agent navigate code semantically — definitions, references, types, call hierarchies — instead of falling back to `grep`. Semantic navigation both reduces token spend and produces more precise edits than text search.
+- **Sandboxed execution** — the compute surface described above, attached to the same filesystem so that what the agent runs and what it edits are the same tree.
 - **Workspace search** — BM25, vector, or hybrid retrieval over the workspace's own contents (files, notes, prior results), so the agent recalls what it learned rather than re-deriving it. Hybrid keyword-plus-vector retrieval is usually the pragmatic default; see [Data Retrievability](/docs/data-retrievability) for the retrieval mechanics.
-- **Skills libraries in the workspace** — reusable procedures the agent has authored or been given, stored in the workspace and loaded on demand, so learned capability compounds across sessions.
+- **Skills libraries in the workspace** — reusable procedures the agent has authored or been given, stored in the workspace and loaded on demand, so learned capability compounds across sessions. See [Agent Skills](/docs/discovery/agent-skills) for the packaging format these libraries now consume.
+- **LSP inspection** — the newest surface, and the one with no obvious predecessor.
 
-[Mastra](/docs/agents/framework-selection) Workspaces is one implementation that bundles a persistent filesystem, code inspection, and workspace search behind a single interface; the pattern is not specific to it.
+### LSP Inspection
+
+The other surfaces are all recognizable as storage: bytes, an index, a folder of procedures. Language-server inspection is a different kind of thing — a live query interface over a semantic model of the code that the agent asks questions of rather than reads.
+
+Concretely, the agent points at a file, a line, and a symbol, and gets back what a developer would get from hovering in an editor: the inferred type or documentation, the declaration site with a one-line preview, implementation or usage locations, and any diagnostics on that line. It is one tool call, and it replaces the several `grep` passes and speculative file reads an agent would otherwise spend arriving at a worse answer.
+
+Two consequences make this worth treating as its own surface rather than a search variant:
+
+- **Precision changes edit quality, not just token spend.** `grep` finds a string; a language server finds the declaration. An agent that knows a symbol's actual type before rewriting a call site produces edits that compile. Text search cannot distinguish the definition from the forty places that mention the same word.
+- **The workspace, not the model, holds the code intelligence.** The semantic model is built by the language server against the real tree, so it stays correct as the agent edits — unlike an index built once at session start, or a summary the agent carries in context.
+
+Coverage is per-language and uneven, which is the practical constraint: a workspace typically ships servers for a handful of mainstream languages and expects you to register your own beyond that.
+
+[Mastra](/docs/agents/framework-selection) Workspaces is one implementation that bundles these surfaces behind a single interface — a persistent filesystem, sandboxed execution, BM25/vector search, skills, and an LSP inspection tool that returns hover, definition, implementation, and line-scoped diagnostics for TypeScript, JavaScript, Python, Go, and Rust out of the box, with other languages available by registering a language server. The surface categories are not specific to it.
 
 ## Failure Modes
 

@@ -43,7 +43,7 @@ async function extractPDFAsImage(pdfPath: string) {
   const base64 = imageData.toString("base64");
 
   const response = await client.messages.create({
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     max_tokens: 2048,
     messages: [
       {
@@ -268,7 +268,7 @@ async function embedImageViaSummary(imageBlob: Buffer) {
 
   // Summarize image with Claude Vision
   const description = await client.messages.create({
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     max_tokens: 500,
     messages: [
       {

@@ -1,6 +1,7 @@
 ---
 title: "DPoP: Demonstrating Proof-of-Possession"
 description: "RFC 9449 sender-constrained tokens, preventing token replay attacks"
+lastVerified: 2026-07-28
 ---
 
 ## Summary
@@ -222,7 +223,7 @@ For read-only operations on public data, the overhead may not be justified.
 
 ## MCP and DPoP
 
-MCP 2025-11-25 encourages DPoP for remote servers that expose sensitive operations. An MCP server can require DPoP proofs on every resource access:
+MCP has encouraged DPoP for remote servers that expose sensitive operations since the `2025-11-25` revision, and the newer `2026-07-28` revision does not change that. An MCP server can require DPoP proofs on every resource access:
 
 ```typescript
 // MCP server validating DPoP
@@ -245,6 +246,15 @@ server.setRequestHandler(
 ```
 
 See [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) for advertising DPoP requirements.
+
+<Callout type="info">
+  Two `2026-07-28` changes make DPoP easier to reason about on MCP servers. Sessions are removed, so
+  there is no connect-time authentication step whose proof a later request could ride on — every
+  request carries its own token and its own proof, which is what DPoP wanted anyway. And client
+  credentials must now be keyed by issuing authorization server (SEP-2352), which means the
+  `dpop_jkt` thumbprint you validate is unambiguously tied to one issuer's key material rather than
+  to a client identity that might have been registered in several places.
+</Callout>
 
 ## Checklist
 
