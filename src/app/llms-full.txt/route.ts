@@ -1,6 +1,5 @@
+import { normalizeSlug, readDocsFile } from "@/lib/docs-fs";
 import { source } from "@/lib/source";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-static";
@@ -10,21 +9,9 @@ function estimateTokens(text: string): number {
 }
 
 function readDocsPage(relativePath: string): string {
-  const docsRoot = join(process.cwd(), "src", "content", "docs");
-  const candidates =
-    relativePath === "" || relativePath === "index"
-      ? [join(docsRoot, "index.mdx")]
-      : [join(docsRoot, `${relativePath}.mdx`), join(docsRoot, relativePath, "index.mdx")];
-
-  for (const candidate of candidates) {
-    try {
-      return readFileSync(candidate, "utf-8");
-    } catch {
-      // Try the next candidate.
-    }
-  }
-
-  return `<!-- content not found for ${relativePath} -->`;
+  const normalized = normalizeSlug(relativePath);
+  const content = normalized ? readDocsFile(normalized) : null;
+  return content ?? `<!-- content not found for ${relativePath} -->`;
 }
 
 export function GET() {

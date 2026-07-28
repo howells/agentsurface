@@ -1,8 +1,7 @@
+import { normalizeSlug, readDocsFile } from "@/lib/docs-fs";
 import { searchDocs } from "@/lib/search";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -22,54 +21,23 @@ function buildMarkdownUrl(slug: string): string {
   return `https://agentsurface.dev/api/md/${slug}`;
 }
 
-function normalizeSlug(slug: string): string | null {
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(slug);
-  } catch {
-    return null;
-  }
-
-  if (/[\u0000-\u001F\u007F]/.test(decoded) || decoded.includes("\\")) {
-    return null;
-  }
-
-  const normalized = decoded.replace(/^\/+/, "").replace(/\/+$/, "");
-  const segments = normalized.split("/").filter(Boolean);
-
-  if (segments.some((segment) => segment === "." || segment === "..")) {
-    return null;
-  }
-
-  return segments.join("/") || "index";
-}
-
 function readDocsPage(slug: string): DocsPage | null {
   const normalized = normalizeSlug(slug);
   if (!normalized) {
     return null;
   }
 
-  const docsRoot = join(process.cwd(), "src", "content", "docs");
-  const candidates =
-    normalized === "index"
-      ? [join(docsRoot, "index.mdx")]
-      : [join(docsRoot, `${normalized}.mdx`), join(docsRoot, normalized, "index.mdx")];
-
-  for (const candidate of candidates) {
-    try {
-      return {
-        content: readFileSync(candidate, "utf-8"),
-        markdownUrl: buildMarkdownUrl(normalized),
-        slug: normalized,
-        url: buildDocsUrl(normalized),
-      };
-    } catch {
-      // Try the next candidate.
-    }
+  const content = readDocsFile(normalized);
+  if (content === null) {
+    return null;
   }
 
-  return null;
+  return {
+    content,
+    markdownUrl: buildMarkdownUrl(normalized),
+    slug: normalized,
+    url: buildDocsUrl(normalized),
+  };
 }
 
 function buildServer(): McpServer {

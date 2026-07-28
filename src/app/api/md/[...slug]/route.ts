@@ -1,28 +1,11 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { normalizeSlug, readDocsFile } from "@/lib/docs-fs";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
-}
-
-function readDocsMarkdown(relativePath: string): string | null {
-  const docsRoot = join(process.cwd(), "src", "content", "docs");
-  const candidates =
-    relativePath === "" || relativePath === "index"
-      ? [join(docsRoot, "index.mdx")]
-      : [join(docsRoot, `${relativePath}.mdx`), join(docsRoot, relativePath, "index.mdx")];
-
-  for (const candidate of candidates) {
-    try {
-      return readFileSync(candidate, "utf-8");
-    } catch {
-      // Try the next candidate.
-    }
-  }
-
-  return null;
 }
 
 export async function GET(
@@ -30,8 +13,13 @@ export async function GET(
   { params }: { params: Promise<{ slug: string[] }> },
 ) {
   const { slug } = await params;
-  const relativePath = slug.join("/");
-  const content = readDocsMarkdown(relativePath);
+  const normalized = normalizeSlug(slug.join("/"));
+
+  if (!normalized) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const content = readDocsFile(normalized);
 
   if (content === null) {
     return new NextResponse("Not found", { status: 404 });
