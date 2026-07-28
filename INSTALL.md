@@ -8,7 +8,7 @@ Agent Surface ships a single local skill:
 
 ## Claude Code (Recommended)
 
-### Option 1: Plugin Marketplace (Easiest)
+### Option 1: Plugin Marketplace (if listed)
 
 In Claude Code, type:
 
@@ -16,7 +16,7 @@ In Claude Code, type:
 /plugin install surface
 ```
 
-This installs the Agent Surface plugin from the Claude Code plugin marketplace if published there. The skill is then available as `/surface` in any project.
+This works if the Agent Surface plugin is listed in a marketplace your Claude Code is configured to use. Marketplace listing is not guaranteed — this repo does not publish or maintain a marketplace entry, so treat `npx skills add` (below) or the git-clone options as the reliable install paths.
 
 ### Option 2: Git Clone (Personal/Team)
 
@@ -119,7 +119,7 @@ For sharing via tarball or zip:
 
    ```bash
    cd agentsurface
-   zip -r surface-2.1.0.skill skills/surface/ -x "*.git*"
+   zip -r surface-2.2.0.skill skills/surface/ -x "*.git*"
    ```
 
 2. **Share the .skill file** with users via GitHub releases or another distribution channel.

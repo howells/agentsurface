@@ -1,6 +1,6 @@
 {
   "name": "agentsurface",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "docs:check": "node scripts/check-docs-integrity.mjs",
     "env:check": "envy check local --schema ./src/config/env-schema.ts --from .env --mode all",
     "deploy:preview": "pnpm env:check && set -a && . ./.env && set +a && vercel deploy . -y",
-    "build": "next build",
+    "build": "node scripts/check-docs-integrity.mjs --no-freshness && next build",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
     "lint": "howells-check --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",

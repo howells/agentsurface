@@ -5,6 +5,7 @@ const repoRoot = process.cwd();
 const docsRoot = path.join(repoRoot, "src/content/docs");
 const referencesRoot = path.join(repoRoot, "skills/surface/references");
 const templatesRoot = path.join(repoRoot, "templates");
+const skillsRoot = path.join(repoRoot, "skills/surface");
 
 function walk(dir) {
   const out = [];
@@ -206,6 +207,7 @@ if (fs.existsSync(modelsDocPath)) {
 const modelScanFiles = [
   ...collectFiles(docsRoot, [".mdx"]).filter((file) => file !== modelsDocPath),
   ...collectFiles(templatesRoot, [".ts", ".tsx", ".yaml", ".yml", ".json", ".md", ".mdc", ".txt"]),
+  ...collectFiles(skillsRoot, [".md"]),
 ];
 
 const modelIssues = [];
@@ -237,6 +239,12 @@ for (const file of modelScanFiles) {
 //       server patterns, discovery/retrieval mechanics, protocols, the tooling
 //       catalog) are REQUIRED to carry a stamp. A missing stamp is flagged.
 const STALE_AFTER_DAYS = 120;
+
+// --no-freshness demotes freshness findings to warnings instead of failures.
+// The build gate uses it so a page aging past the staleness window can never
+// fail an unrelated deploy; the standalone `pnpm docs:check` keeps freshness
+// fatal as the re-verification cadence signal.
+const freshnessFatal = !process.argv.includes("--no-freshness");
 
 // Directory entries ending in "/*" expand to every .mdx page in that directory.
 const FAST_DECAY = [
@@ -329,13 +337,39 @@ for (const slug of [...fastDecaySlugs].toSorted()) {
   }
 }
 
+// MCP server-card version parity check.
+//
+// public/.well-known/mcp/server-card.json carries its own `version` field,
+// which must track the package's published version in package.json so the
+// server card never drifts from what's actually shipped.
+const packageJsonPath = path.join(repoRoot, "package.json");
+const serverCardPath = path.join(repoRoot, "public/.well-known/mcp/server-card.json");
+
+const versionIssues = [];
+if (fs.existsSync(packageJsonPath) && fs.existsSync(serverCardPath)) {
+  const packageVersion = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")).version;
+  const serverCardVersion = JSON.parse(fs.readFileSync(serverCardPath, "utf-8")).version;
+  if (packageVersion !== serverCardVersion) {
+    versionIssues.push(
+      `public/.well-known/mcp/server-card.json version (${serverCardVersion}) does not match package.json version (${packageVersion})`,
+    );
+  }
+}
+
 if (
   linkIssues.length === 0 &&
   metaIssues.length === 0 &&
   templateIssues.length === 0 &&
   modelIssues.length === 0 &&
-  freshnessIssues.length === 0
+  (freshnessIssues.length === 0 || !freshnessFatal) &&
+  versionIssues.length === 0
 ) {
+  if (freshnessIssues.length > 0) {
+    console.warn("Freshness warnings (non-fatal in --no-freshness mode):");
+    for (const issue of freshnessIssues) {
+      console.warn(`- ${issue}`);
+    }
+  }
   console.log("docs integrity check passed");
   process.exit(0);
 }
@@ -371,6 +405,13 @@ if (modelIssues.length > 0) {
 if (freshnessIssues.length > 0) {
   console.error("Docs freshness (lastVerified) issues:");
   for (const issue of freshnessIssues) {
+    console.error(`- ${issue}`);
+  }
+}
+
+if (versionIssues.length > 0) {
+  console.error("MCP server-card version mismatch:");
+  for (const issue of versionIssues) {
     console.error(`- ${issue}`);
   }
 }

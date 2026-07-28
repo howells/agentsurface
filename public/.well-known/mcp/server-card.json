@@ -1,10 +1,10 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "serverInfo": {
     "name": "agentsurface-docs",
     "title": "Agent Surface Documentation",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "description": "Search and retrieve Agent Surface documentation. Tools: search_docs (keyword search across documentation pages), get_page (retrieve full page content by slug).",
   "transport": {
