@@ -48,7 +48,7 @@ import { context, trace, Span, SpanStatusCode } from "@opentelemetry/api";
 import { z } from "zod";
 
 // <CUSTOMISE>: Update model, provider, system prompt
-const MODEL_NAME = "claude-opus-4-8";
+const MODEL_NAME = "claude-opus-5";
 const PROVIDER = "anthropic";
 const SYSTEM_PROMPT = "You are a helpful AI agent...";
 
@@ -304,7 +304,7 @@ export function logSpanContext(): void {
  *
  * Root span (chat operation):
  * - gen_ai.system: "anthropic" | "openai" | "google"
- * - gen_ai.request.model: e.g., "claude-opus-4-8"
+ * - gen_ai.request.model: e.g., "claude-opus-5"
  * - gen_ai.request.max_tokens: integer
  * - gen_ai.request.temperature: 0-2
  * - gen_ai.input.messages: JSON array of messages

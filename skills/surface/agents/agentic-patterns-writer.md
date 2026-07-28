@@ -482,7 +482,7 @@ Provide copy-paste patterns for common agentic workflows. No boilerplate; every 
 
 ## Spec References
 
-- Vercel AI SDK: https://sdk.vercel.ai/
+- Vercel AI SDK: https://ai-sdk.dev/docs
 - Anthropic SDK: https://github.com/anthropics/anthropic-sdk-python
 - LangChain: https://python.langchain.com/
 - MCP: https://modelcontextprotocol.io/

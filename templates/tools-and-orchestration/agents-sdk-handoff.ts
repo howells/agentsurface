@@ -188,7 +188,7 @@ const writerAgent = new Agent({
 3. Write engaging content
 4. If you want editorial feedback, use delegate_to_editor
 5. Return final article in JSON format with title, body, tags, readtime_minutes`,
-  model: "gpt-5.4",
+  model: "gpt-5.6-luna",
   name: "writer",
   outputGuardrails: [outputGuardrail],
   outputSchema: zodToJsonSchema(WriterOutputSchema),
@@ -208,7 +208,7 @@ const editorAgent = new Agent({
 4. Whether it's ready to publish
 If you need fact-checking, use delegate_to_reviewer.
 Return feedback as JSON with feedback, suggestions, ready_to_publish.`,
-  model: "gpt-5.4",
+  model: "gpt-5.6-luna",
   name: "editor",
   outputGuardrails: [outputGuardrail],
   outputSchema: zodToJsonSchema(EditorOutputSchema),
@@ -228,7 +228,7 @@ const reviewerAgent = new Agent({
 3. Recommend corrections
 4. Give final approval status
 Return result as JSON.`,
-  model: "gpt-5.4",
+  model: "gpt-5.6-luna",
   name: "reviewer",
   outputGuardrails: [outputGuardrail],
   outputSchema: zodToJsonSchema(
@@ -331,7 +331,7 @@ export async function runHandoffExample() {
  * - Reviewer's output is final result to user
  *
  * Pattern 3: Cost optimization
- * - Simple tasks: use cheap agent (gpt-5.4)
- * - Escalate to premium agent (gpt-5.5) if needed
+ * - Simple tasks: use cheap agent (gpt-5.6-luna)
+ * - Escalate to premium agent (gpt-5.6-sol) if needed
  * - Example: writer-mini generates draft -> editor (full model) refines
  */

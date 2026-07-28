@@ -15,7 +15,7 @@
  * Canonical docs:
  * - Redis patterns for context storage: https://redis.io/docs/develop/
  * - Notification best practices: https://www.intercom.com/blog/notification-design/
- * - Context injection in prompts: https://sdk.vercel.ai/docs/foundations/prompts
+ * - Context injection in prompts: https://ai-sdk.dev/docs/foundations/prompts
  *
  * // <CUSTOMISE>
  * - Replace Redis client with your store (DynamoDB, PostgreSQL, etc.)

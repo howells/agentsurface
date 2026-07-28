@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 8 scores presence and quality of AGENTS.md, CLAUDE.md, and tool-specific overrides. AGENTS.md is the cross-tool baseline; CLAUDE.md and .cursor/rules are tool-specific overlays. Well-curated files (hand-written, <370 lines, commands-first, permission boundaries explicit) scale knowledge across agents. Quality vs. presence: auto-generated files score low; iteratively maintained files from friction score high. Multi-tool context with progressive disclosure scores highest.
+Dimension 8 scores presence and quality of AGENTS.md, CLAUDE.md, and tool-specific overrides. AGENTS.md is the cross-tool baseline; CLAUDE.md and .cursor/rules are tool-specific overlays. Well-curated files (hand-written, within the <370-line audit tolerance, commands-first, permission boundaries explicit) scale knowledge across agents. Quality vs. presence: auto-generated files score low; iteratively maintained files from friction score high. Multi-tool context with progressive disclosure scores highest.
 
 - **0**: No AGENTS.md or context files (blocker)
 - **1**: Generic/auto-generated, >500 lines, no actionable commands
@@ -20,8 +20,19 @@ Context files are the foundational onboarding layer for AI coding agents. They d
 |-------|----------|-----------|
 | 0 | No AGENTS.md, CLAUDE.md, or equivalent. | No agent context files found. |
 | 1 | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands. | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation). |
-| 2 | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples. | Commands section at top with exact invocations. Permission boundaries defined. <370 lines. Non-obvious conventions documented with examples. |
+| 2 | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples. | Commands section at top with exact invocations. Permission boundaries defined. Within the <370-line audit tolerance. Non-obvious conventions documented with examples. |
 | 3 | Multi-tool context. AGENTS.md (universal) + CLAUDE.md (Claude-specific) + .cursor/rules (Cursor-specific). Progressive disclosure (points to detailed docs). Updated iteratively from friction. | Multiple context file formats. Progressive disclosure via file references. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
+
+### Two length numbers, two jobs
+
+Do not collapse these — they answer different questions.
+
+| Number | Role | Applies to |
+|--------|------|-----------|
+| **<370 lines** | **Audit tolerance.** The ceiling an existing file is scored against. Files under it pass; files over it lose points for bloat. | Scoring a repo you did not write |
+| **~150 lines ideal, <300 max** | **Authoring target.** What a freshly generated context file should aim for. | Writing or scaffolding a new file |
+
+A repo whose AGENTS.md sits at 340 lines is not failing the rubric, but you would not generate a 340-line file from scratch.
 
 ## Evidence to gather
 
@@ -64,7 +75,7 @@ Recommended top-to-bottom sections:
 ### Progressive disclosure
 
 Large repos need a hierarchy:
-- AGENTS.md at root = overview, commands, boundaries. Tight (~150 lines).
+- AGENTS.md at root = overview, commands, boundaries. Tight — the authoring target is ~150 lines ideal, <300 max.
 - Per-package AGENTS.md in monorepos (e.g., packages/api/AGENTS.md, packages/web/AGENTS.md) = scoped detail.
 - Link out to deeper docs: `/docs/arc/decisions/` for ADRs, `/docs/architecture.md` for diagrams, `/docs/CONTRIBUTING.md` for full flow.
 
@@ -193,14 +204,14 @@ Each package can override permission boundaries (e.g., API server can deploy, we
 
 ## Cross-vendor notes
 
-- **Anthropic** treats AGENTS.md as first-class. CLAUDE.md takes precedence when both present. Fully supported: [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code/overview).
-- **Cursor** reads AGENTS.md + .cursor/rules/ with high fidelity. See [Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai).
+- **Anthropic** treats AGENTS.md as first-class. CLAUDE.md takes precedence when both present. Fully supported: [Claude Code docs](https://code.claude.com/docs/en/claude-code).
+- **Cursor** reads AGENTS.md + .cursor/rules/ with high fidelity. See [Cursor rules docs](https://docs.cursor.com/context/rules).
 - **GitHub Copilot** reads AGENTS.md and .github/copilot-instructions.md. Lower token budget than Claude; keep instructions terse.
 - **Google Gemini CLI** reads GEMINI.md + AGENTS.md (if Gemini-specific file missing, defaults to AGENTS.md).
 
 ## Templates and tooling
 
-- `/templates/discovery/AGENTS.md` — universal baseline (80–150 lines).
+- `/templates/discovery/AGENTS.md` — universal baseline; trim to the authoring target of ~150 lines ideal, <300 max.
 - `/templates/discovery/CLAUDE.md` — Claude override template.
 - `/templates/discovery/cursor-rules.mdc` — Cursor rule example.
 - `/templates/discovery/copilot-instructions.md` — GitHub Copilot template.
@@ -297,10 +308,10 @@ This example is ~90 lines, command-first, boundary-explicit, and ready to ship.
 ## Citations
 
 - [agents.md](https://agents.md) — Agentic AI Foundation (Linux Foundation).
-- [Claude Code docs on CLAUDE.md](https://docs.anthropic.com/en/docs/claude-code/overview).
-- [Cursor rules docs](https://docs.cursor.sh/advanced/rules-for-ai).
+- [Claude Code docs on CLAUDE.md](https://code.claude.com/docs/en/claude-code).
+- [Cursor rules docs](https://docs.cursor.com/context/rules).
 - [GitHub Copilot custom instructions](https://docs.github.com/en/copilot/customizing-copilot/adding-custom-instructions-for-copilot).
-- Simon Willison: [Context Engineering](https://simonwillison.net/2023/Dec/28/context-engineering/) (foundational essay on agent context design).
+- Simon Willison: [Context Engineering](https://simonwillison.net/2025/Jun/27/context-engineering/) (essay on agent context design).
 - Anthropic: [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).
 
 ## See also

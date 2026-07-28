@@ -29,7 +29,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Client, TextContent } from "@modelcontextprotocol/sdk/client/index.js";
 import { z } from "zod";
 

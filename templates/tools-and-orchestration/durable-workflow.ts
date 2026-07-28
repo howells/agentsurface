@@ -74,7 +74,7 @@ export const runAgentTurn = defineActivity(
           content: prompt,
         },
       ],
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       system: `You are an AI agent. ${context}`,
     });
 

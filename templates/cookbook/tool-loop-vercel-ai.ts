@@ -12,12 +12,12 @@
  * - Limiting runaway loops with step count termination
  *
  * Canonical docs:
- * - Vercel AI SDK: https://sdk.vercel.ai/docs
- * - ToolLoopAgent: https://sdk.vercel.ai/docs/agents/tool-loop-agent
- * - RFC 9457 Problem Details: https://tools.ietf.org/html/rfc9457
+ * - Vercel AI SDK: https://ai-sdk.dev/docs
+ * - ToolLoopAgent: https://ai-sdk.dev/docs/reference/ai-sdk-core/tool-loop-agent
+ * - RFC 9457 Problem Details: https://datatracker.ietf.org/doc/html/rfc9457
  *
  * // <CUSTOMISE>
- * - Replace openai("gpt-5.4") with your model
+ * - Replace openai("gpt-5.6-terra") with your model
  * - Adjust stopWhen: stepCountIs(N) step limit
  * - Add your MCP/external tools to the tools map
  * - Customize system prompt for your domain
@@ -91,7 +91,7 @@ export async function runToolLoopSync(userMessage: string): Promise<string> {
   const result = await generateText({
     maxSteps: 10,
     messages,
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-terra"),
     stopWhen: stepCountIs(10), // Halt after 10 steps
     system:
       "You are a helpful assistant. Use tools to search and create records. " +
@@ -116,7 +116,7 @@ export async function runToolLoopStream(userMessage: string) {
     experimental_transform: smoothStream(),
     maxSteps: 10,
     messages,
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-terra"),
     stopWhen: stepCountIs(10),
     system:
       "You are a helpful assistant. Use tools to search and create records. " +
@@ -176,7 +176,7 @@ export async function runToolLoopWithWindowing(userMessage: string) {
 
   const agent = new ToolLoopAgent<ToolMap>({
     instructions: "You are a helpful assistant. Use tools to search and create records.",
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-terra"),
     onFinish: async () => {
       console.log("[agent] finished");
     },

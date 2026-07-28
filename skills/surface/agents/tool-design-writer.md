@@ -71,7 +71,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - `.strict()` / `additionalProperties: false` for OpenAI compatibility
    - Prefer optional over nullable; avoid `assignee?: string | null`
 
-5. **Add annotation coverage** on every tool (MCP 2025-11-25):
+5. **Add annotation coverage** on every tool (MCP; annotations are unchanged from 2025-11-25 through the newer 2026-07-28 revision):
    - `readOnlyHint: true` — query-only, no side effects
    - `destructiveHint: true` — mutates or deletes; any state-changing tool must carry this
    - `idempotentHint: true` — safe to retry with same args (prefer upsert over create+update)
@@ -118,7 +118,8 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 
 - Tool Design dimension: `/skills/surface/references/tool-design.md`
 - Anthropic writing-tools-for-agents: https://www.anthropic.com/engineering/writing-tools-for-agents
-- MCP Tool Annotations (2025-11-25): https://modelcontextprotocol.io/specification/2025-11-25
+- MCP Tool Annotations (2025-11-25 — newest revision with full deployed SDK support): https://modelcontextprotocol.io/specification/2025-11-25
+- MCP 2026-07-28 changelog (newest revision; RC locked 2026-05-21): https://modelcontextprotocol.io/specification/draft/changelog
 - OpenAI function calling: https://platform.openai.com/docs/guides/function-calling
 - Tool definition template: `/templates/tools-and-orchestration/tool-definition.ts`
 - Tool registry template: `/templates/tools-and-orchestration/tool-registry.ts`

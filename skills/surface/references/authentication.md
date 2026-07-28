@@ -80,7 +80,19 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
 }
 ```
 
-Authorization server metadata remains RFC 8414. This protected-resource metadata is consumed by MCP 2025-11-25 clients to discover authorization servers and request the right resource/scopes. Always publish it if your API or MCP server is exposed to remote agents.
+Authorization server metadata remains RFC 8414. This protected-resource metadata is consumed by MCP clients (2025-11-25 and the newer 2026-07-28 revision alike) to discover authorization servers and request the right resource/scopes. Always publish it if your API or MCP server is exposed to remote agents.
+
+### Client registration: prefer Client ID Metadata Documents
+
+Dynamic Client Registration ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) is deprecated in the MCP 2026-07-28 revision in favour of **Client ID Metadata Documents**, where the client ID is itself an HTTPS URL that resolves to the client's metadata. It remains available for backwards compatibility, but new clients and authorization servers should not adopt it.
+
+What this changes in practice:
+
+- Agent clients publish their metadata at a stable HTTPS URL and use that URL as the `client_id`, so no registration round-trip is needed before the first authorization request.
+- Authorization servers fetch and cache that document rather than minting per-client records.
+- Servers that already support DCR should keep it working for existing clients through the deprecation window and add Client ID Metadata Document support alongside.
+
+The 2026-07-28 revision also tightens related requirements: authorization servers validate `iss` per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html), `application_type` becomes required where DCR is still used, and credentials are bound to the issuing authorization server — keyed by issuer, and re-registered if the issuer changes.
 
 ### auth.md for agentic registration
 
@@ -168,7 +180,7 @@ async function generateDPopProof(method: string, uri: string, publicKeyPEM: stri
 
 ### OAuth 2.1
 
-([OAuth 2.1 draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) consolidates best practices. Verify the current IETF status before calling it a final RFC in generated docs or implementation notes.
+([OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) consolidates best practices. It is still an Internet-Draft — draft-15 was published 2026-03-02, with IESG submission targeted for December 2026. Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
 
 - **PKCE mandatory** on all authorization-code flows (even confidential clients).
 - **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code only.
@@ -309,7 +321,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 **Google Vertex AI:** Uses IAM short-lived access tokens via Application Default Credentials (ADC). `gcloud auth application-default login` for dev; service account JSON for production. Agent Engine supports service accounts natively.
 
-**MCP 2025-11-25:** Remote servers must advertise `.well-known/oauth-protected-resource`. The client validates JWTs with `iss`, `aud`, and `exp` claims. Async tasks support token refresh mid-flow.
+**MCP:** Remote servers must advertise `.well-known/oauth-protected-resource`. The client validates JWTs with `iss`, `aud`, and `exp` claims. Async tasks support token refresh mid-flow. This holds in 2025-11-25 (the revision with full deployed SDK support) and in the newer 2026-07-28 revision, which adds RFC 9207 `iss` validation, per-issuer credential binding, and deprecates RFC 7591 Dynamic Client Registration in favour of Client ID Metadata Documents.
 
 ## Anti-patterns
 
@@ -348,8 +360,11 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — `.well-known/oauth-protected-resource`.
 - ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — Delegated access, narrowly-scoped tokens.
 - ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — DPoP, sender-constrained tokens.
-- ([OAuth 2.1 (draft)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)) — PKCE, removed insecure flows, refresh token rotation.
-- ([MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25)) — Remote MCP OAuth 2.0 compliance.
+- ([RFC 7591: OAuth 2.0 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)) — deprecated by MCP 2026-07-28 in favour of Client ID Metadata Documents.
+- ([RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)) — `iss` validation required by MCP 2026-07-28.
+- ([OAuth 2.1 draft-ietf-oauth-v2-1-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) — PKCE, removed insecure flows, refresh token rotation. Still an Internet-Draft; draft-15 published 2026-03-02.
+- ([MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25)) — Remote MCP OAuth 2.0 compliance; newest revision with full deployed SDK support.
+- ([MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog)) — newest revision; auth changes above.
 - ([WorkOS auth.md](https://workos.com/auth-md)) — agentic registration discovery.
 - ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) — example service and provider implementations.
 - ([ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)) — provider-attested identity assertions.

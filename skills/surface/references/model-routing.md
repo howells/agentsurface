@@ -19,10 +19,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 type Provider = "google" | "openrouter" | "anthropic" | "openai";
 
 const DEFAULTS: Record<Provider, string> = {
-  google: "gemini-2.5-flash",
-  openrouter: "google/gemini-2.5-flash",
-  anthropic: "claude-sonnet-4-6",
-  openai: "gpt-5.4",
+  google: "gemini-3.6-flash",
+  openrouter: "google/gemini-3.6-flash",
+  anthropic: "claude-sonnet-5",
+  openai: "gpt-5.6-terra",
 };
 
 export function agentModel(overrideModel?: string) {
@@ -75,7 +75,7 @@ export const myAgent = new Agent({
   id: "my-agent",
   model: agentModel(),         // Uses env-based default
   // or
-  model: agentModel("claude-opus-4-6"),  // Override for specific agent
+  model: agentModel("claude-opus-5"),  // Override for specific agent
   // ...
 });
 ```
@@ -87,7 +87,7 @@ export const myAgent = new Agent({
 AGENT_PROVIDER=google          # google | openrouter | anthropic | openai
 
 # Model override (optional — uses provider default if unset)
-AGENT_MODEL=gemini-2.5-flash
+AGENT_MODEL=gemini-3.6-flash
 
 # Provider-specific keys
 GOOGLE_GENERATIVE_AI_API_KEY=...   # For google provider
@@ -137,20 +137,22 @@ interface the same so agents do not care which gateway is active.
 
 ## Provider Comparison
 
+Cost and rate-limit columns are relative positioning, not quotes — verify current vendor pricing and published limits before budgeting.
+
 | Provider | Cost | Best For | Rate Limits |
 |----------|------|----------|-------------|
-| **Google AI** | Free tier available | Development, prototyping | 15 RPM, 1M tokens/min |
-| **OpenRouter** | ~$0.01-0.50/1M tokens | Cost optimization, model variety | Varies by model |
-| **Anthropic** | ~$3-15/1M tokens | Quality-critical agents | Standard API limits |
-| **OpenAI** | ~$0.15-60/1M tokens | GPT ecosystem, function calling | Standard API limits |
+| **Google AI** | Free tier available | Development, prototyping | Tight free-tier RPM and token/min caps |
+| **OpenRouter** | Cheapest tier available; spans cents to dollars per 1M tokens depending on the model routed to | Cost optimization, model variety | Varies by model |
+| **Anthropic** | Mid-to-premium: single-digit to low tens of dollars per 1M tokens across the frontier tiers | Quality-critical agents | Standard API limits |
+| **OpenAI** | Widest spread: sub-dollar value tiers up to premium frontier pricing per 1M tokens | GPT ecosystem, function calling | Standard API limits |
 | **Cloudflare AI Gateway** | Gateway pricing + provider costs | Provider governance, logs, caching, fallback | Gateway and provider limits |
 | **Workers AI** | Platform pricing | Workers-native agents and edge inference | Workers/platform limits |
 
 ## Recommendations
 
 - **Development:** Google AI (free, fast, good enough for iteration)
-- **Production (cost-sensitive):** OpenRouter with `gemini-2.5-flash` or `deepseek-r1`
-- **Production (quality-critical):** Anthropic with `claude-sonnet-4-6`
+- **Production (cost-sensitive):** OpenRouter with `gemini-3.6-flash` or `deepseek-r1`
+- **Production (quality-critical):** Anthropic with `claude-sonnet-5`
 - **Production (diverse models):** OpenRouter lets you switch models without code changes
 - **Production (governed providers):** Cloudflare AI Gateway when you need central logs, policy, caching, budgets, or provider fallback
 - **Workers-native agents:** Workers AI when the agent already runs in Cloudflare Workers and latency/runtime simplicity matters
@@ -178,24 +180,24 @@ type Tier = "quick" | "standard" | "rigorous";
 
 const TIER_MODELS: Record<Provider, Record<Tier, string>> = {
   google: {
-    quick: "gemini-2.5-flash-lite",
-    standard: "gemini-2.5-flash",
-    rigorous: "gemini-2.5-pro",
+    quick: "gemini-3.5-flash-lite",
+    standard: "gemini-3.6-flash",
+    rigorous: "gemini-3.1-pro-preview",
   },
   anthropic: {
     quick: "claude-haiku-4-5",
-    standard: "claude-sonnet-4-6",
-    rigorous: "claude-opus-4-6",
+    standard: "claude-sonnet-5",
+    rigorous: "claude-opus-5",
   },
   openrouter: {
     quick: "deepseek/deepseek-chat",
-    standard: "anthropic/claude-sonnet-4-6",
-    rigorous: "anthropic/claude-opus-4-6",
+    standard: "anthropic/claude-sonnet-5",
+    rigorous: "anthropic/claude-opus-5",
   },
   openai: {
-    quick: "gpt-5.4",
-    standard: "gpt-5.5",
-    rigorous: "o3",
+    quick: "gpt-5.6-luna",
+    standard: "gpt-5.6-terra",
+    rigorous: "gpt-5.6-sol",
   },
 };
 

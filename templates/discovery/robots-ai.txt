@@ -1,6 +1,7 @@
 # robots.txt — AI crawler policy
 #
 # Spec: https://agents.md (Robots.txt for AI section)
+# Content Signals: https://contentsignals.org
 # AI crawler documentation:
 #   - GPTBot: https://openai.com/gptbot
 #   - ClaudeBot: https://www.anthropic.com/claude/bot
@@ -9,59 +10,42 @@
 #   - CCBot (Common Crawl): https://commoncrawl.org/the-common-crawl-crawl-archive/
 #   - Bytespider (ByteDance): https://www.bytedance.com
 #
-# This template allows major AI training and search crawlers while blocking sensitive paths.
+# DEFAULT POSTURE: allow search and retrieval bots, block model-training crawlers.
+# This is the recommended starting point — it keeps your docs discoverable and
+# citable in AI answers without donating them to training corpora. If your project
+# wants training visibility instead, see "TRAINING-VISIBLE ALTERNATIVE" below.
+#
 # Customize USER-AGENT lines and DISALLOW/ALLOW rules for your project.
 
-# Training bots (model training data collection)
-User-agent: GPTBot
-Disallow: /admin
-Disallow: /private
+# ---------------------------------------------------------------------------
+# Content-Signal: state the content-use policy before any per-bot directives.
+# Content Signals are a machine-readable statement of intent that sits alongside
+# robots.txt rules. Declare them first so crawlers that honour the convention see
+# your policy even if they ignore individual user-agent blocks.
+#   search    — may index for search results
+#   ai-input  — may retrieve at inference time to ground an answer
+#   ai-train  — may be used as model training data
+# ---------------------------------------------------------------------------
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Disallow: /admin/
+Disallow: /private/
 Disallow: /.env*
-Disallow: /secrets
+Disallow: /secrets/
+Disallow: /*.json$
+Disallow: /*.sql$
+Disallow: *.pem
 Allow: /llms.txt
 Allow: /llms-full.txt
+Allow: /robots.txt
+Allow: /sitemap.xml
+Allow: /AGENTS.md
+# Keep this Allow: the Disallow: /*.json$ rule above would otherwise block the
+# discovery endpoints (server-card.json, agent-skills index, api-catalog.json).
+# Longest-match precedence lets this Allow win for /.well-known/ paths.
+Allow: /.well-known/
 
-User-agent: ClaudeBot
-Disallow: /admin
-Disallow: /private
-Disallow: /.env*
-Disallow: /secrets
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: Google-Extended
-Disallow: /admin
-Disallow: /private
-Disallow: /.env*
-Disallow: /secrets
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: Meta-ExternalAgent
-Disallow: /admin
-Disallow: /private
-Disallow: /.env*
-Disallow: /secrets
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: CCBot
-Disallow: /admin
-Disallow: /private
-Disallow: /.env*
-Disallow: /secrets
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: Bytespider
-Disallow: /admin
-Disallow: /private
-Disallow: /.env*
-Disallow: /secrets
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-# Search bots (real-time search indexing)
+# Search bots (real-time search indexing) — allowed
 User-agent: OAI-SearchBot
 Disallow: /admin
 Disallow: /private
@@ -85,20 +69,59 @@ User-agent: ChatGPT-User
 User-agent: Claude-User
 # No restrictive rules; these obey user authentication
 
-# Default policy for all other bots
-User-agent: *
-Disallow: /admin/
-Disallow: /private/
-Disallow: /.env*
-Disallow: /secrets/
-Disallow: /*.json$
-Disallow: /*.sql$
-Disallow: *.pem
-Allow: /llms.txt
-Allow: /llms-full.txt
-Allow: /robots.txt
-Allow: /sitemap.xml
-Allow: /AGENTS.md
+# Training bots (model training data collection) — blocked by default
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+# ---------------------------------------------------------------------------
+# TRAINING-VISIBLE ALTERNATIVE
+#
+# If your project actively wants to appear in model training data (open-source
+# libraries and public documentation often do), replace the training-bot block
+# above with the rules below and change the Content-Signal line to
+# `search=yes, ai-input=yes, ai-train=yes`.
+#
+# User-agent: GPTBot
+# Disallow: /admin
+# Disallow: /private
+# Disallow: /.env*
+# Disallow: /secrets
+# Allow: /llms.txt
+# Allow: /llms-full.txt
+#
+# User-agent: ClaudeBot
+# Disallow: /admin
+# Disallow: /private
+# Disallow: /.env*
+# Disallow: /secrets
+# Allow: /llms.txt
+# Allow: /llms-full.txt
+#
+# User-agent: Google-Extended
+# Disallow: /admin
+# Disallow: /private
+# Disallow: /.env*
+# Disallow: /secrets
+# Allow: /llms.txt
+# Allow: /llms-full.txt
+#
+# ...and the same shape for Meta-ExternalAgent, CCBot, and Bytespider.
+# ---------------------------------------------------------------------------
 
 # Crawl delay (optional: slow down if expensive)
 # Crawl-delay: 1
@@ -111,11 +134,13 @@ Sitemap: https://example.com/sitemap-agents.xml
 # CUSTOMISATION CHECKLIST:
 #
 # [ ] Replace example.com with your domain
+# [ ] Decide the training posture: keep the default block, or switch to the
+#     TRAINING-VISIBLE ALTERNATIVE above and update Content-Signal to match
 # [ ] Add paths specific to your project that should be private (/api-internal, /billing, etc.)
 # [ ] Remove any DISALLOW rules if your project has no private areas
-# [ ] Add ALLOW exceptions if needed (e.g., Allow: /api/public/*)
+# [ ] Add ALLOW exceptions if needed (e.g., Allow: /api/public/*); keep
+#     Allow: /.well-known/ so discovery JSON survives the /*.json$ block
 # [ ] Set Crawl-delay if your server struggles under crawler load
 # [ ] Update Sitemap URLs to match your sitemap locations
-# [ ] If you want to completely block AI training bots, change DISALLOW to / for those user-agents
 # [ ] Test with: curl -I https://example.com/robots.txt
 #

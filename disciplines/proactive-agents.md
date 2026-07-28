@@ -43,6 +43,26 @@ When a transaction is inserted (event), enqueue "reconcile_for_date:2026-04-17"
 
 **Hybrid approach** (best): Time-driven schedule (once daily) + event-driven spikes (real-time on new data).
 
+### 1a. Signal Providers
+
+Events from outside your own database — a pull request receiving a review, a third-party webhook firing, a mailbox changing — need a consistent path into the agent. The ecosystem has converged on a **signal provider**: one interface per event source, with four operations.
+
+```typescript
+interface SignalProvider {
+  subscribe(threadId: string, resourceId: string): Promise<void>; // bind a thread to a resource
+  unsubscribe(threadId: string, resourceId: string): Promise<void>;
+  poll(subscriptions: Subscription[]): Promise<void>; // pull-based sources
+  handleWebhook(request: Request): Promise<void>; // push-based sources
+  notify(threadId: string, signal: Signal): Promise<void>; // deliver into the thread
+}
+```
+
+`poll` and `handleWebhook` are the two ingestion modes; `notify` is the single funnel every source shares. Adding a source means writing one provider, not another branch in the notification path.
+
+This is shipped framework capability, not a design proposal. Mastra ships this interface with a generic `WebhookSignalProvider` (supply a resource-ID extractor and an optional notification builder) and a `@mastra/github-signals` provider that watches pull requests and notifies subscribed threads on comments, review state, CI status, and merges; signals are beta as of `@mastra/core@1.39.0` and enter a running loop directly or wake an idle agent into a new run. Treat the interface as the portable part and the vendor as one implementation.
+
+**Keep urgency out of the provider.** A provider's job is to detect and deliver. Whether six comments in a minute produce six wake-ups or one is the batching decision below.
+
 ### 2. Persistent Workflow State
 
 A proactive agent may run for hours. It must tolerate interruption.

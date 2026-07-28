@@ -82,7 +82,7 @@ export const myAgent = new Agent({
   name: "My Agent",
   description: "One sentence about what this agent does.",
   instructions: "System prompt. Can be a string or loaded from markdown files.",
-  model: "anthropic/claude-sonnet-4-6",  // Use Mastra model router format
+  model: "anthropic/claude-sonnet-5",  // Use Mastra model router format
   tools: {
     // Compose from tool groups
     ...domainTools,

@@ -2,7 +2,7 @@
  * MCP Server (stdio) — Minimal canonical implementation
  *
  * Canonical spec: https://modelcontextprotocol.io/specification/2025-11-25
- * SDK: @modelcontextprotocol/sdk (v2.x)
+ * SDK: @modelcontextprotocol/sdk (1.x)
  * Transport: stdio (local, single connection, trusted)
  * Authentication: OS-level (trust delegated to host process)
  *
@@ -28,7 +28,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/types.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   Tool,
   Resource,
@@ -50,7 +50,7 @@ const server = new McpServer(
     capabilities: {
       prompts: {},
       resources: {},
-      tasks: {}, // Enable Tasks async primitive (MCP 2025-11-25)
+      tasks: {}, // Enable Tasks async primitive — experimental in MCP 2025-11-25; moves to the io.modelcontextprotocol/tasks extension in the 2026-07-28 revision
       tools: {},
     },
   },

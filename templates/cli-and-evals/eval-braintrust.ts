@@ -34,7 +34,7 @@ import Braintrust from "@braintrust/eval";
 import { z } from "zod";
 
 // <CUSTOMISE>: Update model and dataset loading
-const AGENT_MODEL = "claude-opus-4-8";
+const AGENT_MODEL = "claude-opus-5";
 const DATASET_NAME = "agent-tasks-v1";
 const EVAL_NAME = "agent-routing-eval";
 
@@ -100,9 +100,9 @@ async function scoreToolCallOrder(
  * Custom scorer: Cost (sum of input + output tokens)
  */
 async function scoreCost(response: AgentResponse): Promise<{ score: number; cost: number }> {
-  // Example: $0.003 per 1M input tokens, $0.015 per 1M output tokens (Opus 4.8)
-  const inputCost = (response.tokens.input / 1e6) * 0.003;
-  const outputCost = (response.tokens.output / 1e6) * 0.015;
+  // Example: $5 per 1M input tokens, $25 per 1M output tokens (Opus 5)
+  const inputCost = (response.tokens.input / 1e6) * 5;
+  const outputCost = (response.tokens.output / 1e6) * 25;
   const totalCost = inputCost + outputCost;
 
   // Score: higher is better. Invert cost as score.

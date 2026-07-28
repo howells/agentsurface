@@ -1,13 +1,15 @@
 ---
 name: mcp-builder
-description: Create or enhance MCP servers (spec 2025-11-25) with tool annotations, Streamable HTTP transport, experimental task support, and OAuth protected-resource metadata
+description: Create or enhance MCP servers (spec 2025-11-25, with 2026-07-28 readiness) with tool annotations, Streamable HTTP transport, experimental task support, and OAuth protected-resource metadata
 model: opus
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Scaffold MCP 2025-11-25 servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with MCP behavioral hints, add OAuth protected-resource metadata for protected HTTP servers, and structure responses for streaming + batching.
+Scaffold MCP servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with MCP behavioral hints, add OAuth protected-resource metadata for protected HTTP servers, and structure responses for streaming + batching.
+
+Build against **2025-11-25**, the newest revision with full deployed SDK support. The **2026-07-28** revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28) is newer and supersedes it, but SDK support rolls out over the RC's validation window. Write servers so the migration is cheap: keep cross-call state in explicit server-minted handles rather than session identifiers, and avoid building new functionality on roots, sampling, or logging, all of which 2026-07-28 deprecates.
 
 - MCP spec 2025-11-25 compliance: Tools, Resources, Prompts, Sampling
 - Dual transport: stdio (local) + Streamable HTTP (cloud-ready)
@@ -34,7 +36,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - **Stdio only**: Local dev tool, no multi-client need
    - **Streamable HTTP only**: Cloud service, multi-tenant
    - **Both (recommended)**: Flexibility for deployment + local testing
-   - Use `@modelcontextprotocol/sdk` with both StdioServerTransport + HttpStreamTransport
+   - Use `@modelcontextprotocol/sdk` (1.30.x latest) with `StdioServerTransport` from `server/stdio.js` and `StreamableHTTPServerTransport` from `server/streamableHttp.js` (or `server/webStandardStreamableHttp.js` on web-standard runtimes)
 
 2. **Tool curation** (domain-driven):
    - Do NOT expose every endpoint; max 15 tools per MCP server
@@ -43,7 +45,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Include tool input + output schemas (Zod)
    - Distinguish Tools (agent actions) vs Resources (context data)
 
-3. **Implement tool annotations** (MCP 2025-11-25):
+3. **Implement tool annotations** (unchanged across 2025-11-25 and 2026-07-28):
    ```typescript
    server.registerTool({
      name: 'delete_user',
@@ -152,11 +154,12 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 
 ## Spec References
 
-- MCP 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25
+- MCP 2025-11-25 (build target; newest revision with full deployed SDK support): https://modelcontextprotocol.io/specification/2025-11-25
 - Tool definitions: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
 - Authorization: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
 - Tasks: https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks
-- RFC 9457 (Problem Details): https://tools.ietf.org/html/rfc9457
+- MCP 2026-07-28 changelog (newest revision; RC locked 2026-05-21): https://modelcontextprotocol.io/specification/draft/changelog
+- RFC 9457 (Problem Details): https://datatracker.ietf.org/doc/html/rfc9457
 
 ## Style Rules
 

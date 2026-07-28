@@ -26,7 +26,7 @@
  * - Define your AgentState schema (what state fields you need)
  * - Implement supervisor() logic (routing heuristic)
  * - Add worker node functions (fetch, review, write, etc.)
- * - Point to actual LLM (Claude, GPT-5.5, etc.)
+ * - Point to actual LLM (Claude, GPT-5.6 Sol, etc.)
  */
 
 import { Annotation, StateGraph, START, END, Command } from "@langchain/langgraph";
@@ -115,7 +115,7 @@ Where should we go next?`;
   const response = await anthropic.messages.create({
     max_tokens: 100,
     messages: [...state.messages, { role: "user", content: userMessage }],
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     system: systemPrompt,
   });
 
@@ -156,7 +156,7 @@ async function researchNode(state: AgentStateType): Promise<Partial<AgentStateTy
         content: `Research the following task and provide key findings:\n\n${state.user_task}`,
       },
     ],
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
   });
 
   const findings = response.content[0]?.type === "text" ? response.content[0].text : "";
@@ -213,7 +213,7 @@ Review feedback: ${state.review_feedback}
 Write final output that incorporates all feedback:`,
       },
     ],
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
   });
 
   const output = response.content[0]?.type === "text" ? response.content[0].text : "";

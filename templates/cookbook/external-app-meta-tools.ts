@@ -14,7 +14,7 @@
  * Canonical docs:
  * - Composio API: https://www.composio.dev/docs/sdk/python
  * - OpenAI tool discovery: https://platform.openai.com/docs/guides/function-calling
- * - Dynamic tool loading: https://sdk.vercel.ai/docs/guides/tools#dynamic-tools
+ * - Dynamic tool loading: https://ai-sdk.dev/docs/foundations/tools#dynamic-tools
  *
  * // <CUSTOMISE>
  * - Replace mock app catalog with real Composio / Make.com / Zapier API calls

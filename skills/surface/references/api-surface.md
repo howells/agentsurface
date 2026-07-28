@@ -410,14 +410,14 @@ export async function GET(req: Request) {
 }
 ```
 
-### Arazzo 1.0.1 workflows
+### Arazzo 1.1.0 workflows
 
-For multi-step operations, use Arazzo 1.0.1 to model agent workflows ([Arazzo 1.0.1](https://www.openapis.org/arazzo-specification)).
+For multi-step operations, use Arazzo 1.1.0 to model agent workflows ([Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html), released 17 May 2026).
 
 **Example: Create user, send welcome email, log event:**
 
 ```yaml
-arazzo: 1.0.1
+arazzo: 1.1.0
 info:
   title: User Onboarding Workflow
   version: 1.0.0
@@ -664,7 +664,7 @@ The surface skill includes these template files under `/templates`:
 ## Citations
 
 - [OpenAPI 3.1.x Specification](https://spec.openapis.org/oas/v3.1.0)
-- [Arazzo 1.0.1 Specification](https://www.openapis.org/arazzo-specification)
+- [Arazzo 1.1.0 Specification](https://spec.openapis.org/arazzo/latest.html)
 - [Anthropic: Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html)
 - [OpenAI Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)

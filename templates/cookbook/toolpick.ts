@@ -13,7 +13,9 @@
  * - You want to always expose certain "anchor" tools (web_search, help)
  *
  * Canonical docs:
- * - Vercel AI SDK `toolpick`: https://sdk.vercel.ai/docs/reference/ai-sdk-core/toolpick
+ * - Vercel AI SDK `filterActiveTools` (closest built-in primitive; this file's
+ *   embedding-based selection is a custom pattern, not an SDK export):
+ *   https://ai-sdk.dev/docs/reference/ai-sdk-core/filter-active-tools
  * - OpenAI embedding API: https://platform.openai.com/docs/guides/embeddings
  *
  * // <CUSTOMISE>
@@ -200,7 +202,7 @@ export async function runAgentWithToolpick(
 
   const agent = new ToolLoopAgent({
     instructions: "You are a helpful assistant. Use the provided tools to help the user.",
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5.6-terra"),
     prepareStep: buildToolpickPrepareStep(toolIndex, {
       maxTools: 12,
       alwaysActive: ["web_search", "search_tools"],

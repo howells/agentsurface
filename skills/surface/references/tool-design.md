@@ -161,9 +161,9 @@ response_format: z.enum(['concise', 'detailed'])
 }
 ```
 
-### Annotations (MCP 2025-11-25)
+### Annotations (MCP)
 
-([MCP spec 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+([MCP spec 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)) — annotations are unchanged in the newer 2026-07-28 revision (RC locked 2026-05-21, final publication scheduled for 2026-07-28), so this guidance carries forward.
 
 Every tool should declare its access level and side effects:
 
@@ -400,7 +400,7 @@ All three adapters wrap the same handler and schema; only the frame changes.
 ## Anti-patterns to avoid
 
 - **Terse descriptions** ("Creates a thing"). Takes no effort to write, compounds agent confusion.
-- **30+ tools on one agent.** Agent cannot reason over large tool sets; accuracy drops sharply.
+- **More than 20 tools on one agent.** Under 10 tools in a single agent context is the target; past 20 is a red flag, and at 30 or more accuracy drops sharply.
 - **Opaque IDs in response without lookup tool.** If a tool returns `user_id: 123`, agent must have a `lookup_user` tool to resolve it.
 - **Nested union types** (e.g., `result: { type: 'success'; data: X } | { type: 'error'; message: string }`). OpenAI strict mode rejects these. Use flat discriminated unions or separate fields.
 - **Nullable parameters** (e.g., `assignee?: string | null`). OpenAI requires explicit omission; Anthropic handles both. Prefer optional fields without null.
@@ -423,7 +423,8 @@ All three adapters wrap the same handler and schema; only the frame changes.
 ## Citations
 
 - ([Anthropic writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents))
-- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25))
+- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)) — newest revision with full deployed SDK support
+- ([MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog)) — newest revision; RC locked 2026-05-21
 - ([OpenAI function calling](https://platform.openai.com/docs/guides/function-calling))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))

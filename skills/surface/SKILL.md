@@ -228,7 +228,7 @@ Use these defaults unless the project already has a better convention:
 - AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files as overlays.
 - `llms.txt` is a useful Markdown discovery convention for inference-time retrieval, not a guaranteed SEO or citation signal. Pair it with crawlable docs, structured data, sitemap, and stable canonical URLs.
 - Choose RAG architecture by data shape and query need, not by trend: dense-only for prototypes, hybrid + rerank for most production knowledge search, graph/LightRAG when relationships drive answers, multimodal retrieval for visual/audio corpora, and compiled/optimized retrieval when the query workload is stable enough to justify preprocessing.
-- MCP 2025-11-25 is the current baseline for this skill. Check tools, resources, prompts, roots, sampling, elicitation, tasks, Streamable HTTP, and protocol-version negotiation where relevant.
+- MCP has two revisions in play. The 2026-07-28 revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28) is the newest and supersedes 2025-11-25; it removes sessions and the initialize handshake, adds `server/discover` and `subscriptions/listen`, and deprecates roots, sampling, and logging. The 2025-11-25 revision remains the newest with full deployed SDK support while support for 2026-07-28 rolls out. Audit against 2025-11-25 and flag 2026-07-28 readiness. Check tools, resources, prompts, roots, sampling, elicitation, tasks, Streamable HTTP, and protocol-version negotiation where relevant.
 - Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request.
 - MCP tool descriptions and annotations are advisory hints, not authorization policy. Treat them as untrusted unless the server is trusted, and enforce approvals, auth, and scope checks in the server or workflow.
 - MCP tools should provide input schemas, `outputSchema` plus `structuredContent` for structured results, annotations, resource links where useful, and structured recoverable errors.
@@ -240,10 +240,10 @@ Use these defaults unless the project already has a better convention:
 - AGENTS.md format: https://agents.md
 - llms.txt proposal: https://llmstxt.org
 - MCP specification: https://modelcontextprotocol.io/specification
-- OpenAI Agents SDK: https://platform.openai.com/docs/guides/agents-sdk/
+- OpenAI Agents SDK: https://openai.github.io/openai-agents-js/
 - Claude Platform release notes: https://platform.claude.com/docs/en/release-notes/overview
 - Claude Managed Agents: https://platform.claude.com/docs/en/managed-agents/overview
-- Claude Code SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
+- Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
 - Vercel AI SDK: https://ai-sdk.dev/docs
 - Vercel Workflow: https://vercel.com/docs/workflow
 - OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html

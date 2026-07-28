@@ -5,7 +5,7 @@
  * Transport: Streamable HTTP (stateless, long-lived POST, SSE-like streaming)
  * Framework: Fastify (minimal HTTP server)
  * Authentication: OAuth 2.1 Bearer token + JWT validation
- * SDK: @modelcontextprotocol/sdk (v2.x)
+ * SDK: @modelcontextprotocol/sdk (1.x)
  *
  * When to use:
  * - Multi-client scenarios (many agents calling simultaneously)
@@ -34,7 +34,7 @@ import Fastify from "fastify";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import fastifyJwt from "@fastify/jwt";
 import fastifyCors from "@fastify/cors";
-import { HttpServerTransport } from "@modelcontextprotocol/sdk/server/http.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TextContent, ErrorContent } from "@modelcontextprotocol/sdk/types.js";
@@ -334,12 +334,15 @@ async function setupFastify(): Promise<FastifyInstance> {
       try {
         // ===== Create MCP Server & Transport =====
         const mcpServer = setupMcpServer();
-        const transport = new HttpServerTransport(request.raw, reply.raw);
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined, // Stateless mode — no session ID in responses
+        });
 
         // Attach context for logging
         (request as any).mcp = { clientId, sessionId };
 
         await mcpServer.connect(transport);
+        await transport.handleRequest(request.raw, reply.raw, request.body);
         logger.info("mcp_session_complete", {
           clientId,
           sessionId,

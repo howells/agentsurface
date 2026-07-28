@@ -52,7 +52,7 @@ workflows:
         description: Name of the new agent
         required: true
       - name: agent_model
-        description: Model to use (claude-opus-4-8 | claude-sonnet-5 | claude-haiku-4-5-20251001)
+        description: Model to use (claude-opus-5 | claude-sonnet-5 | claude-haiku-4-5-20251001)
         required: true
       - name: admin_email
         description: Email to notify of creation

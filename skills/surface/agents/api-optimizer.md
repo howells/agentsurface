@@ -108,9 +108,9 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 ## Spec References
 
 - OpenAPI 3.1.0: https://spec.openapis.org/oas/v3.1.0
-- RFC 9457 (Problem Details): https://tools.ietf.org/html/rfc9457
-- RFC 9110 (HTTP Semantics, Idempotency): https://tools.ietf.org/html/rfc9110
-- Arazzo 1.0 (Workflows): https://spec.openapis.org/arazzo/v1.0.0
+- RFC 9457 (Problem Details): https://datatracker.ietf.org/doc/html/rfc9457
+- RFC 9110 (HTTP Semantics, Idempotency): https://datatracker.ietf.org/doc/html/rfc9110
+- Arazzo 1.1.0 (Workflows): https://spec.openapis.org/arazzo/latest.html
 - MCP Tool Annotations: `/skills/surface/references/mcp-tool-annotations.md`
 
 ## Style Rules

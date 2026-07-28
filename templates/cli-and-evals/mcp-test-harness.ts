@@ -35,8 +35,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Client, Server } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport, StdioServerTransport } from "@modelcontextprotocol/sdk/stdio.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";

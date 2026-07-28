@@ -189,11 +189,11 @@ Enable agents to authenticate without human intervention or browser interaction.
 
 ## Spec References
 
-- OAuth 2.1: https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1-13
-- PKCE (RFC 7636): https://tools.ietf.org/html/rfc7636
-- DPoP (RFC 9449): https://tools.ietf.org/html/rfc9449
-- Token Exchange (RFC 8693): https://tools.ietf.org/html/rfc8693
-- Protected Resource Metadata (RFC 9728): https://tools.ietf.org/html/rfc9728
+- OAuth 2.1 (Internet-Draft; draft-15 published 2026-03-02): https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15
+- PKCE (RFC 7636): https://datatracker.ietf.org/doc/html/rfc7636
+- DPoP (RFC 9449): https://datatracker.ietf.org/doc/html/rfc9449
+- Token Exchange (RFC 8693): https://datatracker.ietf.org/doc/html/rfc8693
+- Protected Resource Metadata (RFC 9728): https://datatracker.ietf.org/doc/html/rfc9728
 - MCP Auth Model: `/skills/surface/references/mcp-auth-model.md`
 
 ## Style Rules

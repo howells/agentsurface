@@ -147,7 +147,7 @@ Verify the agent selects the correct tool for a given prompt. Use temperature 0 
 describe("agent tool routing", () => {
   it("should select docs_search for documentation queries", async () => {
     const agent = new Agent({
-      model: "claude-opus-4-7",
+      model: "claude-opus-5",
       tools: [docSearch, codeSearch, webSearch],
       temperature: 0, // Deterministic routing
     });
@@ -162,7 +162,7 @@ describe("agent tool routing", () => {
 
   it("should refuse unsafe tools on untrusted input", async () => {
     const agent = new Agent({
-      model: "claude-opus-4-7",
+      model: "claude-opus-5",
       tools: [deleteUser, archiveFile],
       temperature: 0,
     });
@@ -183,7 +183,7 @@ Traces are the source of truth for debugging failures. Instrument with OpenTelem
 
 **Key attributes** (cite https://opentelemetry.io/docs/specs/semconv/gen-ai/):
 - `gen_ai.provider.name` — "anthropic", "openai", "google"
-- `gen_ai.request.model` — "claude-opus-4-7"
+- `gen_ai.request.model` — "claude-opus-5"
 - `gen_ai.input.messages` — full conversation (serialized)
 - `gen_ai.output.messages` — model response
 - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`
@@ -272,7 +272,7 @@ Cite Simon Willison + [arxiv 2506.08837](https://arxiv.org/abs/2506.08837) on de
 
 - **Vibes-based iteration.** "It feels more accurate after my prompt rewrite." Ship evals first; measure before/after.
 - **Only testing happy path.** 70% of prod failures are edge cases. Slice evals by scenario.
-- **LLM judge without calibration.** "GPT-4 will grade my agent's outputs." LLM judges are biased and gamable. Validate on 20–30 human labels first.
+- **LLM judge without calibration.** "GPT-5.6 Sol will grade my agent's outputs." LLM judges are biased and gamable. Validate on 20–30 human labels first.
 - **No regression gating.** Evals pass but metrics decline silently. CI gates prevent replay.
 - **Testing tool calls, not outcomes.** "Agent called delete_file." Did the file actually get deleted? Test outcomes.
 - **Ignoring variance.** "1 run passed, ship it." 5 runs pass 60% of the time; you need consistent performance.

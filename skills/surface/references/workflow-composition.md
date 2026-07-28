@@ -248,7 +248,7 @@ const step = createStep({
   execute: async ({ inputData }) => ({ answer: await generate(inputData.query) }),
   scorers: {
     relevancy: {
-      scorer: createAnswerRelevancyScorer({ model: "openai/gpt-5.4" }),
+      scorer: createAnswerRelevancyScorer({ model: "openai/gpt-5.6-terra" }),
       sampling: { type: "ratio", rate: 0.1 },  // score 10% of calls
     },
   },

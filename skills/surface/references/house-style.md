@@ -558,7 +558,7 @@ import { tracer } from "@midday/observe";
 
 const span = tracer.startSpan("invoke_agent", {
   attributes: {
-    "llm.model": "claude-opus-4-1",
+    "llm.model": "claude-opus-5",
     "llm.usage.prompt_tokens": 1200,
     "llm.usage.completion_tokens": 450,
     "llm.temperature": 0.7,

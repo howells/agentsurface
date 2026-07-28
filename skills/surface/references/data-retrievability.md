@@ -47,10 +47,12 @@ The embedding model is the foundation of retrieval quality. Select based on cost
 
 **Dense text embeddings:**
 
-- **OpenAI text-embedding-3-large** — De facto commercial standard. Integrated into Responses API file_search. 3,072 dims (supports Matryoshka truncation to 256 dims). $0.02/1M tokens. Reliable, widely integrated.
-- **Voyage 3 / Voyage 4** (MongoDB-owned since 2024) — 1,536 dims, multilingual, rerank-2.5-lite companion. Voyage 4 latest. $0.01/1M tokens.
-- **Cohere Embed v4** — Multimodal (text + images), 1,536 dims, Matryoshka (256/512/1024/1536), 128k context length. $0.12/1M tokens for text, $0.47/1M for images. Enterprise rerank-3.5 and rerank-4.0 bundled.
-- **Google Gemini Embedding 2** (March 2026) — All-modality (text, image, video, audio, code), 768 dims. Top MTEB leaderboard (68.32 avg). ~$0.02/1M tokens.
+- **OpenAI text-embedding-3-large** — De facto commercial standard. Integrated into Responses API file_search. 3,072 dims (supports Matryoshka truncation to 256 dims). $0.13/1M tokens as of 2026-07-28; `text-embedding-3-small` is roughly 6x cheaper at $0.02/1M. Reliable, widely integrated.
+- **Voyage 3 / Voyage 4** (MongoDB-owned since 2024) — 1,536 dims, multilingual, rerank-2.5-lite companion. Voyage 4 latest. Cents per million tokens; typically the cheapest of the commercial options.
+- **Cohere Embed v4** — Multimodal (text + images), 1,536 dims, Matryoshka (256/512/1024/1536), 128k context length. Tens of cents per million text tokens, with image embedding several times more expensive. Enterprise rerank-3.5 and rerank-4.0 bundled.
+- **Google Gemini Embedding 2** (March 2026) — All-modality (text, image, video, audio, code), 768 dims. Competitive at the top of the MTEB leaderboard. Priced in the same low-cents-per-million band as OpenAI's small model.
+
+Verify current vendor pricing before committing to a model on cost grounds — embedding prices move, and the comparative ordering (Voyage cheapest, OpenAI large in the middle, Cohere most expensive per text token) is more durable than any absolute figure here.
 - **Open-source:** BGE-M3 (MTEB competitive, multilingual), E5-Mistral, Nomic Embed (384 dims, efficient), Jina v3. Hugging Face models, no API costs, self-hosted latency variable.
 
 **Key pattern: Matryoshka Embeddings** — Cohere v4 and OpenAI 3-large support dimensionality reduction post-embedding. Store full dims (1,536) but truncate to 256/512 at query time for cost/latency savings without recomputing.
@@ -71,13 +73,15 @@ The embedding model is the foundation of retrieval quality. Select based on cost
 
 ### Vector databases: when to pick each
 
-**Pinecone serverless (managed)** — Best for: medium-scale (100K–10M vectors), variable workloads, hands-off ops. Automatic scaling, dedicated read nodes (March 2026). $16/1M RUs. 50–100ms baseline latency. Hybrid search + reranking integrated.
+Pricing below is indicative only — it is the shape of the cost curve, not a quote. Verify current vendor pricing before making a selection on cost.
 
-**pgvector + pgvectorscale (self-hosted PostgreSQL)** — **2026 breakthrough**: 28x lower p95 latency, 16x higher throughput vs. Pinecone s1 at 99% recall, 75% less cost. pgvector (C-based) + pgvectorscale (Rust, StreamingDiskANN). Requires PostgreSQL ops, but eliminates Vector DB vendor lock-in. Use for cost-sensitive, performance-critical, or on-prem deployments.
+**Pinecone serverless (managed)** — Best for: medium-scale (100K–10M vectors), variable workloads, hands-off ops. Automatic scaling, dedicated read nodes (March 2026). ~$16–18 per 1M read units plus per-GB storage (verified 2026-07-28). Tens of milliseconds to ~100ms baseline latency. Hybrid search + reranking integrated.
 
-**Qdrant** — Best for: fine-grained control, HNSW tuning, binary quantization (32x compression, 40x speedup), hybrid (sparse-dense). Self-host or managed cloud. $0.20/1M RUs.
+**pgvector + pgvectorscale (self-hosted PostgreSQL)** — Vendor benchmarks put it an order of magnitude ahead of managed serverless on p95 latency and throughput at comparable recall, at a fraction of the cost. Treat those numbers as vendor-published and benchmark your own corpus. pgvector (C-based) + pgvectorscale (Rust, StreamingDiskANN). Requires PostgreSQL ops, but eliminates Vector DB vendor lock-in. Use for cost-sensitive, performance-critical, or on-prem deployments.
 
-**Weaviate** — Best for: hybrid search native (BM25 + dense + RRF fusion), full-text search, and multilingual. Managed or self-hosted Kubernetes. $0.50/1k reads. GraphQL API.
+**Qdrant** — Best for: fine-grained control, HNSW tuning, binary quantization (large compression and speedup gains), hybrid (sparse-dense). Self-host or managed cloud; managed read pricing is roughly an order of magnitude below Pinecone's.
+
+**Weaviate** — Best for: hybrid search native (BM25 + dense + RRF fusion), full-text search, and multilingual. Managed or self-hosted Kubernetes. Managed pricing sits at the higher end of this group. GraphQL API.
 
 **LanceDB** — Best for: multi-vector retrieval (ColBERT, ColPali, late-interaction). Native support. Cost-efficient, TypeScript-friendly.
 
@@ -184,10 +188,10 @@ async function hybridSearch(query: string, limit: number = 10) {
 **Leaders:**
 - **Cohere Rerank 3.5** — Multilingual, 100+ languages, 32k doc token limit
 - **Cohere Rerank 4.0** (2026) — Latest, most performant
-- **Voyage Rerank 2.5** — 13.89% accuracy boost over dense, $0.01/1M tokens, 4k query tokens
+- **Voyage Rerank 2.5** — vendor-reported double-digit percentage accuracy gain over dense-only, 4k query tokens
 - **BGE Rerank** — Open-source, competitive
 
-**Cost-benefit:** Rerank reduces token spend downstream by filtering irrelevant docs before generation. Typical: $0.01 per 1M tokens reranked (negligible vs. generation cost).
+**Cost-benefit:** Rerank reduces token spend downstream by filtering irrelevant docs before generation. Hosted reranking runs at cents per million tokens — two to three orders of magnitude below generation cost, so it usually pays for itself. Verify current vendor pricing before modelling it.
 
 ### Chunking strategies and Contextual Retrieval
 
@@ -236,7 +240,7 @@ async function contextualEmbed(chunk: string, fullDoc: string): Promise<number[]
 }
 ```
 
-**Results:** 49% reduction in retrieval failures alone; 67% with reranking. Prompt caching makes it cost-effective (cache the full doc once, reference repeatedly).
+**Results:** Anthropic's published research on Contextual Retrieval ([Introducing Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval), September 2024) measured a 49% reduction in retrieval failures from contextual embeddings plus contextual BM25, rising to 67% when combined with reranking. Those figures are from Anthropic's own evaluation set; expect your corpus to differ. Prompt caching makes the preprocessing cost-effective (cache the full doc once, reference repeatedly).
 
 ### Knowledge graphs: Neo4j, GraphRAG, LightRAG
 
@@ -248,12 +252,12 @@ async function contextualEmbed(chunk: string, fullDoc: string): Promise<number[]
 **GraphRAG (Microsoft, 2024):**
 - Build hierarchical communities of entities
 - Traverse communities at query time for global reasoning
-- **Problem:** 610K+ tokens per query (expensive, slow updates)
+- **Problem:** hundreds of thousands of tokens per query (expensive, slow updates)
 - Use for: Complex domains with rich relationship semantics
 
 **LightRAG (2025, EMNLP'25) — 2026 PREFERRED:**
 - Avoids community traversal; retrieves entities/relations directly via vectors
-- **6,000x token efficiency** vs. GraphRAG ($0.15 vs. $4–7 per document)
+- **Orders of magnitude more token-efficient than GraphRAG** — the LightRAG paper reports roughly three to four orders of magnitude fewer tokens per query, which translates to cents rather than dollars per document indexed
 - Dual-level: low-level (entities, relations) + high-level (global topics)
 - March 2026: OpenSearch backend integration + setup wizard
 - Use for: Token-efficient, agentic RAG at scale
@@ -406,18 +410,20 @@ test('retrieval maintains >0.85 recall@10', async () => {
 
 ## Cross-vendor capability table
 
+Latency and cost rows are orders of magnitude for comparison, not quotes. Verify current vendor pricing and benchmark against your own corpus before selecting.
+
 | Capability | Pinecone | Qdrant | Weaviate | pgvector | Neo4j | OpenAI API | Voyage | Cohere |
 |-----------|----------|--------|----------|----------|-------|-----------|--------|--------|
 | Dense vectors | Yes | Yes | Yes | Yes | Yes (plug-in) | Embeddings API | Native | Native |
 | Sparse (BM25) | Yes (native) | Yes (SPLADE) | Yes (native) | No (use Postgres FTS) | No (use Cypher + FTS) | No | No | No |
 | Hybrid fusion | Yes (native RRF) | Yes | Yes (RRF) | Manual (SQL JOIN) | Manual (Cypher) | N/A | No | No |
 | Reranking | Integrated | No | No | No | No | N/A | rerank-2.5 API | rerank-3.5/4.0 API |
-| Multimodal | No (store + embed external) | No | No | No | No | No | voyage-multimodal-3.5 | embed-v4 |
+| Multimodal | No (store + embed external) | No | No | No | No | No | voyage-multimodal-3-5 | embed-v4 |
 | Metadata filters | Yes | Yes (payload) | Yes (where) | Yes (SQL WHERE) | Yes (Cypher properties) | N/A | N/A | N/A |
 | Namespaces / multi-tenancy | Yes | Yes (collection sharding) | Yes (tenant schemas) | Yes (schema/namespace) | Yes (graph sharding) | N/A | N/A | N/A |
 | Quantization | No | Yes (binary, scalar) | No | No (use pgvectorscale) | No | N/A | N/A | N/A |
-| Latency (p95) | 50–100ms | 10–30ms (self-host) | 50–100ms | 5–15ms (self-host) | 20–50ms | 100–300ms (API) | 50–150ms (API) | 100–300ms (API) |
-| Cost (1M vectors, monthly) | $330 (storage) | Variable | $500+ | $70 (AWS EC2) | $1K+ | $0.02/1M tokens | $0.01/1M tokens | $0.12/1M tokens |
+| Latency (p95), order of magnitude | ~100ms | ~10ms (self-host) | ~100ms | ~10ms (self-host) | ~10s of ms | ~100ms+ (API) | ~100ms (API) | ~100ms+ (API) |
+| Relative cost (1M vectors, monthly) | Hundreds of $ | Variable (self-host) | Highest of the managed group | Lowest — commodity VM cost | Highest overall | Cents/1M tokens | Cents/1M tokens | Cents/1M tokens |
 | Self-host option | No (serverless only) | Yes | Yes | Yes (PostgreSQL) | Yes | N/A | No (API only) | No (API only) |
 | GraphRAG / LightRAG | No | No | No | No | Yes (GraphRAG) | N/A | No | No |
 | Late-interaction (ColBERT) | No | Yes (FastEmbed) | No | No | No | N/A | No | No |

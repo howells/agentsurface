@@ -25,7 +25,7 @@
  */
 
 import type { Tool } from "ai";
-import type { Tool as MCPTool, ToolInputBase } from "@modelcontextprotocol/sdk/shared/messages";
+import type { Tool as MCPTool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 /**

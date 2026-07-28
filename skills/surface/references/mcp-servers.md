@@ -20,7 +20,7 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 |-------|----------|-----------|
 | 0 | No MCP server. No .mcp.json or .mcp/mcp.json. No SDK imports (@modelcontextprotocol/sdk, mcp-handler, @mastra/mcp). | grep -r "@modelcontextprotocol/sdk" and grep -r "mcp-handler" both return nothing. No .mcp.json. |
 | 1 | Basic MCP server exists but minimal. Fewer than 5 tools; descriptions are terse (<20 words); no annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint); no resources or prompts; errors thrown rather than structured with `isError: true`. | MCP server file imports sdk but: <5 tools defined; descriptions lack "when to use / when not to use"; no annotations object; no resources; errors not wrapped in `{ isError: true, content: [...] }`. |
-| 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Spec compliance 2025-11-25. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses @modelcontextprotocol/sdk v2.x. |
+| 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Spec compliance 2025-11-25 or later. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses `@modelcontextprotocol/sdk` 1.30.x (latest) or a recent 1.29+ release. |
 | 3 | Production MCP. OAuth authorization via RFC 9728 `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. Consent gates for destructive/authenticated/production tools. Roots, sampling, and elicitation are explicitly gated where implemented. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and issuer/audience/resource/scope checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use `tasks/get` polling and `tasks/result` retrieval where supported. Consent policy exists for high-risk calls. |
 
 ## Evidence to gather
@@ -41,8 +41,8 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 - OAuth: `.well-known/oauth-protected-resource` (HTTP servers only)
 
 **Transport detection:**
-- **stdio:** Server instantiated with `StdioServerTransport()` (local, single connection)
-- **Streamable HTTP:** Server instantiated with `HttpServerTransport` (stateless, horizontally scalable; Cloudflare Workers, Lambda, Vercel)
+- **stdio:** Server instantiated with `StdioServerTransport()` from `@modelcontextprotocol/sdk/server/stdio.js` (local, single connection)
+- **Streamable HTTP:** Server instantiated with `StreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/streamableHttp.js` (stateless, horizontally scalable; Cloudflare Workers, Lambda, Vercel). Web-standard runtimes use the `server/webStandardStreamableHttp.js` variant.
 - Legacy SSE (deprecated): `SSEServerTransport`
 
 **Tool annotations presence:**
@@ -73,6 +73,15 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 
 ## Deep dive: Building a production-grade MCP server
 
+### Which revision to build against
+
+Two revisions matter right now.
+
+- **2026-07-28** is the newest revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28). It is the direction of travel and reshapes the protocol substantially.
+- **2025-11-25** is its predecessor and, during the rollout, the newest revision with full deployed SDK support. Build against it today unless you control both ends.
+
+Audit existing servers against 2025-11-25 and treat 2026-07-28 conformance as forward-looking readiness rather than a scoring failure.
+
 ### Spec fundamentals (2025-11-25)
 
 [Source: https://modelcontextprotocol.io/specification/2025-11-25]
@@ -92,6 +101,26 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 - **URL Mode Elicitation:** Servers can direct users to external URLs for sensitive out-of-band interactions.
 - **tool-calling in sampling:** Servers can request tool execution from the client during sampling.
 - **Icon support:** Tools and resources can declare icon URIs for client UI rendering.
+
+**Changed in 2026-07-28:**
+
+[Source: https://modelcontextprotocol.io/specification/draft/changelog]
+
+The 2026-07-28 revision is a structural rewrite, not an increment. The headline changes:
+
+- **Sessions removed.** The `Mcp-Session-Id` header is gone from Streamable HTTP and list endpoints no longer vary per connection. Cross-call state moves to explicit server-minted handles passed as ordinary tool arguments.
+- **Stateless core.** The `initialize` / `notifications/initialized` handshake is removed. Every request carries the protocol version and client capabilities in `_meta` (`io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`); servers identify themselves via `io.modelcontextprotocol/serverInfo` in result `_meta`.
+- **`server/discover` is mandatory.** Servers MUST implement it to advertise versions, capabilities, and identity.
+- **`subscriptions/listen` replaces the HTTP GET endpoint** and `resources/subscribe`/`unsubscribe`: one long-lived POST-response stream, opt-in per notification type. Request-scoped notifications (progress, message) stay on the originating request's stream. SSE resumability (`Last-Event-ID`) is removed — a broken stream is re-issued as a new request.
+- **Removed:** `ping`, `logging/setLevel`, `notifications/roots/list_changed`. Log level is per-request via `io.modelcontextprotocol/logLevel` in `_meta`.
+- **Tasks became an official extension** (`io.modelcontextprotocol/tasks`): `tasks/get` polling plus `tasks/update` replace the blocking `tasks/result`; `tasks/list` is removed.
+- **MRTR (Multi Round-Trip Requests)** replaces server-initiated `roots/list`, `sampling/createMessage`, and `elicitation/create`. The server returns an `InputRequiredResult` and the client retries the original request with `inputResponses`. Every result now carries a required `resultType` (`"complete"` or `"input_required"`); results from older servers without it are treated as `"complete"`.
+- **New required headers** on Streamable HTTP POST: `Mcp-Method` and `Mcp-Name`. Custom headers travel via `x-mcp-header`.
+- **Cacheability is explicit:** list and read results carry `ttlMs` and `cacheScope` (`"public"` / `"private"`). `tools/list` ordering SHOULD be deterministic so prompt caches hit.
+- **Schemas loosened:** tool `inputSchema` / `outputSchema` accept any JSON Schema 2020-12 keywords including `$ref`, and `structuredContent` can be any JSON value.
+- **Deprecated (minimum 12-month window; do not adopt in new servers):** Roots, Sampling, and Logging — migrate to tool parameters / resource URIs / server config, a direct LLM provider API, and stderr or OpenTelemetry respectively. HTTP+SSE transport is formally Deprecated under the new lifecycle policy (it has been deprecated in practice since 2025-03-26). OAuth Dynamic Client Registration (RFC 7591) is deprecated in favour of Client ID Metadata Documents.
+
+Practical reading: annotations, `outputSchema`/`structuredContent`, cursor pagination, and structured `isError` results all survive intact, so a well-built 2025-11-25 server carries forward. The migration cost sits in session state, the handshake, and anything built on roots, sampling, or logging.
 
 **Transports:**
 - **stdio:** Local server. Single client connection. No authentication needed (trust is delegated to OS). Lowest latency.
@@ -368,8 +397,10 @@ async function validateToken(authHeader: string): Promise<{ clientId: string; sc
 // Apply to HTTP stream handler
 app.post("/mcp", express.json(), async (req, res) => {
   const auth = await validateToken(req.headers.authorization || "");
-  const transport = new HttpServerTransport(req, res);
-  // ... attach to server with auth context
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless
+  });
+  // ... attach to server with auth context, then transport.handleRequest(req, res, req.body)
 });
 ```
 
@@ -509,7 +540,7 @@ server.setToolHandler("get_user", async (input) => {
 - Example (Cloudflare Workers):
 
 ```typescript
-import { HttpServerTransport } from "@modelcontextprotocol/sdk/server/http.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 export default {
@@ -521,16 +552,18 @@ export default {
     const server = new McpServer({ name: "my-api", version: "1.0" });
     // ... register tools, resources, prompts
     
-    const transport = new HttpServerTransport(request);
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined, // stateless
+    });
     await server.connect(transport);
-    return transport.response;
+    return transport.handleRequest(request);
   },
 };
 ```
 
 **Discovery:**
 - Publish `/.well-known/mcp/server-card.json` for server capabilities and endpoints; keep `.well-known/mcp.json` only as a compatibility pointer when needed
-- Publish `/.well-known/agent.json` (if multi-agent; A2A v1.0 RC compatible)
+- Publish `/.well-known/agent.json` (if multi-agent; A2A v1.0.1 compatible)
 - Register in OpenAI Apps SDK directory, Anthropic MCP Registry, Google Gemini connectors
 
 ---
@@ -560,7 +593,7 @@ export default {
 - **No annotations:** Tools without `readOnlyHint`, `destructiveHint`, etc. force agents to guess at safety. Always annotate.
 - **Throwing on error:** Exceptions are noisy and interrupt agent flow. Return `{ isError: true, content: [...] }` so agents can reason about recovery.
 - **No pagination:** List tools that return 1000s of items break agent context. Implement cursor-based pagination and default limits.
-- **Tool bloat (≥30 tools):** Agents cannot reason over large tool sets. Split into multiple focused servers or use lazy loading.
+- **Tool bloat (>20 tools):** Agents cannot reason over large tool sets — under 10 in a single agent context is ideal, and anything past 20 is a red flag. Split into multiple focused servers or use lazy loading.
 - **Missing OAuth metadata on HTTP servers:** Public remote MCP servers without `.well-known/oauth-protected-resource` cannot verify client credentials. Always publish auth metadata.
 - **No InMemoryTransport tests:** Untested MCP servers fail silently in production. Test every tool with linked transports.
 
@@ -588,7 +621,8 @@ export default {
 
 ## Citations
 
-- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) — newest revision with full deployed SDK support
+- [MCP draft changelog (2026-07-28 revision)](https://modelcontextprotocol.io/specification/draft/changelog) — newest revision; RC locked 2026-05-21
 - [Anthropic Tool Design Guide](https://www.anthropic.com/engineering/writing-tools-for-agents)
 - [OpenAI Agents SDK (JS)](https://openai.github.io/openai-agents-js/)
 - [OpenAI Apps SDK MCP](https://developers.openai.com/apps-sdk/concepts/mcp-server)

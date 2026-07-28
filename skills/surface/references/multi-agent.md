@@ -46,7 +46,7 @@ Lilian Weng: agent = LLM + tools + memory + planning. Multi-agent is *compositio
 - Clear parallel task decomposition (Anthropic research: parallel URL fetch, independent summaries returned to orchestrator).
 - Skill specialization (code review agent, writer agent, planner agent).
 - Cross-organization delegation (A2A protocol).
-- Cost routing (Haiku/Nano for simple steps, Opus/GPT-5.4 for reasoning).
+- Cost routing (Haiku/Nano for simple steps, Opus/GPT-5.6 Sol for reasoning).
 
 ### Orchestration Patterns
 
@@ -98,12 +98,12 @@ const workflow = new StateGraph(AgentState)
 - **Working memory:** Task state + conversation history in context window.
 - **Episodic memory:** Timestamped past trials (vector DB: pgvector, Qdrant, Pinecone).
 - **Semantic memory:** Agent-authored facts ("User prefers DD/MM/YYYY"). Small, dense, queryable.
-- **Vertex AI Memory Bank:** Managed `$0.25/1k memories/month`. No infra overhead.
+- **Vertex AI Memory Bank:** Managed, billed per thousand stored memories per month (cents, not dollars). No infra overhead. Verify current vendor pricing.
 - **Claude Code memory tool (beta):** Client-side `/memories` persistent across sessions.
 
 ### A2A (Agent-to-Agent Protocol)
 
-**v1.0 RC (March 2026, Linux Foundation):** https://a2a-protocol.org/latest/specification/
+**v1.0.1 (2026-05-28; v1.0 released April 2026 under the Linux Foundation, 150+ member organisations):** https://a2a-protocol.org/latest/specification/
 
 - **Discovery:** AgentCard at `/.well-known/agent.json` (canonical) or `agent-card.json` (fallback). Fields: name, description, endpoints (JSON-RPC URL), skills, capabilities, auth.
 - **Task lifecycle:** Pending → Accepted → In_Progress → Completed/Failed.
@@ -145,7 +145,7 @@ Context isolation breaks assumptions. Parallel workers conflict without coordina
 Multi-agent workflows must be observable: which agent did what, when, with what inputs/outputs, and why did it fail?
 
 **OpenTelemetry GenAI semconv** (https://opentelemetry.io/docs/specs/semconv/gen-ai/):
-- Span name: `{gen_ai.operation.name} {gen_ai.request.model}` (e.g., "orchestrator claude-opus-4-7").
+- Span name: `{gen_ai.operation.name} {gen_ai.request.model}` (e.g., "orchestrator claude-opus-5").
 - Key attrs: `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`.
 - Tool calls: child spans named `tool.{tool_name}`.
 - Nested agents: child spans for subagent calls.
@@ -200,7 +200,7 @@ Multi-agent workflows are harder to test than single agents: non-determinism mul
 
 **Latency:** Parallel agents reduce wall-clock time (3 parallel agents = 1/3 latency if network-bound). Sequential agents add latency (3 sequential = 3x latency). Trade-off: prioritize clarity and correctness over raw speed unless performance is critical.
 
-**Model routing:** Cost-optimize by routing cheap steps (summarization, formatting) to Haiku/Nano, expensive reasoning to Opus/GPT-5.4. Supervisor → Haiku workers + Opus orchestrator can reduce costs 40–60% vs. all-Opus.
+**Model routing:** Cost-optimize by routing cheap steps (summarization, formatting) to Haiku/Nano, expensive reasoning to Opus/GPT-5.6 Sol. Supervisor → Haiku workers + Opus orchestrator can reduce costs 40–60% vs. all-Opus.
 
 ## Workflow Design Guidelines
 
@@ -229,9 +229,9 @@ When designing a multi-agent system:
 - Cognition "Don't Build Multi-Agents": https://cognition.ai/blog/dont-build-multi-agents
 - Anthropic multi-agent research system: https://www.anthropic.com/engineering/multi-agent-research-system
 - 12-factor agents: https://github.com/humanlayer/12-factor-agents
-- A2A v1.0 RC specification: https://a2a-protocol.org/latest/specification/
-- Claude Code SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
-- Claude Code subagents: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+- A2A v1.0.1 specification: https://a2a-protocol.org/latest/specification/
+- Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
+- Claude Code subagents: https://code.claude.com/docs/en/sub-agents
 - OpenAI Agents SDK (TypeScript): https://openai.github.io/openai-agents-js/
 - Google ADK: https://google.github.io/adk-docs/
 - LangGraph JS: https://langchain-ai.github.io/langgraphjs/

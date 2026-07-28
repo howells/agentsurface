@@ -264,8 +264,8 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 
 ## Spec References
 
-- RFC 9457 (Problem Details): https://tools.ietf.org/html/rfc9457
-- RFC 9110 (HTTP Semantics, Idempotency, Rate-Limit): https://tools.ietf.org/html/rfc9110
+- RFC 9457 (Problem Details): https://datatracker.ietf.org/doc/html/rfc9457
+- RFC 9110 (HTTP Semantics, Idempotency, Rate-Limit): https://datatracker.ietf.org/doc/html/rfc9110
 - HTTP Status Codes: https://httpwg.org/specs/rfc9110.html#status.codes
 
 ## Style Rules

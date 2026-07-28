@@ -106,7 +106,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
      
      [Exact test commands and expected output]
      ```
-   - Under 300 lines total
+   - Authoring target: ~150 lines ideal, 300 hard maximum (the <370-line figure elsewhere is the audit tolerance for existing files, not a target to write to)
    - Test: "Can agent discover this from code? If yes, delete it."
 
 4. **Create/update robots.txt and Content Signals**:
@@ -218,7 +218,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Content Signals are consistent with robots.txt allow/block policy
    - `.well-known` files return JSON with correct `Content-Type`
    - Content-Negotiation returns Vary header
-   - AGENTS.md is <300 lines
+   - AGENTS.md is within the authoring target (~150 lines ideal, <300 max)
    - No secrets, credentials, or internal IPs in any file
 
 ## Outputs
@@ -241,9 +241,9 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 - API Catalog: https://www.rfc-editor.org/rfc/rfc9727.html
 - OAuth Protected Resource Metadata: https://www.rfc-editor.org/rfc/rfc9728.html
 - JSON-LD / schema.org: https://schema.org/
-- Content Negotiation (RFC 9110): https://tools.ietf.org/html/rfc9110
+- Content Negotiation (RFC 9110): https://datatracker.ietf.org/doc/html/rfc9110
 - AGENTS.md: https://agents.md
-- `Anthropic Docs Crawling`: https://docs.anthropic.com/agents
+- `Anthropic crawler policy (ClaudeBot, Claude-User, Claude-SearchBot)`: https://support.claude.com/en/articles/8896518
 
 ## Style Rules
 

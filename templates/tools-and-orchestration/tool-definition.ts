@@ -256,7 +256,7 @@ export const vercelSearchDocsTool = createVercelTool({
 
 // For use with ai (Vercel):
 // const { text } = await generateText({
-//   model: openai('gpt-5.4'),
+//   model: openai('gpt-5.6-terra'),
 //   prompt: 'Find docs on authentication',
 //   tools: { search_docs: vercelSearchDocsTool },
 //   maxSteps: 5,
@@ -279,7 +279,7 @@ export const openaiSearchDocsTool = new OpenAITool({
 
 // For use with @openai/agents:
 // const agent = new Agent({
-//   model: 'gpt-5.4',
+//   model: 'gpt-5.6-terra',
 //   tools: [openaiSearchDocsTool],
 // });
 // const session = agent.createSession();

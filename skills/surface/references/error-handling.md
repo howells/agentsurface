@@ -286,6 +286,16 @@ const myTool = tool('fetch_data', 'Get data', schema, async (input) => {
 
 The agent can then read the error, extract `is_retriable`, and decide whether to retry or escalate.
 
+#### Protocol-level JSON-RPC codes
+
+Tool-level failures use `isError: true`. Protocol-level failures use JSON-RPC error codes, and the newer MCP 2026-07-28 revision (RC locked 2026-05-21, final publication scheduled for 2026-07-28) changes how those codes are allocated:
+
+- **Resource not found moves from `-32002` to `-32602`**, aligning with the JSON-RPC "invalid params" code. Clients written against 2025-11-25 should tolerate both during the transition.
+- **A formal allocation policy** now splits the range: `-32000` to `-32019` is implementation-defined (existing uses are grandfathered), and `-32020` to `-32099` is reserved for the specification. Do not invent codes inside the reserved band.
+- **Existing spec codes were renumbered** into the reserved band: `HeaderMismatch` `-32001` → `-32020`, `MissingRequiredClientCapability` `-32003` → `-32021`, `UnsupportedProtocolVersion` `-32004` → `-32022`.
+
+If you define custom protocol errors, keep them in `-32000`..`-32019` and document each one alongside your tool catalogue.
+
 ### Tool-call errors (Agents SDK / Vercel AI SDK / LangGraph)
 
 Prefer returning errors as tool output so the agent can reason about recovery. Throwing aborts the agent loop and loses context (12-factor agents Factor #9: "Compact errors into context").
@@ -295,7 +305,7 @@ Prefer returning errors as tool output so the agent can reason about recovery. T
 import { generateText } from 'ai';
 
 const result = await generateText({
-  model: openai('gpt-5.4'),
+  model: openai('gpt-5.6-terra'),
   tools: {
     fetch_data: tool({
       description: 'Fetch data',
@@ -380,7 +390,8 @@ Parse `RateLimit-*` and `Retry-After` headers (delta-seconds and HTTP-date), com
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html) — Canonical spec, obsoletes RFC 7807
 - [Anthropic: Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents) — Factor #9: compact errors into context
 - [12-factor agents](https://github.com/humanlayer/12-factor-agents) — Factor #9 (errors) and tracing patterns
-- [MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25) — `isError` convention for tool results
+- [MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25) — `isError` convention for tool results; newest revision with full deployed SDK support
+- [MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog) — newest revision; error-code renumbering and allocation policy
 - [Stripe API Error Handling](https://stripe.com/docs/api/errors) — Industry-standard error shape and Idempotency-Key
 - [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) — trace_id and correlation
 

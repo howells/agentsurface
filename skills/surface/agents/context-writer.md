@@ -9,7 +9,7 @@ tools: Read, Glob, Grep, Write, Bash
 
 Emit agent onboarding context files: AGENTS.md (universal, Linux Foundation format), CLAUDE.md (Claude Code specific), monorepo topology docs, .cursor/rules for Cursor AI, and VS Code Copilot instructions. All under strict line limits, no secrets, three-tier permission boundaries.
 
-- AGENTS.md: cross-tool Markdown context (commands, stack, conventions, boundaries, <300 lines)
+- AGENTS.md: cross-tool Markdown context (commands, stack, conventions, boundaries; authoring target ~150 lines ideal, <300 max)
 - CLAUDE.md: Claude Code specific (MCP servers, workflows, tips)
 - Monorepo docs: workspace hierarchy, build order, cross-package dependencies
 - .cursor/rules: alwaysApply base rules + framework/glob patterns
@@ -28,7 +28,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
 ## Process
 
-1. **Create AGENTS.md** (cross-tool Markdown context, <300 lines):
+1. **Create AGENTS.md** (cross-tool Markdown context; authoring target ~150 lines ideal, <300 max — this is stricter than the <370-line audit tolerance used when scoring existing repos):
    - Location: project root
    - Structure:
      ```markdown
@@ -156,9 +156,9 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      - Three-tier boundaries complete
      - All commands verified to work
      - No secrets, production addresses, or credentials
-     - Max 300 lines
+     - Authoring target: ~150 lines ideal, 300 hard maximum
 
-2. **Create CLAUDE.md** (Claude Code specific, <150 lines):
+2. **Create CLAUDE.md** (Claude Code specific; authoring target <150 lines):
    - Location: project root
    - Only if AGENTS.md exists
    - Content:
@@ -289,11 +289,11 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
    - Run all commands listed to ensure they work
    - Check no secrets or production addresses
    - Verify boundaries are sensible (not over/under-protective)
-   - Check line counts (<300 for AGENTS.md, <150 for CLAUDE.md)
+   - Check line counts against the authoring target (AGENTS.md ~150 ideal / <300 max; CLAUDE.md <150)
 
 7. **Quality checks**:
-   - AGENTS.md <300 lines, commands verified
-   - CLAUDE.md <150 lines (if present)
+   - AGENTS.md within the authoring target (~150 ideal, <300 max), commands verified
+   - CLAUDE.md within the authoring target (<150 lines), if present
    - No secrets, credentials, or production addresses in any file
    - Three-tier boundaries complete (Always/Ask First/Never)
    - Code examples are syntactically valid
@@ -314,7 +314,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 - AGENTS.md: https://agents.md
 - Next.js App Router: https://nextjs.org/docs/app
 - Zod Documentation: https://zod.dev/
-- Cursor Rules: https://docs.cursor.sh/context/rules-for-ai
+- Cursor Rules: https://docs.cursor.com/context/rules
 
 ## Style Rules
 

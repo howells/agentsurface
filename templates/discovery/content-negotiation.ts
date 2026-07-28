@@ -14,7 +14,7 @@
  * 4. Customize token budgets and headers
  *
  * Spec:
- * - Content negotiation (HTTP Accept header): https://tools.ietf.org/html/rfc7231#section-5.3
+ * - Content negotiation (HTTP Accept header): https://datatracker.ietf.org/doc/html/rfc7231#section-5.3
  * - MIME type text/markdown: https://www.iana.org/assignments/media-types/media-types.xhtml
  * - Agent discovery: https://agents.md
  *

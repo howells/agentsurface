@@ -19,9 +19,9 @@
  * - Zero-trust auth: every request must carry valid OAuth token + DPoP proof
  *
  * Canonical docs:
- * - MCP spec: https://spec.modelcontextprotocol.io/
- * - OAuth 2.1 draft: https://tools.ietf.org/html/draft-ietf-oauth-v2-1-09
- * - DPoP RFC: https://tools.ietf.org/html/rfc9449
+ * - MCP spec: https://modelcontextprotocol.io/specification
+ * - OAuth 2.1 draft: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15
+ * - DPoP RFC: https://datatracker.ietf.org/doc/html/rfc9449
  * - MCP SDK TypeScript: https://github.com/modelcontextprotocol/typescript-sdk
  *
  * // <CUSTOMISE>
@@ -33,8 +33,8 @@
  */
 
 import type { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { Server } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolRequest, Tool } from "@modelcontextprotocol/sdk/shared/messages.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolRequest, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomBytes } from "node:crypto";
 import { TextEncoder } from "node:util";
 import { z } from "zod";
@@ -174,10 +174,10 @@ function validateToken(
  * MCP Server implementation.
  */
 class PublicMCPServer {
-  private readonly server: Server;
+  private readonly mcpServer: McpServer;
 
   constructor() {
-    this.server = new Server({
+    this.mcpServer = new McpServer({
       name: "agent-server",
       version: "1.0.0",
     });
@@ -186,13 +186,14 @@ class PublicMCPServer {
   }
 
   private setupHandlers() {
-    // Tool discovery
-    this.server.setRequestHandler("tools/list", async () => ({
+    // Tool discovery — the underlying Server instance (McpServer.server) exposes
+    // the low-level setRequestHandler API; McpServer itself favors registerTool().
+    this.mcpServer.server.setRequestHandler("tools/list", async () => ({
       tools: toolDefinitions,
     }));
 
     // Tool execution
-    this.server.setRequestHandler("tools/call", async (request: CallToolRequest) => {
+    this.mcpServer.server.setRequestHandler("tools/call", async (request: CallToolRequest) => {
       const { name, arguments: args } = request;
 
       if (name === "create_order") {
@@ -230,7 +231,7 @@ class PublicMCPServer {
   }
 
   async start(transport: StdioServerTransport) {
-    await this.server.connect(transport);
+    await this.mcpServer.connect(transport);
     console.log("[mcp-server] Connected via stdio");
   }
 }
@@ -279,7 +280,10 @@ export async function setupPublicMCPServer() {
             resources: {},
             tools: {},
           },
-          protocolVersion: "2024-11-05",
+          // 2025-11-25 is the newest revision with full deployed SDK support; the
+          // 2026-07-28 revision removes this initialize handshake entirely (stateless
+          // core — version negotiation moves into per-request `_meta`).
+          protocolVersion: "2025-11-25",
           serverInfo: {
             name: "agent-mcp-server",
             version: "1.0.0",

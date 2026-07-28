@@ -12,7 +12,7 @@
  * - Tracking prompt changes for reproducibility and debugging
  *
  * Canonical docs:
- * - Vercel AI SDK system prompts: https://sdk.vercel.ai/docs/foundations/prompts
+ * - Vercel AI SDK system prompts: https://ai-sdk.dev/docs/foundations/prompts
  * - Prompt versioning: https://github.com/anthropics/anthropic-sdk-python/blob/main/CHANGELOG.md
  *
  * // <CUSTOMISE>
