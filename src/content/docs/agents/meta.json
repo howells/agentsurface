@@ -5,6 +5,7 @@
     "design-principles",
     "framework-selection",
     "anthropic-platform",
+    "openai-platform",
     "browser-access",
     "sandboxes-and-workspaces",
     "runtime-guardrails"

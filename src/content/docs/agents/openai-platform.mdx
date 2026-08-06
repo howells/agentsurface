@@ -1,0 +1,129 @@
+---
+title: OpenAI Platform
+description: "Current OpenAI platform surfaces for agent systems: the Responses API, the Agents SDK, the hosted Shell tool, Agent Skills in the API, server-side compaction, hosted tools, MCP connectors, and current model and runtime changes."
+lastVerified: 2026-08-06
+---
+
+## Summary
+
+OpenAI's agent surface is broader than "an OpenAI model plus function calling." Treat OpenAI as a platform: the stateful Responses API as the base, the OpenAI Agents SDK for embedding the loop, a hosted Shell tool that gives an agent a real terminal and container, Agent Skills loaded from the same cross-vendor `SKILL.md` standard, server-side compaction for long runs, hosted built-in tools, and MCP connectors for reaching external systems.
+
+The common failure is scaffolding against last quarter's shape — the retired Assistants API, a superseded model ID, or a request parameter that has since changed. Use this page when evaluating or scaffolding OpenAI-native systems, and check the freshness stamp above before trusting any dated claim.
+
+This page is the OpenAI-platform counterpart to [Anthropic Platform](/docs/agents/anthropic-platform); keep the choice between them framework-neutral and driven by where the system already runs.
+
+## Current Surfaces
+
+| Surface                      | Use when                                                                                                    | Notes                                                                                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Responses API                | You want a single stateful request that can call hosted tools and keep server-side state across turns.      | The current base API for agent work; the older Assistants API is being sunset in favor of it.                                                                         |
+| OpenAI Agents SDK            | You need to embed the OpenAI agent loop in an app or service.                                               | `@openai/agents` (npm), `openai-agents` (PyPI). Agents, handoffs, guardrails, sessions, tracing, and hosted-tool wiring.                                              |
+| Hosted Shell tool            | The agent should run real shell commands in an isolated container.                                          | Attach `type: "shell"` with an `environment`; the model runs commands in an OpenAI-managed container until the task completes.                                        |
+| Agent Skills in the API      | The agent needs reusable procedures, scripts, and assets loaded on demand.                                  | Skills follow the cross-vendor `SKILL.md` standard and are attached to the Shell environment; the service reads each skill's frontmatter and exposes it to the model. |
+| Server-side compaction       | A run outgrows the context window and must stay coherent.                                                   | The service summarizes prior turns server-side so long, multi-step runs continue without carrying the full transcript.                                                |
+| Built-in hosted tools        | The model should use web search, file search, code interpreter, computer use, or image generation directly. | Hosted by OpenAI and billed as tool use; the app does not execute these itself.                                                                                       |
+| MCP connector and Connectors | A request should call remote MCP servers or OpenAI-maintained connectors.                                   | Remote MCP tool calls plus managed connectors for common third-party systems; private servers can be reached over a secure tunnel.                                    |
+| Realtime API                 | The product needs low-latency speech, audio, or multimodal interaction.                                     | Best fit for voice agents in OpenAI-centric systems.                                                                                                                  |
+
+## Responses API and Hosted Tools
+
+The Responses API is the current base for OpenAI agent work: one request can call hosted tools, run the model's tool loop, and keep state server-side across turns rather than rebuilding it in the app. Prefer it over the older Assistants API, which is being retired — check the current deprecation notices before building anything new on Assistants.
+
+Hosted built-in tools (web search, file search over vector stores, code interpreter, computer use, image generation) run on OpenAI infrastructure and are billed as tool use. Reach for them when the capability is generic and OpenAI already runs it; reach for custom tools or MCP when the capability is product-specific, authenticated, auditable, or cross-vendor.
+
+## Hosted Shell and Containers
+
+The hosted Shell tool gives an agent its own terminal in an OpenAI-managed container, so it can run generated code, drive command-line tools, and inspect its own work instead of round-tripping every step through the model. Two environment shapes matter:
+
+- **Fresh container per request** — provisions a new container for the run and can accept uploaded files. Use it for one-shot execution where nothing should carry over.
+- **Reused container across turns** — references an existing container so a working tree and installed state persist across turns. Use it for a coding session that edits and re-runs the same tree.
+
+Containers ship common language runtimes preinstalled. Treat the Shell the same way you would any sandbox: it contains what code can damage, not what it can read. Keep production credentials out of the container, and see [Sandboxes and Workspaces](/docs/agents/sandboxes-and-workspaces) for the isolation-strength decision.
+
+## Agent Skills in the API
+
+OpenAI's Agent Skills use the same open `SKILL.md` standard as other runtimes — a folder with a `SKILL.md` manifest (`name` and `description` frontmatter plus instructions) and optional `scripts/`, `references/`, and `assets/`. Skills are attached to the Shell environment; the service unpacks them, reads each manifest, and makes the model aware of the skill so it can load the full instructions on demand.
+
+This is a cross-vendor standard, not an OpenAI-only feature — the same skill folder works across adopting runtimes. Do not restate the format here; see [Agent Skills](/docs/discovery/agent-skills) for the canonical packaging reference and `agentskills.io` for the specification. Because skill content is model-visible, keep credentials and authorization out of it.
+
+## Compaction for Long Runs
+
+Long-running agents eventually exceed the context window and lose earlier steps. Server-side compaction summarizes prior turns into compressed state so the run stays coherent past that limit without the app resending the full transcript each turn. Treat it as the OpenAI-side answer to the same durability problem that [durable execution](/docs/runtime-boundaries/durable-execution) and workspace memory solve elsewhere: it keeps a long loop consistent, but it is not an audit log — persist the record of what the agent did in your own system.
+
+## Agents SDK
+
+The OpenAI Agents SDK embeds this loop in your own app. It models agents, tool use, handoffs between agents, guardrails, sessions, and tracing, and it wires up the hosted tools and MCP paths above. Its recent direction externalizes run state so a lost container does not lose the run, and adds sandboxes, subagents, and a code-execution mode for long-horizon work. Prototype in the SDK when OpenAI platform semantics should stay visible; see [Framework Selection](/docs/agents/framework-selection) for when a provider-neutral runtime is the better default instead.
+
+## Decision Guide
+
+Choose the **Responses API directly** when:
+
+- the loop can stay inside one API interaction with hosted tools and server-side state
+- you do not need to embed a custom multi-agent harness in your own service
+
+Choose the **OpenAI Agents SDK** when:
+
+- the app owns the agent loop and needs handoffs, guardrails, sessions, or tracing
+- OpenAI is the product runtime, not only a model provider
+
+Choose the **hosted Shell tool** when:
+
+- the agent must run real commands, execute generated code, or drive CLI tools
+- a managed container is preferable to standing up your own sandbox
+
+Choose **Agent Skills** when:
+
+- the system needs procedural know-how, templates, scripts, or domain assets
+- the work is repeatable and larger than a single tool call
+
+Choose **custom MCP servers** when:
+
+- OpenAI, Claude, Gemini, and other clients should all use the same external capability
+- auth, scopes, audit, pagination, and structured results must be server-owned
+
+## MCP Notes for OpenAI
+
+OpenAI can call remote MCP servers as hosted tools from within a Responses request, and offers OpenAI-maintained connectors that wrap common third-party systems. Private or on-prem MCP servers can be reached through a secure tunnel rather than being exposed publicly. As with any client, state which path is in use and do not assume support for MCP resources, prompts, roots, sampling, or elicitation unless the selected surface documents it. See [MCP Protocol](/docs/protocols/mcp) and [MCP Auth Model](/docs/authentication/mcp-auth-model).
+
+## Model Guidance
+
+Use current model discovery and migration docs rather than hard-coding old IDs. For the canonical, allowlisted OpenAI model IDs, see [Model Reference](/docs/reference-links/models). In summary:
+
+- **GPT-5.6 Sol** (`gpt-5.6-sol`) is the flagship reasoning tier; the bare alias `gpt-5.6` routes to Sol.
+- **GPT-5.6 Terra** (`gpt-5.6-terra`) is the balanced mid tier — the usual default for everyday agent work.
+- **GPT-5.6 Luna** (`gpt-5.6-luna`) is the fastest, cheapest tier.
+- For embeddings, `text-embedding-3-large` and `text-embedding-3-small` remain current.
+- The earlier o-series reasoning models are deprecated; do not scaffold against them.
+
+When OpenAI's strict structured-output mode is in play, tool schemas must set `strict: true` and `additionalProperties: false` — see [Tool Schemas](/docs/tool-design/schemas).
+
+## Security Guidance
+
+OpenAI-native systems still need server-side policy:
+
+- Treat model-visible tool descriptions, MCP annotations, connector metadata, and Skill content as advisory inputs, not trust boundaries.
+- Enforce authorization, tenant identity, and scope checks in trusted server code.
+- Gate destructive, external, authenticated, production, browser, and shell/container tools with confirmation policies.
+- Keep production credentials out of prompts, Skill text, and Shell containers; broker privileged actions through a server-side tool the container cannot bypass.
+- Log agent/session identity, user or tenant context, tool calls, approvals, and outcomes.
+
+## Related
+
+- [Anthropic Platform](/docs/agents/anthropic-platform)
+- [Framework Selection](/docs/agents/framework-selection)
+- [Sandboxes and Workspaces](/docs/agents/sandboxes-and-workspaces)
+- [Agent Skills](/docs/discovery/agent-skills)
+- [MCP Protocol](/docs/protocols/mcp)
+- [Tool Design](/docs/tool-design)
+- [Multi-Agent Systems](/docs/multi-agent)
+
+## Source Links
+
+- [OpenAI Platform docs](https://platform.openai.com/docs)
+- [OpenAI developer docs](https://developers.openai.com)
+- [Responses API guide](https://platform.openai.com/docs/guides/responses)
+- [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk)
+- [Shell + Skills + Compaction for long-running agents](https://developers.openai.com/blog/skills-shell-tips)
+- [Skills in the OpenAI API (cookbook)](https://developers.openai.com/cookbook/examples/skills_in_api)
+- [Agent Skills standard (agentskills.io)](https://agentskills.io)
+- [Realtime API guide](https://platform.openai.com/docs/guides/realtime)
