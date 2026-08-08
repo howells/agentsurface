@@ -129,6 +129,8 @@ An Agent Skill is a folder with a `SKILL.md` entrypoint. The portable minimum is
 
 For CLIs, treat fields like `schema_command`, `auth`, `capabilities`, and `invariants` as useful metadata extensions. They help agents use your CLI, but they should not replace the portable Agent Skills shape.
 
+Skill folders are no longer read only off disk at conversation start. The same format is loaded at runtime by agent frameworks as a skill tool surface, and attached server-side by hosted model platforms to their managed execution environments — see [Agent Skills](/docs/discovery/agent-skills) for the consumption models. Packaging a CLI's knowledge as skills therefore pays off in three places at once, without a translation layer.
+
 ````markdown
 ---
 name: mytool

@@ -116,6 +116,8 @@ def summarize_node(state: AgentState) -> dict:
     return {"messages": compressed}
 ```
 
+**Or let the platform compact.** Context compaction is becoming a server-side primitive: model platforms can summarize prior turns into compressed state inside their own runtime — OpenAI's server-side compaction on the Responses API, Anthropic's compaction API in beta — so the app neither resends nor re-summarizes the transcript. That removes the machinery above for single-provider systems, at the cost of moving the summarization policy — what is kept, what is dropped — out of your control. Platform compaction is also not a memory system or an audit log: it keeps the current run coherent, and nothing else. Working memory, semantic recall, and your own record of what the agent did still live on your side of the API.
+
 ## 2. Working Memory
 
 Working memory is persistent structured state that survives across turns within a session — and optionally across sessions. Unlike message history (which the model processes wholesale), working memory is accessed directly by key and injected selectively into the context.
