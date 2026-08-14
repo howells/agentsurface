@@ -33,12 +33,15 @@ Choose the weakest isolation that still contains the worst case for the code you
 
 Treat these as roughly interchangeable starting points and choose by where your agent already runs, not by feature-list length. The [tooling catalog](/docs/tooling-catalog/browser-sandbox-and-integration) holds the full comparison table; the characterizations below are decision-level only.
 
+One class is new enough to call out: **platform-attached shells**, where the model provider bundles the container into the model API itself rather than selling compute you wire up. OpenAI's hosted Shell tool gives the model a terminal in an OpenAI-managed container — fresh per request, or reused across turns for a persistent working tree — and Anthropic's Managed Agents environments play the same role on the Claude side. The trade is the usual platform one: zero sandbox infrastructure to run and tight integration with the model loop, in exchange for vendor coupling, provider-controlled isolation and network policy, and state that lives inside someone else's runtime. Prefer a platform-attached shell when the agent already lives on that platform and the work fits its container; prefer an independent sandbox when execution must be portable across models, sit inside your own network boundary, or outlive any one provider's session model.
+
 - **E2B** — secure sandboxes and code-interpreter infrastructure positioned around enterprise agent-cloud deployments, including secure MCP execution inside the sandbox. Strong fit for data analysis and generated-code execution.
 - **Daytona** — hosted sandbox product remains active; the open-source repository was frozen in June 2026, so treat the OSS path as unmaintained and prefer the hosted offering.
 - **Modal** — serverless compute with VM-backed sandboxes (June 2026), useful for elastic Python and GPU workloads; integrates with Anthropic's Claude Managed Agents.
 - **Vercel Sandbox** — ephemeral microVMs for running generated or untrusted code, GA on 2026-01-30, with filesystem persistence reaching GA on 2026-05-26. Fits agents already on Vercel infrastructure.
 - **Cloudflare Sandbox SDK and Containers** — container sandboxes for command execution, files, terminals, and code-interpreter workflows driven from a Worker, GA on 2026-04-13. Strong fit for edge-hosted agents.
 - **AWS Bedrock AgentCore** — managed Runtime and Code Interpreter for AgentCore agents; the right choice when the agent stack is intentionally AWS-native.
+- **OpenAI hosted Shell tool** — a platform-attached container invoked directly from the Responses API, with fresh-per-request or reused-across-turns environments and Agent Skills loaded into the same container. The zero-infrastructure default for OpenAI-native agents; see [OpenAI Platform](/docs/agents/openai-platform).
 - **Anthropic Managed Agents** — self-hosted sandboxes are part of the Managed Agents platform, keeping execution inside your own boundary while Anthropic manages the agent runtime.
 
 ## Workspace Surfaces

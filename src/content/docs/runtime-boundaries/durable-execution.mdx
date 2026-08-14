@@ -31,6 +31,12 @@ A plain background job (a cron worker, a queue consumer) is enough when the run 
 
 Decision rule: if losing an in-flight run means re-paying for completed model calls or re-running irreversible side effects, the loop belongs in durable execution.
 
+## Context Durability Versus Execution Durability
+
+Durable execution keeps the _run_ alive across crashes and restarts. A long run has a second, independent durability problem: the _context_ outgrows the model's window. Model platforms now address that one server-side — compaction APIs summarize prior turns into compressed state inside the provider's runtime, so a long loop stays coherent without the app resending or re-summarizing the transcript. OpenAI ships this as server-side compaction on the Responses API; Anthropic's compaction API is in beta.
+
+Treat the two as complements, not substitutes. Platform compaction does nothing for lost processes, replays, or approvals measured in hours, and a recorded workflow history does nothing for a context window that no longer fits — a long-running agent usually needs both. Neither is an audit record: compaction is lossy by design, so the durable log of what the agent actually did belongs in your own history, as recorded steps or checkpoints.
+
 ## Implementation Shape
 
 The mechanics are the same across engines; only the primitives are named differently.
