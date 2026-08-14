@@ -1,7 +1,10 @@
+import { readFile } from "node:fs/promises";
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+
+const interFont = readFile(new URL("../../fonts/Inter-Regular.ttf", import.meta.url));
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
@@ -60,6 +63,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         agentsurface.dev
       </span>
     </div>,
-    { height: 630, width: 1200 },
+    {
+      fonts: [{ data: await interFont, name: "Inter", style: "normal", weight: 400 }],
+      height: 630,
+      width: 1200,
+    },
   );
 }
