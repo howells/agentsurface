@@ -2,9 +2,20 @@ import "fumadocs-ui/style.css";
 import "./global.css";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
 const BASE_URL = "https://agentsurface.dev";
+
+const inter = localFont({
+  display: "swap",
+  src: [
+    { path: "./fonts/InterVariable.woff2", style: "normal" },
+    { path: "./fonts/InterVariable-Italic.woff2", style: "italic" },
+  ],
+  variable: "--font-inter",
+  weight: "100 900",
+});
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -56,12 +67,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html className={inter.variable} lang="en" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)" />
-        <link href="https://rsms.me/" rel="preconnect" />
-        <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

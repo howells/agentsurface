@@ -7,9 +7,7 @@
 /* ── Design Tokens ─────────────────────── */
 
 :root {
-  /* Inter Variable is loaded from rsms.me in layout.tsx; the theme's
-     --font-sans stack resolves through this variable. */
-  --font-inter: "InterVariable";
+  /* InterVariable is self-hosted through next/font/local in layout.tsx. */
   --background: oklch(0.9875 0.0026 106.45);
   --foreground: oklch(0.23 0.0038 106.69);
   --card: oklch(1 0 0);
@@ -250,10 +248,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings:
-      "liga" 1,
-      "calt" 1,
-      "cv11" 1;
+    font-feature-settings: "cpsp", "cv01", "cv02", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
