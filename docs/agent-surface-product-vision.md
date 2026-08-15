@@ -386,7 +386,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: commoninstruments/agent-surface-action@v1
+      - uses: howells/agent-surface-action@v1
         with:
           min-score: silver
           report-path: agent-surface-report.md
@@ -395,7 +395,7 @@ jobs:
 Hosted report example:
 
 ```text
-commoninstruments/agentsurface
+howells/agentsurface
 Score: Gold, 26/30
 Last checked: 2026-06-13
 Weakest dimensions: Authentication, Testing, MCP Server
