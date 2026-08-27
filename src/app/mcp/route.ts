@@ -3,6 +3,7 @@ import { searchDocs } from "@/lib/search";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
+import packageJson from "../../../package.json";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ function readDocsPage(slug: string): DocsPage | null {
 function buildServer(): McpServer {
   const server = new McpServer({
     name: "agentsurface-docs",
-    version: "2.1.0",
+    version: packageJson.version,
   });
 
   server.registerTool(
