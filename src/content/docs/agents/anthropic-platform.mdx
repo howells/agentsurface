@@ -1,12 +1,12 @@
 ---
 title: Anthropic Platform
-description: "Current Claude platform surfaces for agent systems: Managed Agents, Claude Code, the Claude Agent SDK, Agent Skills, the MCP connector, built-in tools, and July 2026 model and runtime changes."
-lastVerified: 2026-07-28
+description: "Current Claude platform surfaces for agent systems: Managed Agents, Claude Code, the Claude Agent SDK, Agent Skills, the MCP connector, built-in tools, and August 2026 model and runtime changes."
+lastVerified: 2026-08-27
 ---
 
 ## Summary
 
-Anthropic's agent surface is broader than "Claude plus tool use." By July 2026, treat Claude as a platform: Anthropic-run Managed Agents, the Claude Code harness across four surfaces, the Claude Agent SDK for embedding that harness, cross-vendor Agent Skills, an MCP connector in the Messages API, hosted built-in tools, and a fast-moving model and runtime layer.
+Anthropic's agent surface is broader than "Claude plus tool use." By August 2026, treat Claude as a platform: Anthropic-run Managed Agents, the Claude Code harness across four surfaces, the Claude Agent SDK for embedding that harness, cross-vendor Agent Skills, an MCP connector in the Messages API, hosted built-in tools, and a fast-moving model and runtime layer.
 
 The common failure is scaffolding against last quarter's shape — a renamed SDK, a superseded model ID, or a deprecated request parameter. Use this page when evaluating or scaffolding Claude-native systems, and check the freshness stamp above before trusting any dated claim.
 
@@ -100,14 +100,14 @@ Prefer custom tools or MCP when the capability is product-specific, authenticate
 
 ## Model Guidance
 
-Use current model discovery and migration docs rather than hard-coding old IDs. As of 2026-07-28:
+Use current model discovery and migration docs rather than hard-coding old IDs. As of 2026-08-27:
 
 - **Fable 5** (`claude-fable-5`) is the flagship, GA since 2026-06-09.
 - **Opus 5** (`claude-opus-5`) released 2026-07-24 and is the recommended default for most agent and coding work — 1M context, effort control, $5/$25 per million tokens (input/output). It superseded Opus 4.8, which is still API-available but no longer the default.
 - **Sonnet 5** (`claude-sonnet-5`) released 2026-06-30 as the mid-tier workhorse.
 - **Haiku 4.5** remains the low-latency, low-cost option.
 - **Sonnet 4 and Opus 4 were retired on 2026-06-15** — that retirement is executed, not pending. Do not scaffold against those IDs.
-- **Opus 4.1 retires on 2026-08-05.** Migrate off it before then.
+- **Opus 4.1 retired on 2026-08-05.** Do not scaffold against it.
 
 Runtime changes that affect cost, latency, and request shape:
 

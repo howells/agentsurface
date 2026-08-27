@@ -21,7 +21,7 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 | 0 | No MCP server. No .mcp.json or .mcp/mcp.json. No SDK imports (@modelcontextprotocol/sdk, mcp-handler, @mastra/mcp). | grep -r "@modelcontextprotocol/sdk" and grep -r "mcp-handler" both return nothing. No .mcp.json. |
 | 1 | Basic MCP server exists but minimal. Fewer than 5 tools; descriptions are terse (<20 words); no annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint); no resources or prompts; errors thrown rather than structured with `isError: true`. | MCP server file imports sdk but: <5 tools defined; descriptions lack "when to use / when not to use"; no annotations object; no resources; errors not wrapped in `{ isError: true, content: [...] }`. |
 | 2 | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Spec compliance 2025-11-25 or later. | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses `@modelcontextprotocol/sdk` 1.30.x (latest) or a recent 1.29+ release. |
-| 3 | Production MCP. OAuth authorization via RFC 9728 `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or Tasks for workflow templates. Consent gates for destructive/authenticated/production tools. Roots, sampling, and elicitation are explicitly gated where implemented. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and issuer/audience/resource/scope checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use `tasks/get` polling and `tasks/result` retrieval where supported. Consent policy exists for high-risk calls. |
+| 3 | Production MCP. OAuth authorization via RFC 9728 `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or negotiated Tasks for workflow templates. Consent gates for destructive/authenticated/production tools. Deprecated roots, sampling, and logging are absent from new designs. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and issuer/audience/resource/scope checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use current extension negotiation with `tasks/get` and `tasks/update`. Consent policy exists for high-risk calls. |
 
 ## Evidence to gather
 
@@ -75,14 +75,14 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 
 ### Which revision to build against
 
-Two revisions matter right now.
+Use the current revision by default.
 
-- **2026-07-28** is the newest revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28). It is the direction of travel and reshapes the protocol substantially.
-- **2025-11-25** is its predecessor and, during the rollout, the newest revision with full deployed SDK support. Build against it today unless you control both ends.
+- **2026-07-28** is current and supported by all Tier 1 SDKs. Build and audit against it.
+- **2025-11-25** is the predecessor. Add compatibility only when a client in scope still requires it.
 
-Audit existing servers against 2025-11-25 and treat 2026-07-28 conformance as forward-looking readiness rather than a scoring failure.
+Treat session state, the initialization handshake, old server-initiated requests, and experimental core Tasks as legacy behavior to migrate, not current best practice.
 
-### Spec fundamentals (2025-11-25)
+### Legacy spec fundamentals (2025-11-25)
 
 [Source: https://modelcontextprotocol.io/specification/2025-11-25]
 
@@ -102,15 +102,15 @@ Audit existing servers against 2025-11-25 and treat 2026-07-28 conformance as fo
 - **tool-calling in sampling:** Servers can request tool execution from the client during sampling.
 - **Icon support:** Tools and resources can declare icon URIs for client UI rendering.
 
-**Changed in 2026-07-28:**
+**Current 2026-07-28 behavior:**
 
-[Source: https://modelcontextprotocol.io/specification/draft/changelog]
+[Source: https://modelcontextprotocol.io/specification/2026-07-28/]
 
 The 2026-07-28 revision is a structural rewrite, not an increment. The headline changes:
 
 - **Sessions removed.** The `Mcp-Session-Id` header is gone from Streamable HTTP and list endpoints no longer vary per connection. Cross-call state moves to explicit server-minted handles passed as ordinary tool arguments.
 - **Stateless core.** The `initialize` / `notifications/initialized` handshake is removed. Every request carries the protocol version and client capabilities in `_meta` (`io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`); servers identify themselves via `io.modelcontextprotocol/serverInfo` in result `_meta`.
-- **`server/discover` is mandatory.** Servers MUST implement it to advertise versions, capabilities, and identity.
+- **`server/discover` is optional.** Servers MAY implement it to advertise versions, capabilities, and identity; handlers must still work without connection-scoped initialization state.
 - **`subscriptions/listen` replaces the HTTP GET endpoint** and `resources/subscribe`/`unsubscribe`: one long-lived POST-response stream, opt-in per notification type. Request-scoped notifications (progress, message) stay on the originating request's stream. SSE resumability (`Last-Event-ID`) is removed — a broken stream is re-issued as a new request.
 - **Removed:** `ping`, `logging/setLevel`, `notifications/roots/list_changed`. Log level is per-request via `io.modelcontextprotocol/logLevel` in `_meta`.
 - **Tasks became an official extension** (`io.modelcontextprotocol/tasks`): `tasks/get` polling plus `tasks/update` replace the blocking `tasks/result`; `tasks/list` is removed.
@@ -613,20 +613,21 @@ export default {
 - `@mastra/mcp` — Mastra ecosystem; agents + MCP together
 
 **Discovery:**
-- https://modelcontextprotocol.io/servers (Anthropic MCP registry)
+- https://registry.modelcontextprotocol.io/ (official MCP Registry)
 - OpenAI Apps SDK directory (https://openai.com/apps)
-- Google Gemini custom connectors (https://ai.google.dev/gemini-api/docs/custom-connectors)
+- Google Gemini Enterprise custom MCP servers (https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
 
 ---
 
 ## Citations
 
-- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) — newest revision with full deployed SDK support
-- [MCP draft changelog (2026-07-28 revision)](https://modelcontextprotocol.io/specification/draft/changelog) — newest revision; RC locked 2026-05-21
+- [MCP Specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/) — current revision
+- [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/) — migration summary and Tier 1 SDK status
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) — predecessor compatibility reference
 - [Anthropic Tool Design Guide](https://www.anthropic.com/engineering/writing-tools-for-agents)
 - [OpenAI Agents SDK (JS)](https://openai.github.io/openai-agents-js/)
 - [OpenAI Apps SDK MCP](https://developers.openai.com/apps-sdk/concepts/mcp-server)
-- [Google Gemini Custom Connectors](https://ai.google.dev/gemini-api/docs/custom-connectors)
+- [Google Gemini Enterprise custom MCP servers](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
 - [RFC 8693: Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)
 - [RFC 9449: DPoP](https://www.rfc-editor.org/rfc/rfc9449.html)
 - [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)

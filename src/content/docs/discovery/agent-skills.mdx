@@ -1,6 +1,7 @@
 ---
 title: Agent Skills
 description: Packaging reusable agent instructions, scripts, references, and assets.
+lastVerified: 2026-08-27
 ---
 
 Agent Skills are portable capability folders for agents. A skill teaches an agent how to do a specific task without putting every instruction into the base prompt.
@@ -67,13 +68,14 @@ For public sites, expose a skill index:
 
 ```json
 {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
-      "id": "create-api-token",
-      "name": "Create API Token",
+      "name": "create-api-token",
+      "type": "skill-md",
       "description": "Use when an agent needs to create a scoped API token for automation.",
-      "format": "agent-skill",
-      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md",
+      "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   ]
 }
@@ -85,7 +87,17 @@ Publish it at:
 /.well-known/agent-skills/index.json
 ```
 
-Only publish skills that are real, reviewed, and kept current with the product.
+This is the discovery v0.2 shape. `type: skill-md` means the URL returns a `SKILL.md` document directly. `digest` is the SHA-256 of the exact bytes returned by that URL, including line endings. Recompute it whenever the artifact changes.
+
+Validate discovery as a chain, not as two unrelated files:
+
+1. Parse the index against its declared schema.
+2. Fetch each skill URL and reject redirects to login pages, HTML shells, placeholders, or empty bodies.
+3. Hash the fetched bytes and compare them with `digest`.
+4. Parse the `SKILL.md` frontmatter and require `name` and `description`.
+5. Confirm that the description explains when the skill should be activated.
+
+Only publish skills that are real, reviewed, and kept current with the product. An index returning HTTP 200 does not count when its skill is stale, malformed, or does not match the published digest.
 
 ## Runtime Consumption
 

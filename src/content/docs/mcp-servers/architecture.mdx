@@ -1,7 +1,7 @@
 ---
 title: Server Architecture
 description: Structuring MCP servers for testability, maintainability, and production reliability
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -260,13 +260,13 @@ Declaring `resources.subscribe: true` without implementing the `resources/subscr
 </Callout>
 
 <Callout type="info">
-  Changing in `2026-07-28`: capabilities are no longer negotiated once at connect time. The
+  Current `2026-07-28` behavior: capabilities are no longer negotiated once at connect time. The
   `initialize` handshake is removed, clients send their capabilities in `_meta` on every request,
-  and servers advertise theirs through a mandatory `server/discover` method. The `logging`
+  and servers may advertise theirs through an optional `server/discover` method. The `logging`
   capability is Deprecated (SEP-2577), and `resources.subscribe` gives way to opting into
   `resourceSubscriptions` on a `subscriptions/listen` stream. Capability objects also gain an
   `extensions` field carrying reverse-DNS identifiers such as `io.modelcontextprotocol/tasks`. The
-  declaration above is correct for `2025-11-25` and today's SDKs; the discipline of declaring only
+  declaration above is a legacy `2025-11-25` compatibility example; the discipline of declaring only
   what you implement carries over unchanged.
 </Callout>
 

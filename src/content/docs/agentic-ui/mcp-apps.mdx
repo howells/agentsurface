@@ -1,7 +1,7 @@
 ---
 title: MCP Apps
 description: Interactive UI delivered through MCP — how a server ships rich, sandboxed interfaces to any supporting client via tool results, when to use it over plain structured output, and its client support matrix.
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -19,12 +19,10 @@ Reach for MCP Apps when the value is in the interaction — selecting, filtering
 </Callout>
 
 <Callout type="warn">
-  This page tracks the MCP Apps extension, which is normalized against the paths in the `2026-07-28`
-  MCP specification — the newest revision, whose release candidate has been locked since 2026-05-21
-  with final publication scheduled for 2026-07-28. The extension framework MCP Apps rides on lands
-  with that revision, and SDK support arrives across the RC's ten-week validation window, so hosts
-  will support the extension over `2025-11-25` connections for some time yet. Pin to the Stable
-  `2026-01-26` extension and recheck the client matrix as hosts move over.
+  This page tracks the MCP Apps extension against the current `2026-07-28` MCP specification. All
+  Tier 1 SDKs support that core revision, but host support for individual extensions can still vary.
+  Pin to the Stable `2026-01-26` MCP Apps extension, negotiate it explicitly, provide a text and
+  structured-data fallback, and recheck the client matrix before release.
 </Callout>
 
 ## When to Use It
@@ -82,7 +80,7 @@ Treat interactive results with the same posture as any other tool output: the UI
 - **No graceful degradation:** The tool returns only a UI resource, so an unsupporting client shows nothing useful. Every MCP App must carry a text representation of the same result.
 - **UI as the source of truth:** Trusting values the sandboxed UI sends back without server-side validation. The UI is untrusted input; validate its events like any other tool arguments.
 - **Privilege leakage:** Expecting the sandbox to grant the UI access to client internals or user credentials. The sandbox exists precisely to deny that; design the UI to work within the constrained channel.
-- **Drifting with the spec:** Building against extension behavior that shifts as hosts move onto `2026-07-28`. Pin to the Stable `2026-01-26` extension and recheck the client matrix as SDK support lands.
+- **Assuming extension parity:** Core revision support does not prove MCP Apps support. Pin to the Stable `2026-01-26` extension and recheck the client matrix before release.
 - **Writing deprecated vendor keys:** Emitting only `_meta["openai/visibility"]`, deprecated 2026-07-21, instead of the standard `_meta.ui.visibility`. Vendor-prefixed metadata is a compatibility shim, not the contract.
 
 ## Related

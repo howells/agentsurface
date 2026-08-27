@@ -270,7 +270,8 @@ export async function setupPublicMCPServer() {
       return;
     }
 
-    // MCP server discovery endpoint
+    // Optional compatibility discovery document. This is not the protocol's
+    // `server/discover` JSON-RPC method; publish only when a target client expects it.
     if (pathname === "/.well-known/mcp-server") {
       res.writeHead(200);
       res.end(
@@ -280,10 +281,8 @@ export async function setupPublicMCPServer() {
             resources: {},
             tools: {},
           },
-          // 2025-11-25 is the newest revision with full deployed SDK support; the
-          // 2026-07-28 revision removes this initialize handshake entirely (stateless
-          // core — version negotiation moves into per-request `_meta`).
-          protocolVersion: "2025-11-25",
+          // 2026-07-28 is current and moves version negotiation into per-request `_meta`.
+          protocolVersion: "2026-07-28",
           serverInfo: {
             name: "agent-mcp-server",
             version: "1.0.0",

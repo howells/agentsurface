@@ -1,50 +1,49 @@
 ---
 title: Model Context Protocol (MCP)
 description: Protocol for connecting AI agents to external tools, data sources, and services
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
 
-MCP defines how agents discover and use tools, read resources, invoke prompts, and run long-lived async tasks over a stateful connection. It is the baseline protocol for connecting AI applications to external systems. Newest spec revision: 2026-07-28 (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28); its predecessor 2025-11-25 is the revision with the fullest deployed SDK support during the rollout window and is what this page teaches against. Transport options: stdio (local), Streamable HTTP (remote). Protected HTTP servers use OAuth-based authorization discovery.
+MCP defines how agents discover and use tools, read resources, and invoke prompts. It is the baseline protocol for connecting AI applications to external systems. Current spec revision: `2026-07-28`, with a stateless core, no initialization handshake, and no protocol sessions. All Tier 1 SDKs — TypeScript, Python, Go, and C# — support it. Transport options are stdio for local processes and Streamable HTTP for remote servers. Protected HTTP servers use OAuth-based authorization discovery.
 
 ```
 Agent → connects via stdio/HTTP → MCP Server
   ├─ discovers tools
   ├─ reads resources (documents, data)
   ├─ invokes prompts (structured workflows)
-  └─ runs async tasks (polling or callback)
+  └─ negotiates optional extensions such as async Tasks
 ```
 
-- Four primitives: tools (model-controlled), resources (agent-read), prompts (structured workflows), tasks (async, long-lived)
-- Stateful JSON-RPC over stdio or HTTP
+- Three core primitives: tools (model-controlled), resources (application-controlled), prompts (user-controlled)
+- Stateless JSON-RPC core over stdio or Streamable HTTP
+- Async Tasks are the official `io.modelcontextprotocol/tasks` extension, not a core primitive
 - Authorization for protected HTTP servers via OAuth protected-resource metadata and authorization-server discovery
 - Server advertises capabilities; agent selects which to use
 - MCP Apps — the first official MCP extension (SEP-1865, Stable `2026-01-26`) — add interactive UI surfaces inside compatible clients (ChatGPT, Claude, VS Code, Goose, Postman); see [MCP Apps](/docs/agentic-ui/mcp-apps)
 - Agent Skills complement MCP by packaging reusable instructions, scripts, references, and assets
 
-MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and execute long-running async tasks — all over a single stateful connection. Implement MCP first when you are exposing tools, data, or workflows to external agents.
+MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and negotiate extensions. Implement MCP first when you are exposing remote tools, data, or workflows to external agents. For page-scoped browser tools, see [WebMCP](/docs/protocols/webmcp).
 
 ## Origin and Governance
 
 Anthropic published the initial MCP specification in November 2024. Since then it has become the main cross-vendor protocol surface for connecting agents to tools, resources, prompts, and workflow primitives. Stewardship now sits with the **Agentic AI Foundation (AAIF)** under the Linux Foundation (founded 2025-12-09, with MCP, goose, and AGENTS.md as anchor projects); the MCP steering group persists under that umbrella.
 
-The newest specification revision is `2026-07-28` — its release candidate has been locked since 2026-05-21 and final publication is scheduled for 2026-07-28. Its predecessor, [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/), remains the revision with the fullest deployed SDK support while `2026-07-28` support rolls out across the SDKs, and is the version this page teaches against. Sections below flag what changes under `2026-07-28`.
+The current specification revision is [`2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/). It shipped on schedule, and all Tier 1 SDKs support it. Its predecessor, [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/), remains relevant only for compatibility with clients that have not migrated. Current semantics come first below; legacy examples are labeled.
 
 <Callout type="info">
-  Revision `2026-07-28` is the largest change since MCP launched. It introduces a **stateless
+  Revision `2026-07-28` was the largest change since MCP launched. It introduced a **stateless
   protocol core** (removing the `initialize` / `notifications/initialized` handshake and the
-  `Mcp-Session-Id` header), a mandatory `server/discover` method, a single `subscriptions/listen`
+  `Mcp-Session-Id` header), an optional `server/discover` method, a single `subscriptions/listen`
   stream in place of the HTTP GET endpoint and `resources/subscribe`, multi round-trip requests in
   place of server-initiated `roots/list`, `sampling/createMessage`, and `elicitation/create`, a
   formal extensions framework, OAuth 2.0 / OIDC hardening, a deprecation lifecycle with a 12-month
-  minimum window, JSON Schema 2020-12 tool schemas, and W3C Trace Context. Because SDK support
-  arrives over the release candidate's ten-week validation window, build new servers against
-  `2025-11-25` today and plan the migrations described below rather than pinning to behavior the
-  next revision removes.
+  minimum window, JSON Schema 2020-12 tool schemas, and W3C Trace Context. Build new servers against
+  `2026-07-28`; add predecessor compatibility only when a supported client requires it.
 </Callout>
 
-## Four Primitives
+## Core Primitives and Extensions
 
 MCP exposes four core capability types. Each primitive has a different controller — the entity that decides when and how it is used.
 
@@ -136,9 +135,9 @@ Prompts are reusable message templates that users select to start or guide inter
 }
 ```
 
-### Tasks (Async Execution)
+### Tasks Extension (Async Execution)
 
-Tasks allow long-running, asynchronous operations with explicit state management and progress notifications. Introduced as experimental in `2025-11-25`, tasks are durable state machines for polling and deferred result retrieval. Requestors poll with `tasks/get`, retrieve completed results with `tasks/result`, and continue until a terminal state such as `completed`, `failed`, or `cancelled`.
+The official `io.modelcontextprotocol/tasks` extension allows long-running, asynchronous operations with explicit state management. Requestors poll with `tasks/get`; a receiver can request additional input with `tasks/update`; processing continues until a terminal state such as `completed`, `failed`, or `cancelled`. Negotiate the extension rather than assuming every MCP peer implements it.
 
 ```json
 {
@@ -157,18 +156,19 @@ Tasks allow long-running, asynchronous operations with explicit state management
 Use tasks when an operation cannot complete in a single RPC roundtrip — report generation, data exports, compliance audits, or expensive batch work. Clients can poll task state and receivers may send optional task status notifications.
 
 <Callout type="info">
-  Changing in `2026-07-28` (SEP-2663): tasks leave the protocol core and become the official
-  extension `io.modelcontextprotocol/tasks`. The blocking `tasks/result` call is replaced by polling
-  `tasks/get` plus a `tasks/update` method for sending client-to-server input mid-task, `tasks/list`
-  is removed, and servers may return a task handle unsolicited for any request. Treat tasks as an
-  extension you negotiate rather than a core primitive you can assume.
+  Compatibility note: `2025-11-25` treated Tasks as experimental core behavior and used
+  `tasks/result` and `tasks/list`. Those methods are not part of the current Tasks extension.
 </Callout>
 
 ## Wire Format
 
 MCP uses JSON-RPC 2.0 as its message format. Every interaction is a request/response pair or a notification, encoded as JSON.
 
-### Initialization Handshake
+### Current Per-Request Metadata
+
+In `2026-07-28`, each request carries its protocol version and client capabilities in `_meta`. A server may implement `server/discover` to advertise supported versions, capabilities, and identity before normal calls, but discovery is optional. Handlers must not depend on connection state established by an initialization exchange.
+
+### Legacy `2025-11-25` Initialization Handshake
 
 When a client connects, it sends an `initialize` request to negotiate protocol version and exchange capability declarations:
 
@@ -214,15 +214,15 @@ When a client connects, it sends an `initialize` request to negotiate protocol v
 The server must respond with the same `protocolVersion` or a lower supported version. If the versions are incompatible, the client disconnects.
 
 <Callout type="warn">
-  Changing in `2026-07-28` (SEP-2575): the `initialize` request and the `notifications/initialized`
-  acknowledgement are removed and the protocol core becomes stateless. Every request instead carries
-  its own protocol version and client capabilities in `_meta` under
+  Current `2026-07-28` behavior (SEP-2575): the `initialize` request and the
+  `notifications/initialized` acknowledgement are removed and the protocol core becomes stateless.
+  Every request instead carries its own protocol version and client capabilities in `_meta` under
   `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`, and
   `io.modelcontextprotocol/clientInfo`; servers identify themselves with
   `io.modelcontextprotocol/serverInfo` in the result `_meta`, and a version mismatch returns
-  `UnsupportedProtocolVersionError`. Servers MUST implement a new `server/discover` method that
-  advertises supported versions, capabilities, and identity, with a back-compatibility probe for
-  stdio. Design new servers so that no handler depends on state established at connect time.
+  `UnsupportedProtocolVersionError`. Servers may implement `server/discover` to advertise supported
+  versions, capabilities, and identity, with a back-compatibility probe for stdio. Design new
+  servers so that no handler depends on state established at connect time.
 </Callout>
 
 ### Tool Call
@@ -354,9 +354,9 @@ The November 2025 revision adds several important capabilities:
 
 **Tool-call support in sampling** — Sampling can include `tools` and `toolChoice` parameters.
 
-## Changing in 2026-07-28
+## What Changed in 2026-07-28
 
-Beyond the stateless core, the removal of sessions, and the tasks extension covered above, the `2026-07-28` revision changes the following. Each is worth knowing before you commit to a design that the next revision removes.
+Beyond the stateless core, the removal of sessions, and the Tasks extension covered above, the `2026-07-28` revision made the following changes. Avoid reintroducing the predecessor behavior in new systems.
 
 **Sessions are gone** (SEP-2567) — the `Mcp-Session-Id` header disappears from Streamable HTTP and list endpoints no longer vary per connection. Cross-call state moves to explicit server-minted handles passed as ordinary tool arguments.
 
@@ -558,9 +558,9 @@ MCP-Protocol-Version: 2025-11-25
 Streamable HTTP replaced the earlier `http+sse` transport, which has been deprecated since the `2025-03-26` revision and is formally Deprecated under the `2026-07-28` lifecycle policy. The legacy SSE transport remains supported via fallback for backward compatibility with older clients, but should not be used in new implementations. Streamable HTTP scales horizontally since each request is stateless.
 
 <Callout type="info">
-  Changing in `2026-07-28`: the `Mcp-Session-Id` header is removed, the GET endpoint that carried
-  the server-to-client stream is replaced by `subscriptions/listen`, and SSE resumability via
-  `Last-Event-ID` is gone. POST requests must instead carry `Mcp-Method` and `Mcp-Name` headers,
+  Current `2026-07-28` behavior: the `Mcp-Session-Id` header is removed, the GET endpoint that
+  carried the server-to-client stream is replaced by `subscriptions/listen`, and SSE resumability
+  via `Last-Event-ID` is gone. POST requests must instead carry `Mcp-Method` and `Mcp-Name` headers,
   with any custom headers namespaced under `x-mcp-header`. See [Transport
   Selection](/docs/mcp-servers/transports) for what this means for server code today.
 </Callout>
@@ -645,8 +645,8 @@ Declare capabilities at server construction time. Only declare what you actually
 Declaring `resources.subscribe: true` without implementing `resources/subscribe` will produce protocol errors that are difficult to trace back to the missing handler.
 
 <Callout type="info">
-  Changing in `2026-07-28`: capabilities travel per request rather than being negotiated once, the
-  `logging` capability is Deprecated, and `resources.subscribe` gives way to opting into
+  Current `2026-07-28` behavior: capabilities travel per request rather than being negotiated once,
+  the `logging` capability is Deprecated, and `resources.subscribe` gives way to opting into
   `resourceSubscriptions` on the `subscriptions/listen` stream. Capability objects also gain an
   `extensions` field carrying reverse-DNS extension identifiers such as
   `io.modelcontextprotocol/tasks`.
@@ -655,7 +655,8 @@ Declaring `resources.subscribe: true` without implementing `resources/subscribe`
 ## Spec & References
 
 - [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) — the revision this page teaches against, with all wire format details
-- [MCP draft changelog](https://modelcontextprotocol.io/specification/draft/changelog) — the `2026-07-28` change list, SEP by SEP
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) — current normative specification
+- [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/) — migration summary and SDK support status
 - [modelcontextprotocol.io](https://modelcontextprotocol.io) — official docs and server registry
 
 ## Related Pages

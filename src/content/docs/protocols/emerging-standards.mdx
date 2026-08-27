@@ -1,7 +1,7 @@
 ---
 title: Emerging Standards Watchlist
 description: Draft and early-stage agent standards worth tracking — WebMCP, Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP — plus pointers to standards that have graduated to stable coverage elsewhere in Agent Surface.
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -10,7 +10,7 @@ This page is a watchlist for draft and early-stage standards in the agent ecosys
 
 Standards that have stabilized enough to earn dedicated coverage no longer live here — they moved to their canonical homes and are listed in "Graduated to stable coverage" below.
 
-- Watch, do not depend: WebMCP, Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP
+- Watch, do not depend without a concrete compatibility reason: Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP
 - Payment-network protocols are watchlist-only; substantive agentic commerce protocols get their own page
 - Everything on this page carries a status and a date so you can judge staleness
 
@@ -23,12 +23,9 @@ These were once tracked here as emerging. They are now stable enough to have can
 - **AGENTS.md** (Linux Foundation context convention) → [Context Files: AGENTS.md](/docs/context-files/agents-md)
 - **llms.txt / llms-full.txt** → [Discovery: llms.txt](/docs/discovery/llms-txt)
 - **JSON-LD and schema.org structured data** → [Discovery: Structured Data](/docs/discovery/structured-data)
+- **WebMCP** (still a draft, but substantial enough to need implementation guidance) → [Protocols: WebMCP](/docs/protocols/webmcp)
 
 ## Draft & Emerging Watchlist
-
-### WebMCP — MCP for the Browser
-
-A W3C proposal co-authored by Google and Microsoft (February 2026) that exposes page-scoped tools to agents through a `navigator.modelContext` browser API, letting a site publish MCP-style tools that run in the page context rather than on a remote server. It shipped a Chrome origin trial spanning Chrome 149–156, so you can experiment behind a flag, but the API surface is unstable and no cross-browser commitment exists yet. Watch for whether Safari and Firefox engage.
 
 ### Web Bot Auth — Signed Bot Identity
 

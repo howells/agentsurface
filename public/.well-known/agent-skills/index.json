@@ -1,28 +1,12 @@
 {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
-      "id": "surface",
       "name": "surface",
-      "description": "Audit a codebase for AI agent readiness, score it across 11 dimensions (0-3 each, raw max 33 scaled to 30), generate clustered findings, produce a transformation plan, dispatch specialist agents to fix gaps, or scaffold new agent infrastructure. Install with: npx skills add https://github.com/howells/agentsurface",
-      "format": "agent-skill",
+      "type": "skill-md",
+      "description": "Use when guiding, auditing, scoring, scaffolding, or transforming software for agent-readable APIs, CLIs, docs, authentication, MCP, tools, workflows, retrieval, testing, and multi-agent systems.",
       "url": "https://agentsurface.dev/skills/surface/SKILL.md",
-      "install": "npx skills add https://github.com/howells/agentsurface",
-      "modes": [
-        "audit",
-        "score",
-        "plan",
-        "transform",
-        "init",
-        "agent",
-        "tool",
-        "workflow",
-        "memory",
-        "model",
-        "browser",
-        "sandbox"
-      ],
-      "runtimes": ["claude-code", "codex", "cursor", "github-copilot"],
-      "source": "https://github.com/howells/agentsurface"
+      "digest": "sha256:6e61fc4995050d35c16a74d45f63b9be065b212aeca5c86358e96fc75e6a3e0b"
     }
   ]
 }

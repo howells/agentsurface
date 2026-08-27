@@ -80,7 +80,7 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
 }
 ```
 
-Authorization server metadata remains RFC 8414. This protected-resource metadata is consumed by MCP clients (2025-11-25 and the newer 2026-07-28 revision alike) to discover authorization servers and request the right resource/scopes. Always publish it if your API or MCP server is exposed to remote agents.
+Authorization server metadata remains RFC 8414. MCP clients use protected-resource metadata to discover authorization servers and request the right resource and scopes. Always publish it for a protected remote API or MCP server.
 
 ### Client registration: prefer Client ID Metadata Documents
 
@@ -321,7 +321,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 **Google Vertex AI:** Uses IAM short-lived access tokens via Application Default Credentials (ADC). `gcloud auth application-default login` for dev; service account JSON for production. Agent Engine supports service accounts natively.
 
-**MCP:** Remote servers must advertise `.well-known/oauth-protected-resource`. The client validates JWTs with `iss`, `aud`, and `exp` claims. Async tasks support token refresh mid-flow. This holds in 2025-11-25 (the revision with full deployed SDK support) and in the newer 2026-07-28 revision, which adds RFC 9207 `iss` validation, per-issuer credential binding, and deprecates RFC 7591 Dynamic Client Registration in favour of Client ID Metadata Documents.
+**MCP:** Remote protected servers publish `.well-known/oauth-protected-resource`. The client and server validate `iss`, `aud`, `exp`, resource, and scopes as appropriate. The current 2026-07-28 revision requires RFC 9207 `iss` validation, per-issuer credential binding, and deprecates RFC 7591 Dynamic Client Registration in favour of Client ID Metadata Documents.
 
 ## Anti-patterns
 
@@ -363,8 +363,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - ([RFC 7591: OAuth 2.0 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)) — deprecated by MCP 2026-07-28 in favour of Client ID Metadata Documents.
 - ([RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)) — `iss` validation required by MCP 2026-07-28.
 - ([OAuth 2.1 draft-ietf-oauth-v2-1-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) — PKCE, removed insecure flows, refresh token rotation. Still an Internet-Draft; draft-15 published 2026-03-02.
-- ([MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25)) — Remote MCP OAuth 2.0 compliance; newest revision with full deployed SDK support.
-- ([MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog)) — newest revision; auth changes above.
+- ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) — current authorization requirements.
 - ([WorkOS auth.md](https://workos.com/auth-md)) — agentic registration discovery.
 - ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) — example service and provider implementations.
 - ([ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)) — provider-attested identity assertions.

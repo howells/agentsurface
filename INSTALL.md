@@ -119,7 +119,7 @@ For sharing via tarball or zip:
 
    ```bash
    cd agentsurface
-   zip -r surface-2.2.0.skill skills/surface/ -x "*.git*"
+   zip -r surface-2.3.0.skill skills/surface/ -x "*.git*"
    ```
 
 2. **Share the .skill file** with users via GitHub releases or another distribution channel.

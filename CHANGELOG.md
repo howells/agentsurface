@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
+## [2.3.0] — 2026-08-27
+
+### Added
+
+- Canonical WebMCP guide covering the current `document.modelContext` Community Group draft, Chrome implementation status, security boundaries, remote-MCP distinction, and the separate `webmcp.dev` library
+- Is Agentic coverage across the tooling catalog, scoring guidance, reference index, and distributable skill, including Agent Skills discovery v0.2, per-signal applicability, semantic capability validation, and an explicit outside-in-scan versus source-audit boundary
+- August 2026 currency and relevance review (`docs/currency-review-2026-08-27.md`)
+
+### Changed
+
+- MCP guidance now targets the shipped `2026-07-28` revision and treats `2025-11-25` as compatibility-only; corrected Tasks extension methods and optional `server/discover`
+- Google example default updated to Gemini 3.7 Flash; Anthropic Opus 4.1 retirement recorded as complete
+- Compatible dependency ranges refreshed, including Next 16.3, React 19.2.8, Fumadocs 16.15, MCP SDK 1.30, Tailwind 4.3.3, and shadcn 4.19
+- Confirmed stale external references migrated to current Promptfoo, LangGraph, Claude Code, Copilot, Bun, OpenAI, Google, and MCP destinations
+- Agent Skills discovery now publishes canonical `skill-md` URLs with exact-byte SHA-256 digests, enforced by the docs integrity gate
+
+### Fixed
+
+- Removed dead A2A and MCP server-card `$schema` URLs instead of advertising schemas that no longer resolve
+- Reverified the stale docs-coverage audit against the current Mastra topic map
+
 ## [2.2.0] — 2026-07-28
 
 The July 2026 currency review: a full-repository audit and remediation on the day the MCP 2026-07-28 revision reached its scheduled final publication. Also closes out the reference-upgrade program that began 2026-07-06.

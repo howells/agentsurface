@@ -19,6 +19,12 @@ Agent-readiness is not binary. A codebase's ability to be consumed by AI agents 
 
 Ambiguity that humans resolve through intuition becomes failure modes at scale with agents. When an agent cannot ask for clarification, every implicit assumption, missing description, or hidden error path becomes a blocker. A 0–3 score per dimension tells you exactly where to invest: optimize the few surfaces agents actually touch, deprioritize human-only features.
 
+## Repository Audit vs Public-Site Scan
+
+The Surface score is a source-backed review across code, documentation, runtime contracts, and tests. Public scanners such as [Is Agentic](https://is-agentic.com/) and [Agent Readiness](https://isitagentready.com/) observe the deployed website from the outside. They are complementary, but their scores are not interchangeable.
+
+Use a public scan to catch deployment reality: blocked crawlers, missing discovery files, unreadable HTML, or a capability that is not actually reachable. Use the Surface audit to find the source-level cause, assess private and authenticated surfaces, and decide whether a recommendation fits the product. Record the scanner, report URL, and scan timestamp as evidence; do not copy its headline number into the 0–30 Surface score.
+
 ## The 0–3 Scale
 
 Each dimension scores from 0 to 3:

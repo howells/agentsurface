@@ -1,7 +1,7 @@
 ---
 title: Protected Resource Metadata
 description: RFC 9728 resource server discovery for OAuth-protected APIs and MCP servers
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -171,13 +171,13 @@ async function callResourceServer(token: string, endpoint: string) {
 ```
 
 <Callout type="info">
-  Changing in `2026-07-28`: the metadata document itself is unchanged, but two client obligations
-  around it tighten. Clients must validate the `iss` parameter on the authorization response against
-  the issuer they discovered through this document, per RFC 9207 (SEP-2468), and must store client
-  credentials keyed by that issuer rather than by resource, re-registering when a resource's
-  `authorization_servers` entry changes (SEP-2352). Publishing a stable, correct `issuer` in your
-  authorization server metadata is therefore load-bearing in a way it was not before — changing it
-  invalidates every client credential registered against it.
+  Current `2026-07-28` behavior: the metadata document itself is unchanged, but two client
+  obligations around it tighten. Clients must validate the `iss` parameter on the authorization
+  response against the issuer they discovered through this document, per RFC 9207 (SEP-2468), and
+  must store client credentials keyed by that issuer rather than by resource, re-registering when a
+  resource's `authorization_servers` entry changes (SEP-2352). Publishing a stable, correct `issuer`
+  in your authorization server metadata is therefore load-bearing in a way it was not before —
+  changing it invalidates every client credential registered against it.
 </Callout>
 
 ## Minimal Metadata for Simple APIs

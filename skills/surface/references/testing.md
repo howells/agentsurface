@@ -194,7 +194,7 @@ Traces are the source of truth for debugging failures. Instrument with OpenTelem
 - `tool.search_docs`
 - `tool.execute_code`
 
-Auto-instrument with [Traceloop SDK](https://www.traceloop.com/) or [OpenLLMetry](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/opentelemetry-instrumentation-openai). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
+Auto-instrument with [Traceloop SDK](https://www.traceloop.com/) or [OpenLLMetry](https://github.com/traceloop/openllmetry). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
 
 ### Eval platforms
 

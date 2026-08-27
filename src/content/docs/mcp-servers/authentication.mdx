@@ -1,7 +1,7 @@
 ---
 title: MCP Authentication
 description: Securing MCP servers with bearer tokens, identity proxies, and OAuth 2.1
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -25,7 +25,7 @@ Public servers        OAuth 2.1
 
 An unauthenticated MCP server is an unauthenticated API. Any tool it exposes — including destructive ones — is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
 
-The `2025-11-25` MCP specification mandates OAuth 2.1 for publicly accessible servers, and the newer `2026-07-28` revision keeps that requirement while hardening it. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
+The current `2026-07-28` MCP specification requires OAuth 2.1 for publicly accessible protected servers and hardens the predecessor model. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
 
 ## Approach 1: Bearer Token
 
@@ -126,8 +126,8 @@ OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers as of the `
 The protocol-level model — protected-resource metadata discovery, authorization-server discovery, client registration options, and token audience binding — lives in [MCP Authorization](/docs/authentication/mcp-auth-model). This section is the server-implementer view: the endpoints you expose, PKCE, token validation, scope enforcement, and the on-behalf-of flow. Read the canonical page first if you need the full OAuth 2.1 discovery and registration flow; use this page to implement it.
 
 <Callout type="info">
-  Changing in `2026-07-28`: clients must validate the authorization response's `iss` parameter per
-  RFC 9207 (SEP-2468) and must key stored client credentials by issuer, using them only with the
+  Current `2026-07-28` behavior: clients must validate the authorization response's `iss` parameter
+  per RFC 9207 (SEP-2468) and must key stored client credentials by issuer, using them only with the
   authorization server that issued them and re-registering when an issuer changes (SEP-2352). RFC
   7591 dynamic client registration is Deprecated in favor of Client ID Metadata Documents, and where
   you still accept DCR the `application_type` field becomes required (SEP-837). The server-side work

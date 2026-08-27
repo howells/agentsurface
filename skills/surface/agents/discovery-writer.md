@@ -195,7 +195,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 8. **Publish `.well-known` capability metadata** where applicable:
    - `/.well-known/api-catalog` for public APIs and OpenAPI specs
    - `/.well-known/mcp/server-card.json` for HTTP MCP servers
-   - `/.well-known/agent-skills/index.json` for task-specific Agent Skills documents; linked skills should be valid `SKILL.md` files with required `name` and `description`
+   - `/.well-known/agent-skills/index.json` for task-specific Agent Skills documents; use the discovery v0.2 schema with `type`, canonical `url`, and a `sha256:` digest of the exact linked artifact bytes
    - `/.well-known/oauth-protected-resource` for OAuth-protected APIs/resources
    - `/.well-known/http-message-signatures-directory` when the service sends signed Web Bot Auth requests
    - Keep deprecated `/.well-known/ai-plugin.json` out unless preserving an existing legacy redirect
@@ -205,18 +205,25 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Universal Commerce Protocol or Agentic Commerce Protocol for agent-mediated commerce surfaces
    - Do not add commerce manifests to non-commerce products just to pass a scanner
 
-10. **Validate all URLs**:
-   - Verify every link in llms.txt resolves (200 OK)
+10. **Validate applicable signals and all URLs**:
+   - Detect the activating surface before requiring API, MCP, OAuth, Agent Skills, WebMCP, commerce, or bot-identity metadata; record absent optional surfaces as not applicable
+   - Verify every link in llms.txt resolves to substantive documentation, not only 200 OK
    - Check for redirects; prefer direct URLs
    - Test from agent perspective (curl + User-Agent header)
+   - Reject HTML shells, login pages, placeholder JSON, and empty bodies returned from machine-readable URLs
+   - Parse OpenAPI, JSON-LD, OAuth metadata, API Catalogs, and `.well-known` JSON; verify their linked resources and claims
+   - For Agent Skills, fetch each linked artifact, compare its exact-byte SHA-256 with `digest`, parse the `SKILL.md` frontmatter, and require a description that explains when to use it
+   - For MCP, validate the advertised transport and safely inspect lists; if resources are advertised, sample `resources/read` results for non-empty content and accurate MIME types
 
 11. **Quality checks**:
    - llms.txt tokens: <5,000 (use tiktoken to verify)
-   - All URLs in discovery files resolve
+   - All URLs in discovery files resolve to the advertised content
    - JSON-LD valid against schema.org validator
    - robots.txt passes validator
    - Content Signals are consistent with robots.txt allow/block policy
-   - `.well-known` files return JSON with correct `Content-Type`
+   - `.well-known` files return parseable, semantically consistent JSON with correct `Content-Type`
+   - Agent Skills index matches discovery v0.2 and every published digest matches the served artifact
+   - Advertised MCP resources are readable, non-empty, and use accurate MIME types
    - Content-Negotiation returns Vary header
    - AGENTS.md is within the authoring target (~150 lines ideal, <300 max)
    - No secrets, credentials, or internal IPs in any file

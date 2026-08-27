@@ -1,7 +1,7 @@
 ---
 title: Protocol Comparison
 description: When to use MCP, A2A, ACP, ANP, Arazzo, and OASF — the full agent protocol landscape
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -28,21 +28,21 @@ Six protocols have emerged to address different coordination problems in multi-a
 
 ## The Full Landscape
 
-| Protocol           | Purpose                       | Topology                      | Transport                       | Auth                            | Discovery                     | Maturity   |
-| ------------------ | ----------------------------- | ----------------------------- | ------------------------------- | ------------------------------- | ----------------------------- | ---------- |
-| **MCP 2026-07-28** | Agent-to-tool / agent-to-data | Vertical (down)               | stdio, Streamable HTTP          | OAuth 2.1 (HTTP only)           | `server/discover`, SDK config | Production |
-| **A2A v1.0.1**     | Agent-to-agent delegation     | Horizontal (peers)            | JSON-RPC, gRPC, HTTP+JSON       | OAuth 2.1 + DPoP                | `/.well-known/agent.json`     | Production |
-| **ACP (commerce)** | Agent-initiated commerce      | Horizontal (agent → merchant) | HTTPS REST with SSE             | Bearer token + request signing  | `/.well-known/acp.json`       | Beta       |
-| **OpenAPI 3.1**    | Service API description       | Vertical (down)               | HTTPS REST / gRPC               | Flexible (OAuth, API key, etc.) | OpenAPI document              | Production |
-| **Arazzo 1.1.0**   | Multi-step workflow spec      | Vertical (down)               | HTTPS REST                      | Via OpenAPI binding             | Arazzo document               | Mature     |
-| **ANP (draft)**    | Decentralized agent identity  | Any                           | Any (via DID service endpoints) | End-to-end encryption via DID   | DID resolution                | Draft      |
-| **OASF (early)**   | Capability schema & discovery | Any                           | Any (schema-agnostic)           | Flexible                        | Registry/marketplace          | Early      |
+| Protocol           | Purpose                       | Topology                      | Transport                       | Auth                            | Discovery                              | Maturity   |
+| ------------------ | ----------------------------- | ----------------------------- | ------------------------------- | ------------------------------- | -------------------------------------- | ---------- |
+| **MCP 2026-07-28** | Agent-to-tool / agent-to-data | Vertical (down)               | stdio, Streamable HTTP          | OAuth 2.1 (HTTP only)           | Optional `server/discover`, SDK config | Production |
+| **A2A v1.0.1**     | Agent-to-agent delegation     | Horizontal (peers)            | JSON-RPC, gRPC, HTTP+JSON       | OAuth 2.1 + DPoP                | `/.well-known/agent.json`              | Production |
+| **ACP (commerce)** | Agent-initiated commerce      | Horizontal (agent → merchant) | HTTPS REST with SSE             | Bearer token + request signing  | `/.well-known/acp.json`                | Beta       |
+| **OpenAPI 3.1**    | Service API description       | Vertical (down)               | HTTPS REST / gRPC               | Flexible (OAuth, API key, etc.) | OpenAPI document                       | Production |
+| **Arazzo 1.1.0**   | Multi-step workflow spec      | Vertical (down)               | HTTPS REST                      | Via OpenAPI binding             | Arazzo document                        | Mature     |
+| **ANP (draft)**    | Decentralized agent identity  | Any                           | Any (via DID service endpoints) | End-to-end encryption via DID   | DID resolution                         | Draft      |
+| **OASF (early)**   | Capability schema & discovery | Any                           | Any (schema-agnostic)           | Flexible                        | Registry/marketplace                   | Early      |
 
 ## What Each Protocol Is For
 
 ### MCP — Give This Agent a Hammer
 
-MCP answers the question: what can this agent do? It connects an agent to tools (functions it can call), resources (data it can read), prompts (structured workflows), and tasks for long-running work. The connection is vertical — the agent reaches down into tools and data sources. `2026-07-28` is the newest revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28); `2025-11-25` is its predecessor and the revision with the fullest deployed SDK support during the rollout window.
+MCP answers the question: what can this agent do? It connects an agent to tools (functions it can call), resources (data it can read), and prompts (structured workflows), with negotiated extensions such as Tasks for long-running work. The connection is vertical — the agent reaches down into tools and data sources. `2026-07-28` is the current revision and all Tier 1 SDKs support it; `2025-11-25` is a compatibility target only where a client still requires it.
 
 Use MCP when:
 
@@ -154,14 +154,14 @@ No single protocol replaces the others. Each addresses a distinct coordination p
 
 ## Maturity Considerations
 
-| Protocol         | Use in production?    | Notes                                                                                               |
-| ---------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
-| MCP `2026-07-28` | Yes, via `2025-11-25` | Newest revision; ship on `2025-11-25` until SDK support catches up (see [MCP](/docs/protocols/mcp)) |
-| A2A `v1.0.1`     | Yes                   | Production-grade — 150+ organizations, SDKs in five languages, multi-transport                      |
-| ACP (commerce)   | Pilots only           | Beta; deflating after the March 2026 Instant Checkout shutdown, momentum → Google UCP               |
-| Arazzo `1.1`     | Yes, with caveats     | Spec stable, tooling still maturing                                                                 |
-| ANP              | No                    | Draft spec, no production implementations                                                           |
-| OASF             | No                    | Early working group, schemas evolving                                                               |
+| Protocol         | Use in production? | Notes                                                                                 |
+| ---------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| MCP `2026-07-28` | Yes                | Current revision; all Tier 1 SDKs support it (see [MCP](/docs/protocols/mcp))         |
+| A2A `v1.0.1`     | Yes                | Production-grade — 150+ organizations, SDKs in five languages, multi-transport        |
+| ACP (commerce)   | Pilots only        | Beta; deflating after the March 2026 Instant Checkout shutdown, momentum → Google UCP |
+| Arazzo `1.1`     | Yes, with caveats  | Spec stable, tooling still maturing                                                   |
+| ANP              | No                 | Draft spec, no production implementations                                             |
+| OASF             | No                 | Early working group, schemas evolving                                                 |
 
 When evaluating a protocol for production use, the spec stability matters less than SDK and tooling support. A stable spec with no SDKs requires you to implement the wire format yourself. MCP and A2A both have mature, actively maintained SDKs across multiple languages.
 
@@ -176,7 +176,7 @@ When evaluating a protocol for production use, the spec stability matters less t
 
 ## Spec References
 
-- [MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) and the [2026-07-28 changelog](https://modelcontextprotocol.io/specification/draft/changelog)
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) and [release summary](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
 - [A2A v1.0.1](https://a2a-protocol.org/latest/specification/)
 - [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0)
 - [Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html)

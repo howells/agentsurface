@@ -1,4 +1,13 @@
 {
   "title": "Protocols & Standards",
-  "pages": ["index", "mcp", "a2a", "acp", "agentic-commerce", "comparison", "emerging-standards"]
+  "pages": [
+    "index",
+    "mcp",
+    "webmcp",
+    "a2a",
+    "acp",
+    "agentic-commerce",
+    "comparison",
+    "emerging-standards"
+  ]
 }

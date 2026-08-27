@@ -1,7 +1,7 @@
 ---
 title: Resources and Prompts
 description: Exposing contextual data and reusable prompt templates through MCP
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -194,7 +194,7 @@ await server.notification({
 </Callout>
 
 <Callout type="warn">
-  Changing in `2026-07-28` (SEP-2575): `resources/subscribe` and `resources/unsubscribe` are
+  Current `2026-07-28` behavior (SEP-2575): `resources/subscribe` and `resources/unsubscribe` are
   removed, along with the HTTP GET endpoint that carried server-to-client notifications. Both are
   replaced by a single `subscriptions/listen` request that opens one long-lived POST-response
   stream, with the client opting in per notification type — `resourcesListChanged` and

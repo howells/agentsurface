@@ -18,7 +18,7 @@ What to customize:
 Note: Copilot has lower context budget (~2k tokens vs Claude's 1M).
 Keep this file <200 lines. Link to AGENTS.md for details.
 
-Spec: https://docs.github.com/en/copilot/customizing-copilot/adding-custom-instructions-for-copilot
+Spec: https://docs.github.com/en/copilot/reference/custom-instructions-support
 -->
 
 # GitHub Copilot Custom Instructions

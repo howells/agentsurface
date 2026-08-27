@@ -126,10 +126,13 @@ Gather these surfaces before scoring:
 - Retrieval: RAG pattern family, document ingestion, embeddings, vector/search stores, hybrid search, rerankers, graph/structured retrieval, metadata filters, eval scripts.
 - Tests/evals: unit, integration, MCP transport tests, CLI contract tests, agent evals, CI.
 
+For Discovery & AEO, activate optional checks only when the corresponding surface is detected. For example, require Agent Skills discovery only when skills are published, MCP metadata only for a remote MCP server, OAuth metadata only for protected resources, and commerce manifests only for a commerce flow. Validate the returned content and linked capability, not merely the presence of a file or an HTTP 200 response.
+
 ### Scoring Rules
 
 - Score each applicable dimension from 0-3.
 - Mark a dimension N/A only when the project genuinely cannot expose that surface.
+- Within an applicable dimension, mark individual signals not applicable when their activating capability is absent; do not turn an optional protocol into a penalty.
 - Derive the final rating from the scaled score out of 30, not the raw score.
 - Score current implementation, not intent or roadmap.
 - Be conservative when evidence is partial.
@@ -228,7 +231,8 @@ Use these defaults unless the project already has a better convention:
 - AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files as overlays.
 - `llms.txt` is a useful Markdown discovery convention for inference-time retrieval, not a guaranteed SEO or citation signal. Pair it with crawlable docs, structured data, sitemap, and stable canonical URLs.
 - Choose RAG architecture by data shape and query need, not by trend: dense-only for prototypes, hybrid + rerank for most production knowledge search, graph/LightRAG when relationships drive answers, multimodal retrieval for visual/audio corpora, and compiled/optimized retrieval when the query workload is stable enough to justify preprocessing.
-- MCP has two revisions in play. The 2026-07-28 revision (release candidate locked 2026-05-21, final publication scheduled for 2026-07-28) is the newest and supersedes 2025-11-25; it removes sessions and the initialize handshake, adds `server/discover` and `subscriptions/listen`, and deprecates roots, sampling, and logging. The 2025-11-25 revision remains the newest with full deployed SDK support while support for 2026-07-28 rolls out. Audit against 2025-11-25 and flag 2026-07-28 readiness. Check tools, resources, prompts, roots, sampling, elicitation, tasks, Streamable HTTP, and protocol-version negotiation where relevant.
+- MCP `2026-07-28` is the current revision and all Tier 1 SDKs support it. It removes sessions and the initialize handshake, offers optional `server/discover`, adds `subscriptions/listen`, moves Tasks into an official extension, and deprecates roots, sampling, and logging. Audit against `2026-07-28`; retain `2025-11-25` compatibility only when an actual client requires it. Check tools, resources, prompts, negotiated extensions, Streamable HTTP, per-request protocol metadata, and explicit state handles where relevant.
+- WebMCP is a separate browser-native draft for page-scoped tools through `document.modelContext`. Do not confuse it with remote MCP or the older `webmcp.dev` JavaScript library.
 - Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request.
 - MCP tool descriptions and annotations are advisory hints, not authorization policy. Treat them as untrusted unless the server is trusted, and enforce approvals, auth, and scope checks in the server or workflow.
 - MCP tools should provide input schemas, `outputSchema` plus `structuredContent` for structured results, annotations, resource links where useful, and structured recoverable errors.

@@ -1,0 +1,96 @@
+---
+title: WebMCP
+description: Browser-native, page-scoped tools for agents, including the current W3C Community Group API and the older webmcp.dev library.
+lastVerified: 2026-08-27
+---
+
+## Summary
+
+WebMCP lets a web page expose structured tools to an agent that is already visiting the page. The current specification is a W3C Community Group draft, not a W3C Standard. Its imperative API is `document.modelContext`; Chrome also documents a declarative form-based API. Chrome's origin trial starts in Chrome 149, and local development can use `chrome://flags/#enable-webmcp-testing`.
+
+WebMCP is not remote MCP in a browser. The specification deliberately does not prescribe the Model Context Protocol wire format: a browser may bridge page tools to MCP, function calling, or another agent runtime. Use remote MCP for server-side capabilities that must be callable without visiting a page; use WebMCP when the page's current DOM, session, and user-visible state are the useful execution context.
+
+- Current API: `document.modelContext.registerTool(...)`
+- Scope: tools exposed by the active page and permitted frames
+- Transport: browser-defined; the WebMCP specification does not require MCP JSON-RPC
+- Status: Draft Community Group Report, dated 2026-08-26
+- Chrome: origin trial from Chrome 149; no cross-browser commitment yet
+
+## Minimal Imperative Tool
+
+```ts
+const registration = new AbortController();
+
+await document.modelContext.registerTool(
+  {
+    name: "cart_add_item",
+    description:
+      "Adds the selected product to the current user's cart. Use only after the user has chosen a variant and quantity.",
+    inputSchema: {
+      type: "object",
+      required: ["variantId", "quantity"],
+      properties: {
+        variantId: { type: "string" },
+        quantity: { type: "integer", minimum: 1, maximum: 20 },
+      },
+    },
+    annotations: {
+      readOnlyHint: false,
+      untrustedContentHint: false,
+    },
+    execute: async ({ variantId, quantity }, { signal }) => {
+      const response = await fetch("/api/cart/items", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ variantId, quantity }),
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cart update failed with ${response.status}`);
+      }
+
+      return { status: "added", variantId, quantity };
+    },
+  },
+  { signal: registration.signal },
+);
+
+// Remove the capability when the page state no longer supports it.
+registration.abort();
+```
+
+Keep the registered tool set synchronized with the page state. A checkout tool should disappear when the cart is empty; a destructive tool should not remain registered merely because the component that created it unmounted incorrectly.
+
+## Security Boundary
+
+Treat every tool description and result as untrusted content. The draft calls out prompt injection, tool poisoning, output injection, ambiguous destructive intent, privacy leakage, and over-parameterization. A browser confirmation prompt is a user-experience safeguard, not an authorization policy.
+
+- Enforce authorization and invariants in the application or server, even when the tool runs in the page.
+- Ask only for the minimum arguments. Derive account, tenant, and session context from the authenticated page where possible.
+- Use `AbortSignal` so cancelled agent work stops network and UI side effects.
+- Keep cross-origin frames opt-in. The `tools` Permissions Policy defaults to `self`; grant a frame access explicitly with `allow="tools"` only when you trust its origin and tools.
+- Use annotations as hints for clients, never as the sole control on a write or destructive action.
+
+## When to Use It
+
+Use WebMCP when the useful capability is tied to a page the user can see: filling a product configurator, manipulating a canvas, completing a form, operating authenticated account UI, or reading page-local state that has no stable server API.
+
+Prefer an HTTP API or remote MCP server when the capability should work headlessly, across many clients, or without loading your UI. A durable agent surface often provides both: remote capabilities for automation and WebMCP tools for page-specific interaction.
+
+## `webmcp.dev` Is a Different Project
+
+[webmcp.dev](https://webmcp.dev/) documents an earlier open-source JavaScript library published as `@jason.today/webmcp`. It uses a script/widget, tokens, and its own tools/resources/prompts/sampling model. It is useful historical and experimental work, but it is not the current W3C Community Group API and code written for it is not interchangeable with `document.modelContext`.
+
+When a requirement says "support WebMCP," identify which surface it means:
+
+- **Current browser proposal:** implement against the [W3C Community Group draft](https://webmachinelearning.github.io/webmcp/) and test in a supporting Chrome build.
+- **Legacy library compatibility:** use [webmcp.dev](https://webmcp.dev/) and pin the package version deliberately.
+- **Remote Model Context Protocol:** implement an [MCP server](/docs/protocols/mcp); WebMCP alone does not publish a remote endpoint.
+
+## Primary Sources
+
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
+- [WebMCP Community Group repository](https://github.com/webmachinelearning/webmcp)
+- [Chrome WebMCP documentation](https://developer.chrome.com/docs/ai/webmcp)
+- [webmcp.dev legacy library](https://webmcp.dev/)

@@ -1,7 +1,7 @@
 ---
 title: Tool Definition Best Practices
 description: Writing tool names, descriptions, and schemas that agents can reason about reliably
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -211,7 +211,7 @@ server.tool(
 </Callout>
 
 <Callout type="info">
-  Changing in `2026-07-28` (SEP-2106): `inputSchema` and `outputSchema` accept any JSON Schema
+  Current `2026-07-28` behavior (SEP-2106): `inputSchema` and `outputSchema` accept any JSON Schema
   2020-12 keywords, including `$ref`, so shared definitions no longer have to be inlined, and
   `structuredContent` may be any JSON value rather than only an object. This loosens a constraint
   rather than breaking anything — schemas written against the current subset stay valid — so keep

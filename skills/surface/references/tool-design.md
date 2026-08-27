@@ -163,7 +163,7 @@ response_format: z.enum(['concise', 'detailed'])
 
 ### Annotations (MCP)
 
-([MCP spec 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)) — annotations are unchanged in the newer 2026-07-28 revision (RC locked 2026-05-21, final publication scheduled for 2026-07-28), so this guidance carries forward.
+([MCP spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) — annotations remain part of the current revision.
 
 Every tool should declare its access level and side effects:
 
@@ -423,8 +423,7 @@ All three adapters wrap the same handler and schema; only the frame changes.
 ## Citations
 
 - ([Anthropic writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents))
-- ([MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)) — newest revision with full deployed SDK support
-- ([MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog)) — newest revision; RC locked 2026-05-21
+- ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) — current revision
 - ([OpenAI function calling](https://platform.openai.com/docs/guides/function-calling))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))

@@ -19,7 +19,7 @@
  * - Temporal TypeScript SDK: https://temporal.io/typescript
  * - Durable execution: https://temporal.io/docs/concepts/what-is-temporal
  * - Inngest alternative: https://www.inngest.com/docs
- * - Bun cron: https://bun.sh/docs/api/cron
+ * - Bun cron: https://bun.com/docs/runtime/cron
  *
  * // <CUSTOMISE>
  * - Replace insight generation with your domain logic

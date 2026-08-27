@@ -1,11 +1,12 @@
 {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
-      "id": "use-api",
-      "name": "Use API",
-      "description": "Replace with a narrow task the site can teach agents to perform reliably.",
-      "format": "agent-skill",
-      "url": "https://example.com/.well-known/agent-skills/use-api/SKILL.md"
+      "name": "use-api",
+      "type": "skill-md",
+      "description": "Use when an agent needs to complete the site's documented API workflow reliably.",
+      "url": "https://example.com/.well-known/agent-skills/use-api/SKILL.md",
+      "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   ]
 }

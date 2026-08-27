@@ -50,7 +50,7 @@ const server = new McpServer(
     capabilities: {
       prompts: {},
       resources: {},
-      tasks: {}, // Enable Tasks async primitive — experimental in MCP 2025-11-25; moves to the io.modelcontextprotocol/tasks extension in the 2026-07-28 revision
+      tasks: {}, // Enable only when the io.modelcontextprotocol/tasks extension is negotiated.
       tools: {},
     },
   },

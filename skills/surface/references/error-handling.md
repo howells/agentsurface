@@ -288,7 +288,7 @@ The agent can then read the error, extract `is_retriable`, and decide whether to
 
 #### Protocol-level JSON-RPC codes
 
-Tool-level failures use `isError: true`. Protocol-level failures use JSON-RPC error codes, and the newer MCP 2026-07-28 revision (RC locked 2026-05-21, final publication scheduled for 2026-07-28) changes how those codes are allocated:
+Tool-level failures use `isError: true`. Protocol-level failures use JSON-RPC error codes, and the current MCP 2026-07-28 revision changes how those codes are allocated:
 
 - **Resource not found moves from `-32002` to `-32602`**, aligning with the JSON-RPC "invalid params" code. Clients written against 2025-11-25 should tolerate both during the transition.
 - **A formal allocation policy** now splits the range: `-32000` to `-32019` is implementation-defined (existing uses are grandfathered), and `-32020` to `-32099` is reserved for the specification. Do not invent codes inside the reserved band.
@@ -390,8 +390,7 @@ Parse `RateLimit-*` and `Retry-After` headers (delta-seconds and HTTP-date), com
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html) — Canonical spec, obsoletes RFC 7807
 - [Anthropic: Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents) — Factor #9: compact errors into context
 - [12-factor agents](https://github.com/humanlayer/12-factor-agents) — Factor #9 (errors) and tracing patterns
-- [MCP 2025-11-25 Specification](https://modelcontextprotocol.io/specification/2025-11-25) — `isError` convention for tool results; newest revision with full deployed SDK support
-- [MCP draft changelog, 2026-07-28 revision](https://modelcontextprotocol.io/specification/draft/changelog) — newest revision; error-code renumbering and allocation policy
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) — current error-code allocation policy
 - [Stripe API Error Handling](https://stripe.com/docs/api/errors) — Industry-standard error shape and Idempotency-Key
 - [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) — trace_id and correlation
 
