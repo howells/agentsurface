@@ -1,7 +1,7 @@
 ---
 title: "DPoP: Demonstrating Proof-of-Possession"
 description: "RFC 9449 sender-constrained tokens, preventing token replay attacks"
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -223,7 +223,7 @@ For read-only operations on public data, the overhead may not be justified.
 
 ## MCP and DPoP
 
-MCP has encouraged DPoP for remote servers that expose sensitive operations since the `2025-11-25` revision, and the newer `2026-07-28` revision does not change that. An MCP server can require DPoP proofs on every resource access:
+MCP has encouraged DPoP for remote servers that expose sensitive operations since the `2025-11-25` revision, and the current `2026-07-28` revision retains that guidance. An MCP server can require DPoP proofs on every resource access:
 
 ```typescript
 // MCP server validating DPoP

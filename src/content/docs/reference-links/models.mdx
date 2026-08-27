@@ -1,12 +1,12 @@
 ---
 title: Model Reference
-description: Canonical July 2026 model IDs for every provider — the single source of truth for the model-ID integrity check.
-lastVerified: 2026-07-28
+description: Canonical August 2026 model IDs for every provider — the single source of truth for the model-ID integrity check.
+lastVerified: 2026-08-27
 ---
 
 This is the canonical list of model IDs Agent Surface uses in examples. Every model-ID string in the docs and in the template kits must appear here. `scripts/check-docs-integrity.mjs` parses this page's code-formatted IDs into an allowlist and flags any model-ID-shaped string elsewhere in the corpus that is not on it. Update this page first, then run the sweep.
 
-Verified against provider documentation on 2026-07-28.
+Verified against provider documentation on 2026-08-27.
 
 ## Anthropic
 
@@ -31,13 +31,14 @@ Verified against provider documentation on 2026-07-28.
 
 ## Google
 
-| Model                    | API ID                   | Role    | Notes                                                                        |
-| ------------------------ | ------------------------ | ------- | ---------------------------------------------------------------------------- |
-| Gemini 3.6 Flash         | `gemini-3.6-flash`       | Current | GA 2026-07-21. Default Google model for agent and eval examples.             |
-| Gemini 3.5 Flash-Lite    | `gemini-3.5-flash-lite`  | Fast    | GA 2026-07-21. Fastest 3.5-series model for high-volume, low-cost calls.     |
-| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview | Higher-capability preview; still preview as of 2026-07-28 — pin the full ID. |
+| Model                    | API ID                   | Role     | Notes                                                                                  |
+| ------------------------ | ------------------------ | -------- | -------------------------------------------------------------------------------------- |
+| Gemini 3.7 Flash         | `gemini-3.7-flash`       | Current  | GA 2026-08. Default Google model for agent and eval examples.                          |
+| Gemini 3.6 Flash         | `gemini-3.6-flash`       | Previous | Stable previous-generation Flash model; retain only for deliberate compatibility pins. |
+| Gemini 3.5 Flash-Lite    | `gemini-3.5-flash-lite`  | Fast     | GA 2026-07-21. Fastest 3.5-series model for high-volume, low-cost calls.               |
+| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview  | Higher-capability preview; still preview as of 2026-07-28 — pin the full ID.           |
 
-**Superseded 2026-07-21:** Gemini 3.5 Flash is replaced by Gemini 3.6 Flash as the example default; the model-ID check flags remaining 3.5 Flash pins. (Gemini 3.5 Pro has not reached GA.)
+**Superseded 2026-08:** Gemini 3.7 Flash replaces Gemini 3.6 Flash as the example default. Keep `gemini-3.6-flash` only where compatibility is deliberate. (Gemini 3.5 Pro has not reached GA.)
 
 ## Embeddings
 

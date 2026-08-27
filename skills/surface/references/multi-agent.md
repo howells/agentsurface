@@ -234,7 +234,7 @@ When designing a multi-agent system:
 - Claude Code subagents: https://code.claude.com/docs/en/sub-agents
 - OpenAI Agents SDK (TypeScript): https://openai.github.io/openai-agents-js/
 - Google ADK: https://google.github.io/adk-docs/
-- LangGraph JS: https://langchain-ai.github.io/langgraphjs/
+- LangGraph JS: https://docs.langchain.com/oss/javascript/langgraph/overview
 - Mastra: https://mastra.ai
 - Temporal: https://temporal.io
 - Inngest: https://inngest.com

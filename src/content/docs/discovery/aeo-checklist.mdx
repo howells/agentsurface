@@ -198,8 +198,11 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 ### Agent Skills Index
 
 - [ ] `/.well-known/agent-skills/index.json` exists when your site teaches task-specific agent workflows
+- [ ] Index declares the Agent Skills discovery v0.2 schema
+- [ ] Every entry has `name`, `type`, activation-oriented `description`, canonical `url`, and `sha256:` `digest`
 - [ ] Each skill is narrow, procedural, and linked as a separate `SKILL.md`
 - [ ] Linked skills follow the Agent Skills format: required `name` and `description`, optional `scripts/`, `references/`, and `assets/`
+- [ ] Each digest matches the exact bytes returned by the corresponding skill URL
 - [ ] Skill descriptions explain when to use the skill, not only what topic it covers
 - [ ] Skills are generated from canonical docs or reviewed with the same rigor as public docs
 

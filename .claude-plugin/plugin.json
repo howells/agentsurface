@@ -1,6 +1,6 @@
 {
   "name": "surface",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Make software legible to agents. One skill that routes to the right workflow: audit agent readiness, scaffold agent infrastructure, generate MCP servers, write context files, or fix specific gaps.",
   "skills": "../skills/",
   "author": {

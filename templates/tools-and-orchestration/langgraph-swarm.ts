@@ -17,8 +17,8 @@
  * ⚠️  Cognition consensus: Single agent is usually simpler. Swarms add complexity;
  * justify with clear handoff heuristics and independent worker logic.
  *
- * Citation: https://langchain-ai.github.io/langgraphjs/tutorials/agents/multi_agent_systems/#swarm
- * LangGraph Command: https://langchain-ai.github.io/langgraphjs/concepts/low_level_conceptual_index/#command
+ * Multi-agent patterns: https://docs.langchain.com/oss/javascript/langchain/multi-agent
+ * LangGraph Graph API: https://docs.langchain.com/oss/javascript/langgraph/graph-api
  *
  * CUSTOMISE:
  * - Define your agents (codeReviewer, testRunner, deployer, etc.)

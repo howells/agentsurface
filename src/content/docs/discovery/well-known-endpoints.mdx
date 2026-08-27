@@ -1,7 +1,7 @@
 ---
 title: Well-Known Discovery Endpoints
 description: Standardized /.well-known/ paths that let agents and protocols discover your capabilities programmatically
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -153,7 +153,6 @@ An MCP Server Card describes a remote MCP server before an agent connects: what 
 
 ```json
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
   "version": "1.0",
   "serverInfo": {
     "name": "docs-search",
@@ -210,7 +209,7 @@ This format is still evolving. If you publish it, use it as a compatibility poin
 
 ### WebMCP — Tools Exposed In-Browser
 
-The well-known MCP files above advertise a _remote_ MCP server. WebMCP is the in-browser counterpart: a W3C proposal that lets a site expose callable tools to an agent running inside the page through a `navigator.modelContext` browser API, rather than pointing at a separate server. It shipped a Chrome origin trial spanning Chrome 149–156, so you can experiment behind a flag, but the API surface is unstable and there is no cross-browser commitment yet. Track it on the [emerging standards watchlist](/docs/protocols/emerging-standards); publish a server card for anything you need agents to reach today.
+The well-known MCP files above advertise a _remote_ MCP server. [WebMCP](/docs/protocols/webmcp) is the browser-side counterpart: a W3C Community Group draft that lets a site expose page-scoped tools through `document.modelContext`. It does not prescribe the remote MCP wire protocol, and a client must visit the page to discover its tools. Chrome's origin trial begins in Chrome 149, but the API remains a draft without a cross-browser commitment. Publish remote MCP metadata for capabilities that must work without loading the UI.
 
 ## /.well-known/agent-skills/index.json
 
@@ -220,17 +219,20 @@ Each linked skill should follow the public Agent Skills format: a folder with a 
 
 ```json
 {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
-      "id": "create-api-token",
-      "name": "Create API Token",
-      "description": "How to create a scoped API token for automation.",
-      "format": "agent-skill",
-      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+      "name": "create-api-token",
+      "type": "skill-md",
+      "description": "Use when an agent needs to create a scoped API token for automation.",
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md",
+      "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   ]
 }
 ```
+
+Use the discovery v0.2 schema and hash the exact served `SKILL.md` bytes. Validation must fetch the linked artifact, compare its SHA-256 with `digest`, parse its frontmatter, and confirm the description says when to use it. A valid index pointing to an HTML shell, login page, empty document, malformed skill, or mismatched digest is not a working discovery surface.
 
 ## /.well-known/oauth-protected-resource
 

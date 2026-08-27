@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 4 measures how discoverable, readable, governable, and callable a project is for AI agents. Covers llms.txt (a proposed inference-time Markdown link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, Markdown content negotiation, `.well-known` capability discovery, OAuth metadata, MCP discovery, Agent Skills discovery, and optional agent-commerce protocol signals.
+Dimension 4 measures how discoverable, readable, governable, and callable a project is for AI agents. Covers llms.txt (a proposed inference-time Markdown link index), AGENTS.md (project guidance), structured JSON-LD schemas, robots.txt crawler policies, sitemap freshness, Markdown content negotiation, `.well-known` capability discovery, OAuth metadata, MCP discovery, WebMCP page tools, Agent Skills discovery, and optional agent-commerce protocol signals.
 
 - **llms.txt**: H1 title, blockquote summary, H2 sections with link descriptions; useful, but not a guaranteed ranking or citation signal
 - **AGENTS.md**: commands, tech stack, testing expectations, permission boundaries
@@ -11,6 +11,7 @@ Dimension 4 measures how discoverable, readable, governable, and callable a proj
 - **Content negotiation**: Accept: text/markdown → markdown response or `.md` fallback URLs
 - **Content Signals**: `search`, `ai-input`, and `ai-train` preferences in robots.txt or response headers
 - **.well-known**: API Catalog, MCP Server Card, Agent Skills index, OAuth metadata, Web Bot Auth keys
+- **WebMCP**: page-scoped tools through `document.modelContext` when the deployed UI itself is the execution surface
 - **Evidence**: File globs for llms.txt, AGENTS.md, sitemap, JSON-LD grep, robots.txt analysis
 
 Treat AEO as practical discoverability engineering, not a promise that any specific model provider will crawl, rank, or cite the site. Strong discovery combines stable URLs, crawlable content, structured data, sitemap freshness, policy files, and capability manifests.
@@ -27,7 +28,45 @@ When auditing a public website, evaluate the same categories that current agent-
 | Capability discovery | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata |
 | Commerce, when applicable | x402, Universal Commerce Protocol, Agentic Commerce Protocol |
 
-Use these scan results as evidence for Dimension 4. Do not overfit to one vendor's exact score: the goal is durable agent-readiness, not passing a single checker.
+Use scanner results as timestamped outside-in evidence for Dimension 4. [Is Agentic](https://is-agentic.com/) is a Vercel public-site scanner powered by Ora; its completed reports are also available through a read-only API, CLI, and remote MCP server. Inspect the individual checks and observed journey rather than copying its headline score into the Surface score. Do not overfit to one vendor's methodology, and never submit private, authenticated, confidential, or pre-release URLs merely to get a score.
+
+## Signal applicability
+
+Discovery & AEO can apply while many of its optional signals do not. Detect the product surface first, then activate only the matching checks:
+
+| Detected surface | Activate these checks |
+|---|---|
+| Public website or docs | Crawl policy, sitemap, stable canonical URLs, structured data, human-readable and machine-readable content |
+| Substantial public documentation | `llms.txt`, `llms-full.txt` when useful, Markdown negotiation or `.md` fallbacks, documentation links |
+| Public HTTP API | OpenAPI, API Catalog, API documentation and status links |
+| OAuth-protected API or resource | Protected Resource Metadata and authorization-server metadata |
+| Remote HTTP MCP server | MCP endpoint and discovery metadata; advertised tools, resources, prompts, transport, and auth |
+| Published task-specific skills | Agent Skills discovery index, linked `SKILL.md` artifacts, and digest verification |
+| Page-scoped agent interactions | WebMCP registration and live browser behavior |
+| Agent-mediated commerce | The commerce protocol actually implemented by the product |
+| Outbound or high-trust bot identity | HTTP Message Signatures directory and key lifecycle |
+
+When no activating surface exists, record the signal as **not applicable**. Do not award credit for an absent optional capability, and do not deduct points for it. A capability mentioned only in a roadmap, placeholder manifest, or stale documentation is not detected implementation.
+
+## Semantic validation rule
+
+Presence is only the first check. For every applicable discovery artifact, verify three layers:
+
+1. **Transport:** the canonical URL resolves with the intended status, content type, cache behavior, and redirects.
+2. **Artifact:** the body parses as the claimed format and contains meaningful, internally consistent metadata rather than an HTML shell, login page, placeholder, or empty response.
+3. **Capability:** linked content resolves and the advertised operation works from an agent client where safe to test.
+
+Examples:
+
+- `llms.txt` is text with a useful H1, categorized links, and descriptions; it is not the site's SPA fallback. Sample linked pages must contain the promised documentation.
+- An OpenAPI URL parses as OpenAPI and describes real endpoints; an API Catalog's specification, documentation, and status links resolve to the advertised resources.
+- OAuth metadata parses as JSON and its issuer and endpoint relationships are coherent. Do not count a redirect to an interactive login page as metadata.
+- JSON-LD parses and matches visible page content. A syntactically valid block containing claims the page does not make is a failure.
+- HTTP `Link` targets resolve to the declared relation instead of a generic home page.
+- An MCP endpoint speaks the advertised transport. If `resources/list` advertises resources, sample them with `resources/read` and require non-empty content with an accurate MIME type. Validate listed tools and prompts similarly without executing mutations.
+- An Agent Skills index conforms to its declared schema; each skill URL returns the exact artifact whose digest is published; and each `SKILL.md` has valid frontmatter and a description that explains when to use it.
+
+If production access, authentication, or mutation risk prevents capability testing, stop at the strongest safe layer and lower confidence. Do not convert an untested claim into a pass.
 
 ## Scoring rubric
 
@@ -36,7 +75,7 @@ Use these scan results as evidence for Dimension 4. Do not overfit to one vendor
 | 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or hides public docs from retrieval. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot/search agents. |
 | 1 | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path. |
 | 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap with accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL. |
-| 3 | Full agent-readable web surface. llms.txt + llms-full.txt. Markdown content negotiation or `.md` URL fallback with Vary: Accept and token hints. Content Signals declared. Capability discovery via `.well-known` API Catalog, MCP Server Card or MCP metadata, Agent Skills index where applicable, and OAuth protected-resource metadata for gated resources. Web Bot Auth considered for outbound or high-trust bots. Agent-commerce protocols checked when commerce applies. | llms-full.txt present. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. `/.well-known/api-catalog`, `/.well-known/mcp/server-card.json` or `/.well-known/mcp.json`, `/.well-known/agent-skills/index.json`, `/.well-known/oauth-protected-resource` where applicable. `http-message-signatures-directory` when bot identity is implemented. |
+| 3 | Full agent-readable web surface. Core discovery is semantically valid, not just present. Applicable capability signals are published and verified; unrelated optional protocols are recorded as not applicable. | `llms-full.txt` when useful. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. Applicable API Catalog, MCP, Agent Skills, OAuth, Web Bot Auth, WebMCP, or commerce artifacts parse correctly, link to real content, and advertise working capabilities. |
 
 **N/A when:** Project has no web presence (pure library, CLI-only tool).
 
@@ -57,6 +96,8 @@ Use these scan results as evidence for Dimension 4. Do not overfit to one vendor
 - NLWeb `/ask` REST endpoint or `/mcp` server mode
 - "Copy for AI" button or `.md` URL suffix on docs pages (e.g. `/docs/api.md`)
 - Commerce manifests or headers when applicable: x402, Universal Commerce Protocol, Agentic Commerce Protocol
+- WebMCP registration (`document.modelContext.registerTool`) in browser code when page-local tools apply
+- Public readiness report URL, scanner name, and scan timestamp when an outside-in scan is available
 
 ---
 
@@ -448,7 +489,6 @@ Minimal shape:
 
 ```json
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
   "version": "1.0",
   "serverInfo": {
     "name": "docs-search",
@@ -476,6 +516,8 @@ Publish an Agent Skills index when a site can teach agents how to complete domai
 
 Use the public Agent Skills format for linked skills: a folder containing `SKILL.md`, required `name` and `description` frontmatter, and optional `scripts/`, `references/`, and `assets/` directories. The discovery index is only the catalog; the full skill is loaded later through progressive disclosure.
 
+Use the Agent Skills discovery v0.2 schema. A `skill-md` entry points directly to a `SKILL.md` artifact and publishes the SHA-256 of the exact response bytes. Recompute the digest whenever the served artifact changes.
+
 Preferred path:
 
 ```
@@ -486,19 +528,30 @@ Minimal shape:
 
 ```json
 {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
-      "id": "create-api-token",
-      "name": "Create API Token",
-      "description": "How to create a scoped API token for automation.",
-      "format": "agent-skill",
-      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md"
+      "name": "create-api-token",
+      "type": "skill-md",
+      "description": "Use when an agent needs to create a scoped API token for automation.",
+      "url": "https://example.com/.well-known/agent-skills/create-api-token/SKILL.md",
+      "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   ]
 }
 ```
 
 Keep skills procedural and narrow. The index should point to skill documents, not inline every workflow. Prefer descriptions that include when to use the skill, not just what topic it covers.
+
+Validate the index and linked artifact together:
+
+```bash
+curl --fail --silent --show-error \
+  https://example.com/.well-known/agent-skills/create-api-token/SKILL.md \
+  | shasum -a 256
+```
+
+Compare the hex result with the index's `sha256:` value. Hash the exact served bytes; line-ending conversion, templating, or a gateway-added newline changes the digest. Also parse the linked `SKILL.md` frontmatter, check that `name` and `description` are present, and confirm the description provides a useful activation condition.
 
 ---
 
@@ -592,6 +645,9 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - **Only publishing human docs for agent-facing APIs.** If a service has public APIs, publish an API Catalog and OpenAPI link.
 - **MCP endpoint hidden in prose.** If an MCP server exists, publish a Server Card or metadata under `.well-known`.
 - **Contradictory access signals.** Do not allow a bot in robots.txt while declaring `ai-input=no` for the same public docs.
+- **Treating a scanner score as certification.** Public readiness scans are point-in-time observations and can be false positive, false negative, or partial; they do not certify security, accessibility, quality, compliance, or compatibility.
+- **Treating HTTP 200 as semantic success.** An SPA shell, login page, placeholder JSON, empty MCP resource, or broken linked artifact does not prove the advertised capability works.
+- **Scoring absent optional protocols as failures.** Activate MCP, OAuth, Agent Skills, WebMCP, commerce, and bot-identity checks only when the corresponding surface exists.
 
 ---
 
@@ -624,8 +680,10 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - https://schema.org/SoftwareApplication — schema.org type definitions
 - https://a2a-protocol.org/latest/specification/ — A2A v1.0.1 agent card protocol
 - https://github.com/microsoft/NLWeb — NLWeb project
-- https://modelcontextprotocol.io/specification/2025-11-25 — MCP spec with OAuth 2.0 M2M; newest revision with full deployed SDK support
-- https://modelcontextprotocol.io/specification/draft/changelog — MCP 2026-07-28 revision (newest; RC locked 2026-05-21)
+- https://modelcontextprotocol.io/specification/2026-07-28 — current MCP specification revision
+- https://webmachinelearning.github.io/webmcp/ — current WebMCP Community Group draft
+- https://is-agentic.com/methodology — Is Agentic scoring model and limitations
+- https://is-agentic.com/docs — Is Agentic report API, CLI, MCP, and skill surfaces
 - https://www.rfc-editor.org/rfc/rfc8414.html — OAuth 2.0 Authorization Server Metadata
 - https://www.rfc-editor.org/rfc/rfc9457.html — Problem Details for HTTP APIs
 - https://developers.openai.com/apps-sdk — OpenAI Apps SDK (MCP-based)

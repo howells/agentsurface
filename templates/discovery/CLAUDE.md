@@ -19,7 +19,7 @@ What to customize:
 Rule: Start with "See AGENTS.md for commands, testing, and boundaries."
 Only override where Claude differs. Keep <150 lines.
 
-Citation: https://code.claude.com/docs/en/claude-code
+Citation: https://code.claude.com/docs/en/memory
 -->
 
 # CLAUDE.md
@@ -139,7 +139,7 @@ IDE breakpoints only bind if you `cd packages/api/` first.
 
 ## See also
 
-- [Claude Code docs](https://code.claude.com/docs/en/claude-code)
+- [Claude Code project memory docs](https://code.claude.com/docs/en/memory)
 - [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [MCP spec 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
 - [AGENTS.md](./AGENTS.md) — Shared context (canonical reference)

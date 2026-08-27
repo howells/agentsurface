@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const repoRoot = process.cwd();
 const docsRoot = path.join(repoRoot, "src/content/docs");
 const referencesRoot = path.join(repoRoot, "skills/surface/references");
 const templatesRoot = path.join(repoRoot, "templates");
 const skillsRoot = path.join(repoRoot, "skills/surface");
+const publishedSkillsRoot = path.join(repoRoot, "skills");
 
 function walk(dir) {
   const out = [];
@@ -251,6 +253,7 @@ const FAST_DECAY = [
   "mcp-servers/real-world-examples",
   "mcp-servers/nextjs-integration",
   "discovery/well-known-endpoints",
+  "discovery/agent-skills",
   "discovery/structured-data",
   "discovery/robots-txt",
   "discovery/llms-txt",
@@ -337,21 +340,148 @@ for (const slug of [...fastDecaySlugs].toSorted()) {
   }
 }
 
-// MCP server-card version parity check.
+// Release version parity check.
 //
-// public/.well-known/mcp/server-card.json carries its own `version` field,
-// which must track the package's published version in package.json so the
-// server card never drifts from what's actually shipped.
+// The package, distributable skill, Claude plugin, and public MCP metadata are
+// one release surface. Keep their versions aligned so installs and discovery
+// never advertise different releases.
 const packageJsonPath = path.join(repoRoot, "package.json");
 const serverCardPath = path.join(repoRoot, "public/.well-known/mcp/server-card.json");
+const skillManifestPath = path.join(repoRoot, ".skill.yaml");
+const pluginManifestPath = path.join(repoRoot, ".claude-plugin/plugin.json");
 
 const versionIssues = [];
-if (fs.existsSync(packageJsonPath) && fs.existsSync(serverCardPath)) {
+if (fs.existsSync(packageJsonPath)) {
   const packageVersion = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")).version;
-  const serverCardVersion = JSON.parse(fs.readFileSync(serverCardPath, "utf-8")).version;
-  if (packageVersion !== serverCardVersion) {
-    versionIssues.push(
-      `public/.well-known/mcp/server-card.json version (${serverCardVersion}) does not match package.json version (${packageVersion})`,
+
+  if (fs.existsSync(serverCardPath)) {
+    const serverCard = JSON.parse(fs.readFileSync(serverCardPath, "utf-8"));
+    for (const [field, value] of [
+      ["version", serverCard.version],
+      ["serverInfo.version", serverCard.serverInfo?.version],
+    ]) {
+      if (packageVersion !== value) {
+        versionIssues.push(
+          `public/.well-known/mcp/server-card.json ${field} (${value}) does not match package.json version (${packageVersion})`,
+        );
+      }
+    }
+  }
+
+  if (fs.existsSync(skillManifestPath)) {
+    const skillManifest = fs.readFileSync(skillManifestPath, "utf-8");
+    const skillVersion = /^version:\s*([^\s#]+)\s*$/m.exec(skillManifest)?.[1];
+    if (packageVersion !== skillVersion) {
+      versionIssues.push(
+        `.skill.yaml version (${skillVersion}) does not match package.json version (${packageVersion})`,
+      );
+    }
+  }
+
+  if (fs.existsSync(pluginManifestPath)) {
+    const pluginVersion = JSON.parse(fs.readFileSync(pluginManifestPath, "utf-8")).version;
+    if (packageVersion !== pluginVersion) {
+      versionIssues.push(
+        `.claude-plugin/plugin.json version (${pluginVersion}) does not match package.json version (${packageVersion})`,
+      );
+    }
+  }
+}
+
+// Agent Skills discovery integrity check.
+//
+// The public v0.2 index is useful only when its digest identifies the exact
+// SKILL.md bytes served by this repository. Validate the required discovery
+// fields and map local agentsurface.dev skill URLs back to their source files.
+const agentSkillsIndexPath = path.join(repoRoot, "public/.well-known/agent-skills/index.json");
+const agentSkillsIssues = [];
+const agentSkillsSchema = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
+
+if (fs.existsSync(agentSkillsIndexPath)) {
+  try {
+    const index = JSON.parse(fs.readFileSync(agentSkillsIndexPath, "utf-8"));
+    if (index.$schema !== agentSkillsSchema) {
+      agentSkillsIssues.push(
+        `public/.well-known/agent-skills/index.json must declare ${agentSkillsSchema}`,
+      );
+    }
+
+    if (!Array.isArray(index.skills) || index.skills.length === 0) {
+      agentSkillsIssues.push(
+        "public/.well-known/agent-skills/index.json must contain at least one skill",
+      );
+    } else {
+      const seenNames = new Set();
+      const seenUrls = new Set();
+
+      for (const [position, skill] of index.skills.entries()) {
+        const label = `public/.well-known/agent-skills/index.json skills[${position}]`;
+        if (typeof skill.name !== "string" || skill.name.trim() === "") {
+          agentSkillsIssues.push(`${label} requires a non-empty name`);
+        } else if (seenNames.has(skill.name)) {
+          agentSkillsIssues.push(`${label} duplicates skill name ${skill.name}`);
+        } else {
+          seenNames.add(skill.name);
+        }
+
+        if (skill.type !== "skill-md") {
+          agentSkillsIssues.push(`${label} must use type "skill-md"`);
+        }
+        if (typeof skill.description !== "string" || !/\buse when\b/i.test(skill.description)) {
+          agentSkillsIssues.push(`${label} description must explain when to use the skill`);
+        }
+        if (typeof skill.url !== "string") {
+          agentSkillsIssues.push(`${label} requires a canonical URL`);
+          continue;
+        }
+        if (seenUrls.has(skill.url)) {
+          agentSkillsIssues.push(`${label} duplicates skill URL ${skill.url}`);
+        } else {
+          seenUrls.add(skill.url);
+        }
+        if (!/^sha256:[a-f0-9]{64}$/.test(skill.digest ?? "")) {
+          agentSkillsIssues.push(`${label} requires a lowercase sha256 digest`);
+          continue;
+        }
+
+        let skillUrl;
+        try {
+          skillUrl = new URL(skill.url);
+        } catch {
+          agentSkillsIssues.push(`${label} has an invalid URL: ${skill.url}`);
+          continue;
+        }
+        if (skillUrl.origin !== "https://agentsurface.dev") {
+          continue;
+        }
+
+        const localMatch = /^\/skills\/(.+)\/SKILL\.md$/.exec(skillUrl.pathname);
+        if (!localMatch) {
+          agentSkillsIssues.push(`${label} URL does not map to a local skill: ${skill.url}`);
+          continue;
+        }
+        const skillPath = path.resolve(publishedSkillsRoot, localMatch[1], "SKILL.md");
+        if (
+          !skillPath.startsWith(`${publishedSkillsRoot}${path.sep}`) ||
+          !fs.existsSync(skillPath)
+        ) {
+          agentSkillsIssues.push(`${label} points to a missing local skill: ${skill.url}`);
+          continue;
+        }
+
+        const actualDigest = `sha256:${createHash("sha256")
+          .update(fs.readFileSync(skillPath))
+          .digest("hex")}`;
+        if (actualDigest !== skill.digest) {
+          agentSkillsIssues.push(
+            `${label} digest (${skill.digest}) does not match ${path.relative(repoRoot, skillPath)} (${actualDigest})`,
+          );
+        }
+      }
+    }
+  } catch (error) {
+    agentSkillsIssues.push(
+      `public/.well-known/agent-skills/index.json is not valid JSON: ${error.message}`,
     );
   }
 }
@@ -362,7 +492,8 @@ if (
   templateIssues.length === 0 &&
   modelIssues.length === 0 &&
   (freshnessIssues.length === 0 || !freshnessFatal) &&
-  versionIssues.length === 0
+  versionIssues.length === 0 &&
+  agentSkillsIssues.length === 0
 ) {
   if (freshnessIssues.length > 0) {
     console.warn("Freshness warnings (non-fatal in --no-freshness mode):");
@@ -410,8 +541,15 @@ if (freshnessIssues.length > 0) {
 }
 
 if (versionIssues.length > 0) {
-  console.error("MCP server-card version mismatch:");
+  console.error("Release version mismatch:");
   for (const issue of versionIssues) {
+    console.error(`- ${issue}`);
+  }
+}
+
+if (agentSkillsIssues.length > 0) {
+  console.error("Agent Skills discovery integrity issues:");
+  for (const issue of agentSkillsIssues) {
     console.error(`- ${issue}`);
   }
 }

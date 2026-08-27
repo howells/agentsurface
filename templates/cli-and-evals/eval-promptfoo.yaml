@@ -10,7 +10,7 @@
 # - Cost-benefit analysis (speed vs quality vs cost)
 # - Red-team testing (inject attack payloads; measure safety guardrails)
 #
-# **Canonical URL:** https://www.promptfoo.dev/docs/configuration/yaml-format
+# **Canonical URL:** https://www.promptfoo.dev/docs/configuration/guide/
 #
 # **Customisation checklist:**
 # - [ ] Update model IDs to your target versions (Anthropic/OpenAI/Google)
@@ -22,8 +22,8 @@
 #
 # **References:**
 # - Promptfoo docs: https://www.promptfoo.dev/
-# - Promptfoo YAML: https://www.promptfoo.dev/docs/configuration/yaml-format
-# - Red-teaming: https://www.promptfoo.dev/docs/red-teaming
+# - Promptfoo configuration: https://www.promptfoo.dev/docs/configuration/guide/
+# - Red-teaming: https://www.promptfoo.dev/docs/red-team/quickstart/
 #
 
 ---

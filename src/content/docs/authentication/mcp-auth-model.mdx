@@ -1,7 +1,7 @@
 ---
 title: MCP Authorization
 description: OAuth protected-resource metadata, client registration, and token handling for HTTP MCP servers
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -94,11 +94,11 @@ MCP supports three client registration approaches:
 When several options exist, clients should prefer pre-registered client details, then Client ID Metadata Documents when supported, then dynamic client registration as a fallback.
 
 <Callout type="warn">
-  Changing in `2026-07-28`: RFC 7591 dynamic client registration is Deprecated in favor of Client ID
-  Metadata Documents, under the same 12-month minimum deprecation window as the rest of the new
-  lifecycle policy. It keeps working for backward compatibility, but new clients and authorization
-  servers should implement Client ID Metadata Documents instead. Where you must still support DCR,
-  the `application_type` field becomes required in the registration request (SEP-837).
+  Current `2026-07-28` behavior: RFC 7591 dynamic client registration is Deprecated in favor of
+  Client ID Metadata Documents, under the same 12-month minimum deprecation window as the rest of
+  the new lifecycle policy. It keeps working for backward compatibility, but new clients and
+  authorization servers should implement Client ID Metadata Documents instead. Where you must still
+  support DCR, the `application_type` field becomes required in the registration request (SEP-837).
 </Callout>
 
 ## Client ID Metadata Documents
@@ -161,9 +161,9 @@ When a request lacks sufficient scope, the server should use normal OAuth error 
 
 Clients should treat a challenged scope as authoritative for satisfying that request. They should not assume it is always identical to the full `scopes_supported` list.
 
-## Changing in 2026-07-28
+## Current 2026-07-28 Requirements
 
-The `2026-07-28` revision — the newest, with its release candidate locked 2026-05-21 and final publication scheduled for 2026-07-28 — hardens this model in four places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
+The current `2026-07-28` revision hardens this model in four places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
 
 **Issuer validation (SEP-2468)** — clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer.
 
@@ -197,4 +197,4 @@ Two structural changes also touch authorization even though they are not auth fe
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents)
 - [auth.md](/docs/authentication/auth-md)
 - [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) — the revision this page describes
-- [MCP draft changelog](https://modelcontextprotocol.io/specification/draft/changelog) — the `2026-07-28` authorization changes, SEP by SEP
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) — current authorization requirements

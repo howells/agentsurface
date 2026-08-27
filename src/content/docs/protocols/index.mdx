@@ -1,7 +1,7 @@
 ---
 title: Protocols & Standards
 description: The protocol landscape for agent-to-service and agent-to-agent communication
-lastVerified: 2026-07-28
+lastVerified: 2026-08-27
 ---
 
 ## Summary
@@ -18,7 +18,8 @@ Orchestrator (uses A2A)
        └── MCP → Specialist's tools
 ```
 
-- MCP: tools, resources, prompts, async tasks — `2026-07-28` is the newest revision (RC locked 2026-05-21, final publication scheduled for 2026-07-28); `2025-11-25` is its predecessor and has the fullest deployed SDK support
+- MCP: remote tools, resources, and prompts — `2026-07-28` is the current revision and is supported by all Tier 1 SDKs; async Tasks are an official extension
+- WebMCP: page-scoped browser tools through `document.modelContext`; a W3C Community Group draft, not remote MCP
 - A2A v1.0.1: production-grade task delegation across organizational boundaries
 - ACP: an overloaded acronym — this section covers the Agentic Commerce Protocol (OpenAI + Stripe)
 - Publish: /.well-known/agent.json, /.well-known/acp.json, /AGENTS.md, /llms.txt
@@ -28,7 +29,9 @@ These protocols and complementary standards define how agents discover capabilit
 
 ## Quick Start
 
-**Does your agent need tools?** → Use [MCP](/docs/protocols/mcp). This is the baseline. `2026-07-28` is the newest revision — a large one, with a stateless core and no sessions — and its release candidate has been locked since 2026-05-21 with final publication scheduled for 2026-07-28. Build against `2025-11-25`, which has the fullest deployed SDK support, and read the [MCP page](/docs/protocols/mcp) for what changes.
+**Does your agent need remote tools or data?** → Use [MCP](/docs/protocols/mcp). `2026-07-28` is the current revision, with a stateless core and no sessions, and all Tier 1 SDKs support it. Retain `2025-11-25` compatibility only when a real client still requires it.
+
+**Does a page need to expose tools while an agent visits it?** → Use [WebMCP](/docs/protocols/webmcp). It is a browser proposal built around `document.modelContext`; it does not require or replace the remote MCP wire protocol.
 
 **Multiple agents delegating work?** → Add [A2A](/docs/protocols/a2a) (v1.0.1) for peer-to-peer task delegation.
 
@@ -43,6 +46,7 @@ These protocols and complementary standards define how agents discover capabilit
 | Protocol                 | Purpose                                  | Learn More                                               |
 | ------------------------ | ---------------------------------------- | -------------------------------------------------------- |
 | **MCP 2026-07-28**       | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp)                          |
+| **WebMCP draft**         | Page-scoped browser tools                | [WebMCP docs](/docs/protocols/webmcp)                    |
 | **A2A v1.0.1**           | Agent-to-agent delegation (horizontal)   | [A2A docs](/docs/protocols/a2a)                          |
 | **ACP (commerce, beta)** | Agent-initiated commerce                 | [ACP docs](/docs/protocols/acp)                          |
 | **Arazzo 1.1.0**         | Multi-step API workflow sequences        | [Comparison page](/docs/protocols/comparison)            |

@@ -19,8 +19,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 type Provider = "google" | "openrouter" | "anthropic" | "openai";
 
 const DEFAULTS: Record<Provider, string> = {
-  google: "gemini-3.6-flash",
-  openrouter: "google/gemini-3.6-flash",
+  google: "gemini-3.7-flash",
+  openrouter: "google/gemini-3.7-flash",
   anthropic: "claude-sonnet-5",
   openai: "gpt-5.6-terra",
 };
@@ -87,7 +87,7 @@ export const myAgent = new Agent({
 AGENT_PROVIDER=google          # google | openrouter | anthropic | openai
 
 # Model override (optional — uses provider default if unset)
-AGENT_MODEL=gemini-3.6-flash
+AGENT_MODEL=gemini-3.7-flash
 
 # Provider-specific keys
 GOOGLE_GENERATIVE_AI_API_KEY=...   # For google provider
@@ -151,7 +151,7 @@ Cost and rate-limit columns are relative positioning, not quotes — verify curr
 ## Recommendations
 
 - **Development:** Google AI (free, fast, good enough for iteration)
-- **Production (cost-sensitive):** OpenRouter with `gemini-3.6-flash` or `deepseek-r1`
+- **Production (cost-sensitive):** OpenRouter with `gemini-3.7-flash` or `deepseek-r1`
 - **Production (quality-critical):** Anthropic with `claude-sonnet-5`
 - **Production (diverse models):** OpenRouter lets you switch models without code changes
 - **Production (governed providers):** Cloudflare AI Gateway when you need central logs, policy, caching, budgets, or provider fallback
@@ -181,7 +181,7 @@ type Tier = "quick" | "standard" | "rigorous";
 const TIER_MODELS: Record<Provider, Record<Tier, string>> = {
   google: {
     quick: "gemini-3.5-flash-lite",
-    standard: "gemini-3.6-flash",
+    standard: "gemini-3.7-flash",
     rigorous: "gemini-3.1-pro-preview",
   },
   anthropic: {

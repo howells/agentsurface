@@ -13,6 +13,13 @@ Detect:
 3. Applicable dimensions.
 4. Previous reports in `docs/surface/`.
 
+Applicability has two levels:
+
+- **Dimension applicability** decides whether the dimension belongs in the score denominator.
+- **Signal applicability** decides which checks inside an applicable dimension are activated by the detected product surface.
+
+Do not penalize an applicable dimension for an unrelated optional capability. A public docs site activates core discovery checks, but it does not activate MCP, OAuth, Agent Skills, WebMCP, commerce, or bot-identity checks unless those capabilities are detected. Record inactive signals as `not applicable` in the evidence rather than silently treating them as passes.
+
 Applicability:
 
 | Dimension | Applies when |
@@ -42,6 +49,7 @@ Each dimension result must contain:
 - Confidence: high, medium, or low
 - Bar visualization
 - Evidence with paths/lines
+- Applicable and not-applicable signals when a dimension contains optional capabilities
 - One-sentence summary
 - Findings when score is below 3
 

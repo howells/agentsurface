@@ -1,5 +1,4 @@
 {
-  "$schema": "https://a2a-protocol.org/schemas/agent-card.json",
   "protocolVersion": "1.0.0",
   "name": "Example Agent API",
   "description": "A production-grade agent that manages agents and runs workflows. Demonstrates A2A v1.0 RC with OAuth 2.1, DPoP, and structured task execution.",
@@ -218,7 +217,7 @@
     },
     {
       "provider": "Google",
-      "models": ["gemini-3.1-pro-preview", "gemini-3.6-flash"]
+      "models": ["gemini-3.1-pro-preview", "gemini-3.7-flash"]
     }
   ],
   "taskManagement": {

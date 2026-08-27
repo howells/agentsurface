@@ -15,7 +15,7 @@ What to customize:
 Principle: "Nearest wins" — an agent reading packages/api/AGENTS.md will prioritize
 its commands over the root file. Avoid duplication; link from per-package back to root.
 
-Citation: https://code.claude.com/docs/en/claude-code
+Citation: https://code.claude.com/docs/en/memory
 -->
 
 # ROOT: packages/AGENTS.md

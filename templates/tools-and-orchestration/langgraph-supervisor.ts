@@ -18,9 +18,9 @@
  * Multi-agent adds complexity; justify only for clear task separation.
  * See: https://cognition.ai/blog/dont-build-multi-agents
  *
- * Citation: https://langchain-ai.github.io/langgraphjs/
- * State management: https://langchain-ai.github.io/langgraphjs/concepts/low_level_conceptual_index/#state
- * Supervisor pattern: https://langchain-ai.github.io/langgraphjs/tutorials/agents/multi_agent_systems/
+ * Citation: https://docs.langchain.com/oss/javascript/langgraph/overview
+ * State management: https://docs.langchain.com/oss/javascript/langgraph/graph-api
+ * Multi-agent patterns: https://docs.langchain.com/oss/javascript/langchain/multi-agent
  *
  * CUSTOMISE:
  * - Define your AgentState schema (what state fields you need)
