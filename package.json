@@ -8,12 +8,18 @@
     "docs:check": "node scripts/check-docs-integrity.mjs",
     "env:check": "envy check local --schema ./src/config/env-schema.ts --from .env --mode all",
     "deploy:preview": "pnpm env:check && set -a && . ./.env && set +a && vercel deploy . -y",
+    "deploy:prod:pull": "vercel pull --yes --environment=production --scope danielhowells",
+    "deploy:prod:stamp": "node scripts/stamp-build.mjs",
+    "deploy:prod:build": "vercel build --prod --scope danielhowells",
+    "deploy:prod:verify": "node scripts/check-vercel-prebuilt.mjs",
+    "deploy:prod:publish": "node scripts/publish-vercel-prebuilt.mjs",
     "build": "node scripts/check-docs-integrity.mjs --no-freshness && next build",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
     "lint": "howells-check --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
     "lint:fix": "howells-fix --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
-    "format": "howells-oxfmt --write src scripts templates disciplines docs public next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts README.md AGENTS.md CHANGELOG.md CLAUDE.md INSTALL.md"
+    "format": "howells-oxfmt --write src scripts templates disciplines docs public next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts README.md AGENTS.md CHANGELOG.md CLAUDE.md INSTALL.md",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@howells/envy": "catalog:",
@@ -41,7 +47,8 @@
   },
   "devDependencies": {
     "@howells/lint": "catalog:",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "oxlint-tsgolint": "7.0.2001"
   },
   "engines": {
     "node": ">=24.15.0 <25"
