@@ -1,66 +1,59 @@
 ---
 title: Naming and Descriptions
 description: Verb-first naming conventions and descriptions written as onboarding prompts
-lastVerified: 2026-07-28
+lastVerified: 2026-09-07
 ---
 
 ## Summary
 
-Tool names and descriptions are the agent's only interface for deciding whether to call a tool. Use verb_noun pattern in snake_case (search_issues, create_invoice, list_repositories, get_user). Descriptions function as onboarding prompts: include "Use when..." and "Do not use for..." to disambiguate from sibling tools. Avoid vague verbs (process), camelCase, or bare nouns. Name scoping with prefixes (billing_create_invoice) groups related tools. Ambiguity compounds into routing errors and incorrect parameter passing.
+Name a tool for a task a person can understand: `read_paint`, `find_palette_ideas`, `add_samples_to_cart`. Agent Surface defaults to lowercase `snake_case` with an imperative verb followed by the thing being read or changed. This is our design convention, not a universal protocol requirement or a proven performance advantage over every other spelling.
 
-```
-Good: search_issues (verb_noun)
-Bad:  createInvoice (camelCase)
-Bad:  invoice (no verb)
-Bad:  process_billing (vague verb)
-```
-
----
-
-Tool names and descriptions are the agent's primary interface for understanding what a tool does. The agent cannot ask for clarification—it reads the name and description, infers intent, and decides whether to call the tool. Ambiguity compounds into routing errors and incorrect parameter construction.
+Use the same public name in registration, descriptions, prompts and dispatch. Keep provider names, caching, transport and connection management inside the implementation unless those are the agent's actual task.
 
 ## Naming Conventions
 
-Tool names must communicate two things instantly: the action being performed and the object being acted on.
+### Describe the task in ordinary language
 
-### Verb-Noun Pattern
+Start with a concrete verb and a familiar object. Extra words should distinguish an operation the agent genuinely needs to choose.
 
-Use **`verb_noun`** or **`service_action`** patterns in snake_case:
+| Prefer | Avoid for a shopping assistant | Reason |
+| --- | --- | --- |
+| `read_paint` | `read_cached_paint` | The shopper needs paint details; the application chooses storage. |
+| `find_palette_ideas` | `find_palette_precedents` | Use the language of the task rather than specialist terminology. |
+| `find_paints` | `mg_find_paints` | An internal supplier abbreviation does not help select the action. |
+| `add_samples_to_cart` | `process_samples` | The name makes the mutation explicit. |
+| No separate diagnostic tool | `check_catalogue_connection` | The application handles connectivity and reports retrieval failures. |
 
-```
-search_issues         ✓ clear verb, clear noun
-create_invoice        ✓ mutation intent obvious
-list_repositories     ✓ plural for collections
-get_user              ✓ singular for detail fetch
-update_status         ✓ specific action
-billing_create_invoice    ✓ namespaced when multiple servers
-```
+A diagnostic agent may genuinely need `check_connection`; a shopping assistant usually does not. Preserve source identity, freshness and actionable failure information in results without asking the model to manage infrastructure. These are Agent Surface design recommendations for the task boundary, not vendor prohibitions.
 
-Avoid:
+### Use a consistent spelling
 
-```
-createInvoice        ✗ camelCase—inconsistent with MCP/OpenAI convention
-invoice              ✗ no verb—is this getter, creator, or list?
-process_billing      ✗ vague verb (process could mean anything)
-do_thing             ✗ non-descriptive
-crud_users           ✗ multiple operations bundled
-```
+Our default is `verb_noun` in lowercase `snake_case`: `search_issues`, `create_invoice`, `list_users`, `read_user`. Use imperative present tense and singular or plural according to what the tool returns. Keep names short enough for every target adapter; a 64-character ceiling is a conservative house limit for shared client tools, not the MCP limit.
 
-### Namespacing
+Do not rename language-native variables or filenames merely to match a public tool name. A TypeScript export can remain `readPaint`, in `read-paint.ts`, while both the tool ID and its registration key are `read_paint`. If a framework distinguishes these identifiers, test their agreement at the model boundary and in its inspector.
 
-When an agent connects to multiple servers (Jira, GitHub, Slack, internal APIs), tool names collide without a prefix. Use a service prefix consistently:
+### Namespace only when it helps selection
 
-- `jira_search_issues`, `jira_create_issue`, `jira_transition_issue`
-- `github_list_pull_requests`, `github_create_pull_request`, `github_approve_pr`
-- `slack_send_message`, `slack_list_channels`, `slack_add_reaction`
+A service name can matter when the agent must choose between actual destinations, such as `search_jira_issues` and `search_github_issues`. It does not matter when two backend implementations provide the same product capability. Do not expose both a generic tool and a provider-prefixed duplicate for that reason alone.
 
-The prefix groups related tools visually and reduces agent confusion when deciding which tool to call.
+Anthropic recommends meaningful namespaces for large tool sets and reports that prefix versus suffix placement affects models differently. Evaluate the names against real tasks; do not claim one word order always wins. [Anthropic tool-design research](https://www.anthropic.com/engineering/writing-tools-for-agents#namespacing-your-tools).
 
-### Tense and Mood
+### Separate protocol validity from design preference
 
-- Use imperative present: `create`, not `creating` or `creation`
-- Avoid past tense: `created` is not a tool name
-- Singular or plural according to semantics: `list_users` (plural—returns multiple), `get_user` (singular—returns one)
+Verified on 7 September 2026:
+
+| Source | What it actually says | Implication |
+| --- | --- | --- |
+| [MCP 2026-07-28: tool names](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names) | Recommends 1–128 characters, case sensitivity and ASCII letters, digits, underscores, hyphens or dots. Its valid examples include `getUser`. | MCP does not require snake_case or verb-first names. |
+| [Claude: define tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools) | User-defined client tool names match `^[a-zA-Z0-9_-]{1,64}$`. | A name valid for MCP may still need adaptation for a model provider. |
+| [OpenAI: function-calling practices](https://developers.openai.com/api/docs/guides/function-calling#best-practices-for-defining-functions) | Calls for clear, intuitive names and descriptions and moving work into code where possible. | A readable task boundary matters more than mechanical renaming. |
+| [Gemini: function-calling practices](https://ai.google.dev/gemini-api/docs/function-calling#best-practices) | Recommends descriptive function names and clear parameter descriptions. | Do not mistake a platform's examples for a universal casing mandate. |
+
+No comparison reviewed here establishes that snake_case beats camelCase across models. Adopt one convention for consistency, then assess whether an agent selects the right operation, supplies valid arguments and completes the task. Avoid a cosmetic rename that leaves two tools semantically indistinguishable.
+
+### Change a public name deliberately
+
+A tool rename changes a callable contract. Update registrations, IDs, prompt references, allowlists, dispatch, progress labels and fixtures together. Preserve historical call records; add migration or replay handling only where saved calls are executed again. Do not advertise both old and new names to the model by default. Keep human display titles separate when the protocol supports them.
 
 ## Descriptions as Prompts
 

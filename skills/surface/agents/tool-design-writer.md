@@ -34,9 +34,11 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 
 1. **Inventory existing tools.** Grep for tool registration sites across frameworks. Record for each: name, description word count, schema fields, annotations present, response shape. Flag descriptions <20 words and tools with un-`.describe()`'d fields.
 
-2. **Fix naming** to `verb_noun` / `resource_action`:
+2. **Use clear task names**, defaulting to lowercase `verb_noun`:
    - `create_issue`, `search_docs`, `update_user`, `delete_subscription`
-   - Namespace related tools with a shared prefix: `asana_search`, `asana_list_projects`, `asana_add_assignee`
+   - Use ordinary language, e.g. `read_paint` and `find_palette_ideas`. Hide providers, caching and connectivity unless they are part of the agent's task.
+   - Namespace only to distinguish destinations or resolve collisions; evaluate prefix or suffix placement.
+   - Treat snake_case as the house convention, not an MCP mandate. Match public tool IDs and registration keys, and update callers when renaming.
    - `search_` for queries, `create_`/`update_`/`delete_` for mutations; imperative present tense throughout
    - Unify parameter casing across all tools (`user_id` everywhere, never `userId` in one and `user_id` in another)
 

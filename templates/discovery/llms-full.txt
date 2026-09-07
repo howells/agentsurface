@@ -140,7 +140,7 @@ const searchUsers = Tool.define({
 });
 ```
 
-**Tool naming:** Namespace with service name. `search_users`, `create_invoice`, not `search` or `create`.
+**Tool naming:** Prefer ordinary task names in lowercase `verb_noun`: `search_users`, `create_invoice`. Namespace only to distinguish destinations; keep backend providers, caching and connectivity in application code.
 
 **Parameters:** All fields explicit; no implicit context. Provide examples in descriptions.
 

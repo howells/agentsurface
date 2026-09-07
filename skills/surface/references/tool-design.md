@@ -37,11 +37,13 @@ Agent tool quality is the single highest-leverage investment in an agent applica
 
 ### Naming conventions
 
-Tool names should follow **`verb_noun`** or **`resource_action`** patterns:
-- `create_issue`, `search_docs`, `github_pull_request_create`, `asana_search`
-- Namespacing with a prefix groups related tools: `asana_search`, `asana_list_projects`, `asana_add_assignee`
-- Avoid ambiguity between query and action tools. Use `search_` for queries, `create_`/`update_`/`delete_` for mutations.
-- Consistent tense: all imperative present (`create`, not `creating` or `creation`).
+Default to lowercase `snake_case` with a verb and an ordinary task noun: `read_paint`, `find_palette_ideas`, `add_samples_to_cart`. This is Agent Surface's convention, not an MCP requirement. The [MCP tool-name rules](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names) also permit other case styles and separators; target model adapters may be stricter.
+
+Keep provider abbreviations, cache choices and connectivity checks inside application code unless the agent's job is to manage them. Namespaces are useful when the agent must distinguish real services or destinations; do not add one merely to expose a backend. Assess routing with representative tasks rather than claiming one casing or namespace order is universally best.
+
+Match public registration keys and tool IDs. Update executable references together when renaming, and preserve historical records. Keep filenames and language-native variable names in the repository's normal style.
+
+The canonical explanation and current primary sources are in [Naming and Descriptions](../../../src/content/docs/tool-design/naming-and-descriptions.mdx), verified 2026-09-07.
 
 ### Descriptions: the single biggest lever
 

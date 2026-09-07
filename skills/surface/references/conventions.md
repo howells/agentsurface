@@ -57,20 +57,22 @@ src/mastra/
 
 ### Files
 - Agent files: `kebab-case.ts` matching the agent's id
-- Tool files: `kebab-case.ts` matching the tool's id
+- Tool files: repository-native filenames, e.g. `read-paint.ts`; independent of the public tool ID
 - Workflow directories: `kebab-case/` matching the workflow's id
 
 ### Identifiers
 - Agent id: `kebab-case` (e.g., `"reading-companion"`, `"brand-intelligence"`)
 - Agent name: `Title Case` (e.g., `"Reading Companion"`, `"Brand Intelligence"`)
-- Tool id: `kebab-case` (e.g., `"get-piece"`, `"search-recipes"`)
+- Public tool ID and registration key: lowercase `snake_case`, verb first (e.g., `"read_piece"`, `"search_recipes"`)
 - Workflow id: `kebab-case` (e.g., `"recipe-generation"`, `"enrich-image"`)
 - Variable names: `camelCase` for the exported const (e.g., `readingCompanion`, `getPieceTool`)
 
 ### Tool Naming
 Tools should use verb-first naming that describes what the tool does:
-- `get-piece`, `search-recipes`, `classify-image`
-- `create-invoice`, `update-status`, `remove-background`
+- `read_piece`, `search_recipes`, `classify_image`
+- `create_invoice`, `update_status`, `remove_background`
+
+Use ordinary task language. Provider names, cache choices and connectivity belong in code unless the agent must act on them. This is a house convention, not a protocol restriction; see `references/tool-design.md` for current evidence and exceptions.
 
 ## Agent Definition Pattern
 
@@ -98,7 +100,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 export const myTool = createTool({
-  id: "my-tool",
+  id: "read_item",
   description: "What this tool does. Written as agent onboarding — include when to use and when not to use.",
   inputSchema: z.object({
     param: z.string().describe("What this parameter means."),
