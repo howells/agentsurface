@@ -14,3 +14,4 @@ to avoid duplicating prior findings. The source documents live in `docs/` and
 | 2026-07-28 | Currency review and remediation (foreman run)                                                           | Audit + remediation | Applied                                    |
 | 2026-08-27 | [Currency and Relevance Review](../currency-review-2026-08-27.md)                                       | Audit + remediation | Applied — docs, lint, and build pass       |
 | 2026-09-07 | [Tool naming review](../tool-naming-review-2026-09-07.md) | Focused research + remediation | Applied locally — docs integrity passes |
+| 2026-09-09 | [Ora / orank remediation](../orank-remediation-2026-09-09.md) | Focused API, browser tools, and catalog changes | Applied locally — deployment and native WebMCP verification pending |

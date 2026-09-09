@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-error";
 import { normalizeSlug, readDocsFile } from "@/lib/docs-fs";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -16,13 +17,23 @@ export async function GET(
   const normalized = normalizeSlug(slug.join("/"));
 
   if (!normalized) {
-    return new NextResponse("Not found", { status: 404 });
+    return apiError(
+      404,
+      "PAGE_NOT_FOUND",
+      "Documentation page not found",
+      "Search /api/docs/search?query=discovery or use a slug from /llms.txt.",
+    );
   }
 
   const content = readDocsFile(normalized);
 
   if (content === null) {
-    return new NextResponse("Not found", { status: 404 });
+    return apiError(
+      404,
+      "PAGE_NOT_FOUND",
+      "Documentation page not found",
+      "Search /api/docs/search?query=discovery or use a slug from /llms.txt.",
+    );
   }
 
   return new NextResponse(content, {

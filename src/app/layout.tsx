@@ -1,5 +1,6 @@
 import "fumadocs-ui/style.css";
 import "./global.css";
+import { DocumentationTools } from "@/components/DocumentationTools";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html className={inter.variable} lang="en" suppressHydrationWarning>
       <head>
+        <link rel="service-desc" href="/openapi.json" type="application/vnd.oai.openapi+json" />
         <meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)" />
         <script
@@ -77,7 +79,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="flex flex-col min-h-screen antialiased">
-        <RootProvider>{children}</RootProvider>
+        <RootProvider>
+          <DocumentationTools />
+          {children}
+        </RootProvider>
       </body>
     </html>
   );

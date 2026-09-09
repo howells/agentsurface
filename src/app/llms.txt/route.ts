@@ -14,6 +14,8 @@ const SUMMARY =
 // Static, hand-written entry points. These are surfaces, not docs pages, so they
 // are not derivable from source.getPages() and must stay curated here.
 const ENTRY_POINTS: string[] = [
+  `- [OpenAPI specification](${SITE_ORIGIN}/openapi.json): Public documentation search and Markdown retrieval; no authentication required.`,
+  `- [Access policy](${SITE_ORIGIN}/auth.md): Public, read-only access without credentials.`,
   `- [AGENTS.md](${SITE_ORIGIN}/AGENTS.md): Project context and working conventions for coding agents.`,
   `- [surface skill](${SITE_ORIGIN}/skills/surface/SKILL.md): The operational workflow for guide, audit, scaffold, transform, and generate tasks.`,
   `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Plain-text export of all documentation pages.`,
