@@ -1,0 +1,35 @@
+---
+title: Retrieval and Job Contracts
+description: Document pagination, asynchronous jobs, bulk operations, GraphQL failures, and schema coverage
+lastVerified: 2026-09-10
+---
+
+A published schema is useful when it explains what clients can safely do next. Describe limits, completion, partial failure, and retries alongside successful data. Apply pagination to collections, durable job handles to long-running work, and bulk semantics to operations that genuinely need multiple items.
+
+## Pagination
+
+For REST collections, document ordering, maximum page size, continuation representation, filtering, and terminal state. Test at least two pages, an empty result, an invalid cursor, and a changing dataset. Opaque cursors should not authorize access or expose private state. Record whether traversal is a stable snapshot or may reflect concurrent updates.
+
+For GraphQL, connection-style pagination can expose edges and `pageInfo` with cursors and end-of-list state. The [GraphQL pagination guide](https://graphql.org/learn/pagination/) describes the pattern; GraphQL itself does not require every collection to use it. Bound requested sizes and describe cursor scope and ordering.
+
+## Asynchronous operations
+
+Return a durable operation identifier and a documented way to retrieve status when work outlives the request. A REST contract can use `202 Accepted`, a status URL, and a polling interval. A GraphQL mutation can return a typed job object and a status query. Document queued, running, succeeded, failed, expired, and cancellation behavior where supported. Retry guidance must distinguish checking an existing job from creating another one.
+
+Verify the final result and terminal error as well as initial acceptance. State retention time, ownership, authorization, and whether an interrupted request may already have started work. Never use an undocumented background promise as the completion contract.
+
+## Bulk operations
+
+Define maximum items and payload size, atomicity, ordering, item identifiers, and per-item errors. Verify mixed success, duplicate submissions, invalid items, and permission checks on each resource. Batch GraphQL mutations are a product capability, not a requirement to accept arrays of GraphQL requests. See [idempotency](/docs/error-handling/idempotency).
+
+## GraphQL errors and evolution
+
+GraphQL responses may contain both `data` and `errors`; HTTP success alone does not prove operation success. Distinguish validation errors, resolver failures, and expected domain outcomes. Use documented error codes or typed mutation outcomes so clients can recover without interpreting arbitrary prose. Preserve the standard response envelope and avoid leaking stack traces. [GraphQL response semantics](https://graphql.org/learn/response/).
+
+Explain field deprecation, replacement, and removal policy. Describe fields, arguments, enums, nullability, authorization, and cost limits in a published schema artifact or permitted introspection surface. Do not open sensitive introspection merely to pass an anonymous probe. Test an existing client's query against a proposed schema change.
+
+## Response coverage and adapters
+
+For REST, specify success and error schemas for every documented status and media type, including pagination and job envelopes. Compare representative real responses with the contract. Keep [versioning policy](/docs/api-surface/api-versioning) and SDK examples aligned with deployed behavior.
+
+For function-calling adapters, exercise the generated tool schema with the intended provider and runtime. Recursive schemas, broad unions, deeply nested objects, and huge enums may require a narrower operation view. Describe any transformation, retain server validation, and do not claim all providers accept the same schema subset. See [tool schemas](/docs/tool-design/schemas).

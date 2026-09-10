@@ -1,0 +1,41 @@
+---
+title: Agent Catalogs and Structured Feeds
+description: Distinguish ARD, AI Catalog, API Catalog, and NLWeb feeds and verify the resources they advertise
+lastVerified: 2026-09-10
+---
+
+Catalogs help a client locate a capability. They do not implement that capability, grant permission, or prove a publisher trustworthy. Choose a format because a consumer uses it, then validate both the document and the advertised target.
+
+## ARD and AI Catalog
+
+[Agentic Resource Discovery](https://agenticresourcediscovery.org/spec/) publishes entries at `/.well-known/ard.json` and advertises them with `rel="ard"`. Its current specification treats the predecessor `ai-catalog.json` path as an optional consumer fallback. [AI Catalog](https://ai-catalog.io/specification/) is a separate specification with its own discovery path, `/.well-known/ai-catalog.json`.
+
+Do not assume the two formats will remain interchangeable. ARD now defines its own entry schema. Validate each advertised representation against the exact schema revision you target. [ARD schema and discovery rules](https://agenticresourcediscovery.org/spec/#appendix-d-formal-schema-definitions).
+
+For each resource, verify publisher identity, identifier, display name, media type, and the choice between a linked resource and inline data. Resolve links and invoke the actual protocol with a compatible client. An OpenAPI document, MCP endpoint, skill, and A2A card have different contracts even when listed together.
+
+A `trustManifest` is a claim envelope. Check its declared verification framework, issuer, expiry, subject, and publisher binding. A signature-shaped string or unsupported compliance claim is not evidence. Record unverifiable claims as unverified; publish only attestations that a consumer can substantiate.
+
+## API Catalog is another surface
+
+The [RFC 9727 API Catalog](/docs/discovery/well-known-endpoints) at `/.well-known/api-catalog` inventories APIs through linksets. It neither replaces ARD nor turns an HTML developer page into an API contract. Publish the formats your intended clients can consume and keep all of them derived from the same capability inventory.
+
+## NLWeb feeds and query endpoints
+
+[NLWeb's reference implementation](https://github.com/nlweb-ai/NLWeb) uses structured content and natural-language queries. It is a server-side retrieval surface; [WebMCP](/docs/protocols/webmcp) exposes tools within a browser page. They serve different execution contexts.
+
+Design and verify three independent parts of the retrieval surface:
+
+| Signal       | Implementation and evidence                                                                                                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema feeds | Advertise structured feeds through the discovery mechanism supported by the consumer. For integrations using a `schemamap:` directive and Schema Map XML, validate against their specified revision. Download and parse listed feeds, including changed and removed records. |
+| `/ask`       | Use the NLWeb request and response contract for the pinned implementation, with source URLs and structured result metadata. A generic chatbot response or a route named `/ask` is insufficient.                                                                              |
+| Streaming    | Exercise a streaming request and inspect event framing, completion, cancellation, and errors. An HTTP 200 or the SSE content type alone does not demonstrate a usable stream.                                                                                                |
+
+The [reference REST API documentation](https://github.com/nlweb-ai/NLWeb/blob/main/docs/nlweb-rest-api.md) describes a `query` argument and a `streaming` option. Pin the implementation and contract your client uses, and retain an actual request and response as compatibility evidence.
+
+Keep ingestion freshness, record identity, and deletion behavior explicit. The feed and query contracts must agree on what each record represents and which source owns it. Choose these integrations when structured retrieval serves a real consumer need.
+
+## Verification record
+
+Save the fetched document, schema revision, response headers, target URLs, validation output, and one real invocation. Include authentication requirements and retrieval time. Recheck after changing hosts, schemas, or capability names. Connect that evidence to an actual [product journey](/docs/scoring/product-journeys): finding a resource, understanding its requirements, and successfully using it.

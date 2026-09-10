@@ -6,7 +6,7 @@
       "type": "skill-md",
       "description": "Use when guiding, auditing, scoring, scaffolding, or transforming software for agent-readable APIs, CLIs, docs, authentication, MCP, tools, workflows, retrieval, testing, and multi-agent systems.",
       "url": "https://agentsurface.dev/skills/surface/SKILL.md",
-      "digest": "sha256:6e61fc4995050d35c16a74d45f63b9be065b212aeca5c86358e96fc75e6a3e0b"
+      "digest": "sha256:cf72b5e8ee7258d9dc24127f79fd2785c376108287545fd41ff9d3d1cbcfb081"
     }
   ]
 }

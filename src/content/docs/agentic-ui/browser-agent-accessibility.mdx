@@ -1,0 +1,33 @@
+---
+title: Browser Agent Accessibility
+description: Verify semantics, names, forms, and untrusted content in the browser accessibility tree
+lastVerified: 2026-09-10
+---
+
+Browser agents often locate controls through roles and accessible names. Build an interface that supports people using assistive technology and verify that the same task is legible to browser automation. An automated accessibility or readiness score is not proof of WCAG conformance or task success.
+
+## Structure and controls
+
+Use meaningful landmarks and heading hierarchy. Prefer native links, buttons, and form controls with visible labels. Give icon-only controls an accurate accessible name, associate labels with inputs, and expose validation and state changes. Placeholder text is not a durable label. Check the computed name in the browser because ARIA can override visible text. [W3C naming guidance](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/).
+
+```html
+<form action="/search" method="get">
+  <label for="query">Search documentation</label>
+  <input id="query" name="query" type="search" required />
+  <button type="submit">Search</button>
+</form>
+```
+
+Verify keyboard focus, submission, empty results, and errors in the actual page. Include dialogs, collapsed regions, and mobile layouts in the task when users encounter them. Avoid adding redundant hidden controls just to influence a scanner.
+
+## Accessibility-tree injection
+
+Treat text from reviews, product descriptions, remote widgets, tool results, alt text, and accessible descriptions as untrusted data. Do not interpolate third-party instructions into first-party control labels or system-level agent guidance. Escape markup, constrain allowed attributes, and retain source boundaries.
+
+Inspection should compare rendered content with the accessibility snapshot. Look for irrelevant instructions, impersonated system messages, and content that asks an agent to leave the user's task. Legitimate off-screen labels and screen-reader help must remain; hiding all nonvisual content would damage accessibility. Detection is an additional signal, not a guarantee that prompt injection is impossible. Authorization belongs at the action boundary even if the page looks safe.
+
+## Evidence for a real journey
+
+Save the route and viewport, meaningful roles and names, keyboard sequence, action result, and any console or network failures. For a purchase or destructive action, verify the review and confirmation step without executing an unauthorized transaction. A passing DOM scan cannot establish that search, cart, or checkout works.
+
+Choose representative pages containing the controls users need for the task, including forms and dialogs reached after navigation. See [WebMCP](/docs/protocols/webmcp) for explicit browser tools and [product journey evaluation](/docs/scoring/product-journeys) for evidence of the final outcome.

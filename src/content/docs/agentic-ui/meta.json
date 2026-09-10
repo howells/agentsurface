@@ -1,4 +1,4 @@
 {
   "title": "Agentic UI",
-  "pages": ["index", "session-control", "mcp-apps"]
+  "pages": ["index", "session-control", "mcp-apps", "browser-agent-accessibility"]
 }

@@ -71,3 +71,5 @@ Only submit public URLs. Do not use an external scanner for private, authenticat
 [Ora](https://ora.ai/) provides a public score and actionable findings across discovery, access, usability, and payments. Retrieve the cached result with `GET https://ora.ai/api/score/agentsurface.dev`, or request a scan with `POST https://ora.ai/api/scan` and JSON body `{"url":"agentsurface.dev"}`. See its [API reference](https://ora.ai/api/openapi.json) for caching and rate limits.
 
 Treat each finding as evidence to investigate. A public documentation API benefits from OpenAPI and recoverable JSON errors; it does not need an OAuth authorization server when no protected resources exist. Wikipedia and Wikidata presence depend on independent evidence and eligibility, not configuration. Record the scan date and deployed version before comparing scores.
+
+Use [Evaluating Product Journeys](/docs/scoring/product-journeys) to interpret external findings in terms of a real task, source ownership, applicability, and verified outcomes.

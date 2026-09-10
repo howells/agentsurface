@@ -2,13 +2,17 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GlossaryTerm } from "@/data/glossary";
 
 // ── Line patterns by category (pure CSS, zero DOM elements) ─────────────────
 
 const LINE_ANGLES: Record<string, number> = {
+  "Auth & Identity": 60,
+  Payments: -30,
   "Agent Infrastructure": 45,
   "Agent Readiness": 30,
   "Data & Integration": -45,
@@ -38,10 +42,12 @@ function GlossaryCard({
   term,
   onOpen,
   active,
+  grid = false,
 }: {
   term: GlossaryTerm;
   onOpen: (id: string) => void;
   active: boolean;
+  grid?: boolean;
 }) {
   return (
     <motion.button
@@ -49,7 +55,9 @@ function GlossaryCard({
       onClick={() => {
         onOpen(term.id);
       }}
-      className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
+      className={`relative flex ${grid ? "w-full min-w-0" : "w-52"} h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring`}
+      aria-label={`Read about ${term.name}`}
+      aria-haspopup="dialog"
       style={{
         boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)",
         opacity: active ? 0 : 1,
@@ -80,15 +88,36 @@ function GlossaryCard({
 // ── Overlay (portalled to document.body) ─────────────────────────────────────
 
 function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    const focusable = () =>
+      Array.from(dialog?.querySelectorAll<HTMLElement>('button, a[href], [tabindex="0"]') ?? []);
+    focusable()[0]?.focus();
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
+      }
+      if (e.key === "Tab") {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => {
       window.removeEventListener("keydown", handler);
+      if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus();
+      }
     };
   }, [onClose]);
 
@@ -105,9 +134,13 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
       />
 
       <div className="pointer-events-none fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-8">
-        <motion.div
+        <motion.dialog
+          open
+          ref={dialogRef}
+          aria-modal="true"
+          aria-labelledby={`term-title-${term.id}`}
           layoutId={`card-${term.id}`}
-          className="pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border border-white/50 bg-white/85 backdrop-blur-2xl dark:border-fd-border/60 dark:bg-fd-card/90"
+          className="relative m-0 pointer-events-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/50 bg-white/85 backdrop-blur-2xl dark:border-fd-border/60 dark:bg-fd-card/90"
           style={{
             WebkitBackdropFilter: "blur(40px)",
             boxShadow: "0 40px 100px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
@@ -158,6 +191,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.acronym}
             </motion.p>
             <motion.p
+              id={`term-title-${term.id}`}
               className="mt-1 text-sm text-fd-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -188,8 +222,16 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
             >
               {term.detail}
             </motion.p>
+            {term.href && (
+              <Link
+                href={term.href}
+                className="mt-5 inline-block text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+              >
+                Read the implementation guide
+              </Link>
+            )}
           </div>
-        </motion.div>
+        </motion.dialog>
       </div>
     </>,
     document.body,
@@ -214,6 +256,7 @@ function FilterPills({
       {[ALL, ...categories].map((cat) => (
         <button
           key={cat}
+          aria-pressed={active === cat}
           onClick={() => {
             onChange(cat);
           }}
@@ -241,6 +284,7 @@ export function GlossaryGrid({
   showFilters?: boolean;
   layout?: "scroll" | "grid";
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState(ALL);
 
@@ -267,6 +311,7 @@ export function GlossaryGrid({
             {visible.map((term) => (
               <GlossaryCard
                 key={term.id}
+                grid
                 term={term}
                 onOpen={setActiveId}
                 active={term.id === activeId}
@@ -275,33 +320,61 @@ export function GlossaryGrid({
           </AnimatePresence>
         </div>
       ) : (
-        <div className="relative mt-6 w-screen ml-[calc(50%-50vw)]">
-          <ScrollAreaPrimitive.Root className="w-full">
-            <ScrollAreaPrimitive.Viewport className="w-full" style={{ overflowY: "visible" }}>
-              <div className="flex gap-3 pt-4 pb-5 px-1">
-                {/* Left spacer — aligns first card with content, scrolls away */}
-                <div
-                  className="shrink-0"
-                  style={{ width: "max(1.5rem, calc(50vw - 30.5rem))" }}
-                  aria-hidden="true"
-                />
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {visible.map((term) => (
-                    <GlossaryCard
-                      key={term.id}
-                      term={term}
-                      onOpen={setActiveId}
-                      active={term.id === activeId}
-                    />
-                  ))}
-                </AnimatePresence>
-                <div className="w-6 shrink-0" aria-hidden="true" />
-              </div>
-            </ScrollAreaPrimitive.Viewport>
-            <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="hidden">
-              <ScrollAreaPrimitive.Thumb />
-            </ScrollAreaPrimitive.Scrollbar>
-          </ScrollAreaPrimitive.Root>
+        <div>
+          <div className="mt-5 flex justify-end gap-2" aria-label="Glossary carousel controls">
+            {([-1, 1] as const).map((direction) => {
+              const Icon = direction === -1 ? ArrowLeft : ArrowRight;
+              return (
+                <button
+                  key={direction}
+                  type="button"
+                  aria-label={direction === -1 ? "Previous terms" : "Next terms"}
+                  onClick={() =>
+                    viewportRef.current?.scrollBy({
+                      left: direction * Math.max(220, viewportRef.current.clientWidth * 0.7),
+                      behavior: "auto",
+                    })
+                  }
+                  className="rounded-full border border-fd-border p-2 hover:bg-fd-muted focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative mt-2 w-screen ml-[calc(50%-50vw)]">
+            <ScrollAreaPrimitive.Root className="w-full">
+              <ScrollAreaPrimitive.Viewport
+                ref={viewportRef}
+                aria-label="Glossary terms"
+                className="w-full"
+                style={{ overflowY: "visible" }}
+              >
+                <div className="flex gap-3 pt-4 pb-5 px-1">
+                  {/* Left spacer — aligns first card with content, scrolls away */}
+                  <div
+                    className="shrink-0"
+                    style={{ width: "max(1.5rem, calc(50vw - 30.5rem))" }}
+                    aria-hidden="true"
+                  />
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {visible.map((term) => (
+                      <GlossaryCard
+                        key={term.id}
+                        term={term}
+                        onOpen={setActiveId}
+                        active={term.id === activeId}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <div className="w-6 shrink-0" aria-hidden="true" />
+                </div>
+              </ScrollAreaPrimitive.Viewport>
+              <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="hidden">
+                <ScrollAreaPrimitive.Thumb />
+              </ScrollAreaPrimitive.Scrollbar>
+            </ScrollAreaPrimitive.Root>
+          </div>
         </div>
       )}
 

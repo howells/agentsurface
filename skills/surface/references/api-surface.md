@@ -685,3 +685,7 @@ The surface skill includes these template files under `/templates`:
 - `/templates/mcp-and-api/arazzo-workflow.yaml` — workflow example for multi-step operations
 - `/references/tool-design.md` — shared concerns with tool naming and descriptions
 - `/references/error-handling.md` — per-operation error schemas and recovery hints
+
+## Retrieval and lifecycle checks
+
+For collection, long-running, or bulk operations, verify continuation, limits, ownership, partial failure, and terminal state. Compare declared success and error schemas with real responses. Canonical REST/GraphQL guidance is at `/docs/api-surface/retrieval-and-job-contracts`; use `product-journeys.md` to evaluate the operation within a real task.

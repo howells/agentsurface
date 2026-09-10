@@ -190,6 +190,14 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 ---
 
+## Evidence from product use
+
+Evaluate a representative task through the intended client. Discovery evidence should show that a caller can find the right capability without private knowledge. Retrieval evidence should establish current, authoritative decision facts, including prices and availability when relevant. API and tool evidence should show usable continuation and lifecycle contracts. Testing evidence should include a meaningful failure, safe recovery, and the authoritative final result.
+
+Assign each defect to the dimension owning its root cause and explain effects on the rest of the journey. Avoid counting the same broken source or endpoint several times. Protocol files, catalog entries, and listings support the evaluation only when they lead to a capability needed by that product. Score definitions and totals above remain unchanged.
+
+See [Evaluating Product Journeys](https://agentsurface.dev/docs/scoring/product-journeys) for the full method.
+
 ## Scoring Notes
 
 - Score based on **current state**, not intent or roadmap

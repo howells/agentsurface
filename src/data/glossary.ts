@@ -5,10 +5,10 @@ export interface GlossaryTerm {
   category: string;
   definition: string;
   detail: string;
+  href?: string;
 }
 
 export const glossaryTerms: GlossaryTerm[] = [
-  // Foundation
   {
     acronym: "LLM",
     category: "Foundation",
@@ -45,7 +45,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "prompt-engineering",
     name: "Prompt Engineering",
   },
-  // Memory & Knowledge
   {
     acronym: "RAG",
     category: "Memory & Knowledge",
@@ -84,15 +83,16 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "knowledge-graph",
     name: "Knowledge Graph",
   },
-  // Agent Infrastructure
   {
     acronym: "MCP",
     category: "Agent Infrastructure",
-    definition: "An open standard for connecting AI agents to tools, data, and services.",
+    definition:
+      "An open protocol for connecting agent clients to tools, data, and reusable prompts.",
     detail:
-      "MCP is to agents what USB is to devices — a universal connector. Any AI client (Claude, Cursor, Copilot) can connect to any MCP server and automatically discover its tools. You build the server once; every MCP-compatible agent can use it without custom integration. MCP servers expose tools (actions), resources (data), and prompts (templates). Servers can run locally or as HTTP services. The protocol handles capability discovery, input validation, and streaming responses.",
+      "An MCP server describes the capabilities it offers so a compatible client can discover and call them. Servers can run locally or be reached over HTTP. Support varies by client and protocol version, so authentication, tools, and results still need testing in the clients customers use.",
     id: "mcp",
     name: "Model Context Protocol",
+    href: "/docs/mcp-servers",
   },
   {
     acronym: "Tools",
@@ -115,22 +115,23 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     acronym: "Orch.",
     category: "Agent Infrastructure",
-    definition: "Coordinating multiple agents, tools, and models to complete a complex task.",
+    definition: "Coordinating model calls, tools, and workflow steps to complete a task.",
     detail:
-      "When a single agent can't complete a task end-to-end, orchestration breaks it across specialised agents. A planner agent decomposes the goal; specialist agents execute subtasks; a synthesiser combines results. Frameworks like Mastra, LangGraph, and CrewAI provide state machines, retry logic, and handoff protocols. Agent-to-agent communication is increasingly standardised via A2A and ACP protocols. Orchestration adds reliability at the cost of latency and complexity.",
+      "An orchestrator decides what runs next, carries state between steps, and handles retries, limits, and handoffs. It can support one agent or several. A fixed workflow suits predictable steps; an agent can make decisions where the next step depends on the result. More agents are useful only when their separate responsibilities justify the added coordination.",
     id: "orchestration",
     name: "Orchestration",
+    href: "/docs/multi-agent",
   },
-  // Data & Integration
   {
     acronym: "API",
     category: "Data & Integration",
     definition:
-      "A contract that lets software talk to software — the connective tissue of the web.",
+      "A defined way for software to request data or perform an action in another system.",
     detail:
-      "APIs define how to request data or trigger actions: the URL, method (GET/POST), parameters, and response format. REST APIs return JSON over HTTP; GraphQL lets callers specify exactly the shape of data they want. For AI agents, API quality matters enormously — good OpenAPI specs let agents discover and use your services without human guidance. An API without machine-readable docs is invisible to agents; one with clear schemas, operationIds, and descriptions is a first-class citizen of the agentic web.",
+      "An API describes the operations available, the inputs each accepts, and the results or errors it returns. For example, a shop might offer operations to search products, prepare a cart, and check an order. Clear documentation and consistent responses help agents use those operations correctly.",
     id: "api",
     name: "Application Programming Interface",
+    href: "/docs/api-surface",
   },
   {
     acronym: "ETL/ELT",
@@ -159,24 +160,25 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "schema",
     name: "Schema / Ontology / Taxonomy",
   },
-  // Agent Readiness
   {
     acronym: "AEO",
     category: "Agent Readiness",
-    definition: "Making your software discoverable, navigable, and operable by AI agents.",
+    definition: "Making content easier for answer engines to find, interpret, and cite.",
     detail:
-      "Just as SEO made websites findable by search engines, AEO makes software legible to AI agents. It covers: structured context files (AGENTS.md, CLAUDE.md), machine-readable discovery endpoints (llms.txt, .well-known), agent-friendly APIs with OpenAPI specs, MCP servers for direct tool access, and content negotiation (serving Markdown when an agent requests it). AEO is the discipline this entire site is built around — the 11 Surface dimensions are its scoring rubric.",
+      "Answer engine optimization concerns how search and AI answer systems retrieve and describe your content. It includes crawlable pages, clear facts, structured data, and trustworthy sources. Agent readiness is broader: an agent may also need to sign in, perform actions, recover from errors, or pay. Visibility does not establish that those tasks work.",
     id: "aeo",
-    name: "Agent Engine Optimisation",
+    name: "Answer Engine Optimization",
+    href: "/docs/discovery/aeo-checklist",
   },
   {
     acronym: "llms.txt",
     category: "Agent Readiness",
-    definition: "A plain-text file at a site's root that maps content for LLM consumption.",
+    definition: "A Markdown index that points agents to a site's important documentation.",
     detail:
-      "Proposed by Jeremy Howard in 2024, llms.txt is the robots.txt for the agent era. Where robots.txt tells crawlers what not to index, llms.txt tells LLMs what to read and in what order. It's a Markdown file listing the most important pages on a site with brief descriptions — a curated map rather than a sitemap dump. Many documentation sites and developer tools now publish both llms.txt (index) and llms-full.txt (full content concatenated) so agents can ingest the whole site in one request.",
+      "A site can publish llms.txt at its root with a short introduction and links to relevant pages. It helps clients that read this convention find focused documentation. It does not set crawler permissions or guarantee search rankings, citations, or adoption by every agent.",
     id: "llms-txt",
     name: "llms.txt",
+    href: "/docs/discovery/llms-txt",
   },
   {
     acronym: "Ground",
@@ -196,7 +198,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "guardrails",
     name: "Guardrails",
   },
-  // Ops & Lifecycle
   {
     acronym: "LLMOps",
     category: "Ops & Lifecycle",
@@ -233,6 +234,297 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "a2a",
     name: "Agent-to-Agent",
   },
+  {
+    id: "openapi",
+    acronym: "OpenAPI",
+    name: "OpenAPI Specification",
+    category: "Data & Integration",
+    definition: "A machine-readable description of an HTTP API.",
+    detail:
+      "It lists operations, inputs, responses, authentication requirements, and errors. Agents and developer tools can use it to construct requests. The specification must describe the API that actually runs; publishing a file alone does not make the operations work.",
+    href: "/docs/api-surface/openapi-for-agents",
+  },
+  {
+    id: "graphql",
+    acronym: "GraphQL",
+    name: "GraphQL",
+    category: "Data & Integration",
+    definition: "An API query language that lets callers choose which fields they receive.",
+    detail:
+      "A typed schema describes the data and operations available. Queries read data; mutations can change it. Agents need field descriptions, pagination rules, and clear errors to use the schema. A successful HTTP response can still contain GraphQL errors.",
+    href: "/docs/api-surface/retrieval-and-job-contracts",
+  },
+  {
+    id: "json-ld",
+    acronym: "JSON-LD",
+    name: "JavaScript Object Notation for Linked Data",
+    category: "Agent Readiness",
+    definition: "Structured labels that describe what the information on a web page means.",
+    detail:
+      "A page can use JSON-LD and a shared vocabulary such as Schema.org to identify a product, its brand, its price, and the relationships between them. These labels help software interpret the page. They should match the visible facts and never invent ratings or reviews.",
+    href: "/docs/discovery/structured-data",
+  },
+  {
+    id: "robots-txt",
+    acronym: "robots.txt",
+    name: "Crawler Rules",
+    category: "Agent Readiness",
+    definition: "A file that tells cooperating crawlers which URLs they may fetch.",
+    detail:
+      "Different rules can apply to search crawlers, training crawlers, and other automated visitors. robots.txt is a voluntary crawling convention, not access control: private information still needs authentication. Firewall rules can also block agents even when robots.txt allows them.",
+    href: "/docs/discovery/robots-txt",
+  },
+  {
+    id: "markdown",
+    acronym: "Markdown",
+    name: "Markdown",
+    category: "Agent Readiness",
+    definition: "A plain-text format for headings, links, lists, and other document structure.",
+    detail:
+      "Markdown keeps a document readable without most of a website's interface markup. A Markdown version can help an agent retrieve focused content, provided it preserves the original facts, links, and source information.",
+    href: "/docs/discovery/content-negotiation",
+  },
+  {
+    id: "content-negotiation",
+    acronym: "Formats",
+    name: "Content Negotiation",
+    category: "Agent Readiness",
+    definition: "Letting a client request a particular representation of the same resource.",
+    detail:
+      "For example, a browser may request HTML while an agent requests Markdown through an HTTP Accept header. The server chooses a supported format and labels the response. Caches must distinguish these formats so a person does not unexpectedly receive raw Markdown.",
+    href: "/docs/discovery/content-negotiation",
+  },
+  {
+    id: "agent-skills",
+    acronym: "Skills",
+    name: "Agent Skills",
+    category: "Agent Infrastructure",
+    definition: "Instructions and supporting files that teach an agent how to perform a task.",
+    detail:
+      "A skill explains when to use it, the steps to follow, and any tools or reference material needed. It can package a team's working practices for compatible coding agents. Instructions do not grant credentials or override the permissions enforced by the host or service.",
+    href: "/docs/discovery/agent-skills",
+  },
+  {
+    id: "agent-plugins",
+    acronym: "Plugins",
+    name: "Agent Plugins",
+    category: "Agent Infrastructure",
+    definition: "Installable packages of related agent tools, skills, and connections.",
+    detail:
+      "A plugin bundles capabilities for a particular agent platform and describes how to install and configure them. Platform formats differ, so a working package in one host does not guarantee compatibility with another.",
+    href: "/docs/discovery/commercial-and-entity-discovery",
+  },
+  {
+    id: "sdk",
+    acronym: "SDK",
+    name: "Software Development Kit",
+    category: "Data & Integration",
+    definition: "Libraries and supporting tools for integrating a service into an application.",
+    detail:
+      "An SDK can provide typed functions, authentication helpers, and examples around an API. It saves developers and coding agents from rebuilding common integration code. Its supported API versions and maintenance status should be clear.",
+    href: "/docs/discovery/commercial-and-entity-discovery",
+  },
+  {
+    id: "cli",
+    acronym: "CLI",
+    name: "Command-Line Interface",
+    category: "Data & Integration",
+    definition: "A way to operate software by entering commands in a terminal.",
+    detail:
+      "Coding agents can use a CLI in scripts and automated workflows. Explicit arguments, structured output, meaningful exit codes, and a way to run without interactive prompts make commands easier to use reliably.",
+    href: "/docs/cli-design",
+  },
+  {
+    id: "webmcp",
+    acronym: "WebMCP",
+    name: "Web Model Context Protocol",
+    category: "Agent Infrastructure",
+    definition: "A proposed browser interface that lets a page offer tools to visiting agents.",
+    detail:
+      "A compatible browser can discover named actions in the current page and call them with defined inputs. The tools operate in the page's context. Browser support is still evolving; this is distinct from running a remote MCP server and should complement accessible controls.",
+    href: "/docs/protocols/webmcp",
+  },
+  {
+    id: "mcp-apps",
+    acronym: "MCP Apps",
+    name: "Interactive Views in MCP Clients",
+    category: "Agent Infrastructure",
+    definition:
+      "Interactive interfaces displayed alongside tool results in a compatible MCP client.",
+    detail:
+      "An MCP App can show a chart, selection interface, or editable result inside a conversation. The host controls how the view loads and what it can access. A service must test host compatibility, accessibility, and security boundaries as well as its tool responses.",
+    href: "/docs/agentic-ui/mcp-apps",
+  },
+  {
+    id: "oauth",
+    acronym: "OAuth",
+    name: "Delegated Authorization",
+    category: "Auth & Identity",
+    definition: "A way to give an application limited access without sharing a user's password.",
+    detail:
+      "A customer can approve access to selected capabilities, such as reading orders. The client then uses an access token when calling the API. The service must enforce the granted permissions, expiry, and account boundaries. OAuth grants access; it is not by itself a complete user identity protocol.",
+    href: "/docs/authentication/oauth-for-agents",
+  },
+  {
+    id: "scopes",
+    acronym: "Scopes",
+    name: "Permission Scopes",
+    category: "Auth & Identity",
+    definition: "Named permissions that define what an access token is allowed to do.",
+    detail:
+      "A token might allow reading orders while forbidding refunds. The server must check those permissions on every protected operation and ensure the caller can access the requested account or record. A scope written in documentation provides no protection unless it is enforced.",
+    href: "/docs/authentication/agent-identity",
+  },
+  {
+    id: "auth-md",
+    acronym: "auth.md",
+    name: "Agent Registration Guidance",
+    category: "Auth & Identity",
+    definition: "A published walkthrough of how an agent can register for a service.",
+    detail:
+      "The auth.md protocol connects readable setup instructions with metadata describing accepted identity methods and endpoints. An agent can discover how to register, obtain access, and involve the user when an account needs claiming. Advertised flows must exist and enforce normal authorization checks.",
+    href: "/docs/authentication/auth-md",
+  },
+  {
+    id: "web-bot-auth",
+    acronym: "Bot Auth",
+    name: "Web Bot Auth",
+    category: "Auth & Identity",
+    definition: "Signed HTTP requests that help a website verify which bot sent them.",
+    detail:
+      "The sender signs a request and publishes verification keys. The receiving service checks the signature and applies its own access rules. Verifying a bot's identity does not give it permission to read a customer's private data or spend their money.",
+    href: "/docs/authentication/agent-identity#web-bot-auth",
+  },
+  {
+    id: "id-jag",
+    acronym: "ID-JAG",
+    name: "Identity Assertion JWT Authorization Grant",
+    category: "Auth & Identity",
+    definition: "A signed identity assertion used to request access from another service.",
+    detail:
+      "A trusted issuer describes an identity in an audience-bound JWT. The receiving service verifies the assertion and decides what access may follow. In auth.md, the provider assertion goes to the identity endpoint; registration and the later token exchange are separate steps.",
+    href: "/docs/authentication/auth-md",
+  },
+  {
+    id: "idempotency",
+    acronym: "Idempotency",
+    name: "Safe Repeated Requests",
+    category: "Ops & Lifecycle",
+    definition: "Making a repeated request have the same intended effect as a single request.",
+    detail:
+      "If an order request times out, the caller may not know whether it succeeded. An idempotency key lets the server recognize the retry and return the earlier outcome instead of placing a second order. The API must document how long keys remain valid and how changed inputs are handled.",
+    href: "/docs/error-handling/idempotency",
+  },
+  {
+    id: "pagination",
+    acronym: "Pagination",
+    name: "Paged Results",
+    category: "Data & Integration",
+    definition:
+      "Returning a large collection in smaller portions with a way to request the next portion.",
+    detail:
+      "A response includes a cursor or another continuation mechanism. Predictable ordering and stable item identifiers help agents work through results without omissions or duplicates, especially when the collection changes between requests.",
+    href: "/docs/api-surface/retrieval-and-job-contracts",
+  },
+  {
+    id: "rate-limits",
+    acronym: "Rate limits",
+    name: "Request Limits",
+    category: "Ops & Lifecycle",
+    definition: "Limits on how often a client can call a service.",
+    detail:
+      "A service may cap requests within a time window or limit concurrent work. Documented quotas and retry timing let agents slow down when they reach the limit. Repeatedly retrying immediately can prolong the failure or exhaust a budget.",
+    href: "/docs/error-handling/retry-patterns",
+  },
+  {
+    id: "webhooks",
+    acronym: "Webhooks",
+    name: "Event Notifications",
+    category: "Data & Integration",
+    definition: "HTTP messages a service sends when a subscribed event occurs.",
+    detail:
+      "For example, an order service can notify a client when a shipment leaves the warehouse. Receivers should verify the sender, handle duplicate deliveries, and recover from missed events. A webhook reports an event; the current record remains the source for its latest state.",
+    href: "/docs/api-surface/webhooks-events",
+  },
+  {
+    id: "sandbox",
+    acronym: "Sandbox",
+    name: "Test Environment",
+    category: "Ops & Lifecycle",
+    definition:
+      "An isolated environment for trying operations without affecting production customers.",
+    detail:
+      "A sandbox can provide test credentials, sample records, and simulated payments. It lets agents exercise changes and failure recovery before using live services. Document differences from production so a passing test is not mistaken for proof of every live behavior.",
+    href: "/docs/testing/evaluation-framework",
+  },
+  {
+    id: "prompt-injection",
+    acronym: "Injection",
+    name: "Prompt Injection",
+    category: "Ops & Lifecycle",
+    definition: "Instructions hidden in external content that try to redirect an agent's behavior.",
+    detail:
+      "A retrieved page might tell an agent to reveal private data or ignore the user's request. Treat that page as untrusted data and enforce permissions outside the model. Test attempted redirects as well as ordinary input errors.",
+    href: "/docs/testing/red-teaming",
+  },
+  {
+    id: "ucp",
+    acronym: "UCP",
+    name: "Universal Commerce Protocol",
+    category: "Payments",
+    definition: "A protocol for connecting agent platforms with merchant commerce capabilities.",
+    detail:
+      "UCP describes capabilities such as checkout, identity linking, and order management. It lets compatible systems exchange purchase information through defined contracts. A merchant still needs supported payment integrations and must enforce its business rules and the buyer's authority.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "acp",
+    acronym: "ACP",
+    name: "Agentic Commerce Protocol",
+    category: "Payments",
+    definition: "A protocol for agent-assisted checkout and related commerce operations.",
+    detail:
+      "ACP provides defined interfaces for preparing and completing purchases with a merchant. The integration must handle totals, customer approval, payment, and order results. Use the version and binding supported by the actual agent client and payment provider.",
+    href: "/docs/protocols/acp",
+  },
+  {
+    id: "ap2",
+    acronym: "AP2",
+    name: "Agent Payments Protocol",
+    category: "Payments",
+    definition: "A protocol for expressing and verifying authorization in agent-led payments.",
+    detail:
+      "AP2 uses signed mandates to record purchase intent and authorization. Participants verify the evidence required by their payment flow. A signed mandate, a completed payment, and delivery of the purchased item are separate facts.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "payment-mandate",
+    acronym: "Mandate",
+    name: "Payment Mandate",
+    category: "Payments",
+    definition: "A record of what someone has authorized an agent to buy or spend.",
+    detail:
+      "A mandate can bind permission to an amount, merchant, purpose, or expiry, depending on the protocol. The receiving system verifies that permission before proceeding. An agent preparing a cart does not itself establish authority to pay.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "mpp",
+    acronym: "MPP",
+    name: "Machine Payments Protocol",
+    category: "Payments",
+    definition: "An HTTP payment protocol for paid resources such as API calls and content.",
+    detail:
+      "A server presents a payment challenge, the client responds with a payment credential, and the server verifies it before supplying the resource. Price, spending limits, receipts, and recovery after failed delivery all need defined behavior.",
+    href: "/docs/protocols/mpp",
+  },
+  {
+    id: "x402",
+    acronym: "x402",
+    name: "HTTP Payment Protocol",
+    category: "Payments",
+    definition: "A protocol that uses HTTP 402 responses to request payment for a resource.",
+    detail:
+      "The response tells a compatible client what payment is required. The client provides payment information, which is verified under the supported scheme before access is granted. Check the payment network, asset, settlement process, and retry behavior required by the integration.",
+    href: "/docs/protocols/agentic-commerce",
+  },
 ];
-
-export const featuredTermIds = ["mcp", "rag", "aeo", "llm", "tool-calling", "grounding"];

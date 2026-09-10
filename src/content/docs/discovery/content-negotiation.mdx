@@ -280,3 +280,9 @@ Strip:
 - Cookie consent banners and modals
 - Advertisement placeholders
 - HTML-only interactive elements (accordions, tabs — flatten to headings and content)
+
+## Missing paths and representation parity
+
+A missing page must return HTTP 404 rather than redirecting every unknown path to the homepage or returning a successful empty shell. For a Markdown request, provide a short explanation and links to the documentation index, search, or the nearest valid section. API failures should use the [structured error contract](/docs/error-handling/rfc-9457). Verify status, media type, and recovery links on the deployed host.
+
+If an explicit agent view or User-Agent-based Markdown variant exists, compare its facts, prices, links, and permissions with ordinary HTML. User-Agent strings are spoofable and must not grant authorization. Prefer explicit content negotiation where possible and test cache separation. Add title, canonical source URL, and source-derived modification metadata to Markdown frontmatter when the consuming client uses it; never stamp every request as a content update.

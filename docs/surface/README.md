@@ -15,3 +15,5 @@ to avoid duplicating prior findings. The source documents live in `docs/` and
 | 2026-08-27 | [Currency and Relevance Review](../currency-review-2026-08-27.md)                                       | Audit + remediation | Applied — docs, lint, and build pass       |
 | 2026-09-07 | [Tool naming review](../tool-naming-review-2026-09-07.md) | Focused research + remediation | Applied locally — docs integrity passes |
 | 2026-09-09 | [Ora / orank remediation](../orank-remediation-2026-09-09.md) | Focused API, browser tools, and catalog changes | Applied locally — deployment and native WebMCP verification pending |
+| 2026-09-10 | [Product journey advice synthesis](../ora-documentation-coverage-2026-09-10.md) | Generalized guidance informed by external research | Composed into docs, rubric, skill, and audit template |
+| 2026-09-10 | [Homepage coverage review](../homepage-coverage-2026-09-10.md) | Live catalog cross-check and five-area homepage | 125 checks mapped to 56 cards; auth and payment groups added |

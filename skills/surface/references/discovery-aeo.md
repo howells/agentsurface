@@ -703,3 +703,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - `templates/discovery/llms.txt`, `templates/discovery/AGENTS.md`, `templates/discovery/json-ld-softwareapp.ts` — AEO templates
 - `references/context-files.md` — Detailed AGENTS.md curation guide
 - `references/authentication.md` — OAuth 2.1 and .well-known/oauth-protected-resource
+
+## Discovery through to use
+
+Verify that a caller can move from the intended entry point to the advertised capability without private knowledge. Check consistent identity, authoritative decision facts, link resolution, and a real invocation. Catalog and feed guidance is at `/docs/discovery/catalogs-and-feeds`; pricing, availability, section indexes, and external identity guidance is at `/docs/discovery/commercial-and-entity-discovery`. Use `product-journeys.md` to connect this evidence to the existing audit.

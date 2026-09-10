@@ -4,9 +4,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import Link from "next/link";
 
 export const metadata = {
-  description:
-    "24 essential terms for the AI agent era — plain-language definitions of MCP, RAG, LLMOps, A2A, and the infrastructure concepts every C-suite and PM should understand.",
-  title: "Agentic Glossary — Agent Surface",
+  description: `Plain-language definitions of ${glossaryTerms.length} terms covering AI agents, APIs, discovery, identity, reliability, and payments.`,
+  title: "Agentic Glossary",
 };
 
 export default function GlossaryPage() {
@@ -25,8 +24,8 @@ export default function GlossaryPage() {
             intelligent software.
           </h1>
           <p className="mt-6 max-w-xl text-[0.9375rem] leading-7 text-fd-muted-foreground">
-            24 concepts every product leader and executive needs to navigate the AI agent landscape.
-            Filter by category or scroll through all. Click any card to go deeper.
+            {glossaryTerms.length} terms for product, business, and engineering teams. Filter by
+            category or scroll through all. Click any card to go deeper.
           </p>
         </section>
 
