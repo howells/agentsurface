@@ -3,7 +3,9 @@ import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
 import authIdentityArt from "@/assets/areas/auth-identity.png";
+import connectionsArt from "@/assets/areas/connections.png";
 import discoverabilityArt from "@/assets/areas/discoverability.png";
+import paymentsArt from "@/assets/areas/payments.png";
 import understandabilityArt from "@/assets/areas/understandability.png";
 import usabilityArt from "@/assets/areas/usability.png";
 import { AreaMark } from "@/components/AreaMark";
@@ -14,11 +16,13 @@ import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
 import { cn } from "@/lib/utils";
 
-// Square monochrome engravings on white. Each form sits in the top of its square and leaves
-// the bottom third white, so the card heading can rise into the image.
+// One motif series of engraved line-pattern crops on white. Each runs off the top and sides of
+// its square and fades to white across the bottom third, so the card heading can rise into it.
 const ILLUSTRATIONS: Record<string, StaticImageData> = {
   "auth-identity": authIdentityArt,
+  connections: connectionsArt,
   discoverability: discoverabilityArt,
+  payments: paymentsArt,
   understandability: understandabilityArt,
   usability: usabilityArt,
 };
