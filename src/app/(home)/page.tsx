@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
+import authIdentityArt from "@/assets/areas/auth-identity.png";
+import discoverabilityArt from "@/assets/areas/discoverability.png";
+import understandabilityArt from "@/assets/areas/understandability.png";
+import usabilityArt from "@/assets/areas/usability.png";
 import { AreaMark } from "@/components/AreaMark";
 import { AreaNav } from "@/components/AreaNav";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
@@ -10,22 +14,19 @@ import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
 import { cn } from "@/lib/utils";
 
-// Monochrome line engravings on white; hatching angles follow the glossary card patterns.
-// Placement lets some forms bleed off the card edge, so they read as printed on the card.
-const ILLUSTRATIONS: Record<string, { placement: string; src: string }> = {
-  "auth-identity": { placement: "-top-4 bottom-0", src: "/areas/auth-identity.png" },
-  discoverability: {
-    placement: "-right-14 left-2 top-0 -bottom-2",
-    src: "/areas/discoverability.png",
-  },
-  understandability: { placement: "top-2 bottom-0", src: "/areas/understandability.png" },
-  usability: { placement: "-left-14 right-4 top-0 -bottom-2", src: "/areas/usability.png" },
+// Square monochrome engravings on white. Each form sits in the top of its square and leaves
+// the bottom third white, so the card heading can rise into the image.
+const ILLUSTRATIONS: Record<string, StaticImageData> = {
+  "auth-identity": authIdentityArt,
+  discoverability: discoverabilityArt,
+  understandability: understandabilityArt,
+  usability: usabilityArt,
 };
 
 export const metadata: Metadata = {
   title: "Make your website and app work with AI agents",
   description:
-    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, identity, usability, and payments, with clear recommendations and detailed implementation docs.",
+    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, sign-in, usability, and payments, with clear recommendations and detailed implementation docs.",
 };
 
 const focusStyle =
@@ -33,42 +34,34 @@ const focusStyle =
 
 function AreaOverview() {
   return (
-    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-      {guideStages.map((stage, index) => {
+    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {guideStages.map((stage) => {
         const foundations = stage.cards.filter((card) => card.applies === "Start here");
         const highlights = foundations.length > 0 ? foundations : stage.cards;
         const illustration = ILLUSTRATIONS[stage.id];
         return (
-          <li
-            key={stage.id}
-            className={cn(
-              "lg:col-span-2",
-              index >= 3 && "lg:col-span-3",
-              index === guideStages.length - 1 && "sm:max-lg:col-span-2",
-            )}
-          >
+          <li key={stage.id}>
             <a
               href={`#${stage.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <span className="relative block h-44">
+              <span className="relative block aspect-square w-full">
                 {illustration ? (
-                  <span className={cn("absolute inset-0", illustration.placement)}>
-                    <Image
-                      src={illustration.src}
-                      alt=""
-                      fill
-                      sizes="(min-width: 1024px) 30rem, (min-width: 640px) 50vw, 100vw"
-                      className="object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
-                    />
-                  </span>
+                  <Image
+                    src={illustration}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 20rem, (min-width: 640px) 50vw, 100vw"
+                    className="origin-top object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
+                  />
                 ) : (
-                  <span className="grid h-full place-items-center">
+                  <span className="grid h-2/3 place-items-center">
                     <AreaMark area={stage.id} />
                   </span>
                 )}
               </span>
-              <span className="flex flex-1 flex-col px-5 pb-5 pt-1">
+              {/* Percentage margins resolve against width, so this rises 30% into the square. */}
+              <span className="relative -mt-[30%] flex flex-1 flex-col px-5 pb-5">
                 <span className="flex items-baseline justify-between gap-3">
                   <span className="text-base font-medium leading-6">{stage.name}</span>
                   <span className="flex items-center gap-1.5 text-sm tabular-nums text-fd-muted-foreground">
@@ -126,7 +119,7 @@ export default function HomePage() {
             href="#guide-map"
             className={`inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 font-medium text-fd-primary-foreground ${focusStyle}`}
           >
-            See the five areas <ArrowDown aria-hidden="true" className="size-4" />
+            See the six areas <ArrowDown aria-hidden="true" className="size-4" />
           </a>
           <Link
             href="/docs"
@@ -144,7 +137,7 @@ export default function HomePage() {
       >
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="map-heading" className="text-base font-medium">
-            The five things to get right
+            The six things to get right
           </h2>
           <p className="text-sm text-fd-muted-foreground">{total} recommendations</p>
         </div>

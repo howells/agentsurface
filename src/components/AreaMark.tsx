@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 // Angles match the glossary card patterns for the same subjects.
 const AREA_ANGLES: Record<string, number> = {
   "auth-identity": 60,
+  connections: 45,
   discoverability: 30,
   payments: -30,
   understandability: 0,
@@ -26,6 +27,14 @@ const AREA_PATHS: Record<string, ReactNode> = {
     <>
       <rect x="13" y="10" width="22" height="28" rx="3" />
       <path d="M18 18h12M18 24h9M18 30h5" />
+    </>
+  ),
+  // Two ends joined.
+  connections: (
+    <>
+      <circle cx="13" cy="24" r="4.5" />
+      <circle cx="35" cy="24" r="4.5" />
+      <path d="M17.5 24h13" />
     </>
   ),
   // A boundary with one deliberate opening.
