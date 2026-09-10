@@ -171,6 +171,26 @@ export const glossaryTerms: GlossaryTerm[] = [
     href: "/docs/discovery/aeo-checklist",
   },
   {
+    id: "content-signals",
+    acronym: "Content Signals",
+    name: "Content-use Preferences",
+    category: "Agent Readiness",
+    definition: "Declarations of whether content may be used for search, AI input, or training.",
+    detail:
+      "Crawler rules describe access to a page. Content Signals separately express permitted uses after retrieval through search, ai-input, and ai-train values. They communicate your policy to systems that honor it; they do not enforce access controls or guarantee compliance.",
+    href: "/docs/discovery/robots-txt#content-signals",
+  },
+  {
+    id: "dns-aid",
+    acronym: "DNS-AID",
+    name: "DNS for AI Discovery",
+    category: "Agent Readiness",
+    definition: "An emerging way to advertise agent services through a domain's DNS records.",
+    detail:
+      "DNS normally helps software locate servers. DNS-AID proposes records that also advertise agent services and their connection details. Compatible clients can discover services from a known domain. It remains an individual Internet-Draft, and publishing records does not grant access or prove the service works.",
+    href: "/docs/discovery/dns-discovery",
+  },
+  {
     acronym: "llms.txt",
     category: "Agent Readiness",
     definition: "A Markdown index that points agents to a site's important documentation.",

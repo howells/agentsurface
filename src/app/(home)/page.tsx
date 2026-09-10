@@ -271,10 +271,14 @@ export default function HomePage() {
             from{" "}
             <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
               Is Agentic
-            </a>{" "}
-            and{" "}
+            </a>
+            ,{" "}
             <a href="https://ora.ai/methodology" className="underline underline-offset-4">
               Ora
+            </a>
+            , and{" "}
+            <a href="https://isitagentready.com/" className="underline underline-offset-4">
+              Cloudflare Agent Readiness
             </a>
             . Priorities reflect the task and product; the{" "}
             <Link

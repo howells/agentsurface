@@ -73,3 +73,23 @@ Only submit public URLs. Do not use an external scanner for private, authenticat
 Treat each finding as evidence to investigate. A public documentation API benefits from OpenAPI and recoverable JSON errors; it does not need an OAuth authorization server when no protected resources exist. Wikipedia and Wikidata presence depend on independent evidence and eligibility, not configuration. Record the scan date and deployed version before comparing scores.
 
 Use [Evaluating Product Journeys](/docs/scoring/product-journeys) to interpret external findings in terms of a real task, source ownership, applicability, and verified outcomes.
+
+## Cloudflare Agent Readiness
+
+[Cloudflare's checker](https://isitagentready.com/) covers discovery, content, bot access control, API/auth/tool metadata, and commerce. It exposes a [skill index](https://isitagentready.com/.well-known/agent-skills/index.json), a remote MCP server at `https://isitagentready.com/mcp`, and a scan API:
+
+```sh
+curl https://isitagentready.com/api/scan \
+  -H 'Content-Type: application/json' \
+  --data '{"url":"https://example.com"}'
+```
+
+The comparison verified on **10 September 2026** found 22 available checks; the website's default selection excludes A2A and AP2. Commerce is excluded from the displayed overall percentage, and neutral results do not count in its denominator. The API also returns a separate readiness level. Record the selected checks and scan time when comparing results.
+
+Its useful differences from [Ora's published catalog](https://ora.ai/api/checks) are:
+
+- **DNS-AID:** an additional DNS discovery check, absent from Ora contract 1.24.0's 125 checks. See [DNS Discovery](/docs/discovery/dns-discovery) for applicability and verification.
+- **Content Signals:** a separate check from crawler rules. Ora already accepts Content Signals within its crawler-policy check. Keep access and content use separate in your implementation even when a scanner combines their scores.
+- **Discovery routes:** the catalog probe also tries DNS TXT and SRV records. A broader set of probes does not imply a new product requirement.
+
+Is Agentic uses Ora's checks, so it provides another interpretation of that evidence rather than an independent checklist. Most Cloudflare capabilities overlap Ora, with different acceptance criteria and weights. Use each report to investigate actual client failures; a scanner's preferred path or older API name is not a substitute for the current protocol specification.

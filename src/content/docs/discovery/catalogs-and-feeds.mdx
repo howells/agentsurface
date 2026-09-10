@@ -16,6 +16,12 @@ For each resource, verify publisher identity, identifier, display name, media ty
 
 A `trustManifest` is a claim envelope. Check its declared verification framework, issuer, expiry, subject, and publisher binding. A signature-shaped string or unsupported compliance claim is not evidence. Record unverifiable claims as unverified; publish only attestations that a consumer can substantiate.
 
+## DNS discovery is another route
+
+Clients may also look up agent endpoints through [DNS discovery](/docs/discovery/dns-discovery). DNS-AID is an emerging proposal with its own service records. It complements an HTTP catalog; neither route establishes that a discovered service is authorized or usable.
+
+Cloudflare's scanner also probes `_catalog._agents` TXT and `_search._agents` SRV records as part of its catalog check. These are observed discovery routes, not evidence that every ARD consumer requires them. Use the current specification and your client's supported discovery mechanism when deciding what to publish.
+
 ## API Catalog is another surface
 
 The [RFC 9727 API Catalog](/docs/discovery/well-known-endpoints) at `/.well-known/api-catalog` inventories APIs through linksets. It neither replaces ARD nor turns an HTML developer page into an API contract. Publish the formats your intended clients can consume and keep all of them derived from the same capability inventory.
