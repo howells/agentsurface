@@ -21,7 +21,7 @@ export default function GlossaryPage() {
             <br />
             intelligent software.
           </h1>
-          <p className="mt-6 max-w-xl type-lead text-fd-muted-foreground">
+          <p className="mt-6 max-w-xl type-body text-fd-muted-foreground">
             {glossaryTerms.length} terms for product, business, and engineering teams. Filter by
             category or scroll through all. Click any card to go deeper.
           </p>

@@ -63,7 +63,7 @@ export default function HomePage() {
           A practical guide to agent-ready products
         </p>
         <h1 className="max-w-3xl type-display">Make your website and app work with AI agents.</h1>
-        <p className="mt-6 max-w-2xl type-lead text-fd-muted-foreground">
+        <p className="mt-6 max-w-2xl type-body text-fd-muted-foreground">
           Help agents find your product, understand what it offers, and use it on a customer’s
           behalf. Here’s what to consider, why it matters, and where to start.
         </p>
@@ -117,7 +117,7 @@ export default function HomePage() {
                     {stage.question}
                   </h2>
                 </div>
-                <p className="self-end type-lead text-fd-muted-foreground">{stage.description}</p>
+                <p className="self-end type-body text-fd-muted-foreground">{stage.description}</p>
               </div>
               <RecommendationList stage={stage} />
             </div>
@@ -187,7 +187,7 @@ export default function HomePage() {
                 Install the Surface skill to apply this guidance to your codebase: explain a topic,
                 assess what exists, or turn the findings into an implementation plan.
               </p>
-              <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 type-data">
+              <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 type-small font-mono">
                 <code>npx skills add https://github.com/howells/agentsurface</code>
               </pre>
               <p className="mt-3 type-small text-fd-muted-foreground">
