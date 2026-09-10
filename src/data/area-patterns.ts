@@ -8,9 +8,9 @@ export interface AreaPattern {
   params: RileyParams;
 }
 
-// One structure per area, all drawn by the same hairline generator so they read as a series,
-// and all fraying out towards the bottom so the card heading sits among the last lines.
-// Edit these in the studio at /patterns, then run `pnpm patterns:render`.
+// Six shuffled wave fields from the generator, all running across and fraying out towards the
+// bottom so the card heading sits among the last lines. Edit them in the studio at /patterns,
+// then run `pnpm patterns:render`.
 export const AREA_PATTERNS: AreaPattern[] = [
   {
     id: "hatch",
@@ -18,91 +18,95 @@ export const AREA_PATTERNS: AreaPattern[] = [
     params: { ...RILEY_DEFAULTS },
   },
   {
-    // A signal spreading from a point.
+    // One broad swell with a travelling crest.
     id: "discoverability",
     name: "Discoverability",
     params: {
       ...RILEY_DEFAULTS,
-      focusX: 0.2,
-      focusY: 0.08,
-      kind: "ripple",
-      lines: 30,
-      loose: 0.55,
-      seed: 11,
-      spacingGrow: 0.25,
+      amplitude: 106,
+      compress: -0.07,
+      drift: 0.057,
+      lines: 25,
+      loose: 0.5,
+      seed: 5101,
+      wavelength: 897,
     },
   },
   {
-    // Bars gathering to a fold, after Movement in Squares.
+    // Near-straight lines settling into order.
     id: "understandability",
     name: "Understandability",
     params: {
       ...RILEY_DEFAULTS,
-      focusX: 0.6,
-      kind: "bars",
-      lines: 44,
-      loose: 0.55,
-      seed: 22,
-      spacingGrow: 0.7,
+      ampGrow: 0.33,
+      amplitude: 18,
+      drift: 0.097,
+      lines: 39,
+      loose: 0.5,
+      seed: 3784,
+      wavelength: 1005,
     },
   },
   {
-    // Two sets woven together.
+    // A crest running diagonally across the field.
     id: "connections",
     name: "Connections",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 12,
-      kind: "weave",
-      lines: 28,
-      loose: 0.55,
-      seed: 33,
-      wavelength: 700,
+      ampGrow: -0.34,
+      amplitude: 49,
+      compress: -0.5,
+      drift: 0.053,
+      lines: 39,
+      loose: 0.5,
+      seed: 2860,
+      spacingGrow: 0.01,
+      wavelength: 408,
     },
   },
   {
-    // Lines parting around an opening.
+    // Tight on the left, opening out to the right.
     id: "auth-identity",
     name: "Sign-in & permissions",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 30,
-      focusX: 0.55,
-      focusY: 0.32,
-      kind: "lens",
+      amplitude: 120,
+      compress: -0.56,
+      drift: -0.012,
       lines: 36,
-      loose: 0.55,
-      seed: 44,
-      wavelength: 800,
+      loose: 0.5,
+      seed: 4134,
+      wavelength: 745,
     },
   },
   {
-    // A route converging on its destination.
+    // A long sweep rising to one side.
     id: "usability",
     name: "Usability",
     params: {
       ...RILEY_DEFAULTS,
-      focusX: 1.05,
-      focusY: 0.98,
-      kind: "fan",
-      lines: 40,
-      loose: 0.55,
-      seed: 55,
-      wavelength: 700,
+      amplitude: 120,
+      drift: 0.033,
+      lines: 33,
+      loose: 0.5,
+      seed: 5826,
+      wavelength: 741,
     },
   },
   {
-    // Measured zigzag bands.
+    // Few, calm, evenly measured lines.
     id: "payments",
     name: "Payments",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 18,
-      kind: "chevron",
-      lines: 30,
-      loose: 0.55,
-      seed: 66,
-      wavelength: 260,
+      ampGrow: 0.53,
+      amplitude: 32,
+      drift: -0.072,
+      lines: 23,
+      loose: 0.5,
+      seed: 4485,
+      spacingGrow: 0.09,
+      wavelength: 310,
     },
   },
 ];

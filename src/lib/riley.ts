@@ -378,7 +378,7 @@ function runs(mask: boolean[]): [number, number][] {
         start = i;
       }
     } else if (start >= 0) {
-      if (i - start >= Math.min(mask.length * 0.12, 24)) {
+      if (i - start >= Math.min(mask.length * 0.18, 40)) {
         out.push([start, i]);
       }
       start = -1;
