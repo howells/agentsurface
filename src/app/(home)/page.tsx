@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import Image, { type StaticImageData } from "next/image";
+import Image from 'next/image';
+import type { StaticImageData } from 'next/image';
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
-import authIdentityArt from "@/assets/areas/auth-identity.png";
-import connectionsArt from "@/assets/areas/connections.png";
-import discoverabilityArt from "@/assets/areas/discoverability.png";
-import paymentsArt from "@/assets/areas/payments.png";
-import understandabilityArt from "@/assets/areas/understandability.png";
-import usabilityArt from "@/assets/areas/usability.png";
+import authIdentityArt from "@/assets/areas/auth-identity.svg";
+import connectionsArt from "@/assets/areas/connections.svg";
+import discoverabilityArt from "@/assets/areas/discoverability.svg";
+import paymentsArt from "@/assets/areas/payments.svg";
+import understandabilityArt from "@/assets/areas/understandability.svg";
+import usabilityArt from "@/assets/areas/usability.svg";
 import { AreaMark } from "@/components/AreaMark";
 import { AreaNav } from "@/components/AreaNav";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
@@ -16,8 +17,8 @@ import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
 import { cn } from "@/lib/utils";
 
-// One motif series of engraved line-pattern crops on white. Each runs off the top and sides of
-// its square and fades to white across the bottom third, so the card heading can rise into it.
+// Line fields drawn by src/lib/riley.ts from the presets in src/data/area-patterns.ts.
+// Tune them at /patterns, then `pnpm patterns:render` rewrites these files.
 const ILLUSTRATIONS: Record<string, StaticImageData> = {
   "auth-identity": authIdentityArt,
   connections: connectionsArt,
@@ -49,7 +50,8 @@ function AreaOverview() {
               href={`#${stage.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <span className="relative block aspect-square w-full">
+              {/* The field fills the square and fades out where the heading rises into it. */}
+              <span className="relative block aspect-square w-full [mask-image:linear-gradient(to_bottom,black_50%,transparent_74%)]">
                 {illustration ? (
                   <Image
                     src={illustration}
