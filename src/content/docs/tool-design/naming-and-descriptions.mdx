@@ -16,13 +16,13 @@ Use the same public name in registration, descriptions, prompts and dispatch. Ke
 
 Start with a concrete verb and a familiar object. Extra words should distinguish an operation the agent genuinely needs to choose.
 
-| Prefer | Avoid for a shopping assistant | Reason |
-| --- | --- | --- |
-| `read_paint` | `read_cached_paint` | The shopper needs paint details; the application chooses storage. |
-| `find_palette_ideas` | `find_palette_precedents` | Use the language of the task rather than specialist terminology. |
-| `find_paints` | `mg_find_paints` | An internal supplier abbreviation does not help select the action. |
-| `add_samples_to_cart` | `process_samples` | The name makes the mutation explicit. |
-| No separate diagnostic tool | `check_catalogue_connection` | The application handles connectivity and reports retrieval failures. |
+| Prefer                      | Avoid for a shopping assistant | Reason                                                               |
+| --------------------------- | ------------------------------ | -------------------------------------------------------------------- |
+| `read_paint`                | `read_cached_paint`            | The shopper needs paint details; the application chooses storage.    |
+| `find_palette_ideas`        | `find_palette_precedents`      | Use the language of the task rather than specialist terminology.     |
+| `find_paints`               | `mg_find_paints`               | An internal supplier abbreviation does not help select the action.   |
+| `add_samples_to_cart`       | `process_samples`              | The name makes the mutation explicit.                                |
+| No separate diagnostic tool | `check_catalogue_connection`   | The application handles connectivity and reports retrieval failures. |
 
 A diagnostic agent may genuinely need `check_connection`; a shopping assistant usually does not. Preserve source identity, freshness and actionable failure information in results without asking the model to manage infrastructure. These are Agent Surface design recommendations for the task boundary, not vendor prohibitions.
 
@@ -42,12 +42,12 @@ Anthropic recommends meaningful namespaces for large tool sets and reports that 
 
 Verified on 7 September 2026:
 
-| Source | What it actually says | Implication |
-| --- | --- | --- |
-| [MCP 2026-07-28: tool names](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names) | Recommends 1–128 characters, case sensitivity and ASCII letters, digits, underscores, hyphens or dots. Its valid examples include `getUser`. | MCP does not require snake_case or verb-first names. |
-| [Claude: define tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools) | User-defined client tool names match `^[a-zA-Z0-9_-]{1,64}$`. | A name valid for MCP may still need adaptation for a model provider. |
-| [OpenAI: function-calling practices](https://developers.openai.com/api/docs/guides/function-calling#best-practices-for-defining-functions) | Calls for clear, intuitive names and descriptions and moving work into code where possible. | A readable task boundary matters more than mechanical renaming. |
-| [Gemini: function-calling practices](https://ai.google.dev/gemini-api/docs/function-calling#best-practices) | Recommends descriptive function names and clear parameter descriptions. | Do not mistake a platform's examples for a universal casing mandate. |
+| Source                                                                                                                                     | What it actually says                                                                                                                        | Implication                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [MCP 2026-07-28: tool names](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names)                             | Recommends 1–128 characters, case sensitivity and ASCII letters, digits, underscores, hyphens or dots. Its valid examples include `getUser`. | MCP does not require snake_case or verb-first names.                 |
+| [Claude: define tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools)                 | User-defined client tool names match `^[a-zA-Z0-9_-]{1,64}$`.                                                                                | A name valid for MCP may still need adaptation for a model provider. |
+| [OpenAI: function-calling practices](https://developers.openai.com/api/docs/guides/function-calling#best-practices-for-defining-functions) | Calls for clear, intuitive names and descriptions and moving work into code where possible.                                                  | A readable task boundary matters more than mechanical renaming.      |
+| [Gemini: function-calling practices](https://ai.google.dev/gemini-api/docs/function-calling#best-practices)                                | Recommends descriptive function names and clear parameter descriptions.                                                                      | Do not mistake a platform's examples for a universal casing mandate. |
 
 No comparison reviewed here establishes that snake_case beats camelCase across models. Adopt one convention for consistency, then assess whether an agent selects the right operation, supplies valid arguments and completes the task. Avoid a cosmetic rename that leaves two tools semantically indistinguishable.
 
