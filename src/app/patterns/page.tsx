@@ -16,7 +16,9 @@ export default async function PatternsPage({
 }) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(await searchParams)) {
-    if (typeof value === "string") {query.set(key, value);}
+    if (typeof value === "string") {
+      query.set(key, value);
+    }
   }
   const initial = decodeRiley(query.toString(), RILEY_DEFAULTS);
 

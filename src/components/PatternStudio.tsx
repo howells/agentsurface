@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, Download, Link2, RotateCcw } from "lucide-react";
+import { Check, Copy, Download, Link2, RotateCcw, Shuffle } from "lucide-react";
 import { AREA_PATTERNS } from "@/data/area-patterns";
-import { RILEY_DEFAULTS, RILEY_RANGES, encodeRiley, rileyPaths, rileySvg } from '@/lib/riley';
-import type { RileyParams } from '@/lib/riley';
+import {
+  RILEY_DEFAULTS,
+  RILEY_RANGES,
+  encodeRiley,
+  randomRiley,
+  rileyPaths,
+  rileySvg,
+} from "@/lib/riley";
+import type { RileyParams } from "@/lib/riley";
 import { cn } from "@/lib/utils";
 
 type NumericKey = keyof typeof RILEY_RANGES;
@@ -37,6 +44,13 @@ const GROUPS: { title: string; controls: { key: NumericKey; label: string; unit?
     title: "Ribbon",
     controls: [{ key: "ribbon", label: "Swell on each crest" }],
   },
+  {
+    title: "Loose bottom",
+    controls: [
+      { key: "loose", label: "How far up the lines fray" },
+      { key: "seed", label: "Which lines drop out" },
+    ],
+  },
 ];
 
 const SIZE = 1024;
@@ -67,13 +81,20 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
   }, [query]);
 
   useEffect(() => {
-    if (!notice) {return;}
-    const id = setTimeout(() =>{  setNotice(null); }, 1600);
-    return () =>{  clearTimeout(id); };
+    if (!notice) {
+      return;
+    }
+    const id = setTimeout(() => {
+      setNotice(null);
+    }, 1600);
+    return () => {
+      clearTimeout(id);
+    };
   }, [notice]);
 
-  const update = (key: NumericKey, value: number) =>{ 
-    setParams((prev) => ({ ...prev, [key]: value })); };
+  const update = (key: NumericKey, value: number) => {
+    setParams((prev) => ({ ...prev, [key]: value }));
+  };
 
   const copy = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
@@ -102,7 +123,9 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                 key={preset.id}
                 type="button"
                 aria-pressed={active}
-                onClick={() =>{  setParams(preset.params); }}
+                onClick={() => {
+                  setParams(preset.params);
+                }}
                 className={cn(
                   "h-8 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
                   active
@@ -141,26 +164,37 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setParams((prev) => randomRiley(Date.now() % 1e9, { loose: prev.loose }));
+            }}
+            className={buttonStyle}
+          >
+            <Shuffle aria-hidden="true" className="size-3.5" /> Shuffle
+          </button>
           <button type="button" onClick={download} className={buttonStyle}>
             <Download aria-hidden="true" className="size-3.5" /> Download SVG
           </button>
           <button
             type="button"
-            onClick={ async () => copy(rileySvg(params, SIZE), "SVG copied")}
+            onClick={async () => copy(rileySvg(params, SIZE), "SVG copied")}
             className={buttonStyle}
           >
             <Copy aria-hidden="true" className="size-3.5" /> Copy SVG
           </button>
           <button
             type="button"
-            onClick={ async () => copy(location.href, "Link copied")}
+            onClick={async () => copy(location.href, "Link copied")}
             className={buttonStyle}
           >
             <Link2 aria-hidden="true" className="size-3.5" /> Copy link
           </button>
           <button
             type="button"
-            onClick={() =>{  setParams(RILEY_DEFAULTS); }}
+            onClick={() => {
+              setParams(RILEY_DEFAULTS);
+            }}
             disabled={samePreset(params, RILEY_DEFAULTS)}
             className={buttonStyle}
           >
@@ -180,7 +214,9 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
 
       <form
         className="space-y-7"
-        onSubmit={(event) =>{  event.preventDefault(); }}
+        onSubmit={(event) => {
+          event.preventDefault();
+        }}
         aria-label="Pattern settings"
       >
         <fieldset>
@@ -194,7 +230,9 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                 key={option.label}
                 type="button"
                 aria-pressed={params.vertical === option.vertical}
-                onClick={() =>{  setParams((prev) => ({ ...prev, vertical: option.vertical })); }}
+                onClick={() => {
+                  setParams((prev) => ({ ...prev, vertical: option.vertical }));
+                }}
                 className={cn(
                   "h-7 rounded font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
                   params.vertical === option.vertical
@@ -233,8 +271,12 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                       max={range.max}
                       step={range.step}
                       value={params[key]}
-                      onChange={(event) =>{  update(key, Number(event.target.value)); }}
-                      onDoubleClick={() =>{  update(key, RILEY_DEFAULTS[key]); }}
+                      onChange={(event) => {
+                        update(key, Number(event.target.value));
+                      }}
+                      onDoubleClick={() => {
+                        update(key, RILEY_DEFAULTS[key]);
+                      }}
                       className="mt-1.5 h-5 w-full cursor-pointer accent-fd-foreground"
                     />
                   </div>

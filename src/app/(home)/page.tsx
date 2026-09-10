@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Image from 'next/image';
-import type { StaticImageData } from 'next/image';
+import Image from "next/image";
+import type { StaticImageData } from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
 import authIdentityArt from "@/assets/areas/auth-identity.svg";
@@ -50,8 +50,8 @@ function AreaOverview() {
               href={`#${stage.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              {/* The field fills the square and fades out where the heading rises into it. */}
-              <span className="relative block aspect-square w-full [mask-image:linear-gradient(to_bottom,black_50%,transparent_74%)]">
+              {/* The field's lines fray out in its lower half, where the heading rises into it. */}
+              <span className="relative block aspect-square w-full">
                 {illustration ? (
                   <Image
                     src={illustration}

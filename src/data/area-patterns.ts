@@ -2,9 +2,14 @@
 import { RILEY_DEFAULTS } from '../lib/riley.ts';
 import type { RileyParams } from '../lib/riley.ts';
 
-export interface AreaPattern { id: string; name: string; params: RileyParams }
+export interface AreaPattern {
+  id: string;
+  name: string;
+  params: RileyParams;
+}
 
-// One line field per area, all drawn by the same generator so they read as a series.
+// One line field per area, all drawn by the same generator so they read as a series. Lines
+// run across and fray out towards the bottom, so the card heading sits among the last of them.
 // Edit these in the studio at /patterns, then run `pnpm patterns:render`.
 export const AREA_PATTERNS: AreaPattern[] = [
   {
@@ -13,74 +18,92 @@ export const AREA_PATTERNS: AreaPattern[] = [
     params: { ...RILEY_DEFAULTS },
   },
   {
-    // A signal spreading: waves at the top settle to calm lines below.
+    // One broad swell, sparse and open.
     id: "discoverability",
     name: "Discoverability",
     params: {
       ...RILEY_DEFAULTS,
-      ampGrow: -1,
-      amplitude: 56,
-      drift: 0.035,
-      lines: 34,
-      wavelength: 480,
+      amplitude: 103,
+      lines: 24,
+      loose: 0.55,
+      seed: 7563,
+      wavelength: 853,
     },
   },
   {
-    // Noise on the left resolving into order on the right.
+    // Flat lines at the top gathering into waves lower down.
     id: "understandability",
     name: "Understandability",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 26,
-      compress: -0.9,
-      drift: 0.07,
-      lines: 38,
-      wavelength: 260,
+      ampGrow: 0.77,
+      amplitude: 56,
+      compress: 0.7,
+      lines: 39,
+      loose: 0.55,
+      seed: 8575,
+      spacingGrow: 0.21,
+      wavelength: 667,
     },
   },
   {
-    // Two fields woven: a travelling crest across vertical lines.
+    // A crest travelling diagonally across the field.
     id: "connections",
     name: "Connections",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 30,
-      drift: 0.12,
-      lines: 38,
-      vertical: true,
-      wavelength: 380,
+      ampGrow: 0.55,
+      amplitude: 86,
+      drift: -0.02,
+      lines: 30,
+      loose: 0.55,
+      seed: 2706,
+      spacingGrow: 0.18,
+      wavelength: 523,
     },
   },
   {
-    // Lines gathering towards one boundary.
+    // Lines packed tight at the top, opening out below.
     id: "auth-identity",
     name: "Sign-in & permissions",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 22,
-      lines: 38,
-      spacingGrow: 0.4,
-      vertical: true,
-      wavelength: 620,
+      amplitude: 120,
+      compress: -0.45,
+      lines: 41,
+      loose: 0.55,
+      seed: 5395,
+      spacingGrow: -0.19,
+      wavelength: 667,
     },
   },
   {
-    // A long sweep tightening towards its destination.
+    // A long sweep rising to one side.
     id: "usability",
     name: "Usability",
     params: {
       ...RILEY_DEFAULTS,
-      amplitude: 48,
-      compress: 0.7,
-      drift: 0.025,
-      lines: 34,
-      wavelength: 760,
+      amplitude: 120,
+      drift: 0.015,
+      lines: 43,
+      loose: 0.55,
+      seed: 8707,
+      spacingGrow: 0.36,
+      wavelength: 769,
     },
   },
   {
-    // Measured bands: alternate lines inverted so they meet in lenses.
+    // Few, calm, evenly measured lines.
     id: "payments",
     name: "Payments",
-    params: { ...RILEY_DEFAULTS, amplitude: 9, drift: 0.5, lines: 30, wavelength: 210 },
+    params: {
+      ...RILEY_DEFAULTS,
+      amplitude: 46,
+      drift: 0.045,
+      lines: 23,
+      loose: 0.55,
+      seed: 5851,
+      wavelength: 756,
+    },
   },
 ];

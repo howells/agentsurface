@@ -10,7 +10,9 @@ const outDir = path.join(import.meta.dirname, "../src/assets/areas");
 await mkdir(outDir, { recursive: true });
 
 for (const pattern of AREA_PATTERNS) {
-  if (pattern.id === "hatch") {continue;}
+  if (pattern.id === "hatch") {
+    continue;
+  }
   const file = path.join(outDir, `${pattern.id}.svg`);
   await writeFile(file, rileySvg(pattern.params));
   console.log(`wrote ${path.relative(process.cwd(), file)}`);
