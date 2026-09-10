@@ -57,7 +57,7 @@ Authorization-server capabilities such as `grant_types_supported`, `response_typ
 If your service supports agentic user registration through `auth.md`, keep the split explicit:
 
 - Protected-resource metadata tells the agent which resource it is calling and which authorization servers protect it.
-- Authorization server metadata advertises the optional `agent_auth` block with registration, claim, and revocation endpoints.
+- Authorization server metadata advertises the optional `agent_auth` block with identity, claim, and provider-event endpoints. Token revocation remains a top-level OAuth endpoint.
 - `auth.md` gives agents a readable walkthrough of the same flow, including supported registration methods, scopes, error recovery, and contact links.
 
 A protected resource can point agents toward the registration path without embedding registration details directly:
@@ -75,9 +75,12 @@ Then the authorization server metadata can advertise supported agent registratio
   "token_endpoint": "https://auth.example.com/oauth/token",
   "agent_auth": {
     "skill": "https://example.com/auth.md",
-    "register_uri": "https://auth.example.com/agent/auth",
-    "claim_uri": "https://auth.example.com/agent/auth/claim",
-    "identity_types_supported": ["identity_assertion", "anonymous"]
+    "identity_endpoint": "https://auth.example.com/agent/identity",
+    "claim_endpoint": "https://auth.example.com/agent/identity/claim",
+    "identity_types_supported": ["identity_assertion", "anonymous"],
+    "identity_assertion": {
+      "assertion_types_supported": ["urn:ietf:params:oauth:token-type:id-jag"]
+    }
   }
 }
 ```

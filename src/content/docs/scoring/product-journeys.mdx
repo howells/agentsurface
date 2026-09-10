@@ -1,0 +1,61 @@
+---
+title: Evaluating Product Journeys
+description: Assess whether an agent can discover a product, make an informed choice, act with permission, and verify the result
+---
+
+Start an audit with a task someone actually wants completed. An agent may need to find a suitable product, compare its terms, obtain permission, perform an action, and report what happened. Agent Surface evaluates the surfaces that support that journey together, using the existing [scoring dimensions](/docs/scoring/rubric).
+
+Choose a representative request, the intended client, the acting identity, and an observable completion condition. For example: “Find two available samples within this budget and prepare a cart for review.” Define the boundary between preparation and purchase before testing.
+
+## Begin where the customer begins
+
+Start from a search result, product page, documentation link, or installed integration. Follow the links actually available there. Record any endpoint, credential flow, or product identifier the tester had to supply from private knowledge. That missing connection is part of the finding.
+
+A useful entry point explains what the product does, when it fits, its limits, and the next usable action. Verify consistent identity across the domain, structured data, official packages, and any relevant listings. Measure external search visibility with a repeatable query set and record date, region, and returned sources. External visibility complements the [discovery surface](/docs/discovery); it does not establish that the product works.
+
+## Make the decision facts available
+
+Agents need the facts a person would use to choose correctly. Publish authoritative prices, units, availability, regional constraints, shipping and return terms, or service quotas where those facts affect the task. Give each offer or resource a stable identity and a source URL. Mark uncertainty explicitly and refresh volatile facts before an action commits them.
+
+A product page, JSON-LD offer, Markdown representation, search result, and API response should agree because they draw from the same owned source. Test one real item across those surfaces. A mismatch is a data or publishing defect, even when every representation parses correctly. See [commercial and entity discovery](/docs/discovery/commercial-and-entity-discovery).
+
+## Follow a supported action path
+
+Select an interface the intended client can use: HTTP API, MCP, CLI, or browser UI. Check that discovery leads to an accurate contract and then to a working operation. Alternate interfaces should preserve business rules and authorization. Split services when audiences, permissions, or lifecycle justify it.
+
+For browser journeys, verify landmarks, control names, labels, focus, validation, and actual effects. Explicit browser tools can simplify a task, while accessible UI remains useful to people and other clients. See [browser accessibility](/docs/agentic-ui/browser-agent-accessibility).
+
+For API journeys, verify response schemas, collection traversal, durable job status, partial failures, and bounded bulk operations as needed. A client must be able to determine what to do next from the response. See [retrieval and job contracts](/docs/api-surface/retrieval-and-job-contracts).
+
+## Put authority at the commitment boundary
+
+Identify whose resources are being accessed and who is permitted to authorize the action. Public reads may need no credentials. User-delegated access requires a supported consent and credential flow; service-owned access has its own identity boundary. Verify insufficient permissions, expired credentials, and attempts to access another user's resource. Use [authentication guidance](/docs/authentication) for the implemented flow.
+
+For a purchase, distinguish selecting an offer, preparing a cart, authorizing spend, settling payment, and confirming the order. Present the final amount, currency, merchant, and relevant terms before commitment. A successful payment is not necessarily successful fulfillment. Select [payment protocols](/docs/protocols/agentic-commerce) based on real client and provider support.
+
+## Recover without guessing or repeating effects
+
+Exercise one failure that matters to the task: unavailable inventory, invalid input, expired permission, a rate limit, or an interrupted mutation. The response should identify what happened, whether retry is safe, and a useful next action.
+
+After an interrupted write, reconcile through a stable operation or resource identifier before resubmitting. Check idempotency where retries can repeat an effect. Verify missing-page recovery, expired job behavior, and actionable partial errors where relevant. See [error handling](/docs/error-handling).
+
+## Verify the outcome
+
+Observe the authoritative result: a saved object, reviewed cart, confirmed booking, downloaded artifact, or completed job. Preserve its identifier and status. Compare that result with what the interface told the user. A success message, accepted job, or payment receipt proves only its own stage.
+
+Use an isolated test environment for consequential flows when available, and stay within the authorized boundary. Record unsupported clients and unverified steps explicitly. A frontend screenshot, schema validation, and a successful API response are different evidence; retain the evidence that establishes the intended outcome.
+
+## Apply findings to the existing rubric
+
+| Finding                                                                     | Primary Surface dimension                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| A caller cannot locate the right entry point or identify the product        | Discovery & AEO                                                                 |
+| Relevant prices, availability, or source facts cannot be retrieved reliably | Data Retrievability                                                             |
+| An operation's inputs, result, continuation, or lifecycle are unclear       | API Surface, CLI Design, MCP Server, or Tool Design, according to the interface |
+| The acting identity cannot obtain or stay within the right permissions      | Authentication                                                                  |
+| Failure or interruption leaves the caller without a safe next step          | Error Handling                                                                  |
+| No evidence establishes the final result through the intended client        | Testing                                                                         |
+
+Assign the root cause to its primary dimension and describe cross-surface effects without counting one defect repeatedly. Judge the capability and its consequences; do not award readiness for the number of protocol files or listings present. Existing score definitions and totals remain unchanged.
+
+Use `/templates/discovery/product-journey-audit.md` to retain the task, evidence, findings, owner, and verification after a fix. External reports can supply leads. Reproduce the relevant behavior on the deployed product, distinguish inapplicable checks from unknown behavior, and prioritize the earliest defect that blocks the user's outcome.

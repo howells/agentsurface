@@ -1,0 +1,37 @@
+---
+title: DNS Discovery for Agent Services
+description: Advertise agent endpoints through DNS when your clients support the emerging DNS-AID proposal
+lastVerified: 2026-09-10
+---
+
+DNS-AID lets an organization advertise agent services through its domain's DNS records. A compatible client can look up connection details from a known domain, then use the advertised protocol to contact the service.
+
+## When to use it
+
+Consider DNS discovery when you operate agent services and an intended client supports it. Keep HTTP discovery through [well-known endpoints](/docs/discovery/well-known-endpoints) and [catalogs](/docs/discovery/catalogs-and-feeds) available to other clients.
+
+As verified on 10 September 2026, DNS-AID revision 02 is an **active individual Internet-Draft**. It is not an RFC or an IETF-endorsed standard. Pin the revision your client implements before publishing records. [Draft status](https://datatracker.ietf.org/doc/draft-mozleywilliams-dnsop-dnsaid/).
+
+## What to publish
+
+The proposal uses service binding records to describe connections. Agree on the record names, protocol identifiers and parameters with your client implementation; do not assume every client supports every discovery route.
+
+[Cloudflare's published implementation guide](https://isitagentready.com/.well-known/agent-skills/dns-aid/SKILL.md) uses names under `_agents`, ServiceMode SVCB records or HTTPS records, and connection parameters such as protocol and port. Its scanner probes `_index._agents`, `_a2a._agents` and `_mcp._agents` with both record types, plus a TXT index. These are scanner probes, not a requirement to publish services you do not operate.
+
+Use your DNS provider's record editor or infrastructure configuration. Keep records tied to the same service inventory as your HTTP metadata. Choose a TTL that allows planned endpoint changes, and remove obsolete records when a service is retired.
+
+## Verify discovery through to use
+
+1. Query the names the intended client uses. For example, `dig SVCB _mcp._agents.example.com +dnssec` inspects one possible entry point; substitute your domain and client's record name.
+2. Check that the client understands the returned target and parameters. An empty answer, unsupported record or parse failure needs an explicit fallback or error.
+3. Validate DNSSEC using a trusted validating resolver. Requesting DNSSEC data with `+dnssec` alone does not establish that validation succeeded. Cloudflare's guide recommends signing public discovery zones.
+4. Connect to the advertised endpoint, verify TLS, and exercise a read-only operation using the advertised protocol. Continue to enforce the service's authentication and permission requirements.
+5. Repeat with the actual supported client after a DNS or endpoint change. Keep the lookup, resolver, validation result, endpoint response and timestamp as evidence.
+
+DNSSEC authenticates DNS data. It does not establish that a service is safe, authorize a tool call, or replace TLS and application authorization. Treat discovered endpoints as untrusted until the relevant checks succeed.
+
+## How to interpret a scanner result
+
+Cloudflare checks DNS-AID independently. Its catalog check also probes `_catalog._agents` TXT and `_search._agents` SRV records; those are separate routes within catalog discovery. A scan can show what was found, but cannot establish compatibility with every client.
+
+Record DNS-AID as optional unless your product promises it to a supported consumer. A website that has no such integration does not need DNS records merely to improve a score. See the [public scanner comparison](/docs/tooling-catalog/evaluation-and-observability#cloudflare-agent-readiness) for the distinction between coverage and implementation requirements.

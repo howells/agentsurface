@@ -1,0 +1,1294 @@
+{
+  "retrievedAt": "2026-09-10T08:41:25.883217+00:00",
+  "source": "https://ora.ai/api/checks",
+  "contractVersion": "1.24.0",
+  "sourceSha256": "96ad41e16cb18cc32c94ea1bb010382b9e8b19de3b289a3603a6a43ac7bf4a37",
+  "sourceHttpAgeSeconds": 0,
+  "scope": "Coverage of the latest publicly exposed check catalog, not a claim about unpublished scanner internals or product conformance.",
+  "isAgentic": {
+    "source": "https://is-agentic.com/methodology",
+    "relationship": "Runs and scores Ora checks; groups by maturity and applicability. No independent check catalog or methodology version is published on the reviewed page."
+  },
+  "supportingSources": [
+    {
+      "url": "https://is-agentic.com/methodology",
+      "retrievedAt": "2026-09-10T08:42:40.732945+00:00",
+      "sha256": "05cc3305e7dc0a09b5945a310cd82a69654cef235aba08afb8859221aad3f5e4",
+      "age": "0",
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "url": "https://is-agentic.com/docs",
+      "retrievedAt": "2026-09-10T08:42:40.910690+00:00",
+      "sha256": "e42910a37464fa9bc4cb72ba5cf440c09f990c521e84b06182f4f18be47495a5",
+      "age": "0",
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "url": "https://ora.ai/methodology",
+      "retrievedAt": "2026-09-10T08:42:41.296941+00:00",
+      "sha256": "9b7ec317f464bd741e7e65e1fad0830e8a403b3d85b04c9158d1e8322f05b63f",
+      "age": "5760",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://mpp.dev/overview",
+      "retrievedAt": "2026-09-10T08:42:41.928817+00:00",
+      "sha256": "39c571e5ff17b80020b09726305c463d8b0e3d1c3db9f45ac807285d14b90dd4",
+      "age": "0",
+      "contentType": "text/markdown; charset=utf-8"
+    }
+  ],
+  "checks": [
+    {
+      "id": "ard-catalog",
+      "name": "ARD discovery",
+      "layer": "discovery",
+      "definitionSha256": "a183175a1b58caa4c4553f0cb2eecf5e379e17e60c29f6ded8a9dfa862cdd204",
+      "cardId": "catalogs",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "adapted",
+      "note": "Use the current ARD schema supported by the consumer; do not equate file presence with a working capability."
+    },
+    {
+      "id": "ai-catalog-published",
+      "name": "AI Catalog discovery",
+      "layer": "discovery",
+      "definitionSha256": "097313220fac568b0a830c72015d37c188bfbc309cab6de078e82f06bf2063cb",
+      "cardId": "catalogs",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "adapted",
+      "note": "AI Catalog has its own schema. Do not repeat the scanner claim that an ARD document always works unchanged."
+    },
+    {
+      "id": "ard-entries-valid",
+      "name": "ARD entry validity",
+      "layer": "discovery",
+      "definitionSha256": "9e418a9a91e129b3a6b4cd5d53205a44c2e251d8f4ead91ffe65172c28a91bb2",
+      "cardId": "catalogs",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ard-trust-manifest",
+      "name": "ARD trust manifest",
+      "layer": "discovery",
+      "definitionSha256": "ff71be9b8b7e482b44d510061fb6c212cb475c0ffa23239220ec457f8a2a0aa4",
+      "cardId": "verifiable-trust",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "adapted",
+      "note": "Publish only substantiated claims; validate issuer and subject rather than awarding trust for a field."
+    },
+    {
+      "id": "agentic-search-usecase",
+      "name": "Category share of voice",
+      "layer": "discovery",
+      "definitionSha256": "450842274fe7ff819293e0f0c6a9bc024a6a972e664d1bc95317751fcb930360",
+      "cardId": "search-visibility",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agentic-search-specific",
+      "name": "Developer resource discoverability",
+      "layer": "discovery",
+      "definitionSha256": "fe3f98cc48a6848b4d790e4efca8fd5821a7597d1f6d69245ad479e73ee834fd",
+      "cardId": "search-visibility",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "brand-search-accuracy",
+      "name": "Brand name discoverability",
+      "layer": "discovery",
+      "definitionSha256": "3d3e08c4167472de5205b9ff51522825be6019b097d411c9f012a8a0b48f2b11",
+      "cardId": "search-visibility",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "wikipedia-presence",
+      "name": "Wikipedia / Wikidata entity presence",
+      "layer": "discovery",
+      "definitionSha256": "03fa2b034fd59557b4149d1353d5211e6a9d8dd2691eb45eefc73b9b141b619b",
+      "cardId": "search-visibility",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "adapted",
+      "note": "Earn independent coverage and check eligibility; no blanket recommendation to create an encyclopedia article."
+    },
+    {
+      "id": "sitemap",
+      "name": "Sitemap exists",
+      "layer": "accessibility",
+      "definitionSha256": "76620a2046585104fd67d2d6e51735af21e3aa95a1b56cfcea4214ce504510d4",
+      "cardId": "sitemaps",
+      "reference": "/docs/discovery/aeo-checklist",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "content-no-js",
+      "name": "Content without JavaScript",
+      "layer": "accessibility",
+      "definitionSha256": "b9ea7cdc519b46c4d421576cdcae3785928ef89037e8a504acd0ea6cd9437ffc",
+      "cardId": "readable-pages",
+      "reference": "/docs/discovery/content-structure",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "bot-detection",
+      "name": "Not blocked by bot detection",
+      "layer": "accessibility",
+      "definitionSha256": "3d79bd2ce19bca4ea3d1b8ad8024f2bc8419f78bd09268f003a5492920e862c7",
+      "cardId": "crawler-access",
+      "reference": "/docs/discovery/robots-txt",
+      "treatment": "adapted",
+      "note": "Choose access policy by intended traffic; a User-Agent string does not prove identity."
+    },
+    {
+      "id": "robots-ai-policy-quality",
+      "name": "robots.txt AI crawler policy",
+      "layer": "discovery",
+      "definitionSha256": "e92dc2912663482aaa5d49f58ab0f35c41e735b4fc9ee03dc0c109f4c61e628c",
+      "cardId": "crawler-access",
+      "reference": "/docs/discovery/robots-txt",
+      "treatment": "adapted",
+      "note": "Search, user retrieval, and training are distinct policy choices. Do not copy a blanket crawler allowlist."
+    },
+    {
+      "id": "agent-discovery-file",
+      "name": "Agent discovery file",
+      "layer": "accessibility",
+      "definitionSha256": "3529b1a4d8886736eadf77ef8ca32f3a296a12468a8eef272d0aa530c21b37a0",
+      "cardId": "task-guidance",
+      "reference": "/docs/discovery/llms-txt",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-skills-index-v2",
+      "name": "Agent Skills index conformance (v0.2.0)",
+      "layer": "accessibility",
+      "definitionSha256": "ea3f186da4fa1ceca638a70e0bce38b65dcaa242e2dad2a9427a47f16d905656",
+      "cardId": "task-guidance",
+      "reference": "/docs/discovery/agent-skills",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "a2a-agent-card",
+      "name": "A2A / agent-card",
+      "layer": "accessibility",
+      "definitionSha256": "e50c8951810920045cead41d0892459e830ccf117b5f415818a0287a6791ef94",
+      "cardId": "delegation",
+      "reference": "/docs/protocols/a2a",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-registry-listed",
+      "name": "Listed in MCP registries",
+      "layer": "discovery",
+      "definitionSha256": "12b129e54803e67facfd3b01e3f724e501df2c562a6699fffda4f7af5ac36a02",
+      "cardId": "distribution",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "npm-sdk-package",
+      "name": "NPM/PyPI SDK package",
+      "layer": "discovery",
+      "definitionSha256": "a7b2ce8767122867104b0bd3a3bf25f05447afebbc81f34f3f01eba006130c76",
+      "cardId": "official-sdks",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-rules-repo",
+      "name": "Agent platform configs",
+      "layer": "discovery",
+      "definitionSha256": "f257b8e74ef9a720d548887ec3ad74aa08fd72686c31318a18fd7b372f6f62d3",
+      "cardId": "repo-instructions",
+      "reference": "/docs/discovery/agents-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-plugins-repo",
+      "name": "Agent Plugins manifest",
+      "layer": "discovery",
+      "definitionSha256": "039fee74b15434052d95ab026d7750a9060611950d20bc1d6793e98520edf40d",
+      "cardId": "agent-plugins",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "skills-sh-listed",
+      "name": "Listed on skills.sh",
+      "layer": "discovery",
+      "definitionSha256": "ec936c54777c88b9cd0d756fd3b772a5278cd874eda54bd693fa66a6c9e05e82",
+      "cardId": "distribution",
+      "reference": "/docs/discovery/agent-skills",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "pricing-md",
+      "name": "pricing.md exists",
+      "layer": "accessibility",
+      "definitionSha256": "8968c3b98d254f4aa00d6a5e7c8a9c0ae57de4732cd576465c816dfa821ff3b6",
+      "cardId": "pricing",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "nlweb-schema-feeds",
+      "name": "NLWeb Schema Feeds",
+      "layer": "accessibility",
+      "definitionSha256": "331cf795c6bbb0e816385c4664774acd57ba0e1b6e4034c2761d9a0af17f8b82",
+      "cardId": "catalogs",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-well-known-discovery",
+      "name": "MCP well-known discovery",
+      "layer": "accessibility",
+      "definitionSha256": "76e732a58f44b148e7538dd6db236c221fcfd4173eb8dd3c0c76095a01630650",
+      "cardId": "endpoint-discovery",
+      "reference": "/docs/discovery/well-known-endpoints",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-mode-view",
+      "name": "Agent mode view",
+      "layer": "accessibility",
+      "definitionSha256": "b3122cc08d0348b146375353bef2d82cde8c2cdfdbbd25382aa127b1e6f430ce",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "adapted",
+      "note": "Provide an equivalent agent-readable representation where useful; the query parameter itself is not a universal requirement."
+    },
+    {
+      "id": "link-headers-discovery",
+      "name": "HTTP Link headers (RFC 8288)",
+      "layer": "accessibility",
+      "definitionSha256": "bb316da793a696361b399d54f65aa205b084a762d10d59da8404bf50dac8bfd7",
+      "cardId": "endpoint-discovery",
+      "reference": "/docs/discovery/well-known-endpoints",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "markdown-url-fallback",
+      "name": "Markdown URL fallback",
+      "layer": "accessibility",
+      "definitionSha256": "5ccd410cb31ed22cd5c3d29bec9756c6a22d8585d4f01da99fad11825e6248f9",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "modular-llms-txt",
+      "name": "Modular llms.txt per product area",
+      "layer": "accessibility",
+      "definitionSha256": "56d90d64d72881337ba6322125a714fe41f81f61f86cccd6a55e471107e6628f",
+      "cardId": "llms-index",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "registry-branding",
+      "name": "Registry branding",
+      "layer": "discovery",
+      "definitionSha256": "98424c5f1284129e54e4e5e4a7f6bddc4f42006deb676b4d23b20f9d5f834fcb",
+      "cardId": "distribution",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "chatgpt-app-listed",
+      "name": "ChatGPT app listed",
+      "layer": "discovery",
+      "definitionSha256": "76bd1d59a7061fd6adba43757cedb324448aaff2089868c524ef8da004fb84ad",
+      "cardId": "distribution",
+      "reference": "/docs/agentic-ui/mcp-apps",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "sitemap-lastmod",
+      "name": "Sitemap freshness (lastmod)",
+      "layer": "accessibility",
+      "definitionSha256": "238939c09c38ed2f6813057d097d61b43ed709f6b435c46cdbec9bcd4933abac",
+      "cardId": "sitemaps",
+      "reference": "/docs/discovery/aeo-checklist",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "robots-agent-user-policy",
+      "name": "robots.txt agent-user policy",
+      "layer": "accessibility",
+      "definitionSha256": "0cdb2ff4453c4f0468236e3ffcb2e4dd2166f4c0f63acc1ea4916c6f2b821296",
+      "cardId": "crawler-access",
+      "reference": "/docs/discovery/robots-txt",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "llms-txt-exists",
+      "name": "llms.txt exists",
+      "layer": "accessibility",
+      "definitionSha256": "0bb44ba8e6b8f1ba417788701c2336dcee1ada6c57e219fab826120ee68b6dcb",
+      "cardId": "llms-index",
+      "reference": "/docs/discovery/llms-txt",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "llms-txt-formatting",
+      "name": "llms.txt formatting",
+      "layer": "accessibility",
+      "definitionSha256": "61ca59216fde0c6ed1eb529cd501495f19131098b0cd3ae769f7e34e514f12c8",
+      "cardId": "llms-index",
+      "reference": "/docs/discovery/llms-txt",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "json-ld",
+      "name": "JSON-LD structured data",
+      "layer": "accessibility",
+      "definitionSha256": "6dfdab1a0520900794613af2e037fea5f8d69dab9f2096f052919f47368657fb",
+      "cardId": "structured-data",
+      "reference": "/docs/discovery/structured-data",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "pricing-info",
+      "name": "Pricing info accessible",
+      "layer": "accessibility",
+      "definitionSha256": "155287193d5252bfe6895d1a9101c7aa11697ea90da68251ceeb73bb7253bf73",
+      "cardId": "pricing",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "public-api-docs",
+      "name": "Public API/docs linked from homepage",
+      "layer": "accessibility",
+      "definitionSha256": "dc09017976f9b3181a2a1aef226eea8d6185faa6dab17a55cc1c894bbe218862",
+      "cardId": "public-docs",
+      "reference": "/docs/api-surface/openapi-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-instruction",
+      "name": "Agent instruction / when-to-use",
+      "layer": "accessibility",
+      "definitionSha256": "3693ce9553ac0d4e71807077397282bad02800f35d57df382edf717d7471f5a1",
+      "cardId": "product-purpose",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "skills-sh-quality",
+      "name": "Skills.sh skill quality",
+      "layer": "accessibility",
+      "definitionSha256": "5d12d01bdba045910a270f3f29c8684e3cf567c0f45386379f0b0f8762cb9915",
+      "cardId": "task-guidance",
+      "reference": "/docs/discovery/agent-skills",
+      "treatment": "adapted",
+      "note": "Publish useful focused skills; more repositories are not intrinsically better."
+    },
+    {
+      "id": "json-ld-entity-linking",
+      "name": "JSON-LD entity linking (sameAs)",
+      "layer": "accessibility",
+      "definitionSha256": "862f208c38edd63cde98768b92ef7193b2a6d83eca90105970c76f1897685f10",
+      "cardId": "identity",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-tool-descriptions",
+      "name": "MCP tool descriptions",
+      "layer": "usability",
+      "definitionSha256": "a06dfea99191bfe88ee533b8603aa2f2dfc21c1a2e95c7dbfa42778fae87f9c6",
+      "cardId": "tool-contracts",
+      "reference": "/docs/mcp-servers/tool-best-practices",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-param-schemas",
+      "name": "MCP parameter schemas",
+      "layer": "usability",
+      "definitionSha256": "63d135fb8c25b5883fe54d0879c5b96204d96248d559d9bd5e819b8f6c1213ab",
+      "cardId": "tool-contracts",
+      "reference": "/docs/tool-design/schemas",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-server-identity",
+      "name": "MCP server identity",
+      "layer": "usability",
+      "definitionSha256": "72c9eed84f4dd61691b4f083d48389d7595f3610c86a91c415d74dca1744da85",
+      "cardId": "mcp",
+      "reference": "/docs/mcp-servers/architecture",
+      "treatment": "adapted",
+      "note": "Declare identity and capabilities through the protocol revision the client actually supports; do not hardcode an obsolete handshake."
+    },
+    {
+      "id": "metadata-completeness",
+      "name": "Metadata completeness",
+      "layer": "accessibility",
+      "definitionSha256": "fd62df28f7f65c4e1f9f538b790b4ee5d049b402fd02fb45dd9449699456b11a",
+      "cardId": "page-metadata",
+      "reference": "/docs/discovery/structured-data",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "org-schema-completeness",
+      "name": "Organization schema completeness",
+      "layer": "accessibility",
+      "definitionSha256": "49922757e8605c42fb2559d1b2436cd5686235e0d5c4ffad46e6eed8db61d6b3",
+      "cardId": "identity",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "adapted",
+      "note": "Include accurate, appropriate contact information; do not fabricate an address."
+    },
+    {
+      "id": "schema-type-breadth",
+      "name": "Schema type breadth",
+      "layer": "accessibility",
+      "definitionSha256": "45a9e759e058d187d631178a09f3db02aa6b2720b5ae85f5c42dcfd85eede610",
+      "cardId": "structured-data",
+      "reference": "/docs/discovery/structured-data",
+      "treatment": "adapted",
+      "note": "Use applicable types backed by real facts; do not invent ratings or reviews."
+    },
+    {
+      "id": "trust-anchors",
+      "name": "Trust anchor pages",
+      "layer": "accessibility",
+      "definitionSha256": "2767af79dcff03c9b98581285a277055d6a3595c22303c10b70312b45993dd03",
+      "cardId": "identity",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-tool-listing",
+      "name": "MCP tool listing",
+      "layer": "usability",
+      "definitionSha256": "b05db6f7ba8ba3a8ec06e84b27760c38c853ffd3baf698402976011892436af2",
+      "cardId": "mcp",
+      "reference": "/docs/mcp-servers/resources-prompts",
+      "treatment": "adapted",
+      "note": "Expose useful operations. No arbitrary minimum tool count or obligation to add writes."
+    },
+    {
+      "id": "mcp-tool-naming",
+      "name": "MCP tool naming",
+      "layer": "usability",
+      "definitionSha256": "9b646ba6fe659abba22fe95bcc03575dca51d52eeb7c882496b98261b191b47c",
+      "cardId": "tool-contracts",
+      "reference": "/docs/tool-design/naming-and-descriptions",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "llms-txt-links-resolve",
+      "name": "llms.txt links resolve",
+      "layer": "accessibility",
+      "definitionSha256": "dea6d90a5cb04e4900f8051da2fa5dc6d6c468a44710d6da3b6535eb81731a6b",
+      "cardId": "llms-index",
+      "reference": "/docs/discovery/llms-txt",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "markdown-link-alternate",
+      "name": "Markdown alternate link",
+      "layer": "accessibility",
+      "definitionSha256": "6f94144f68ff5f89c85830194b01d2b2d59acaf4f883d5d020d9ca963196abe0",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "markdown-frontmatter",
+      "name": "Markdown frontmatter metadata",
+      "layer": "accessibility",
+      "definitionSha256": "92209021de5d391de22f0ba1694821325da53d815d8107dee3cc0eda8237755d",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "redirect-hygiene",
+      "name": "Redirect hygiene",
+      "layer": "accessibility",
+      "definitionSha256": "54b3eede79811bf0871c9bd48585bd6ca478ad86b8bcc864fbabbcf2e7fcb47f",
+      "cardId": "sitemaps",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "page-token-budget",
+      "name": "Page token budget",
+      "layer": "accessibility",
+      "definitionSha256": "a0455998169ccc4ee6071cbf0a01de39e3c2656f9ee848fe50db2da3f811850b",
+      "cardId": "readable-pages",
+      "reference": "/docs/discovery/content-structure",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "code-fence-validity",
+      "name": "Code fence validity",
+      "layer": "accessibility",
+      "definitionSha256": "b558ff9f875ca4888739abad9cc6459fcdf9bda1a94e17dfb6f8ad841760896d",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-structure",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "docs-auth-gate",
+      "name": "Content behind auth",
+      "layer": "accessibility",
+      "definitionSha256": "d22ecd440a5a6a0070f02ef8bb784e4bac90f0c4861cff9a79ea009c46438061",
+      "cardId": "public-docs",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "public-api",
+      "name": "Public API with reachable endpoints",
+      "layer": "usability",
+      "definitionSha256": "ef94edff8d2d4b0c1701d3ecc7422100d022dbeb060e533f79db572882dbc035",
+      "cardId": "working-api",
+      "reference": "/docs/api-surface/openapi-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "openapi-spec",
+      "name": "OpenAPI spec published",
+      "layer": "accessibility",
+      "definitionSha256": "09611478da10537a89acea1787e35b744f194e9d5ee224b4b2b54e48120241c9",
+      "cardId": "api-specification",
+      "reference": "/docs/api-surface/openapi-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "oauth-support",
+      "name": "OAuth 2.0 support",
+      "layer": "usability",
+      "definitionSha256": "e8f15751ab27be1c55b8cb5fcbab5fa1771eff70ec832a7760f755c342b5aed6",
+      "cardId": "auth-onboarding",
+      "reference": "/docs/authentication/oauth-for-agents",
+      "treatment": "adapted",
+      "note": "Use OAuth for delegated protected access when appropriate; public resources may be anonymous."
+    },
+    {
+      "id": "scoped-permissions",
+      "name": "Scoped permissions",
+      "layer": "usability",
+      "definitionSha256": "ffb1e1b8e8ee35071551035f405aebb7bc785006acd8f3ea0652591c9348e8cc",
+      "cardId": "permissions",
+      "reference": "/docs/authentication/oauth-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "developer-portal",
+      "name": "Developer portal",
+      "layer": "accessibility",
+      "definitionSha256": "58b8f687b5045568afe12151898a2454ed1af72b06336d51f09aca6708f9e7c3",
+      "cardId": "public-docs",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-auth-mechanism",
+      "name": "MCP auth mechanism",
+      "layer": "usability",
+      "definitionSha256": "664f9436789b33b95bf9099ffb2904a0a26c5fdcd3425fd9ee075871e2934467",
+      "cardId": "auth-onboarding",
+      "reference": "/docs/mcp-servers/authentication",
+      "treatment": "adapted",
+      "note": "Protect private capabilities; public read-only MCP need not invent OAuth."
+    },
+    {
+      "id": "mcp-oauth-metadata",
+      "name": "MCP OAuth metadata",
+      "layer": "usability",
+      "definitionSha256": "d500dac325972b64959e08d36052d2fedebb73c1f377fdc6bad9b175f593f26c",
+      "cardId": "auth-discovery",
+      "reference": "/docs/authentication/protected-resource-metadata",
+      "treatment": "adapted",
+      "note": "Publish capabilities supported by the actual authorization server and client; preserve required compatibility."
+    },
+    {
+      "id": "mcp-pkce-s256",
+      "name": "MCP PKCE S256 support",
+      "layer": "usability",
+      "definitionSha256": "b9691e7988b0f134f266113c25f706d01fa10aefefaa100abd413ab4c5d220cf",
+      "cardId": "auth-onboarding",
+      "reference": "/docs/authentication/oauth-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mpp-support",
+      "name": "MPP payment protocol",
+      "layer": "payments",
+      "definitionSha256": "eed7046cc7bc960210544e7cc42872309d063f236dd3c3a5bc98bc3043a31c29",
+      "cardId": "machine-payments",
+      "reference": "/docs/protocols/mpp",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "x402-support",
+      "name": "x402 payment protocol",
+      "layer": "payments",
+      "definitionSha256": "d7f8b410fa771e2b94c7b947189b191d30519dc31021730e34180b75254d91bb",
+      "cardId": "machine-payments",
+      "reference": "/docs/protocols/agentic-commerce",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "onboarding-friction",
+      "name": "Agent onboarding friction",
+      "layer": "usability",
+      "definitionSha256": "26f688e94427c4bd85e6399203f2911290597a30e7755fab96a3a3371e3c1d92",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "adapted",
+      "note": "Offer a usable supported onboarding path and test environment; a free tier is a product choice."
+    },
+    {
+      "id": "web-bot-auth-directory",
+      "name": "Web Bot Auth directory",
+      "layer": "usability",
+      "definitionSha256": "84ff9572efc4783fced111d4a81ac96341684051d0a94fc66ca60e4ae7a247d7",
+      "cardId": "signed-bot-identity",
+      "reference": "/docs/authentication/agent-identity",
+      "treatment": "adapted",
+      "note": "The sender or identity provider publishes keys; a receiver verifies requests. Publishing a directory does not authenticate inbound users."
+    },
+    {
+      "id": "api-catalog-rfc9727",
+      "name": "API catalog (RFC 9727)",
+      "layer": "accessibility",
+      "definitionSha256": "0c898872e93921a4478203c93fdef052318e1178eea7e87102ffb8ce26360eab",
+      "cardId": "endpoint-discovery",
+      "reference": "/docs/discovery/well-known-endpoints",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "oauth-protected-resource",
+      "name": "OAuth Protected Resource metadata (RFC 9728)",
+      "layer": "usability",
+      "definitionSha256": "74968d0ca887433bf52335c0b5cab9283d34094bcca5d6bf07edfc9bad39defa",
+      "cardId": "auth-discovery",
+      "reference": "/docs/authentication/protected-resource-metadata",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ucp-support",
+      "name": "UCP - Universal Commerce Protocol",
+      "layer": "payments",
+      "definitionSha256": "3fa0c304be6650dfb3694bc1143963593e17b146fdf4c0113b49b4bfcd0156bf",
+      "cardId": "checkout",
+      "reference": "/docs/protocols/agentic-commerce",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "acp-support",
+      "name": "ACP - Agentic Commerce Protocol",
+      "layer": "payments",
+      "definitionSha256": "4195b01275155721332c1e31865e28d641c1b6c74e8f3bc96f60538008d7820d",
+      "cardId": "checkout",
+      "reference": "/docs/protocols/acp",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "acp-delegate-payment",
+      "name": "ACP delegate payment",
+      "layer": "payments",
+      "definitionSha256": "6b85aebbdcd6247a16af6907e3ea9c25228c802772269fb0e59ed2894e0613d9",
+      "cardId": "delegated-spending",
+      "reference": "/docs/protocols/acp",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ap2-support",
+      "name": "AP2 - Agent Payments Protocol",
+      "layer": "payments",
+      "definitionSha256": "bd4d634deade4c27572351c91bf17ec463da85385cc287da6510ddaa08984a27",
+      "cardId": "delegated-spending",
+      "reference": "/docs/protocols/agentic-commerce",
+      "treatment": "adapted",
+      "note": "Signed mandates express authority; they do not replace settlement, checkout, or provider compatibility."
+    },
+    {
+      "id": "auth-md-exists",
+      "name": "auth.md exists",
+      "layer": "usability",
+      "definitionSha256": "4b47f70c3d05364dcc5dc8cfbed25fa427b2f39b4bd8e50005a4dc40df61043c",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "auth-md-structure",
+      "name": "auth.md structure",
+      "layer": "usability",
+      "definitionSha256": "cbef3dca4179f51fd50fbda4de32569fd854c676b95d8b7251d143dad37e52f1",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "auth-md-walkthrough-simulation",
+      "name": "auth.md walkthrough simulation",
+      "layer": "usability",
+      "definitionSha256": "540b7efbec3b4ec0d81bba965a805e80c07dc4a7fa4218539807dbc9bf663cbe",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-auth-discovery-metadata",
+      "name": "Agent auth discovery metadata",
+      "layer": "usability",
+      "definitionSha256": "f576c16672c9db52e4455febfeead6a61ac6ffd64798354bab5e2b0e08c3bd00",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-auth-www-authenticate",
+      "name": "Agent auth WWW-Authenticate hint",
+      "layer": "usability",
+      "definitionSha256": "3752f59a294d67ad3595abc1d1bbf44926280246b2884813be79c9e198835f0d",
+      "cardId": "auth-discovery",
+      "reference": "/docs/authentication/protected-resource-metadata",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-auth-endpoints-reachable",
+      "name": "agent_auth endpoints reachable",
+      "layer": "usability",
+      "definitionSha256": "b8e60cdd811565e272dcb5637371b1810369ccd0b77dd258cd8b951c11c242ee",
+      "cardId": "agent-registration",
+      "reference": "/docs/authentication/auth-md",
+      "treatment": "adapted",
+      "note": "Verify the real advertised flow, not just non-404 OPTIONS responses."
+    },
+    {
+      "id": "mcp-server",
+      "name": "MCP server / manifest",
+      "layer": "usability",
+      "definitionSha256": "aeaddb7f8dbfe4382e107afe2c041857484a9ddaafa1dcb23836e6e00917f151",
+      "cardId": "mcp",
+      "reference": "/docs/mcp-servers/transports",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-error-handling",
+      "name": "MCP error handling",
+      "layer": "usability",
+      "definitionSha256": "6830ef9ae7f66234e4d7ed42dcda1a54e1bc15ee72fa48e5bc8f853aeeea33b5",
+      "cardId": "structured-errors",
+      "reference": "/docs/error-handling/errors-for-agents",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-transport-modern",
+      "name": "MCP modern transport",
+      "layer": "usability",
+      "definitionSha256": "4017faa571ffebc3941cc624f2d3cefab0343c9d2a9b95194a60c1adab0fdab7",
+      "cardId": "mcp",
+      "reference": "/docs/mcp-servers/transports",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "webmcp",
+      "name": "WebMCP support",
+      "layer": "usability",
+      "definitionSha256": "dff241c1f2a7ad8cb257e8d14d75ec2f359e93721ada250a5da2f3052af337ce",
+      "cardId": "webmcp",
+      "reference": "/docs/protocols/webmcp",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "markdown-negotiation",
+      "name": "Markdown agent docs",
+      "layer": "accessibility",
+      "definitionSha256": "40c1e5a6929f021bc003076b2f5ded5e173e54200b5c5f4bda55c068e43b25e8",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "markdown-negotiation-vary",
+      "name": "Markdown content negotiation (acceptmarkdown.com)",
+      "layer": "accessibility",
+      "definitionSha256": "0eb185aa84ec58bb70efb0e9322a62b5954a4a5487acca102985a2f0930d7dbb",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "rate-limit-headers",
+      "name": "Rate limit response headers",
+      "layer": "usability",
+      "definitionSha256": "2532f170938c57c0b1533a182fa215a973160d0a6026f5c7b2479c9c9eb56dea",
+      "cardId": "rate-limits",
+      "reference": "/docs/error-handling/retry-patterns",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "idempotency-key-support",
+      "name": "Idempotency-Key support",
+      "layer": "usability",
+      "definitionSha256": "65f8396d3deeeafc8d84639474432ce2e4502bcc2a2bc83d257f6939431d3978",
+      "cardId": "safe-retries",
+      "reference": "/docs/error-handling/idempotency",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "json-error-responses",
+      "name": "JSON error responses",
+      "layer": "usability",
+      "definitionSha256": "8c988513ae034df3e79caa1927033a63dc4657934c7a00e9018616b0b8bfba08",
+      "cardId": "structured-errors",
+      "reference": "/docs/error-handling/rfc-9457",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "api-error-model",
+      "name": "REST typed error model",
+      "layer": "usability",
+      "definitionSha256": "29e9d9a70dbaea2b19a6007bfd09309a4e53b7be730e670895d9fa61c9005463",
+      "cardId": "structured-errors",
+      "reference": "/docs/error-handling/rfc-9457",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "api-versioning-policy",
+      "name": "REST versioning / deprecation policy",
+      "layer": "usability",
+      "definitionSha256": "f44897952c4068aaa112fef34e9e200ce26f52e20e1c76749b0394a7e784808d",
+      "cardId": "compatibility",
+      "reference": "/docs/api-surface/api-versioning",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "pagination-shape",
+      "name": "REST pagination pattern",
+      "layer": "usability",
+      "definitionSha256": "19e4e86743bf7d74135757cf492f1cde29fd9eb1f76904a05b72a679f5e198b4",
+      "cardId": "search-and-collections",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "async-job-pattern",
+      "name": "REST async-job pattern",
+      "layer": "usability",
+      "definitionSha256": "9e8a8aa3712249a90e7cb614e0a37fa515d46b17c7e777ac42b7904a2d2ef3af",
+      "cardId": "jobs-and-bulk",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "cli-tool",
+      "name": "CLI tool available",
+      "layer": "usability",
+      "definitionSha256": "8aa234ac3ad96ff5290cf9b8f86c121c16def5b97b8f9e21e717db6ecbff97a3",
+      "cardId": "developer-tools",
+      "reference": "/docs/cli-design/machine-readable-output",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "rest-sdk-packages",
+      "name": "Multi-language SDK packages",
+      "layer": "usability",
+      "definitionSha256": "e2d9ae05871ad1088baab52a40bad2d088242d133716ea7a849d1ba86aadb89c",
+      "cardId": "official-sdks",
+      "reference": "/docs/discovery/commercial-and-entity-discovery",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "nlweb-ask",
+      "name": "NLWeb /ask endpoint",
+      "layer": "usability",
+      "definitionSha256": "7ff4501b348524061ef446a99263dd0b606735a6dbf65db3ba9fecca54e3628a",
+      "cardId": "natural-language-search",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "adapted",
+      "note": "Use the pinned NLWeb implementation contract; a generic /ask route is not compatibility."
+    },
+    {
+      "id": "nlweb-streaming",
+      "name": "NLWeb streaming support",
+      "layer": "usability",
+      "definitionSha256": "2bb0cf2d04ec73fd3b7067b18ddd991df4d62676af09b4dbee640c44fb640f1f",
+      "cardId": "natural-language-search",
+      "reference": "/docs/discovery/catalogs-and-feeds",
+      "treatment": "adapted",
+      "note": "Verify actual framing and completion; the reference implementation uses a streaming option, not necessarily the scanner example shape."
+    },
+    {
+      "id": "response-schema-coverage",
+      "name": "REST response schema coverage",
+      "layer": "usability",
+      "definitionSha256": "5da426f69c5cbfe8809f3ce5932d7bb3aff1e8deb6227095a2e9bca8562b9b11",
+      "cardId": "api-specification",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-tool-annotations",
+      "name": "MCP tool annotations",
+      "layer": "usability",
+      "definitionSha256": "07f288dd84da79a305fb5959c1b1ad0c23b914ebee2ade90059933af23f4ab97",
+      "cardId": "tool-behavior",
+      "reference": "/docs/mcp-servers/annotations",
+      "treatment": "adapted",
+      "note": "Annotations are untrusted advisory hints; enforce authorization and approvals separately."
+    },
+    {
+      "id": "mcp-server-card",
+      "name": "MCP server-card.json",
+      "layer": "usability",
+      "definitionSha256": "f500bab88240040172108a790e98704bd1e3b29470f1e223c4fc95d776cdad13",
+      "cardId": "endpoint-discovery",
+      "reference": "/docs/discovery/well-known-endpoints",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-multi-surface-coverage",
+      "name": "Product + docs MCP coverage",
+      "layer": "usability",
+      "definitionSha256": "1c4882cd9f52278036506579dea84ecd25455808bfdd349d31bdbaf9724146fc",
+      "cardId": "mcp-resources",
+      "reference": "/docs/mcp-servers/architecture",
+      "treatment": "adapted",
+      "note": "Provide learning and action capabilities where useful; separate servers are not intrinsically required."
+    },
+    {
+      "id": "sandbox-environment",
+      "name": "Sandbox / test environment",
+      "layer": "usability",
+      "definitionSha256": "bc69b0dd37cb78b96af1e1fbe85becd08046e86f79189879383109ada1bd149d",
+      "cardId": "sandbox",
+      "reference": "/docs/testing/evaluation-framework",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "batch-endpoints",
+      "name": "REST batch / bulk endpoint",
+      "layer": "usability",
+      "definitionSha256": "ada94a7987116e4a86cdbf79b10ca8a7ca870d02542859d097d653409d59b25b",
+      "cardId": "jobs-and-bulk",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-resource-listing",
+      "name": "MCP resources exposed",
+      "layer": "usability",
+      "definitionSha256": "66e78aeeda8cfeaaba53de30e24bf5b1a4a1c726375e5c100c743a1c792a3e6d",
+      "cardId": "mcp-resources",
+      "reference": "/docs/mcp-servers/resources-prompts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "graphql-error-type-definition",
+      "name": "GraphQL typed error model",
+      "layer": "usability",
+      "definitionSha256": "7eb343f3a51e98a5606a56c2e986a117c84226f87108d9e468e9450fa8dd248e",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "graphql-versioning-policy",
+      "name": "GraphQL versioning / deprecation policy",
+      "layer": "usability",
+      "definitionSha256": "23793a891590d65371fe6af64d36eb1f8e591c7b48250a6751b8a28ca2973a4a",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "graphql-pagination-pattern",
+      "name": "GraphQL pagination pattern",
+      "layer": "usability",
+      "definitionSha256": "0fa224fe60cd77f68fa98c7255087ceff37666c92887b2cc2454fec5f16bc4c2",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "adapted",
+      "note": "Connection pagination is useful, not a GraphQL requirement; document the chosen contract."
+    },
+    {
+      "id": "graphql-async-job-pattern",
+      "name": "GraphQL async-job pattern",
+      "layer": "usability",
+      "definitionSha256": "85a9e883b5c35e0d4556810bb0b0fee6425df00e36a2bc1fe7648703fd358cd5",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "graphql-schema-completeness",
+      "name": "GraphQL schema description coverage",
+      "layer": "usability",
+      "definitionSha256": "c91cab8bffa81f33d19f1fea0affeead73f0fd688aeb94840f8ec7a0a987f4c0",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "graphql-batch-mutations",
+      "name": "GraphQL batch mutations",
+      "layer": "usability",
+      "definitionSha256": "3e4f27bfc0726cb9afc235353a091ca24ec286322d2abd2ecf91becd29d524e7",
+      "cardId": "graphql-contract",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-ua-markdown",
+      "name": "Bot-UA markdown serving",
+      "layer": "accessibility",
+      "definitionSha256": "7cf1106da0ef35e0c880219fb09d751d87d2cf9db5f1ed61c8ec257482288a9c",
+      "cardId": "markdown",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "adapted",
+      "note": "Optional representation optimization; prefer explicit content negotiation and preserve equivalent facts and correct caching."
+    },
+    {
+      "id": "agent-friendly-404",
+      "name": "Agent-friendly 404s",
+      "layer": "usability",
+      "definitionSha256": "f21ca03768c2dc4280cdb487160575bb3702239555b079371c7a48abe238a010",
+      "cardId": "missing-pages",
+      "reference": "/docs/discovery/content-negotiation",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ax-document-structure",
+      "name": "Accessible document structure",
+      "layer": "usability",
+      "definitionSha256": "8207f1305636ae388a549af5c2bbfb4d0253e84997236d18f46e3b4fd9ce68af",
+      "cardId": "accessible-ui",
+      "reference": "/docs/agentic-ui/browser-agent-accessibility",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ax-native-controls",
+      "name": "Native interactive controls",
+      "layer": "usability",
+      "definitionSha256": "5553443aa5fac5c2cba7284c8a0a50913710c2dd6f8cadf2906b0cdd1c4ef003",
+      "cardId": "accessible-ui",
+      "reference": "/docs/agentic-ui/browser-agent-accessibility",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ax-accessible-names",
+      "name": "Accessible names on controls",
+      "layer": "usability",
+      "definitionSha256": "42ab8c1d90d34b6c62ee36f8a3606484f7b3f9bb3e382d4c85db3418b320b207",
+      "cardId": "accessible-ui",
+      "reference": "/docs/agentic-ui/browser-agent-accessibility",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ax-form-labeling",
+      "name": "Form control labeling",
+      "layer": "usability",
+      "definitionSha256": "3b693604af8059051508f873aad176f2574353ecc5c6222f600c3b8d76e0f859",
+      "cardId": "accessible-ui",
+      "reference": "/docs/agentic-ui/browser-agent-accessibility",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "ax-tree-injection-safe",
+      "name": "Accessibility-tree injection safety (bonus)",
+      "layer": "usability",
+      "definitionSha256": "e3dd835015669a3863dd657431e95ed1c7c34545ebdad8f832bbd8cc9a90983c",
+      "cardId": "untrusted-content",
+      "reference": "/docs/agentic-ui/browser-agent-accessibility",
+      "treatment": "adapted",
+      "note": "Preserve legitimate screen-reader content while isolating untrusted instructions; detection is not a security guarantee."
+    },
+    {
+      "id": "mcp-app-registry",
+      "name": "MCP Apps support",
+      "layer": "usability",
+      "definitionSha256": "dedfda6296930a4f716b77778ff8e0b3fa894d2c2d5568703ac51d54bfcb3b3a",
+      "cardId": "embedded-ui",
+      "reference": "/docs/agentic-ui/mcp-apps",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "a2ui-support",
+      "name": "A2UI / generative UI support",
+      "layer": "usability",
+      "definitionSha256": "66cdb7ed54881abe275cfd38f4d42931603c9bc3816e7c8deb462dae25feeed8",
+      "cardId": "embedded-ui",
+      "reference": "/docs/protocols/emerging-standards",
+      "treatment": "adapted",
+      "note": "The scanner accepts several interactive UI approaches; use a supported host integration, not an assumed universal A2UI protocol."
+    },
+    {
+      "id": "mcp-apps-ui-quality",
+      "name": "MCP Apps UI quality",
+      "layer": "usability",
+      "definitionSha256": "bb3912178eaa7ae90b9d7993746475b23cb11c37c75c0d02aa54ad9979d6dd69",
+      "cardId": "embedded-ui",
+      "reference": "/docs/agentic-ui/mcp-apps",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-view-domain",
+      "name": "MCP App view reachable",
+      "layer": "usability",
+      "definitionSha256": "9f2ccc355f4a82d40372428fddf1ba12cd9130cc122eeff739b5888b73356bf1",
+      "cardId": "embedded-ui",
+      "reference": "/docs/agentic-ui/mcp-apps",
+      "treatment": "adapted",
+      "note": "Ensure the host can load the view; data and tool actions still require appropriate authorization."
+    },
+    {
+      "id": "mcp-view-csp",
+      "name": "MCP App view CSP",
+      "layer": "usability",
+      "definitionSha256": "077c4516dfd2103834fa96bbfeaaf666bcb4c8374e34edfc9c1da69c9767f364",
+      "cardId": "embedded-ui",
+      "reference": "/docs/agentic-ui/mcp-apps",
+      "treatment": "adapted",
+      "note": "Scope policies to actual host origins and integrations; do not grant every named host automatically."
+    },
+    {
+      "id": "api-schema-analysis",
+      "name": "API schema complexity analysis",
+      "layer": "usability",
+      "definitionSha256": "dc81f34ad7dae3fec323e984e0fe5f400708dcc19326f700f91d1168951d527b",
+      "cardId": "api-specification",
+      "reference": "/docs/api-surface/retrieval-and-job-contracts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "agent-crawler-reachability",
+      "name": "Agent crawler reachability",
+      "layer": "accessibility",
+      "definitionSha256": "e68a7c72f528d369f6c083c8ab42d282eed6abbe4c2b730a58dfbde33a89c68c",
+      "cardId": "crawler-access",
+      "reference": "/docs/discovery/robots-txt",
+      "treatment": "adapted",
+      "note": "Verify access from intended clients; do not grant trust or permission based on a claimed bot name."
+    },
+    {
+      "id": "function-calling-compat",
+      "name": "Function calling compatibility",
+      "layer": "usability",
+      "definitionSha256": "0a25063633793e84406b1845992d9ecd5e94e871047de507029a47160281d148",
+      "cardId": "tool-contracts",
+      "reference": "/docs/tool-design/schemas",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    },
+    {
+      "id": "mcp-resource-quality",
+      "name": "MCP resource quality",
+      "layer": "usability",
+      "definitionSha256": "f6f7d9a0bd88aee8916e148428f13a226b2ef4a1369023646bfbbdb60934f98e",
+      "cardId": "mcp-resources",
+      "reference": "/docs/mcp-servers/resources-prompts",
+      "treatment": "covered",
+      "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
+    }
+  ]
+}

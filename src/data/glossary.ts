@@ -5,10 +5,10 @@ export interface GlossaryTerm {
   category: string;
   definition: string;
   detail: string;
+  href?: string;
 }
 
 export const glossaryTerms: GlossaryTerm[] = [
-  // Foundation
   {
     acronym: "LLM",
     category: "Foundation",
@@ -45,10 +45,9 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "prompt-engineering",
     name: "Prompt Engineering",
   },
-  // Memory & Knowledge
   {
     acronym: "RAG",
-    category: "Memory & Knowledge",
+    category: "Memory & knowledge",
     definition:
       "Pulls live knowledge into a prompt at inference time rather than baking it into weights.",
     detail:
@@ -58,7 +57,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Embed",
-    category: "Memory & Knowledge",
+    category: "Memory & knowledge",
     definition:
       "A list of numbers that captures the meaning of text in a form machines can compare.",
     detail:
@@ -68,7 +67,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "VectorDB",
-    category: "Memory & Knowledge",
+    category: "Memory & knowledge",
     definition: "A store optimised for finding semantically similar embeddings at scale.",
     detail:
       "Traditional databases find exact matches. A vector database finds nearest neighbours — the N embeddings geometrically closest to a query vector. This is how RAG retrieves 'relevant' chunks without knowing the exact words in them. Popular options include Pinecone, Weaviate, Qdrant, pgvector (Postgres extension), and Chroma. Most support metadata filtering so you can combine semantic search with structured conditions (e.g., 'similar to this query AND from the last 30 days').",
@@ -77,26 +76,27 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "KG",
-    category: "Memory & Knowledge",
+    category: "Memory & knowledge",
     definition: "A network of entities and the typed relationships between them.",
     detail:
       "Where a vector database finds similar documents, a knowledge graph models how things connect. Nodes represent entities (Product, Brand, Category, Supplier); edges represent relationships (MADE_BY, BELONGS_TO, SUBSTITUTES). KGs enable multi-hop reasoning — 'find all suppliers of ingredients used in products certified organic in the EU' — that's hard to do with vector search alone. KGs and RAG are often combined: the graph provides structure, vectors provide semantic search.",
     id: "knowledge-graph",
     name: "Knowledge Graph",
   },
-  // Agent Infrastructure
   {
     acronym: "MCP",
-    category: "Agent Infrastructure",
-    definition: "An open standard for connecting AI agents to tools, data, and services.",
+    category: "Agent infrastructure",
+    definition:
+      "An open protocol for connecting agent clients to tools, data, and reusable prompts.",
     detail:
-      "MCP is to agents what USB is to devices — a universal connector. Any AI client (Claude, Cursor, Copilot) can connect to any MCP server and automatically discover its tools. You build the server once; every MCP-compatible agent can use it without custom integration. MCP servers expose tools (actions), resources (data), and prompts (templates). Servers can run locally or as HTTP services. The protocol handles capability discovery, input validation, and streaming responses.",
+      "An MCP server describes the capabilities it offers so a compatible client can discover and call them. Servers can run locally or be reached over HTTP. Support varies by client and protocol version, so authentication, tools, and results still need testing in the clients customers use.",
     id: "mcp",
     name: "Model Context Protocol",
+    href: "/docs/mcp-servers",
   },
   {
     acronym: "Tools",
-    category: "Agent Infrastructure",
+    category: "Agent infrastructure",
     definition: "Structured mechanism for an LLM to invoke external actions and return results.",
     detail:
       "LLMs can't directly query databases or call APIs — but they can emit a structured 'I want to call this function with these arguments' response. The host application executes the actual call, returns the result, and the model incorporates it into its response. This is function calling (OpenAI terminology) or tool use (Anthropic/Google). Tools transform an LLM from a text generator into an agent that can take real-world actions: search the web, write files, send emails, query APIs.",
@@ -105,7 +105,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Agent",
-    category: "Agent Infrastructure",
+    category: "Agent infrastructure",
     definition: "An LLM in a loop — perceives, reasons, acts, and observes consequences.",
     detail:
       "An AI agent is not just a chatbot — it's a system where an LLM autonomously decides what actions to take (tool calls), observes the results, and iterates until a goal is reached. Agents can browse the web, write and run code, manage files, and coordinate with other agents. The key elements are: a model (the reasoner), tools (the hands), memory (context), and an orchestrator (the loop). Reliability drops as loop length grows — short, bounded tasks are where agents shine today.",
@@ -114,27 +114,28 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Orch.",
-    category: "Agent Infrastructure",
-    definition: "Coordinating multiple agents, tools, and models to complete a complex task.",
+    category: "Agent infrastructure",
+    definition: "Coordinating model calls, tools, and workflow steps to complete a task.",
     detail:
-      "When a single agent can't complete a task end-to-end, orchestration breaks it across specialised agents. A planner agent decomposes the goal; specialist agents execute subtasks; a synthesiser combines results. Frameworks like Mastra, LangGraph, and CrewAI provide state machines, retry logic, and handoff protocols. Agent-to-agent communication is increasingly standardised via A2A and ACP protocols. Orchestration adds reliability at the cost of latency and complexity.",
+      "An orchestrator decides what runs next, carries state between steps, and handles retries, limits, and handoffs. It can support one agent or several. A fixed workflow suits predictable steps; an agent can make decisions where the next step depends on the result. More agents are useful only when their separate responsibilities justify the added coordination.",
     id: "orchestration",
     name: "Orchestration",
+    href: "/docs/multi-agent",
   },
-  // Data & Integration
   {
     acronym: "API",
-    category: "Data & Integration",
+    category: "Data & integration",
     definition:
-      "A contract that lets software talk to software — the connective tissue of the web.",
+      "A defined way for software to request data or perform an action in another system.",
     detail:
-      "APIs define how to request data or trigger actions: the URL, method (GET/POST), parameters, and response format. REST APIs return JSON over HTTP; GraphQL lets callers specify exactly the shape of data they want. For AI agents, API quality matters enormously — good OpenAPI specs let agents discover and use your services without human guidance. An API without machine-readable docs is invisible to agents; one with clear schemas, operationIds, and descriptions is a first-class citizen of the agentic web.",
+      "An API describes the operations available, the inputs each accepts, and the results or errors it returns. For example, a shop might offer operations to search products, prepare a cart, and check an order. Clear documentation and consistent responses help agents use those operations correctly.",
     id: "api",
     name: "Application Programming Interface",
+    href: "/docs/api-surface",
   },
   {
     acronym: "ETL/ELT",
-    category: "Data & Integration",
+    category: "Data & integration",
     definition: "Pipelines that move and reshape data from sources to destinations.",
     detail:
       "ETL extracts data from source systems, transforms it to fit the target schema, then loads it. ELT loads raw data first, transforms later — the modern approach enabled by cheap compute in data warehouses. For AI: ETL/ELT pipelines feed training sets, populate vector databases, keep knowledge graphs fresh, and sync product catalogs into RAG systems. Without well-designed pipelines, your AI applications reason over stale or inconsistent data. Tools include dbt, Airbyte, Fivetran, and AWS Glue.",
@@ -143,7 +144,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "PIM/MDM",
-    category: "Data & Integration",
+    category: "Data & integration",
     definition: "Central systems of record for product data and enterprise entity definitions.",
     detail:
       "A PIM (Product Information Manager) is the canonical source for product attributes — names, descriptions, specs, images, pricing, certifications. MDM extends this to any master entity: customers, suppliers, locations, materials. For AI agents, PIM/MDM quality is a multiplier — an agent browsing your catalog is only as good as the data it retrieves. Agents benefit most when PIM data has structured attributes (not long unstructured descriptions), standardised taxonomies, and machine-readable export formats.",
@@ -152,35 +153,56 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Schema",
-    category: "Data & Integration",
+    category: "Data & integration",
     definition: "The structure, vocabulary, and hierarchy that give data meaning.",
     detail:
       "A schema defines the shape of data (fields, types, constraints). A taxonomy organises concepts into a hierarchy (Animal > Mammal > Dog). An ontology goes further — it defines relationships between concepts (Dog IS-A Mammal, Dog CAN bark). These distinctions matter for AI because structured, well-defined data is dramatically easier for models to reason over than free-text. Schema.org provides shared vocabularies for web content; JSON-LD embeds them in HTML so agents can parse meaning without scraping.",
     id: "schema",
     name: "Schema / Ontology / Taxonomy",
   },
-  // Agent Readiness
   {
     acronym: "AEO",
-    category: "Agent Readiness",
-    definition: "Making your software discoverable, navigable, and operable by AI agents.",
+    category: "Agent readiness",
+    definition: "Making content easier for answer engines to find, interpret, and cite.",
     detail:
-      "Just as SEO made websites findable by search engines, AEO makes software legible to AI agents. It covers: structured context files (AGENTS.md, CLAUDE.md), machine-readable discovery endpoints (llms.txt, .well-known), agent-friendly APIs with OpenAPI specs, MCP servers for direct tool access, and content negotiation (serving Markdown when an agent requests it). AEO is the discipline this entire site is built around — the 11 Surface dimensions are its scoring rubric.",
+      "Answer engine optimization concerns how search and AI answer systems retrieve and describe your content. It includes crawlable pages, clear facts, structured data, and trustworthy sources. Agent readiness is broader: an agent may also need to sign in, perform actions, recover from errors, or pay. Visibility does not establish that those tasks work.",
     id: "aeo",
-    name: "Agent Engine Optimisation",
+    name: "Answer Engine Optimization",
+    href: "/docs/discovery/aeo-checklist",
+  },
+  {
+    id: "content-signals",
+    acronym: "Content Signals",
+    name: "Content-use Preferences",
+    category: "Agent readiness",
+    definition: "Declarations of whether content may be used for search, AI input, or training.",
+    detail:
+      "Crawler rules describe access to a page. Content Signals separately express permitted uses after retrieval through search, ai-input, and ai-train values. They communicate your policy to systems that honor it; they do not enforce access controls or guarantee compliance.",
+    href: "/docs/discovery/robots-txt#content-signals",
+  },
+  {
+    id: "dns-aid",
+    acronym: "DNS-AID",
+    name: "DNS for AI Discovery",
+    category: "Agent readiness",
+    definition: "An emerging way to advertise agent services through a domain's DNS records.",
+    detail:
+      "DNS normally helps software locate servers. DNS-AID proposes records that also advertise agent services and their connection details. Compatible clients can discover services from a known domain. It remains an individual Internet-Draft, and publishing records does not grant access or prove the service works.",
+    href: "/docs/discovery/dns-discovery",
   },
   {
     acronym: "llms.txt",
-    category: "Agent Readiness",
-    definition: "A plain-text file at a site's root that maps content for LLM consumption.",
+    category: "Agent readiness",
+    definition: "A Markdown index that points agents to a site's important documentation.",
     detail:
-      "Proposed by Jeremy Howard in 2024, llms.txt is the robots.txt for the agent era. Where robots.txt tells crawlers what not to index, llms.txt tells LLMs what to read and in what order. It's a Markdown file listing the most important pages on a site with brief descriptions — a curated map rather than a sitemap dump. Many documentation sites and developer tools now publish both llms.txt (index) and llms-full.txt (full content concatenated) so agents can ingest the whole site in one request.",
+      "A site can publish llms.txt at its root with a short introduction and links to relevant pages. It helps clients that read this convention find focused documentation. It does not set crawler permissions or guarantee search rankings, citations, or adoption by every agent.",
     id: "llms-txt",
     name: "llms.txt",
+    href: "/docs/discovery/llms-txt",
   },
   {
     acronym: "Ground",
-    category: "Agent Readiness",
+    category: "Agent readiness",
     definition: "Anchoring LLM outputs to verified, up-to-date source material.",
     detail:
       "An ungrounded LLM reasons from its training weights — which may be stale, biased, or simply wrong for your domain. Grounding connects model outputs to external truth sources: a product database, a live API, a document store. RAG is the most common grounding technique. Grounding is why agents with tool access are more reliable than standalone models for factual tasks — they can verify claims against live data rather than hallucinating from memory.",
@@ -189,17 +211,16 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Guard",
-    category: "Agent Readiness",
+    category: "Agent readiness",
     definition: "Constraints that keep AI agents within safe, intended boundaries.",
     detail:
       "Guardrails are the safety and compliance layer around AI systems. They can be input filters (block prompt injection attempts), output validators (ensure responses match a schema, don't leak PII), action constraints (an agent can read files but not delete them), or cost caps (stop after N tokens or N tool calls). Hard guardrails halt execution; soft guardrails log violations for review. As agents take on higher-stakes tasks — writing code, sending emails, executing transactions — guardrail design becomes a core engineering concern.",
     id: "guardrails",
     name: "Guardrails",
   },
-  // Ops & Lifecycle
   {
     acronym: "LLMOps",
-    category: "Ops & Lifecycle",
+    category: "Ops & lifecycle",
     definition: "The discipline of deploying, monitoring, and improving AI systems in production.",
     detail:
       "LLMOps extends DevOps principles to AI: version-control your prompts, track model changes like code changes, monitor output quality over time, and build eval pipelines to catch regressions. Unlike traditional software, AI systems degrade silently — a model update or data drift can change behaviour without a clear error. LLMOps tooling (Langfuse, Braintrust, Helicone, Arize) provides observability for this fuzzy layer. Evals — automated tests that score model outputs against criteria — are the unit tests of LLMOps.",
@@ -208,7 +229,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "SFT",
-    category: "Ops & Lifecycle",
+    category: "Ops & lifecycle",
     definition: "Adapting a pretrained model to a specific domain or task using targeted training.",
     detail:
       "Fine-tuning continues training an already-capable base model on a smaller, curated dataset — typically thousands of input/output pairs that demonstrate the desired behaviour. It can make a model faster, cheaper, more consistent, or better at domain-specific tasks. It does NOT reliably add new knowledge (RAG is better for that) — it shapes style and behaviour. Fine-tuning is often misused as a first resort; most problems are better solved with prompt engineering or RAG before reaching for the training budget.",
@@ -217,7 +238,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "Infer",
-    category: "Ops & Lifecycle",
+    category: "Ops & lifecycle",
     definition: "Running a trained model to produce outputs — the live serving layer.",
     detail:
       "Training teaches the model; inference is using it. Every API call to Claude or GPT-4 is an inference request. Inference cost and latency are the primary operational concerns for AI products: larger models are more capable but slower and costlier per token. Optimisation techniques include quantisation (reducing numerical precision), batching (processing multiple requests together), caching (reusing computation for repeated prefixes), and speculative decoding (using a smaller model to draft tokens a larger model verifies).",
@@ -226,13 +247,304 @@ export const glossaryTerms: GlossaryTerm[] = [
   },
   {
     acronym: "A2A",
-    category: "Ops & Lifecycle",
+    category: "Ops & lifecycle",
     definition: "Protocols for agents to discover, delegate to, and collaborate with other agents.",
     detail:
       "As agent systems grow, agents need to call other agents — a research agent might delegate to a web-search agent, which delegates to a summarisation agent. A2A (Google's Agent-to-Agent protocol) and ACP (Agent Communication Protocol) standardise how agents advertise capabilities, accept tasks, stream progress, and return results. Without standards, every multi-agent integration is bespoke. With them, agents from different vendors and frameworks can compose. A2A is to agent networks what APIs are to web services.",
     id: "a2a",
     name: "Agent-to-Agent",
   },
+  {
+    id: "openapi",
+    acronym: "OpenAPI",
+    name: "OpenAPI Specification",
+    category: "Data & integration",
+    definition: "A machine-readable description of an HTTP API.",
+    detail:
+      "It lists operations, inputs, responses, authentication requirements, and errors. Agents and developer tools can use it to construct requests. The specification must describe the API that actually runs; publishing a file alone does not make the operations work.",
+    href: "/docs/api-surface/openapi-for-agents",
+  },
+  {
+    id: "graphql",
+    acronym: "GraphQL",
+    name: "GraphQL",
+    category: "Data & integration",
+    definition: "An API query language that lets callers choose which fields they receive.",
+    detail:
+      "A typed schema describes the data and operations available. Queries read data; mutations can change it. Agents need field descriptions, pagination rules, and clear errors to use the schema. A successful HTTP response can still contain GraphQL errors.",
+    href: "/docs/api-surface/retrieval-and-job-contracts",
+  },
+  {
+    id: "json-ld",
+    acronym: "JSON-LD",
+    name: "JavaScript Object Notation for Linked Data",
+    category: "Agent readiness",
+    definition: "Structured labels that describe what the information on a web page means.",
+    detail:
+      "A page can use JSON-LD and a shared vocabulary such as Schema.org to identify a product, its brand, its price, and the relationships between them. These labels help software interpret the page. They should match the visible facts and never invent ratings or reviews.",
+    href: "/docs/discovery/structured-data",
+  },
+  {
+    id: "robots-txt",
+    acronym: "robots.txt",
+    name: "Crawler Rules",
+    category: "Agent readiness",
+    definition: "A file that tells cooperating crawlers which URLs they may fetch.",
+    detail:
+      "Different rules can apply to search crawlers, training crawlers, and other automated visitors. robots.txt is a voluntary crawling convention, not access control: private information still needs authentication. Firewall rules can also block agents even when robots.txt allows them.",
+    href: "/docs/discovery/robots-txt",
+  },
+  {
+    id: "markdown",
+    acronym: "Markdown",
+    name: "Markdown",
+    category: "Agent readiness",
+    definition: "A plain-text format for headings, links, lists, and other document structure.",
+    detail:
+      "Markdown keeps a document readable without most of a website's interface markup. A Markdown version can help an agent retrieve focused content, provided it preserves the original facts, links, and source information.",
+    href: "/docs/discovery/content-negotiation",
+  },
+  {
+    id: "content-negotiation",
+    acronym: "Formats",
+    name: "Content Negotiation",
+    category: "Agent readiness",
+    definition: "Letting a client request a particular representation of the same resource.",
+    detail:
+      "For example, a browser may request HTML while an agent requests Markdown through an HTTP Accept header. The server chooses a supported format and labels the response. Caches must distinguish these formats so a person does not unexpectedly receive raw Markdown.",
+    href: "/docs/discovery/content-negotiation",
+  },
+  {
+    id: "agent-skills",
+    acronym: "Skills",
+    name: "Agent Skills",
+    category: "Agent infrastructure",
+    definition: "Instructions and supporting files that teach an agent how to perform a task.",
+    detail:
+      "A skill explains when to use it, the steps to follow, and any tools or reference material needed. It can package a team's working practices for compatible coding agents. Instructions do not grant credentials or override the permissions enforced by the host or service.",
+    href: "/docs/discovery/agent-skills",
+  },
+  {
+    id: "agent-plugins",
+    acronym: "Plugins",
+    name: "Agent Plugins",
+    category: "Agent infrastructure",
+    definition: "Installable packages of related agent tools, skills, and connections.",
+    detail:
+      "A plugin bundles capabilities for a particular agent platform and describes how to install and configure them. Platform formats differ, so a working package in one host does not guarantee compatibility with another.",
+    href: "/docs/discovery/commercial-and-entity-discovery",
+  },
+  {
+    id: "sdk",
+    acronym: "SDK",
+    name: "Software Development Kit",
+    category: "Data & integration",
+    definition: "Libraries and supporting tools for integrating a service into an application.",
+    detail:
+      "An SDK can provide typed functions, authentication helpers, and examples around an API. It saves developers and coding agents from rebuilding common integration code. Its supported API versions and maintenance status should be clear.",
+    href: "/docs/discovery/commercial-and-entity-discovery",
+  },
+  {
+    id: "cli",
+    acronym: "CLI",
+    name: "Command-Line Interface",
+    category: "Data & integration",
+    definition: "A way to operate software by entering commands in a terminal.",
+    detail:
+      "Coding agents can use a CLI in scripts and automated workflows. Explicit arguments, structured output, meaningful exit codes, and a way to run without interactive prompts make commands easier to use reliably.",
+    href: "/docs/cli-design",
+  },
+  {
+    id: "webmcp",
+    acronym: "WebMCP",
+    name: "Web Model Context Protocol",
+    category: "Agent infrastructure",
+    definition: "A proposed browser interface that lets a page offer tools to visiting agents.",
+    detail:
+      "A compatible browser can discover named actions in the current page and call them with defined inputs. The tools operate in the page's context. Browser support is still evolving; this is distinct from running a remote MCP server and should complement accessible controls.",
+    href: "/docs/protocols/webmcp",
+  },
+  {
+    id: "mcp-apps",
+    acronym: "MCP Apps",
+    name: "Interactive Views in MCP Clients",
+    category: "Agent infrastructure",
+    definition:
+      "Interactive interfaces displayed alongside tool results in a compatible MCP client.",
+    detail:
+      "An MCP App can show a chart, selection interface, or editable result inside a conversation. The host controls how the view loads and what it can access. A service must test host compatibility, accessibility, and security boundaries as well as its tool responses.",
+    href: "/docs/agentic-ui/mcp-apps",
+  },
+  {
+    id: "oauth",
+    acronym: "OAuth",
+    name: "Delegated Authorization",
+    category: "Auth & identity",
+    definition: "A way to give an application limited access without sharing a user's password.",
+    detail:
+      "A customer can approve access to selected capabilities, such as reading orders. The client then uses an access token when calling the API. The service must enforce the granted permissions, expiry, and account boundaries. OAuth grants access; it is not by itself a complete user identity protocol.",
+    href: "/docs/authentication/oauth-for-agents",
+  },
+  {
+    id: "scopes",
+    acronym: "Scopes",
+    name: "Permission Scopes",
+    category: "Auth & identity",
+    definition: "Named permissions that define what an access token is allowed to do.",
+    detail:
+      "A token might allow reading orders while forbidding refunds. The server must check those permissions on every protected operation and ensure the caller can access the requested account or record. A scope written in documentation provides no protection unless it is enforced.",
+    href: "/docs/authentication/agent-identity",
+  },
+  {
+    id: "auth-md",
+    acronym: "auth.md",
+    name: "Agent Registration Guidance",
+    category: "Auth & identity",
+    definition: "A published walkthrough of how an agent can register for a service.",
+    detail:
+      "The auth.md protocol connects readable setup instructions with metadata describing accepted identity methods and endpoints. An agent can discover how to register, obtain access, and involve the user when an account needs claiming. Advertised flows must exist and enforce normal authorization checks.",
+    href: "/docs/authentication/auth-md",
+  },
+  {
+    id: "web-bot-auth",
+    acronym: "Bot Auth",
+    name: "Web Bot Auth",
+    category: "Auth & identity",
+    definition: "Signed HTTP requests that help a website verify which bot sent them.",
+    detail:
+      "The sender signs a request and publishes verification keys. The receiving service checks the signature and applies its own access rules. Verifying a bot's identity does not give it permission to read a customer's private data or spend their money.",
+    href: "/docs/authentication/agent-identity#web-bot-auth",
+  },
+  {
+    id: "id-jag",
+    acronym: "ID-JAG",
+    name: "Identity Assertion JWT Authorization Grant",
+    category: "Auth & identity",
+    definition: "A signed identity assertion used to request access from another service.",
+    detail:
+      "A trusted issuer describes an identity in an audience-bound JWT. The receiving service verifies the assertion and decides what access may follow. In auth.md, the provider assertion goes to the identity endpoint; registration and the later token exchange are separate steps.",
+    href: "/docs/authentication/auth-md",
+  },
+  {
+    id: "idempotency",
+    acronym: "Idempotency",
+    name: "Safe Repeated Requests",
+    category: "Ops & lifecycle",
+    definition: "Making a repeated request have the same intended effect as a single request.",
+    detail:
+      "If an order request times out, the caller may not know whether it succeeded. An idempotency key lets the server recognize the retry and return the earlier outcome instead of placing a second order. The API must document how long keys remain valid and how changed inputs are handled.",
+    href: "/docs/error-handling/idempotency",
+  },
+  {
+    id: "pagination",
+    acronym: "Pagination",
+    name: "Paged Results",
+    category: "Data & integration",
+    definition:
+      "Returning a large collection in smaller portions with a way to request the next portion.",
+    detail:
+      "A response includes a cursor or another continuation mechanism. Predictable ordering and stable item identifiers help agents work through results without omissions or duplicates, especially when the collection changes between requests.",
+    href: "/docs/api-surface/retrieval-and-job-contracts",
+  },
+  {
+    id: "rate-limits",
+    acronym: "Rate limits",
+    name: "Request Limits",
+    category: "Ops & lifecycle",
+    definition: "Limits on how often a client can call a service.",
+    detail:
+      "A service may cap requests within a time window or limit concurrent work. Documented quotas and retry timing let agents slow down when they reach the limit. Repeatedly retrying immediately can prolong the failure or exhaust a budget.",
+    href: "/docs/error-handling/retry-patterns",
+  },
+  {
+    id: "webhooks",
+    acronym: "Webhooks",
+    name: "Event Notifications",
+    category: "Data & integration",
+    definition: "HTTP messages a service sends when a subscribed event occurs.",
+    detail:
+      "For example, an order service can notify a client when a shipment leaves the warehouse. Receivers should verify the sender, handle duplicate deliveries, and recover from missed events. A webhook reports an event; the current record remains the source for its latest state.",
+    href: "/docs/api-surface/webhooks-events",
+  },
+  {
+    id: "sandbox",
+    acronym: "Sandbox",
+    name: "Test Environment",
+    category: "Ops & lifecycle",
+    definition:
+      "An isolated environment for trying operations without affecting production customers.",
+    detail:
+      "A sandbox can provide test credentials, sample records, and simulated payments. It lets agents exercise changes and failure recovery before using live services. Document differences from production so a passing test is not mistaken for proof of every live behavior.",
+    href: "/docs/testing/evaluation-framework",
+  },
+  {
+    id: "prompt-injection",
+    acronym: "Injection",
+    name: "Prompt Injection",
+    category: "Ops & lifecycle",
+    definition: "Instructions hidden in external content that try to redirect an agent's behavior.",
+    detail:
+      "A retrieved page might tell an agent to reveal private data or ignore the user's request. Treat that page as untrusted data and enforce permissions outside the model. Test attempted redirects as well as ordinary input errors.",
+    href: "/docs/testing/red-teaming",
+  },
+  {
+    id: "ucp",
+    acronym: "UCP",
+    name: "Universal Commerce Protocol",
+    category: "Payments",
+    definition: "A protocol for connecting agent platforms with merchant commerce capabilities.",
+    detail:
+      "UCP describes capabilities such as checkout, identity linking, and order management. It lets compatible systems exchange purchase information through defined contracts. A merchant still needs supported payment integrations and must enforce its business rules and the buyer's authority.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "acp",
+    acronym: "ACP",
+    name: "Agentic Commerce Protocol",
+    category: "Payments",
+    definition: "A protocol for agent-assisted checkout and related commerce operations.",
+    detail:
+      "ACP provides defined interfaces for preparing and completing purchases with a merchant. The integration must handle totals, customer approval, payment, and order results. Use the version and binding supported by the actual agent client and payment provider.",
+    href: "/docs/protocols/acp",
+  },
+  {
+    id: "ap2",
+    acronym: "AP2",
+    name: "Agent Payments Protocol",
+    category: "Payments",
+    definition: "A protocol for expressing and verifying authorization in agent-led payments.",
+    detail:
+      "AP2 uses signed mandates to record purchase intent and authorization. Participants verify the evidence required by their payment flow. A signed mandate, a completed payment, and delivery of the purchased item are separate facts.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "payment-mandate",
+    acronym: "Mandate",
+    name: "Payment Mandate",
+    category: "Payments",
+    definition: "A record of what someone has authorized an agent to buy or spend.",
+    detail:
+      "A mandate can bind permission to an amount, merchant, purpose, or expiry, depending on the protocol. The receiving system verifies that permission before proceeding. An agent preparing a cart does not itself establish authority to pay.",
+    href: "/docs/protocols/agentic-commerce",
+  },
+  {
+    id: "mpp",
+    acronym: "MPP",
+    name: "Machine Payments Protocol",
+    category: "Payments",
+    definition: "An HTTP payment protocol for paid resources such as API calls and content.",
+    detail:
+      "A server presents a payment challenge, the client responds with a payment credential, and the server verifies it before supplying the resource. Price, spending limits, receipts, and recovery after failed delivery all need defined behavior.",
+    href: "/docs/protocols/mpp",
+  },
+  {
+    id: "x402",
+    acronym: "x402",
+    name: "HTTP Payment Protocol",
+    category: "Payments",
+    definition: "A protocol that uses HTTP 402 responses to request payment for a resource.",
+    detail:
+      "The response tells a compatible client what payment is required. The client provides payment information, which is verified under the supported scheme before access is granted. Check the payment network, asset, settlement process, and retry behavior required by the integration.",
+    href: "/docs/protocols/agentic-commerce",
+  },
 ];
-
-export const featuredTermIds = ["mcp", "rag", "aeo", "llm", "tool-calling", "grounding"];

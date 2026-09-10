@@ -119,7 +119,9 @@ Disallow: /private
 
 ## Content Signals
 
-Content Signals are a structured way to declare AI usage permissions alongside `robots.txt`. They can be emitted through managed platform settings or written directly into `robots.txt`:
+Crawler rules describe who may fetch content. [Content Signals](https://contentsignals.org/) describe permitted uses after retrieval: search, input to an AI answer, and model training. Decide these separately; allowing a fetch does not answer all three usage questions. The declarations communicate policy to systems that honor them, rather than technically enforcing it.
+
+They can be emitted through managed platform settings or written directly into `robots.txt`. This example permits search and AI input while declining training; choose values that match your policy:
 
 ```
 User-agent: *
@@ -133,17 +135,17 @@ Some platforms can also emit the same signal as a response header:
 Content-Signal: search=yes, ai-input=yes, ai-train=no
 ```
 
-The three signal types:
+The three core signal types, described in [Cloudflare’s policy documentation](https://developers.cloudflare.com/bots/additional-configurations/managed-robots-txt/#content-signals-policy):
 
-**`search`** — Whether search engines may index this content. `search=yes` is equivalent to allowing `Googlebot`.
+**`search`** — Whether content may be used to build search indexes and results, excluding AI-generated summaries. This is a use preference, not a rule allowing a particular crawler to fetch the page.
 
-**`ai-input`** — Whether AI systems may use this content as retrieval context at inference time. `ai-input=yes` allows retrieval bots to include this page in their responses.
+**`ai-input`** — Whether content may be used as input to an AI system, such as retrieval context for an answer.
 
-**`ai-train`** — Whether AI systems may use this content to train or fine-tune models. `ai-train=no` is the typical setting for commercial content you want to protect.
+**`ai-train`** — Whether content may be used to train or fine-tune models. Choose this independently of search and AI input.
 
 The header approach has an advantage over `robots.txt`: it applies per-response rather than per-path, which means you can vary the policy based on the request (authenticated users versus public content, for example).
 
-Content Signals does not replace `robots.txt`. Well-behaved crawlers respect both, with `robots.txt` as the baseline and Content Signals as an override or supplement. Bots that do not support Content Signals still see `robots.txt`.
+Content Signals does not replace or override crawl access rules. A client must consider both whether it may fetch the content and whether the intended use is permitted. Bots that do not support Content Signals still see the crawler rules in `robots.txt`.
 
 ## Referencing llms.txt from robots.txt
 

@@ -1,0 +1,27 @@
+---
+title: Machine Payments Protocol
+description: HTTP payment challenges, verified retries, receipts, and spending controls for paid agent resources
+lastVerified: 2026-09-10
+---
+
+Machine Payments Protocol (MPP) supports payment-gated HTTP resources. It is relevant when a client needs to pay for an API request, content, or tool call. A free documentation service does not need a payment challenge. [MPP overview](https://mpp.dev/overview).
+
+## Server and client contract
+
+The server returns an HTTP 402 payment challenge. The client evaluates the terms and, within its spending authority, obtains and returns a payment credential. The server verifies payment before releasing the resource and supplies receipt information. Use the maintained implementation for challenge construction, credential validation, and receipts rather than assembling a plausible-looking header. [Server integration](https://mpp.dev/quickstart/server).
+
+Describe the payment requirements in the capability contract and expose a complete challenge through the chosen protocol implementation. Validate its fields and discovery metadata against the SDK revision and intended client. Verify that a client can interpret the offer, submit a credential, and retrieve the paid resource.
+
+## Spending and failure behavior
+
+Set resource, merchant, currency, amount, and aggregate spending limits before allowing an agent to pay. Require the appropriate user approval for commitments outside that authority. Keep server secrets out of client bundles and logs. Separate payment authorization from access to private data: paying for a resource does not grant another person's permissions. [Managing agent spend](https://mpp.dev/guides/managing-agent-spend).
+
+Document expired challenges, unsupported payment methods, insufficient funds, duplicate credentials, interrupted delivery, refund policy, and whether retrying a request can charge again. Distinguish transport retries from a new purchase. Bound session duration and total spend for recurring or streaming use.
+
+## Verification
+
+Use a supported test environment to exercise the unpaid request, complete challenge, valid payment, rejected or expired credential, repeated request, and receipt. Confirm the resource remains unavailable until verification succeeds, the charged amount matches the offer, and failed delivery can be reconciled without duplicate settlement. Use an authorized test payment and record its settlement and delivery outcomes separately.
+
+## Choosing a payment surface
+
+Compare MPP with [x402 and commerce protocols](/docs/protocols/agentic-commerce) using the payment methods, clients, fulfillment model, and provider integrations you actually need. Retail checkout requires product, cart, shipping, and order semantics beyond paying for one HTTP resource. Record which supported route completes the intended purchase, including how spending authority, settlement, and delivery are reconciled.

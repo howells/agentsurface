@@ -1,166 +1,91 @@
 ---
 title: auth.md
-description: Agentic registration discovery for user-bound credentials
-lastVerified: 2026-07-06
+description: Discover agent registration, verify identity, and exchange assertions for scoped access
+lastVerified: 2026-09-10
 ---
 
 ## Summary
 
-`auth.md` is an emerging open protocol, launched by WorkOS on 2026-05-21, for helping agents register with an application on behalf of a user. An application publishes a Markdown file at `https://service.com/auth.md` and pairs it with OAuth protected-resource metadata so agents can discover registration flows, supported scopes, endpoints, and credential shapes without scraping an interactive sign-up form.
+`auth.md` is WorkOS's emerging agentic-registration profile. It provides a readable onboarding procedure alongside machine-readable OAuth discovery. Adopt it when your service supports the registration flow and an intended client can use it. Public documentation does not need to invent a protected resource or registration service.
 
-- New/emerging WorkOS protocol (launched 2026-05-21); do not treat it as a mature authentication baseline yet.
-- WorkOS AuthKit has native `auth.md` support.
-- WorkOS-published week-one adopters include Cloudflare, Resend, and Firecrawl (attributed to WorkOS's own announcement, not independently confirmed).
-- No standards-body track: there is no IETF or foundation roadmap for `auth.md` — it is a single-vendor proposal.
-- `auth.md` is the prose walkthrough for agents and humans.
-- `/.well-known/oauth-protected-resource` remains the machine-readable resource metadata.
-- `/.well-known/oauth-authorization-server` can advertise an `agent_auth` block with registration endpoints and supported identity types.
-- Provider-attested registration uses ID-JAG identity assertions from trusted agent platforms.
-- User-claimed registration uses an email OTP ceremony when no provider assertion is available.
-- Issued credentials are still normal scoped bearer credentials: API keys or access tokens.
-
-Use `auth.md` when an agent needs to create or claim a user-bound credential for your service. It belongs in the registration path. Do not treat it as a replacement for OAuth token validation, scope checks, DPoP, or audit logging on the runtime API path.
-
-## Where It Fits
-
-Agent auth has three separate but connected surfaces:
-
-| Surface                       | Audience                                     | Purpose                                                                                              |
-| ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `auth.md`                     | Agents and humans                            | Step-by-step registration instructions, supported flows, scopes, and contact links.                  |
-| Protected Resource Metadata   | OAuth clients and MCP clients                | Resource identity, authorization servers, supported scopes, bearer methods, and discovery bootstrap. |
-| Authorization Server Metadata | OAuth clients and agent registration clients | Token endpoints, supported grants, and optional `agent_auth` registration metadata.                  |
-
-The protected resource metadata is the authority for the resource. `auth.md` is a readable companion that helps agents that arrive through docs, SDKs, search, or a 401 challenge understand how to register before they make normal authenticated API calls.
+The current reference separates identity registration from access-token issuance. A provider assertion, a service-issued identity assertion, and an access token have different roles; do not substitute one for another. [WorkOS reference overview](https://github.com/workos/auth.md).
 
 ## Discovery Shape
 
-On unauthenticated API requests, return a `WWW-Authenticate` header that points agents to protected-resource metadata:
+Serve the walkthrough as Markdown at `/auth.md`. For an OAuth-protected API, publish [protected-resource metadata](/docs/authentication/protected-resource-metadata) on the resource server and link to it from authentication challenges:
 
 ```http
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
 ```
 
-The protected-resource metadata points to the authorization server:
+The resource document identifies the API and its authorization server:
 
 ```json
 {
   "resource": "https://api.example.com/",
-  "resource_name": "Example API",
   "authorization_servers": ["https://auth.example.com/"],
-  "scopes_supported": ["items:read", "items:write"],
+  "scopes_supported": ["items:read"],
   "bearer_methods_supported": ["header"]
 }
 ```
 
-The authorization server metadata can add an `agent_auth` block. Keep token issuance and registration separate: normal OAuth fields describe token endpoints and grants; `agent_auth` describes agent registration, claim, and revocation endpoints.
+On the authorization-server origin, publish RFC 8414 metadata with the optional registration extension. This example advertises all three methods; remove methods and endpoints the service does not implement.
 
 ```json
 {
-  "issuer": "https://auth.example.com/",
-  "token_endpoint": "https://auth.example.com/oauth/token",
+  "issuer": "https://auth.example.com",
+  "token_endpoint": "https://auth.example.com/oauth2/token",
+  "revocation_endpoint": "https://auth.example.com/oauth2/revoke",
+  "grant_types_supported": [
+    "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    "urn:workos:agent-auth:grant-type:claim"
+  ],
   "agent_auth": {
     "skill": "https://example.com/auth.md",
-    "register_uri": "https://auth.example.com/agent/auth",
-    "claim_uri": "https://auth.example.com/agent/auth/claim",
-    "revocation_uri": "https://auth.example.com/agent/auth/revoke",
-    "identity_types_supported": ["identity_assertion", "anonymous"],
+    "identity_endpoint": "https://auth.example.com/agent/identity",
+    "claim_endpoint": "https://auth.example.com/agent/identity/claim",
+    "events_endpoint": "https://auth.example.com/agent/event/notify",
+    "identity_types_supported": ["anonymous", "identity_assertion", "service_auth"],
     "identity_assertion": {
-      "assertion_types_supported": ["urn:ietf:params:oauth:token-type:id-jag", "verified_email"],
-      "credential_types_supported": ["access_token", "api_key"]
+      "assertion_types_supported": ["urn:ietf:params:oauth:token-type:id-jag"]
     },
-    "anonymous": {
-      "credential_types_supported": ["api_key"]
-    }
+    "events_supported": ["https://schemas.workos.com/events/agent/auth/identity/assertion/revoked"]
   }
 }
 ```
 
-Advertise only flows you actually accept. If anonymous registration is not safe for your product, leave it out.
+The ID-JAG URN belongs inside `identity_assertion.assertion_types_supported`, not in `identity_types_supported`. The current endpoint fields are `identity_endpoint`, `claim_endpoint`, and `events_endpoint`; the earlier `register_uri` example is obsolete. Match your implementation to a pinned profile revision. [Service implementation guide](https://github.com/workos/auth.md/blob/main/agent-services/README.md).
 
 ## Flow Selection
 
-| Agent has                                                 | Flow                          | Result                                                                            |
-| --------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
-| A provider session that can mint an audience-bound ID-JAG | Agent verified                | Service verifies the assertion and returns credentials immediately.               |
-| A user email but no provider-signed assertion             | User claimed, email required  | Service emails the user, waits for OTP completion, then issues credentials.       |
-| No usable user identity                                   | User claimed, anonymous start | Service issues a low-scope pre-claim credential and lets the user claim it later. |
+| Method               | Registration behavior                                                                                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identity_assertion` | A trusted provider supplies an audience-bound ID-JAG. The service verifies it and may require account-linking confirmation before returning its own identity assertion. |
+| `service_auth`       | The agent supplies a login hint. The user signs in to the service and approves a claim ceremony before credentials are issued.                                          |
+| `anonymous`          | The service may issue an assertion for restricted pre-claim access; a later claim can bind it to a user.                                                                |
 
-### Agent Verified
+Check accepted assertion types before asking a provider to mint one. In the claim ceremony, the agent presents the verification URL and user code to the person. The person enters the code on the service's authenticated page; they do not send an email OTP back to the agent. [Current agent walkthrough](https://github.com/workos/auth.md/blob/main/AUTH.md).
 
-Agent verified works when the agent platform can attest the user's identity. The service maintains a trust list of accepted providers, verifies the ID-JAG against the provider JWKS, checks claims, matches or provisions the user, and returns a scoped credential.
+## Exchange and use
 
-Minimum server checks:
+Exchange the service-issued identity assertion at the advertised token endpoint using the JWT-bearer grant. This is separate from submitting the provider's ID-JAG to registration.
 
-- `iss` is on your trusted provider list.
-- JWT signature validates against the provider JWKS.
-- `aud` matches your resource or authorization server policy.
-- `exp` is still valid and `iat` is within clock-skew policy.
-- `jti` has not been seen before.
-- `client_id` maps to a known provider identity.
-- At least one usable identity claim, such as verified email or verified phone, is present.
+```http
+POST /oauth2/token
+Content-Type: application/x-www-form-urlencoded
 
-Access tokens issued from this path should be short-lived. To extend access, require a fresh assertion rather than issuing a refresh token to the agent.
+grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=<service-issued-assertion>&resource=https://api.example.com/
+```
 
-### User Claimed
+Use the resulting access token as a bearer credential. A claim ceremony instead polls the token endpoint with `urn:workos:agent-auth:grant-type:claim`, respecting the returned interval and recovery instructions. [JWT-bearer grant](https://www.rfc-editor.org/rfc/rfc7523.html).
 
-User claimed works without agent-provider participation. The app owns the registration and OTP ceremony. The human interaction is intentional and bounded: the user reads a code to approve or claim the delegation, then the agent receives or continues using a programmatic credential.
+## Errors and revocation
 
-There are two entrypoints:
+Document invalid assertions, unavailable methods, account-linking confirmation, stale provider authentication, pending claims, expiry, and throttling. Distinguish revoking one access token from revoking the underlying registration and its derived credentials. The `events_endpoint` receives provider security events; it is not an agent-callable logout route.
 
-- **Email required:** the agent submits an email address to `/agent/auth`; the service emails an OTP page and withholds credentials until `/agent/auth/claim/complete` succeeds.
-- **Anonymous start:** the agent calls `/agent/auth` without a user identity; the service issues a reduced-scope credential immediately and returns a claim token that can later upgrade or bind the registration after OTP completion.
+## Verification
 
-Anonymous start is useful for uninterrupted setup, but it creates real credentials before a user is bound. Keep pre-claim scopes small, expire claim tokens, store only token hashes, and rotate or reissue credentials when the claim completes if the post-claim scope is broader.
+Follow the published chain from `/auth.md` or an API challenge through resource metadata, authorization metadata, registration, any human claim, token exchange, and a permitted request. An OPTIONS response or valid JSON alone does not establish that the flow works.
 
-## What To Put In auth.md
-
-Structure the file as an ordered agent walkthrough:
-
-1. Identify the service, resource server, and authorization server hostnames.
-2. Explain how to find the protected-resource metadata from a 401 or the well-known path.
-3. Explain how to read the authorization server metadata and `agent_auth` block.
-4. Provide a method decision tree.
-5. Show exact request and response shapes for each supported registration flow.
-6. Describe the OTP claim ceremony, including what the agent should ask the user.
-7. Explain how to use the returned credential as a bearer token.
-8. List structured error codes and recovery steps.
-9. Explain revocation behavior and what the agent should do after a 401.
-10. Link to API docs, terms, privacy policy, and an integration support contact.
-
-Keep the file concrete. Agents need real hostnames, exact endpoints, supported scopes, and recoverable error behavior more than broad identity architecture.
-
-## Implementation Checklist
-
-- [ ] Serve `https://service.com/auth.md`.
-- [ ] Publish `/.well-known/oauth-protected-resource` with resource identity, scopes, and authorization servers.
-- [ ] Include `WWW-Authenticate: Bearer resource_metadata="..."` on 401 responses.
-- [ ] Publish authorization server metadata with an `agent_auth` block if supporting agentic registration.
-- [ ] Implement `POST /agent/auth` and dispatch by `type`.
-- [ ] For ID-JAG, maintain a provider trust list, cache JWKS safely, validate claims, and block replayed `jti` values.
-- [ ] For OTP flows, store only hashed claim tokens and OTPs, expire attempts, and make the user-facing page clear about the requesting agent.
-- [ ] Issue least-privilege credentials with clear `credential_expires` behavior.
-- [ ] Log `registration_id`, user or pre-claim principal, provider `iss`, provider `sub`, scopes, claim state, and revocation events.
-- [ ] Return structured error codes with instructions agents can act on.
-
-## Anti-Patterns
-
-- Publishing `auth.md` without the protected-resource metadata it points to.
-- Advertising `identity_assertion` before you can validate ID-JAG signatures and replay.
-- Letting anonymous-start credentials carry full account scope.
-- Persisting plaintext claim tokens after returning them.
-- Treating provider-asserted email as equivalent to your own verification policy without an explicit decision.
-- Omitting revocation and audit events for provider-backed delegations.
-- Returning HTML login pages from API 401s instead of OAuth discovery hints and structured errors.
-
-## See Also
-
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata)
-- [MCP Authorization](/docs/authentication/mcp-auth-model)
-- [Agent Identity](/docs/authentication/agent-identity)
-- [Token Exchange](/docs/authentication/token-exchange)
-- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay)
-- [WorkOS auth.md](https://workos.com/auth-md)
-- [workos/auth.md reference implementation](https://github.com/workos/auth.md)
-- [ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)
+Verify issuer trust, signature, audience, expiry, authentication freshness, and replay prevention. Test insufficient scopes, rejected account linking, claim expiry, and revocation. Keep secrets out of logs and enforce [authorization](/docs/authentication/oauth-for-agents) on every protected operation. Retain the exact reference revision and real-client evidence with the integration.

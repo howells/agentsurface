@@ -201,7 +201,7 @@ describe('Agent', () => {
 
 ### Tool naming & descriptions
 
-- Names: `service_action` or `resource_action` (snake_case)
+- Names: plain-language `verb_noun` in lowercase `snake_case` by default. Add a service namespace only when it helps choose a destination; keep providers, caching and connection checks inside application code.
 - Descriptions: readable as onboarding docs; include "Use when..." and "Do not use for..."
 - Parameters: explicit, no hidden context; include examples
 

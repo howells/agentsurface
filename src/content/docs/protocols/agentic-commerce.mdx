@@ -8,14 +8,14 @@ lastVerified: 2026-07-06
 
 An agent that buys things needs explicit, verifiable, revocable spending authority, and the merchant on the other side needs to know the agent is authorized to spend on a specific user's behalf. Ad-hoc "card on file with the agent vendor" breaks both halves: the user cannot see or cap what the agent may spend, and the merchant cannot tell an authorized agent from a scripted bot replaying stored credentials. Agentic commerce protocols exist to make the spending boundary a first-class, signed object rather than an implicit trust relationship.
 
-This page covers only foundation-backed protocols that have real governance and real deployment. Vendor-branded schemes with no cross-vendor traction are out of scope — see the [emerging standards watchlist](/docs/protocols/emerging-standards) for those.
+This page surveys commerce and payment approaches. The dated adoption observations below are not implementation requirements. For HTTP payment-gated resources, also consult [Machine Payments Protocol](/docs/protocols/mpp), verified separately on 2026-09-10; choose a protocol based on an actual client and payment-provider integration.
 
 - **UCP** — Google + Shopify; the current commerce center of gravity, thousands of live stores
 - **AP2** — Google-originated, now at the FIDO Alliance; the signed-mandate primitive, deployments still thin
 - **x402** — Coinbase-originated HTTP 402 payments, now a Linux Foundation project running at AWS and Cloudflare edge
 - **ACP** — covered below as deflating; full page at [Agentic Commerce Protocol](/docs/protocols/acp)
 
-The common primitive across all of them is a **mandate**: a signed, scoped, revocable authorization that proves an agent may make a specific payment. Mandates are an instance of agent authorization generally — see [Agent Identity](/docs/authentication/agent-identity).
+Spending authority must be explicit, bounded, and verifiable. Protocols express payment and delegation differently; do not assume a shared wire-level mandate. See [Agent Identity](/docs/authentication/agent-identity) and [MPP](/docs/protocols/mpp) for authorization and payment verification boundaries.
 
 ## UCP — Universal Commerce Protocol
 
@@ -59,7 +59,7 @@ The recurring "watch, don't build" note is deliberate: outside x402's infrastruc
 
 ## Mandates: The Common Primitive
 
-Every protocol here reduces to the same object: a **mandate** — a signed, amount-capped, merchant-scoped, revocable authorization that proves an agent may make a specific payment on a specific user's behalf. AP2 makes it explicit; UCP is compatible with it; x402's inline payment terms are a machine-to-machine variant of the same idea; even ACP's payment-delegation challenge is a mandate in all but name.
+A **mandate** is one way to represent spending authority. Distinguish that authorization from a payment challenge, settlement proof, or receipt; they answer different questions. Validate the artifacts required by the specific payment flow instead of treating protocol names as interchangeable.
 
 This is why agentic commerce is not really a payments problem — it is an agent-authorization problem. A mandate is a specialization of the general pattern in [Agent Identity](/docs/authentication/agent-identity): scoped, delegated, auditable authority that a downstream service can verify without trusting the caller's self-description. Design your spending authority as verifiable signed intent, and the specific protocol becomes a serialization detail.
 

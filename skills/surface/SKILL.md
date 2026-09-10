@@ -261,3 +261,7 @@ Use these defaults unless the project already has a better convention:
 - `references/`: detailed audit and scaffold references. Load only the relevant file.
 - `agents/openai.yaml`: UI metadata generated for skill listings.
 - `agents/*.md`: specialist task prompts for scoring and targeted transformations. Load only when delegating or executing that specialty.
+
+## Public product audits
+
+For websites and integrations, read `references/product-journeys.md` alongside the relevant dimension references. Start from a real user task, verify authoritative decision facts, follow the intended interface and permission boundary, exercise recovery, and inspect the final result. Apply findings to the existing Surface rubric; use external reports as supporting evidence.

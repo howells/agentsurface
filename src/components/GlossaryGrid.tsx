@@ -1,32 +1,50 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Pill } from "@/components/Pill";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
+import type { StaticImageData } from "next/image";
+import agentInfrastructureArt from "@/assets/glossary/agent-infrastructure.svg";
+import agentReadinessArt from "@/assets/glossary/agent-readiness.svg";
+import authIdentityArt from "@/assets/glossary/auth-identity.svg";
+import dataIntegrationArt from "@/assets/glossary/data-integration.svg";
+import foundationArt from "@/assets/glossary/foundation.svg";
+import memoryKnowledgeArt from "@/assets/glossary/memory-knowledge.svg";
+import opsLifecycleArt from "@/assets/glossary/ops-lifecycle.svg";
+import paymentsArt from "@/assets/glossary/payments.svg";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Line patterns by category (pure CSS, zero DOM elements) ─────────────────
+// ── Line fields by category ─────────────────────────────────────────────────
+// Drawn by src/lib/riley.ts from src/data/glossary-patterns.ts; `pnpm patterns:render` rewrites them.
 
-const LINE_ANGLES: Record<string, number> = {
-  "Agent Infrastructure": 45,
-  "Agent Readiness": 30,
-  "Data & Integration": -45,
-  Foundation: 0,
-  "Memory & Knowledge": 90,
-  "Ops & Lifecycle": -60,
+const CATEGORY_ART: Record<string, StaticImageData> = {
+  "Agent infrastructure": agentInfrastructureArt,
+  "Agent readiness": agentReadinessArt,
+  "Auth & identity": authIdentityArt,
+  "Data & integration": dataIntegrationArt,
+  Foundation: foundationArt,
+  "Memory & knowledge": memoryKnowledgeArt,
+  "Ops & lifecycle": opsLifecycleArt,
+  Payments: paymentsArt,
 };
 
 function CardPattern({ category }: { category: string }) {
-  const angle = LINE_ANGLES[category] ?? 0;
+  const art = CATEGORY_ART[category] ?? foundationArt;
   return (
-    <div
-      className="h-full w-full"
-      style={{
-        background: `repeating-linear-gradient(${angle}deg, currentColor 0 0.75px, transparent 0.75px 7px)`,
-        opacity: 0.12,
-      }}
-    />
+    <span className="absolute inset-0 block">
+      <Image
+        src={art}
+        alt=""
+        fill
+        sizes="(min-width: 640px) 16rem, 50vw"
+        className="object-cover object-top mix-blend-multiply dark:opacity-85 dark:mix-blend-screen dark:invert"
+      />
+    </span>
   );
 }
 
@@ -38,10 +56,12 @@ function GlossaryCard({
   term,
   onOpen,
   active,
+  grid = false,
 }: {
   term: GlossaryTerm;
   onOpen: (id: string) => void;
   active: boolean;
+  grid?: boolean;
 }) {
   return (
     <motion.button
@@ -49,29 +69,20 @@ function GlossaryCard({
       onClick={() => {
         onOpen(term.id);
       }}
-      className="relative flex w-52 h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground"
-      style={{
-        boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)",
-        opacity: active ? 0 : 1,
-      }}
-      whileHover={
-        active
-          ? undefined
-          : { boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)", y: -6 }
-      }
+      className={`relative flex ${grid ? "w-full min-w-0" : "w-48"} h-60 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground transition-shadow duration-200 focus-ring ${active ? "" : "shadow-sm hover:shadow-md"}`}
+      aria-label={`Read about ${term.name}`}
+      aria-haspopup="dialog"
+      style={{ opacity: active ? 0 : 1 }}
+      whileHover={active ? undefined : { y: -3 }}
       transition={SPRING}
     >
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <CardPattern category={term.category} />
       </div>
-      <div className="px-4 pb-5 pt-2 text-left">
-        <p className="font-mono text-[0.55rem] font-medium uppercase tracking-widest text-fd-muted-foreground">
-          {term.category}
-        </p>
-        <p className="mt-0.5 text-[1.6rem] font-semibold tracking-tight leading-none text-fd-foreground">
-          {term.acronym}
-        </p>
-        <p className="mt-0.5 text-[0.65rem] leading-4 text-fd-muted-foreground">{term.name}</p>
+      <div className="px-4 pb-4 pt-3 text-left">
+        <p className="type-small text-fd-muted-foreground">{term.category}</p>
+        <p className="mt-1 type-heading text-fd-foreground">{term.acronym}</p>
+        <p className="mt-1.5 truncate type-small text-fd-muted-foreground">{term.name}</p>
       </div>
     </motion.button>
   );
@@ -80,15 +91,36 @@ function GlossaryCard({
 // ── Overlay (portalled to document.body) ─────────────────────────────────────
 
 function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    const focusable = () =>
+      Array.from(dialog?.querySelectorAll<HTMLElement>('button, a[href], [tabindex="0"]') ?? []);
+    focusable()[0]?.focus();
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
+      }
+      if (e.key === "Tab") {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => {
       window.removeEventListener("keydown", handler);
+      if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus();
+      }
     };
   }, [onClose]);
 
@@ -105,9 +137,13 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
       />
 
       <div className="pointer-events-none fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-8">
-        <motion.div
+        <motion.dialog
+          open
+          ref={dialogRef}
+          aria-modal="true"
+          aria-labelledby={`term-title-${term.id}`}
           layoutId={`card-${term.id}`}
-          className="pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border border-white/50 bg-white/85 backdrop-blur-2xl dark:border-fd-border/60 dark:bg-fd-card/90"
+          className="relative m-0 pointer-events-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/50 bg-white/85 backdrop-blur-2xl dark:border-fd-border/60 dark:bg-fd-card/90"
           style={{
             WebkitBackdropFilter: "blur(40px)",
             boxShadow: "0 40px 100px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
@@ -142,7 +178,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
 
           <div className="px-7 pb-8 pt-5">
             <motion.p
-              className="font-mono text-[0.6rem] font-medium uppercase tracking-widest text-fd-muted-foreground"
+              className="type-small text-fd-accent-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.28 }}
@@ -150,7 +186,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.category}
             </motion.p>
             <motion.p
-              className="mt-2 text-4xl font-semibold tracking-tight leading-none text-fd-foreground"
+              className="mt-2 type-heading text-fd-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.16, duration: 0.28 }}
@@ -158,7 +194,8 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.acronym}
             </motion.p>
             <motion.p
-              className="mt-1 text-sm text-fd-muted-foreground"
+              id={`term-title-${term.id}`}
+              className="mt-1 type-body text-fd-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.22, duration: 0.28 }}
@@ -173,7 +210,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               transition={{ delay: 0.28, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             />
             <motion.p
-              className="text-sm font-medium leading-6 text-fd-foreground"
+              className="type-body text-fd-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.34, duration: 0.28 }}
@@ -181,15 +218,23 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.definition}
             </motion.p>
             <motion.p
-              className="mt-3 text-sm leading-7 text-fd-muted-foreground"
+              className="mt-3 type-body text-fd-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.28 }}
             >
               {term.detail}
             </motion.p>
+            {term.href && (
+              <Link
+                href={term.href}
+                className="mt-5 inline-block type-body underline underline-offset-4 focus-ring"
+              >
+                Read the implementation guide
+              </Link>
+            )}
           </div>
-        </motion.div>
+        </motion.dialog>
       </div>
     </>,
     document.body,
@@ -212,19 +257,15 @@ function FilterPills({
   return (
     <div className="flex flex-wrap gap-2">
       {[ALL, ...categories].map((cat) => (
-        <button
+        <Pill
           key={cat}
+          pressed={active === cat}
           onClick={() => {
             onChange(cat);
           }}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-            active === cat
-              ? "border-fd-foreground bg-fd-foreground text-fd-background"
-              : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground"
-          }`}
         >
           {cat}
-        </button>
+        </Pill>
       ))}
     </div>
   );
@@ -241,6 +282,7 @@ export function GlossaryGrid({
   showFilters?: boolean;
   layout?: "scroll" | "grid";
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState(ALL);
 
@@ -256,7 +298,7 @@ export function GlossaryGrid({
   }, [activeId]);
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       {showFilters && categories.length > 1 && (
         <FilterPills categories={categories} active={filter} onChange={setFilter} />
       )}
@@ -267,6 +309,7 @@ export function GlossaryGrid({
             {visible.map((term) => (
               <GlossaryCard
                 key={term.id}
+                grid
                 term={term}
                 onOpen={setActiveId}
                 active={term.id === activeId}
@@ -275,33 +318,64 @@ export function GlossaryGrid({
           </AnimatePresence>
         </div>
       ) : (
-        <div className="relative mt-6 w-screen ml-[calc(50%-50vw)]">
-          <ScrollAreaPrimitive.Root className="w-full">
-            <ScrollAreaPrimitive.Viewport className="w-full" style={{ overflowY: "visible" }}>
-              <div className="flex gap-3 pt-4 pb-5 px-1">
-                {/* Left spacer — aligns first card with content, scrolls away */}
-                <div
-                  className="shrink-0"
-                  style={{ width: "max(1.5rem, calc(50vw - 30.5rem))" }}
-                  aria-hidden="true"
-                />
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {visible.map((term) => (
-                    <GlossaryCard
-                      key={term.id}
-                      term={term}
-                      onOpen={setActiveId}
-                      active={term.id === activeId}
-                    />
-                  ))}
-                </AnimatePresence>
-                <div className="w-6 shrink-0" aria-hidden="true" />
-              </div>
-            </ScrollAreaPrimitive.Viewport>
-            <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="hidden">
-              <ScrollAreaPrimitive.Thumb />
-            </ScrollAreaPrimitive.Scrollbar>
-          </ScrollAreaPrimitive.Root>
+        <div>
+          <div
+            className="mt-5 flex justify-end gap-2 max-sm:hidden"
+            aria-label="Glossary carousel controls"
+          >
+            {([-1, 1] as const).map((direction) => {
+              const Icon = direction === -1 ? ArrowLeft : ArrowRight;
+              return (
+                <button
+                  key={direction}
+                  type="button"
+                  aria-label={direction === -1 ? "Previous terms" : "Next terms"}
+                  onClick={() =>
+                    viewportRef.current?.scrollBy({
+                      left: direction * Math.max(220, viewportRef.current.clientWidth * 0.7),
+                      behavior: "auto",
+                    })
+                  }
+                  className="rounded-full border border-fd-border p-2 hover:bg-fd-muted focus-ring"
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative mt-2 w-screen ml-[calc(50%-50vw)]">
+            <ScrollAreaPrimitive.Root className="w-full">
+              <ScrollAreaPrimitive.Viewport
+                ref={viewportRef}
+                aria-label="Glossary terms"
+                className="w-full"
+                style={{ overflowY: "visible" }}
+              >
+                <div className="flex gap-3 pt-4 pb-5 px-1">
+                  {/* Left spacer — aligns first card with content, scrolls away */}
+                  <div
+                    className="shrink-0"
+                    style={{ width: "max(1.5rem, calc(50vw - 30.5rem))" }}
+                    aria-hidden="true"
+                  />
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {visible.map((term) => (
+                      <GlossaryCard
+                        key={term.id}
+                        term={term}
+                        onOpen={setActiveId}
+                        active={term.id === activeId}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <div className="w-6 shrink-0" aria-hidden="true" />
+                </div>
+              </ScrollAreaPrimitive.Viewport>
+              <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="hidden">
+                <ScrollAreaPrimitive.Thumb />
+              </ScrollAreaPrimitive.Scrollbar>
+            </ScrollAreaPrimitive.Root>
+          </div>
         </div>
       )}
 
@@ -315,6 +389,6 @@ export function GlossaryGrid({
           />
         )}
       </AnimatePresence>
-    </>
+    </MotionConfig>
   );
 }

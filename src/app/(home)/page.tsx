@@ -1,372 +1,226 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
+import { AreaNav } from "@/components/AreaNav";
+import { PageIntro } from "@/components/PageIntro";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
+import { RecommendationList } from "@/components/RecommendationList";
 import { glossaryTerms } from "@/data/glossary";
+import { guideStages } from "@/data/homepage-guide";
 
-const paths = [
-  {
-    desc: "Design principles, runtime choices, browser access, and protocol boundaries.",
-    href: "/docs/agents",
-    title: "Understand agent systems",
-  },
-  {
-    desc: "Framework selection, orchestration, retrieval, memory, UI, testing, and deployment patterns.",
-    href: "/docs/getting-started",
-    title: "Build production agents",
-  },
-  {
-    desc: "APIs, CLIs, MCP servers, discovery files, auth, errors, and tool definitions.",
-    href: "/docs/api-surface",
-    title: "Expose software to agents",
-  },
-  {
-    desc: "Score a surface, collect evidence, group fixes, and track before-and-after deltas.",
-    href: "/docs/scoring",
-    title: "Evaluate readiness",
-  },
-  {
-    desc: "Compare protocols, runtimes, model providers, retrieval systems, eval tools, and sandboxes.",
-    href: "/docs/tooling-catalog",
-    title: "Choose standards and tools",
-  },
-];
+export const metadata: Metadata = {
+  title: "Make your website and app work with AI agents",
+  description:
+    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, sign-in, usability, and payments, with clear recommendations and detailed implementation docs.",
+};
 
-const systemTopics = [
-  {
-    desc: "Design principles, sandboxes and workspaces, browser access, runtime guardrails, and platform tradeoffs.",
-    href: "/docs/agents",
-    title: "Agent systems",
-  },
-  {
-    desc: "Where logic, tools, state, and approvals live — and when agent loops need durable execution.",
-    href: "/docs/runtime-boundaries",
-    title: "Runtime boundaries",
-  },
-  {
-    desc: "Session control, tool approvals, mid-run steering, MCP Apps, and generative interfaces.",
-    href: "/docs/agentic-ui",
-    title: "Agentic UI",
-  },
-  {
-    desc: "Supervisors, swarms, councils, delegation, the five memory types, and tool sprawl.",
-    href: "/docs/multi-agent",
-    title: "Multi-agent",
-  },
-  {
-    desc: "RAG patterns, embeddings, retrieval pipelines, vector stores, and knowledge graphs.",
-    href: "/docs/data-retrievability",
-    title: "Data retrievability",
-  },
-  {
-    desc: "Metrics, judges, golden datasets, red teams, traces, and CI checks.",
-    href: "/docs/testing",
-    title: "Testing and evals",
-  },
-];
-
-const surfaces = [
-  {
-    desc: "HTTP contracts, OpenAPI, Arazzo workflows, versions, and events.",
-    href: "/docs/api-surface",
-    title: "API Surface",
-  },
-  {
-    desc: "Names, descriptions, schemas, safety, portability, curation, and token budgets.",
-    href: "/docs/tool-design",
-    title: "Tool Design",
-  },
-  {
-    desc: "Structured output, predictable commands, stdin payloads, schemas, and safety rails.",
-    href: "/docs/cli-design",
-    title: "CLI Design",
-  },
-  {
-    desc: "Tools, resources, prompts, transports, auth, annotations, and server tests.",
-    href: "/docs/mcp-servers",
-    title: "MCP Servers",
-  },
-  {
-    desc: "llms.txt, AGENTS.md, structured data, content negotiation, robots, and endpoints.",
-    href: "/docs/discovery",
-    title: "Discovery",
-  },
-  {
-    desc: "Repository instructions for Codex, Claude Code, Cursor, Copilot, and monorepos.",
-    href: "/docs/context-files",
-    title: "Context Files",
-  },
-  {
-    desc: "Agent identity, OAuth, token exchange, DPoP, protected resources, and replay safety.",
-    href: "/docs/authentication",
-    title: "Authentication",
-  },
-  {
-    desc: "Problem Details, recovery hints, retries, idempotency, trace IDs, and CLI errors.",
-    href: "/docs/error-handling",
-    title: "Error Handling",
-  },
-];
-
-const references = [
-  {
-    desc: "The 0-3 rubric, scorecard format, evidence rules, clustering, and calibration.",
-    href: "/docs/scoring",
-    title: "Scoring framework",
-  },
-  {
-    desc: "MCP, A2A, ACP, agentic commerce, Arazzo, and the emerging-standards watchlist.",
-    href: "/docs/protocols",
-    title: "Protocols",
-  },
-  {
-    desc: "Frameworks, providers, gateways, retrieval systems, eval tools, browsers, and sandboxes.",
-    href: "/docs/tooling-catalog",
-    title: "Tooling catalog",
-  },
-  {
-    desc: "Production patterns for loops, approvals, background agents, code execution, and MCP.",
-    href: "/docs/cookbook",
-    title: "Cookbook",
-  },
-  {
-    desc: "Canonical specs, vendor docs, research notes, and source material.",
-    href: "/docs/reference-links",
-    title: "Reference links",
-  },
-];
-
-const agentSurface = [
-  { href: "/llms.txt", path: "llms.txt", role: "section index" },
-  { href: "/llms-full.txt", path: "llms-full.txt", role: "every page, inlined" },
-  { href: "/AGENTS.md", path: "AGENTS.md", role: "repo map" },
-  { href: "/api/md/index", path: "/api/md", role: "any page as Markdown" },
-  { href: "/mcp", path: "/mcp", role: "search + fetch tools" },
-  {
-    href: "/.well-known/mcp/server-card.json",
-    path: ".well-known/mcp",
-    role: "server card",
-  },
-];
-
-function AgentSurfacePanel() {
+function AreaOverview() {
   return (
-    <aside className="mt-12 lg:mt-3">
-      <ul className="divide-y divide-fd-border border-y border-fd-border">
-        {agentSurface.map((row) => (
-          <li key={row.path}>
-            <a
-              href={row.href}
-              className="group flex items-baseline justify-between gap-4 py-2.5 transition-colors hover:text-fd-foreground"
-            >
-              <span className="font-mono text-[0.8125rem] text-fd-foreground underline-offset-4 group-hover:underline">
-                {row.path}
+    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {guideStages.map((stage, index) => (
+        <li key={stage.id}>
+          <a
+            href={`#${stage.id}`}
+            className="group flex flex-col rounded-2xl sm:min-h-44 border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+          >
+            <span className="flex items-baseline justify-between type-small tabular-nums text-fd-muted-foreground">
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span className="flex items-center gap-1">
+                {stage.cards.length}
+                <span className="sr-only"> recommendations</span>
+                <ArrowDown
+                  aria-hidden="true"
+                  className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+                />
               </span>
-              <span className="shrink-0 text-xs text-fd-muted-foreground">{row.role}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </aside>
-  );
-}
-
-function LinkList({ items }: { items: { title: string; desc: string; href: string }[] }) {
-  return (
-    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((item) => (
-        <Link
-          key={item.title}
-          href={item.href}
-          className="group rounded-lg border border-fd-border p-5 transition-colors hover:border-fd-ring hover:bg-fd-accent"
-        >
-          <h3 className="text-[0.9375rem] font-medium text-fd-foreground group-hover:text-fd-accent-foreground">
-            {item.title}
-          </h3>
-          <p className="mt-1.5 text-xs leading-5 text-fd-muted-foreground">{item.desc}</p>
-        </Link>
+            </span>
+            <span className="mt-auto block pt-6 type-body sm:pt-10 text-fd-foreground">
+              {stage.question}
+            </span>
+            <span className="mt-1 block type-small text-fd-muted-foreground">{stage.name}</span>
+          </a>
+        </li>
       ))}
-    </div>
-  );
-}
-
-function LinkRows({ items }: { items: { title: string; desc: string; href: string }[] }) {
-  return (
-    <div className="mt-8 grid gap-x-12 gap-y-7 sm:grid-cols-2">
-      {items.map((item) => (
-        <Link key={item.title} href={item.href} className="group">
-          <h3 className="text-sm font-medium text-fd-foreground underline-offset-4 group-hover:underline">
-            {item.title}
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-fd-muted-foreground">{item.desc}</p>
-        </Link>
-      ))}
-    </div>
+    </ol>
   );
 }
 
 export default function HomePage() {
+  const total = guideStages.reduce((count, stage) => count + stage.cards.length, 0);
+  const areas = guideStages.map((stage) => ({
+    count: stage.cards.length,
+    id: stage.id,
+    name: stage.name,
+  }));
+
   return (
-    <main className="flex flex-col items-center bg-fd-background text-fd-foreground">
-      <section className="w-full max-w-5xl px-6 pb-14 pt-16 sm:px-10">
-        <div className="grid items-start gap-y-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-16">
-          <div>
-            <p className="mb-4 font-mono text-xs text-fd-muted-foreground">
-              agent-readable software
-            </p>
-            <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.1]">
-              A field guide for software that agents can use.
-            </h1>
-            <p className="mt-6 max-w-2xl text-[0.9375rem] leading-7 text-fd-muted-foreground">
-              Agent Surface explains how agents read context, call tools, retrieve knowledge, handle
-              errors, ask for approval, and coordinate work. Use it to design agent systems, expose
-              existing products to agents, score readiness, and choose protocols or tools with the
-              engineering detail intact.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/docs"
-                className="inline-flex h-10 items-center rounded-md bg-fd-primary px-5 text-sm font-medium text-fd-primary-foreground transition-colors hover:bg-fd-primary/90"
-              >
-                Start the guide
-              </Link>
-              <Link
-                href="/docs/getting-started"
-                className="inline-flex h-10 items-center rounded-md border border-fd-border px-5 text-sm font-medium text-fd-muted-foreground transition-colors hover:border-fd-ring hover:text-fd-foreground"
-              >
-                Choose a path
-              </Link>
-            </div>
-          </div>
-
-          <AgentSurfacePanel />
-        </div>
-      </section>
-
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-xl font-semibold tracking-tight text-fd-foreground">
-              Start with the job
-            </h2>
-            <span className="text-xs text-fd-muted-foreground">
-              five routes through the same dense guide
-            </span>
-          </div>
-          <LinkList items={paths} />
-        </div>
-      </section>
-
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <h2 className="text-xl font-semibold tracking-tight text-fd-foreground">Agent systems</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
-            These chapters cover the product and system design questions behind agents: where they
-            run, how they use tools, what memory they need, how people supervise them, and how to
-            prove they work.
-          </p>
-          <LinkRows items={systemTopics} />
-        </div>
-      </section>
-
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <h2 className="text-xl font-semibold tracking-tight text-fd-foreground">
-            Agent-readable surfaces
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
-            These chapters make existing software easier for agents to inspect, call, recover from,
-            and keep within permission boundaries.
-          </p>
-          <LinkRows items={surfaces} />
-        </div>
-      </section>
-
-      <section className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <h2 className="text-xl font-semibold tracking-tight text-fd-foreground">
-            Evaluation and reference
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground">
-            Use these sections when you need to compare maturity, select a standard, pick
-            infrastructure, or turn a pattern into an implementation plan.
-          </p>
-          <LinkRows items={references} />
-        </div>
-      </section>
-
-      <section id="skill" className="w-full border-t border-fd-border">
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <div className="grid gap-8 sm:grid-cols-[1fr_1fr]">
-            <div>
-              <h2 className="font-mono text-xl font-semibold text-fd-foreground">surface</h2>
-              <p className="mt-3 max-w-sm text-sm leading-6 text-fd-muted-foreground">
-                The surface skill turns the guide into work on a repository. It can explain a topic,
-                audit readiness, write a transformation plan, scaffold agent infrastructure, or
-                delegate focused fixes to specialist prompts.
-              </p>
-              <p className="mt-4 text-xs text-fd-muted-foreground">
-                Works with Codex, Claude Code, Cursor, and any agent that reads markdown skill
-                files.
-              </p>
-            </div>
-            <div className="flex flex-col justify-center">
-              <div className="overflow-hidden rounded-lg border border-fd-border bg-fd-muted/30">
-                <pre className="overflow-x-auto p-4 text-xs leading-7 text-fd-foreground">
-                  <code>
-                    <span className="select-none text-fd-muted-foreground">$ </span>
-                    npx skills add https://github.com/howells/agentsurface
-                  </code>
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="w-full border-t border-fd-border" style={{ overflowX: "clip" }}>
-        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-xl font-semibold tracking-tight text-fd-foreground">
-              The language of agents
-            </h2>
-            <span className="text-xs text-fd-muted-foreground">
-              plain-language definitions for product and engineering teams
-            </span>
-          </div>
-          <div className="mt-8">
-            <GlossaryGrid terms={glossaryTerms} showFilters={false} />
-          </div>
-          <div className="mt-6">
-            <Link
-              href="/glossary"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-fd-foreground transition-colors hover:text-fd-muted-foreground"
+    <main id="main" className="bg-fd-background text-fd-foreground">
+      <PageIntro
+        className="pb-14 pt-16 sm:pt-20"
+        eyebrow="A practical guide to agent-ready products"
+        title="Make your website and app work with AI agents."
+        actions={
+          <>
+            <a
+              href="#guide-map"
+              className="inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground focus-ring"
             >
-              View all 24 terms
-              <span aria-hidden="true">-&gt;</span>
+              See the six areas <ArrowDown aria-hidden="true" className="size-4" />
+            </a>
+            <Link
+              href="/docs"
+              className="inline-flex items-center gap-2 underline-offset-4 hover:underline focus-ring"
+            >
+              Technical documentation <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </>
+        }
+      >
+        Help agents find your product, understand what it offers, and use it on a customer’s behalf.
+        Here’s what to consider, why it matters, and where to start.
+      </PageIntro>
+
+      <section
+        id="guide-map"
+        aria-labelledby="map-heading"
+        className="mx-auto max-w-5xl scroll-mt-20 px-6 pb-20 sm:px-10"
+      >
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="map-heading" className="type-body">
+            The six things to get right
+          </h2>
+          <p className="type-small text-fd-muted-foreground">{total} recommendations</p>
+        </div>
+        <AreaOverview />
+      </section>
+
+      <div>
+        <AreaNav areas={areas} />
+        {guideStages.map((stage) => (
+          <section
+            key={stage.id}
+            id={stage.id}
+            aria-labelledby={`${stage.id}-heading`}
+            className="scroll-mt-24"
+          >
+            <div className="mx-auto max-w-5xl px-6 pb-4 pt-14 sm:px-10 sm:pt-16">
+              <div className="mb-7 grid gap-4 md:grid-cols-[1fr_1.15fr] md:gap-12">
+                <div>
+                  <p className="mb-3 type-body text-fd-accent-foreground">{stage.name}</p>
+                  <h2 id={`${stage.id}-heading`} className="type-heading">
+                    {stage.question}
+                  </h2>
+                </div>
+                <p className="self-end type-body text-fd-muted-foreground">{stage.description}</p>
+              </div>
+              <RecommendationList stage={stage} />
+            </div>
+          </section>
+        ))}
+        <div className="h-16" aria-hidden="true" />
+      </div>
+
+      <section
+        id="glossary"
+        aria-labelledby="glossary-heading"
+        className="scroll-mt-20 border-t border-fd-border"
+        style={{ overflowX: "clip" }}
+      >
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
+          <div className="flex flex-wrap items-baseline justify-between gap-4">
+            <div>
+              <h2 id="glossary-heading" className="type-heading">
+                The language of agents
+              </h2>
+              <p className="mt-2 type-body text-fd-muted-foreground">
+                Plain-language definitions of the terms in this guide. Choose a card to learn more.
+              </p>
+            </div>
+            <Link href="/glossary" className="type-body underline underline-offset-4 focus-ring">
+              View all {glossaryTerms.length} terms
             </Link>
           </div>
+          <GlossaryGrid terms={glossaryTerms} showFilters={false} />
         </div>
       </section>
 
-      <footer className="w-full border-t border-fd-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-8 sm:px-10">
-          <span className="text-xs text-fd-muted-foreground">
-            Agent Surface by{" "}
-            <a
-              href="https://danielhowells.com"
-              className="transition-colors hover:text-fd-foreground"
-              target="_blank"
-              rel="noopener noreferrer"
+      <section className="border-t border-fd-border" aria-labelledby="next-heading">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
+          <div className="grid gap-10 md:grid-cols-2 md:gap-16">
+            <div>
+              <BookOpen aria-hidden="true" className="mb-4 size-5 text-fd-accent-foreground" />
+              <h2 id="next-heading" className="type-heading">
+                Put the guide to work
+              </h2>
+              <p className="mt-3 type-body text-fd-muted-foreground">
+                Choose a task a customer wants to complete and follow it from discovery to the final
+                result. Use the docs for implementation detail, examples, and the tradeoffs behind
+                each recommendation.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 type-body">
+                <Link
+                  href="/docs/scoring/product-journeys"
+                  className="underline underline-offset-4 focus-ring"
+                >
+                  Evaluate a customer task
+                </Link>
+                <Link href="/docs" className="underline underline-offset-4 focus-ring">
+                  Browse the docs
+                </Link>
+                <Link href="/glossary" className="underline underline-offset-4 focus-ring">
+                  Explore the glossary
+                </Link>
+              </div>
+            </div>
+            <div id="skill" className="min-w-0 scroll-mt-20">
+              <h3 className="type-body">Work through it with your coding agent</h3>
+              <p className="mt-3 type-body text-fd-muted-foreground">
+                Install the Surface skill to apply this guidance to your codebase: explain a topic,
+                assess what exists, or turn the findings into an implementation plan.
+              </p>
+              <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 type-small font-mono">
+                <code>npx skills add https://github.com/howells/agentsurface</code>
+              </pre>
+              <p className="mt-3 type-small text-fd-muted-foreground">
+                For Codex, Claude Code, Cursor, and other agents that support skills.
+              </p>
+            </div>
+          </div>
+          <p className="mt-12 border-t border-fd-border pt-6 type-small text-fd-muted-foreground">
+            This guide brings together Agent Surface’s implementation guidance and practical lessons
+            from{" "}
+            <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
+              Is Agentic
+            </a>
+            ,{" "}
+            <a href="https://ora.ai/methodology" className="underline underline-offset-4">
+              Ora
+            </a>
+            , and{" "}
+            <a href="https://isitagentready.com/" className="underline underline-offset-4">
+              Cloudflare Agent Readiness
+            </a>
+            . Priorities reflect the task and product; the{" "}
+            <Link
+              href="/docs/tooling-catalog/evaluation-and-observability"
+              className="underline underline-offset-4"
             >
+              reference docs
+            </Link>{" "}
+            explain how external assessments fit into an evaluation.
+          </p>
+        </div>
+      </section>
+
+      <footer className="border-t border-fd-border">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-8 type-small text-fd-muted-foreground sm:px-10">
+          <span>
+            Agent Surface by{" "}
+            <a href="https://danielhowells.com" className="hover:text-fd-foreground">
               Daniel Howells
             </a>
           </span>
-          <a
-            href="https://github.com/howells/agentsurface"
-            className="text-xs text-fd-muted-foreground transition-colors hover:text-fd-foreground"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href="https://github.com/howells/agentsurface" className="hover:text-fd-foreground">
             GitHub
           </a>
         </div>

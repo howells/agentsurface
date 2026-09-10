@@ -29,7 +29,7 @@ Agents cannot solve CAPTCHAs, complete generic OAuth authorization-code redirect
 - Auth config files: Clerk, Auth0, WorkOS, Supabase Auth, NextAuth, better-auth
 - `.well-known/oauth-authorization-server` (RFC 8414) and `.well-known/oauth-protected-resource` (RFC 9728)
 - `auth.md` at the service root, plus `agent_auth` metadata in authorization server metadata
-- `/agent/auth`, `/agent/auth/claim`, `/agent/auth/claim/complete`, and `/agent/auth/revoke` endpoints
+- advertised identity and claim endpoints (the reference uses `/agent/identity`), plus OAuth token and revocation endpoints
 - API key generation endpoints and rotation mechanisms
 - Token exchange implementation and audience restrictions
 - CAPTCHAs in auth flow (anti-pattern)
@@ -96,23 +96,13 @@ The 2026-07-28 revision also tightens related requirements: authorization server
 
 ### auth.md for agentic registration
 
-`auth.md` is an emerging WorkOS-authored open protocol for services that want agents to register or claim user-bound credentials without an interactive sign-up form. The app publishes `https://service.com/auth.md` as a readable walkthrough, keeps RFC 9728 protected-resource metadata as the resource authority, and can add an `agent_auth` block to authorization server metadata.
+`auth.md` is an emerging registration profile. Publish the walkthrough beside RFC 9728 resource metadata and RFC 8414 authorization-server metadata. The optional `agent_auth` extension advertises `identity_endpoint`, `claim_endpoint`, and provider-facing `events_endpoint`, with `skill` linking to the walkthrough.
 
-Use it when a service wants agents to:
+Use the current identity-method enum: `anonymous`, `identity_assertion`, and `service_auth`. List the ID-JAG URN inside `identity_assertion.assertion_types_supported`, never as a top-level identity method. Advertise only implemented methods.
 
-- discover registration and claim endpoints from docs or a 401 challenge
-- choose between provider-attested identity assertions and OTP-backed user claim flows
-- receive scoped API keys or access tokens tied to a user or pre-claim principal
-- handle revocation and registration errors in a structured way
+Keep registration and token exchange separate: the provider supplies an audience-bound ID-JAG to the identity endpoint; the service returns its own assertion for exchange at the OAuth token endpoint. For a user claim, the agent gives the person a verification URL and code to enter on the service's authenticated page. Do not ask the person to relay an email OTP to the agent. Respect polling intervals, expiry, account-linking confirmation, and revocation.
 
-The two core flow families:
-
-| Flow | Use when | Key checks |
-|------|----------|------------|
-| Agent verified | A trusted agent provider can mint an audience-bound ID-JAG for the user. | Trust-list issuer, verify JWKS signature, validate `aud`, `exp`, `iat`, `jti`, `client_id`, and verified identity claims. |
-| User claimed | No trusted provider assertion is available. | Own the OTP ceremony, hash claim tokens, expire attempts, keep pre-claim scopes small, and bind or upgrade credentials after completion. |
-
-`auth.md` is not a substitute for OAuth validation. Issued credentials still need normal bearer-token validation, scope enforcement, audience checks, replay protection, audit logging, and revocation handling.
+Verify issuer trust, signature, audience, expiry, authentication freshness, and replay defenses. Enforce scopes on the API independently of registration. Follow the current canonical [auth.md guide](../../../src/content/docs/authentication/auth-md.mdx) and pin the [WorkOS reference](https://github.com/workos/auth.md) used by the integration. Fetch and exercise the complete discovery-to-action chain; endpoint existence alone is not proof.
 
 ### Agent identity and delegation
 

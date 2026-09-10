@@ -51,9 +51,9 @@ Status: single-vendor, no published spec version, real download volume but no cr
 
 An IETF effort to standardize a `Content-Usage` HTTP header (and companion signals) letting publishers express how their content may be used for AI. It is pre-consensus: the working group is still shaping the vocabulary, and nothing is settled. Watch it alongside Content Signals as the AI-usage-preference space converges.
 
-### NLWeb — Losing Mindshare
+### NLWeb — Structured Retrieval
 
-NLWeb is a Microsoft initiative to make web pages and APIs natively accessible to agents by adding `/ask` and `/mcp` endpoints derived from schema.org markup. As of mid-2026 it has zero releases and is losing mindshare to WebMCP, which addresses a similar browser-side goal with backing from both Google and Microsoft. Included here for completeness and honesty; do not plan around it.
+NLWeb provides server-side natural-language retrieval over structured site content. Its [reference implementation](https://github.com/nlweb-ai/NLWeb) supports MCP integration. WebMCP exposes page-local browser tools and serves a different execution context. Assess NLWeb against your retrieval needs and intended clients; see [catalogs, feeds, and query verification](/docs/discovery/catalogs-and-feeds). Evaluate feed freshness, query correctness, and streaming behavior separately.
 
 ### OASF — Open Agent Schema Framework
 

@@ -30,6 +30,18 @@ When auditing a public website, evaluate the same categories that current agent-
 
 Use scanner results as timestamped outside-in evidence for Dimension 4. [Is Agentic](https://is-agentic.com/) is a Vercel public-site scanner powered by Ora; its completed reports are also available through a read-only API, CLI, and remote MCP server. Inspect the individual checks and observed journey rather than copying its headline score into the Surface score. Do not overfit to one vendor's methodology, and never submit private, authenticated, confidential, or pre-release URLs merely to get a score.
 
+### Cloudflare comparison
+
+Verified 2026-09-10: Cloudflare's scanner exposes 22 checks, with A2A and AP2 excluded from the website's default selection. DNS-AID is additional to Ora's published 125-check catalog (contract 1.24.0). Content Signals has a separate Cloudflare check, while Ora already accepts it within crawler policy. Is Agentic uses Ora's checks. Do not add all scanner requirements to the Surface rubric or change its weights.
+
+### Optional DNS discovery
+
+DNS-AID advertises agent services through DNS. Treat it as an emerging, individual Internet-Draft and activate it only for an integration whose client supports the chosen revision. Cloudflare probes SVCB/HTTPS records under `_index._agents`, `_a2a._agents` and `_mcp._agents`, plus a TXT index. Its catalog check separately probes `_catalog._agents` TXT and `_search._agents` SRV. These are observed scanner routes, not universal client requirements.
+
+Verify the intended client's actual lookup, record parsing, DNSSEC result, TLS connection, protocol response and authentication boundary. Missing records on an unrelated website are not a scoring penalty. DNSSEC authenticates DNS data; it does not authorize an action or prove an endpoint safe. Keep ordinary HTTP discovery available for other clients.
+
+Canonical explanation: `src/content/docs/discovery/dns-discovery.mdx`. Primary references: https://datatracker.ietf.org/doc/draft-mozleywilliams-dnsop-dnsaid/ and https://isitagentready.com/.well-known/agent-skills/dns-aid/SKILL.md.
+
 ## Signal applicability
 
 Discovery & AEO can apply while many of its optional signals do not. Detect the product surface first, then activate only the matching checks:
@@ -644,7 +656,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - **No robots.txt policy for AI bots.** Default is opt-in; explicit rules signal curation.
 - **Only publishing human docs for agent-facing APIs.** If a service has public APIs, publish an API Catalog and OpenAPI link.
 - **MCP endpoint hidden in prose.** If an MCP server exists, publish a Server Card or metadata under `.well-known`.
-- **Contradictory access signals.** Do not allow a bot in robots.txt while declaring `ai-input=no` for the same public docs.
+- **Conflating access with content use.** Allowing a fetch while declining AI input can be intentional. Check each use against its declared policy; do not treat different permissions for search, AI input, and training as a contradiction.
 - **Treating a scanner score as certification.** Public readiness scans are point-in-time observations and can be false positive, false negative, or partial; they do not certify security, accessibility, quality, compliance, or compatibility.
 - **Treating HTTP 200 as semantic success.** An SPA shell, login page, placeholder JSON, empty MCP resource, or broken linked artifact does not prove the advertised capability works.
 - **Scoring absent optional protocols as failures.** Activate MCP, OAuth, Agent Skills, WebMCP, commerce, and bot-identity checks only when the corresponding surface exists.
@@ -703,3 +715,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - `templates/discovery/llms.txt`, `templates/discovery/AGENTS.md`, `templates/discovery/json-ld-softwareapp.ts` — AEO templates
 - `references/context-files.md` — Detailed AGENTS.md curation guide
 - `references/authentication.md` — OAuth 2.1 and .well-known/oauth-protected-resource
+
+## Discovery through to use
+
+Verify that a caller can move from the intended entry point to the advertised capability without private knowledge. Check consistent identity, authoritative decision facts, link resolution, and a real invocation. Catalog and feed guidance is at `/docs/discovery/catalogs-and-feeds`; pricing, availability, section indexes, and external identity guidance is at `/docs/discovery/commercial-and-entity-discovery`. Use `product-journeys.md` to connect this evidence to the existing audit.

@@ -8,8 +8,11 @@
     "structured-data",
     "content-negotiation",
     "well-known-endpoints",
+    "dns-discovery",
     "robots-txt",
     "content-structure",
-    "aeo-checklist"
+    "aeo-checklist",
+    "catalogs-and-feeds",
+    "commercial-and-entity-discovery"
   ]
 }

@@ -65,3 +65,26 @@ _Avoid_: Agent generator, application scaffolder
 **scorecard**:
 A diagnostic summary of evidence and judgment about applicable surface channels and their operability qualities.
 _Avoid_: Certification, conformance report
+
+**homepage guide**:
+The plain-language introduction to making an existing website or app usable by agents, helping product and business readers understand what to do.
+_Avoid_: Protocol directory, scanner checklist
+
+**reference documentation**:
+The comprehensive technical explanations and implementation guidance that support the homepage guide.
+_Avoid_: Homepage checklist
+
+**discoverability**:
+An agent's ability to find the software and the right place to begin a task.
+
+**understandability**:
+An agent's ability to understand what the software offers, what its information means, and which limits apply.
+
+**usability**:
+An agent's ability to carry out a permitted task, recover from problems, and confirm the result.
+
+**auth and identity**:
+The mechanisms that establish who an agent represents and what authority it has to access data or take actions.
+
+**payments**:
+The product capabilities that connect an offer, permission to spend, settlement, and a verifiable purchase or paid-resource result.

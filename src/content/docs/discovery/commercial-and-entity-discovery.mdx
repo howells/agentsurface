@@ -1,0 +1,41 @@
+---
+title: Commercial and Entity Discovery
+description: Publish accurate pricing, identity, and task guidance without inventing external authority
+lastVerified: 2026-09-10
+---
+
+An agent needs to establish what you sell, who operates it, when it fits a task, and what it costs. These facts should agree across visible pages, structured data, Markdown, repositories, and listings.
+
+## Pricing and task guidance
+
+Publish `/pricing.md` when prices or plans affect a buying decision. Include currency, billing unit, taxes and shipping treatment, minimum quantities, regional restrictions, included usage, overages, renewal/cancellation terms, and a date or canonical source. For variable catalog pricing, link to current product offers rather than inventing one universal price. State “quote required” when that is the real contract.
+
+Maintain the Markdown representation from the same source as the visible price. Check an actual product or plan against both representations and the purchase flow. A readable pricing file that is stale is worse than a clear link to authoritative live pricing. Use this representation when it helps a supported client retrieve pricing; retain the same authoritative terms across representations.
+
+For `llms.txt`, split large product families into section-level indexes only when that improves retrieval. Link those indexes from the root; use descriptive Markdown links, stable URLs, and a concise “when to use” summary with limitations. Verify every link, media type, canonical redirect, and relevant regional variant. See [llms.txt](/docs/discovery/llms-txt) and [content negotiation](/docs/discovery/content-negotiation).
+
+## Entity identity and independent coverage
+
+Use stable Organization identifiers and [JSON-LD](/docs/discovery/structured-data). Add `sameAs` only for pages representing the same entity; a press article mentioning a company is not necessarily an equivalent identity. Keep names, official URLs, real contact details, and ownership consistent. Publish useful About, Contact, and Privacy pages; do not add fictional addresses, ratings, or testimonials to broaden schema coverage.
+
+Wikipedia requires significant independent, reliable coverage for organizations. Wikidata has separate eligibility rules; a Wikipedia article is not its only possible qualification. Check both policies before drafting. If an eligible Wikidata entity exists, verify it is the right entity and use P856 for its official website. Do not create duplicates or promotional articles for score improvement. Sources: [Wikipedia organization notability](<https://en.wikipedia.org/wiki/Wikipedia:Notability_(organizations_and_companies)>), [Wikidata notability](https://www.wikidata.org/wiki/Wikidata:Notability), [P856](https://www.wikidata.org/wiki/Property:P856).
+
+## Search visibility and distribution
+
+Measure brand-name results separately from category or use-case results. Record exact queries, language, region, date, engine, returned URLs, and mistaken identity. Repeat a fixed query set before comparing changes. Citation share and ranking are observations, not guaranteed consequences of markup or directory membership.
+
+When you distribute an SDK, skill, plugin, MCP server, or ChatGPT app, verify the official listing, publisher, installation instructions, and working artifact. Link it from your domain and confirm the listing links back. Use the platform's actual manifest and submission rules. A repository with a file named `plugin.json` does not establish compatibility with every agent platform. A storefront need not publish a coding repository or become a ChatGPT app to serve ordinary customers.
+
+For a retail task, verify price visibility, product identity, availability, delivery restrictions, return terms, and the transition to cart or checkout. For a service integration, verify quotas, billing units, supported operations, and credential requirements. Choose distribution channels and payment integrations according to those tasks and their intended clients.
+
+## Agent plugins and official packages
+
+Package related skills and MCP connections as a plugin only for supported hosts. The [Agent Plugins specification](https://agent-plugins.org/specification) describes its manifest and packaging contract; other platforms can have different requirements. Validate the declared schema, resolve every referenced artifact, and perform an installation in the intended host. Keep publisher identity, permissions, configuration, and update behavior explicit.
+
+For SDKs, select the language ecosystems your customers use. Check the published package's homepage and repository links, installation command, supported API version, authentication example, and error behavior. Generating a package from a schema is a starting point; execute a representative operation from the distributed artifact before calling it supported.
+
+## Revalidate before commitment
+
+Search indexes, feeds, and cached representations can lag behind the source. Include provenance and meaningful update times where supported. Recheck volatile facts such as stock, price, delivery eligibility, and quotas before an operation commits the user. If they have changed, return the updated terms for review rather than silently substituting another offer.
+
+A useful test follows one resource through search, detail, selection, and confirmation. Retain its stable identifier, compare the source facts at each step, and verify that the final record reflects the choice the user authorized. See [Evaluating Product Journeys](/docs/scoring/product-journeys).

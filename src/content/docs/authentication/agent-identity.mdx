@@ -177,9 +177,9 @@ A payment mandate is a specialization of agent identity. Instead of proving _who
 
 ## Web Bot Auth
 
-The identity mechanisms above are token-based: the agent presents a JWT it obtained through OAuth. Web Bot Auth addresses a different layer — proving that inbound HTTP traffic comes from an accountable bot at the request level, before any application token is checked. The IETF WebBotAuth working group is chartered, building on RFC 9421 HTTP Message Signatures so an agent can cryptographically sign its requests and a receiving site can distinguish it from anonymous automation. Cloudflare has run it in production since March 2026, folded into its Verified Bots program.
+Web Bot Auth uses HTTP Message Signatures to associate automated requests with a verifiable sender. The sender or its identity provider publishes verification keys through a signatures directory. The receiving service validates the signed request, key ownership and validity, covered message components, and replay protections before applying its bot-access policy. A receiving website does not become a verified sender merely by publishing an empty directory.
 
-Be honest about the gap: the server-side verification capability is real and deployed, but client-side adoption by major agent vendors is still largely undocumented, so the request-signing half of the ecosystem is unproven. Treat Web Bot Auth as a way to admit "good bots" through bot-management controls rather than as a settled identity standard. See [robots.txt for AI Agents](/docs/discovery/robots-txt) for the bot-verification context and [Well-Known Endpoints](/docs/discovery/well-known-endpoints) for the signatures directory that publishes verification keys.
+Request identity does not grant a user's application permissions. Keep OAuth, resource authorization, and spending authority independent. A User-Agent string is a useful traffic hint, not proof of identity. Use signed traffic where the intended sender and receiver support a compatible profile; test rejected signatures and expired keys as well as successful requests. See [Cloudflare's signing, verification, and directory examples](https://github.com/cloudflare/web-bot-auth), [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html), and the [directory reference](/docs/discovery/well-known-endpoints).
 
 ## Checklist
 

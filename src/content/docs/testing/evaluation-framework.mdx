@@ -368,3 +368,9 @@ This discipline prevents the common pattern where evals are written after the sy
 - `/docs/testing/vitest-harness` — in-process evals with Vitest
 - `/docs/testing/observability` — OpenTelemetry traces for debugging
 - `/docs/testing/ci-integration` — regression testing and statistical significance
+
+## Integration sandbox evidence
+
+For integrations that mutate data, send messages, or charge money, document a supported test environment: its base URL, separate credentials and data, supported operations, reset mechanism, and differences from production. Verify the environment cannot reach production effects with its test credentials. A demo page or an environment variable named sandbox is not sufficient evidence.
+
+Run the intended journey with test data, including an invalid request and an interrupted or repeated operation. Retain the final resource state, authorization outcome, and cleanup result. If no safe test environment exists, record that limitation and use the smallest authorized verification path; do not manufacture successful evidence from mocked responses. Choose the isolation needed for the operation; a public read may need no dedicated sandbox.

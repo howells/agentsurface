@@ -16,6 +16,10 @@ JSON-LD markup embeds structured data so search engines and agents can extract f
 
 Search-augmented AI systems retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Treat it as an extraction aid and search-quality signal, not as a guarantee that a page will appear in generated answers.
 
+## Page identity and presentation metadata
+
+Set a descriptive page title, the document language (`html lang`), and a canonical URL. Use accurate Open Graph type and image metadata when consumers present shared previews. Keep alternate Markdown and regional versions tied to their actual source. These signals complement structured data; they do not establish ranking or factual accuracy. Verify the rendered head and the fetched document rather than relying on framework configuration alone.
+
 ## Why JSON-LD
 
 JSON-LD embeds structured data in a separate `` `<script>` `` block rather than wrapping HTML elements in microdata attributes. For AI agents, this is the preferable format:
@@ -305,3 +309,7 @@ Test structured data before deploying:
 - **Google Rich Results Test** — `search.google.com/test/rich-results` — validates whether Google can process your schema and whether it qualifies for rich results
 - **Schema.org Validator** — `validator.schema.org` — validates against the full Schema.org specification, including fields outside Google's subset
 - **JSON-LD Playground** — `json-ld.org/playground` — useful for debugging `@context` and `@graph` issues
+
+## External identity evidence
+
+Use sameAs for verified equivalent identities, not arbitrary mentions. Wikipedia/Wikidata eligibility, official-site linking, and truthful Organization details are covered in [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery).

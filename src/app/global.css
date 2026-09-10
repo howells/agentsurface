@@ -257,3 +257,29 @@
     @apply font-sans;
   }
 }
+
+/* ── Type case ──────────────────────────
+   Every text element picks one role. Hierarchy comes from colour
+   (fd-foreground / fd-muted-foreground / fd-accent-foreground), never weight.
+   Four roles, four sizes: display, 24, 14, 12. `font-mono` and `tabular-nums` are the only modifiers.
+   `pnpm typography:check` enforces it
+   on the marketing pages and components. */
+
+@layer components {
+  /* Keyboard focus ring for links and controls that sit on the page surface. */
+  .focus-ring {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring;
+  }
+  .type-display {
+    @apply text-[clamp(2.25rem,1.5rem+3.2vw,3.5rem)] font-normal leading-[1.08] tracking-[-0.02em];
+  }
+  .type-heading {
+    @apply text-2xl font-normal leading-[1.2] tracking-[-0.015em];
+  }
+  .type-body {
+    @apply text-sm font-normal leading-[1.6] tracking-normal;
+  }
+  .type-small {
+    @apply text-xs font-normal leading-[1.5] tracking-normal;
+  }
+}

@@ -243,3 +243,7 @@ When `--format=json` is requested, include:
 ```
 
 Do not omit the normal human-readable report unless the user asked for JSON only.
+
+## Product journey evidence
+
+For a public product or integration, read `product-journeys.md` during detection. Define an intended task and client, then connect discovery, authoritative facts, access, action, recovery, and the final result. Assign root causes to existing dimensions and avoid duplicate penalties. External reports supply leads to reproduce, with their observation date and applicability recorded separately.

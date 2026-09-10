@@ -231,3 +231,9 @@ When documenting a dimension score, use this template:
 **Document low-confidence scores.** If you haven't examined >30% of relevant code, mark it `Low confidence` and suggest manual re-verification.
 
 **Update scores iteratively.** As you discover new evidence, update both the score and confidence level. Audits are not snapshots—they're living documents.
+
+## Evidence across a product journey
+
+Capture both what the client was told and what the authoritative source recorded. For a purchase, a cart preview, payment receipt, and confirmed order establish different stages. For asynchronous work, acceptance and terminal completion establish different stages. Preserve stable identifiers so interruptions can be reconciled without repeating effects.
+
+Compare one real resource across its public description, machine-readable representation, action input, and final state. Record stale or conflicting facts as source defects, then assign the root cause to the appropriate scoring dimension. Use [Evaluating Product Journeys](/docs/scoring/product-journeys) and `/templates/discovery/product-journey-audit.md` for a reusable evidence record.
