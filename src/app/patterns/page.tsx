@@ -33,7 +33,7 @@ export default async function PatternsPage({
           title="Line fields, after Bridget Riley."
         >
           One curve, repeated. Change how it grows across the field, how it travels from line to
-          line, and how it tightens along its length. The result is the artwork on the area cards,
+          line, and how it tightens along its length. The result is the artwork on the glossary cards,
           and you can download any variation as SVG.
         </PageIntro>
         <section className="mx-auto max-w-5xl px-6 pb-20 sm:px-10">
