@@ -281,7 +281,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                 return (
                   <div key={key}>
                     <div className="flex items-baseline justify-between type-small">
-                      <label htmlFor={id} className="text-fd-foreground">
+                      <label id={`${id}-label`} htmlFor={id} className="text-fd-foreground">
                         {label}
                       </label>
                       <span className="tabular-nums text-fd-muted-foreground">
@@ -292,6 +292,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                     <input
                       id={id}
                       type="range"
+                      aria-labelledby={`${id}-label`}
                       min={range.min}
                       max={range.max}
                       step={range.step}

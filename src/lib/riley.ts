@@ -118,15 +118,17 @@ function fmt(n: number) {
   return (Math.round(n * 10) / 10).toString();
 }
 
-/** Small deterministic generator so a seed always frays the same lines. */
+/** Small deterministic generator (Park-Miller) so a seed always frays the same lines. */
+const RNG_MODULUS = 2_147_483_647;
 function rng(seed: number) {
-  let a = seed >>> 0 || 1;
+  let a = Math.abs(Math.trunc(seed)) % RNG_MODULUS || 1;
+  // Skip the first steps: small seeds otherwise open with very small values.
+  for (let i = 0; i < 3; i += 1) {
+    a = (a * 48_271) % RNG_MODULUS;
+  }
   return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    a = (a * 48_271) % RNG_MODULUS;
+    return (a - 1) / (RNG_MODULUS - 1);
   };
 }
 
@@ -437,13 +439,16 @@ export function rileyPaths(p: RileyParams, size = 1024): { d: string; fill: bool
   return out;
 }
 
+function round(n: number, places = 2) {
+  return Math.round(n * 10 ** places) / 10 ** places;
+}
+
 /** A tasteful random field of any kind. Wave height stays under the spacing so lines never cross. */
 export function randomRiley(seed: number, base: Partial<RileyParams> = {}): RileyParams {
   const random = rng(seed);
   const pick = (min: number, max: number) => min + (max - min) * random();
   const maybe = (chance: number, min: number, max: number) =>
     random() < chance ? pick(min, max) : 0;
-  const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
   const kind = base.kind ?? RILEY_KINDS[Math.floor(random() * RILEY_KINDS.length)];
   const lines = Math.round(pick(22, 44));
   const spacing = 1024 / lines;
