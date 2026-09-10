@@ -3,29 +3,27 @@ import Image from "next/image";
 import type { StaticImageData } from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
-import authIdentityArt from "@/assets/areas/auth-identity.svg";
-import connectionsArt from "@/assets/areas/connections.svg";
-import discoverabilityArt from "@/assets/areas/discoverability.svg";
-import paymentsArt from "@/assets/areas/payments.svg";
-import understandabilityArt from "@/assets/areas/understandability.svg";
-import usabilityArt from "@/assets/areas/usability.svg";
+import authIdentityPhoto from "@/assets/areas/auth-identity.jpg";
+import connectionsPhoto from "@/assets/areas/connections.jpg";
+import discoverabilityPhoto from "@/assets/areas/discoverability.jpg";
+import paymentsPhoto from "@/assets/areas/payments.jpg";
+import understandabilityPhoto from "@/assets/areas/understandability.jpg";
+import usabilityPhoto from "@/assets/areas/usability.jpg";
 import { AreaMark } from "@/components/AreaMark";
 import { AreaNav } from "@/components/AreaNav";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
 import { RecommendationList } from "@/components/RecommendationList";
 import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
-import { cn } from "@/lib/utils";
 
-// Line fields drawn by src/lib/riley.ts from the presets in src/data/area-patterns.ts.
-// Tune them at /patterns, then `pnpm patterns:render` rewrites these files.
-const ILLUSTRATIONS: Record<string, StaticImageData> = {
-  "auth-identity": authIdentityArt,
-  connections: connectionsArt,
-  discoverability: discoverabilityArt,
-  payments: paymentsArt,
-  understandability: understandabilityArt,
-  usability: usabilityArt,
+// One monochrome photograph per area, a motif series: light, paper and shadow, no objects.
+const PHOTOS: Record<string, StaticImageData> = {
+  "auth-identity": authIdentityPhoto,
+  connections: connectionsPhoto,
+  discoverability: discoverabilityPhoto,
+  payments: paymentsPhoto,
+  understandability: understandabilityPhoto,
+  usability: usabilityPhoto,
 };
 
 export const metadata: Metadata = {
@@ -40,49 +38,40 @@ const focusStyle =
 function AreaOverview() {
   return (
     <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {guideStages.map((stage) => {
-        const illustration = ILLUSTRATIONS[stage.id];
-        return (
-          <li key={stage.id}>
-            <a
-              href={`#${stage.id}`}
-              className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-            >
-              <span className="relative block aspect-square w-full overflow-hidden">
-                {illustration ? (
-                  <Image
-                    src={illustration}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 20rem, (min-width: 640px) 50vw, 100vw"
-                    className="object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
+      {guideStages.map((stage) => (
+        <li key={stage.id}>
+          <a
+            href={`#${stage.id}`}
+            className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+          >
+            <span className="relative block aspect-[4/3] w-full overflow-hidden">
+              <Image
+                src={PHOTOS[stage.id]}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 20rem, (min-width: 640px) 50vw, 100vw"
+                className="object-cover grayscale contrast-[1.05] transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none dark:opacity-80"
+              />
+            </span>
+            <span className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium leading-5">{stage.name}</span>
+                <span className="flex items-center gap-1 text-xs tabular-nums text-fd-muted-foreground">
+                  {stage.cards.length}
+                  <span className="sr-only"> recommendations</span>
+                  <ArrowDown
+                    aria-hidden="true"
+                    className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
                   />
-                ) : (
-                  <span className="grid h-full place-items-center">
-                    <AreaMark area={stage.id} />
-                  </span>
-                )}
-              </span>
-              <span className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
-                <span className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-medium leading-5">{stage.name}</span>
-                  <span className="flex items-center gap-1 text-xs tabular-nums text-fd-muted-foreground">
-                    {stage.cards.length}
-                    <span className="sr-only"> recommendations</span>
-                    <ArrowDown
-                      aria-hidden="true"
-                      className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
-                    />
-                  </span>
-                </span>
-                <span className="mt-0.5 text-[13px] leading-5 text-fd-muted-foreground">
-                  {stage.question}
                 </span>
               </span>
-            </a>
-          </li>
-        );
-      })}
+              <span className="mt-0.5 text-[13px] leading-5 text-fd-muted-foreground">
+                {stage.question}
+              </span>
+            </span>
+          </a>
+        </li>
+      ))}
     </ol>
   );
 }

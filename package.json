@@ -20,7 +20,7 @@
     "lint:fix": "howells-fix --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
     "format": "howells-oxfmt --write src scripts templates disciplines docs public next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts README.md AGENTS.md CHANGELOG.md CLAUDE.md INSTALL.md",
     "typecheck": "tsc --noEmit",
-    "patterns:render": "node scripts/render-area-patterns.mts"
+    "patterns:render": "node scripts/render-patterns.mts"
   },
   "dependencies": {
     "@howells/envy": "catalog:",

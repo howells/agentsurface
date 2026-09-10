@@ -6,25 +6,45 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { LinePattern } from "@/components/LinePattern";
+import Image from "next/image";
+import type { StaticImageData } from "next/image";
+import agentInfrastructureArt from "@/assets/glossary/agent-infrastructure.svg";
+import agentReadinessArt from "@/assets/glossary/agent-readiness.svg";
+import authIdentityArt from "@/assets/glossary/auth-identity.svg";
+import dataIntegrationArt from "@/assets/glossary/data-integration.svg";
+import foundationArt from "@/assets/glossary/foundation.svg";
+import memoryKnowledgeArt from "@/assets/glossary/memory-knowledge.svg";
+import opsLifecycleArt from "@/assets/glossary/ops-lifecycle.svg";
+import paymentsArt from "@/assets/glossary/payments.svg";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Line patterns by category ───────────────────────────────────────────────
-// Auth, payments, readiness and foundation share angles with the homepage area marks.
+// ── Line fields by category ─────────────────────────────────────────────────
+// Drawn by src/lib/riley.ts from src/data/glossary-patterns.ts; `pnpm patterns:render` rewrites them.
 
-const LINE_ANGLES: Record<string, number> = {
-  "Auth & identity": 60,
-  Payments: -30,
-  "Agent infrastructure": 45,
-  "Agent readiness": 30,
-  "Data & integration": -45,
-  Foundation: 0,
-  "Memory & knowledge": 90,
-  "Ops & lifecycle": -60,
+const CATEGORY_ART: Record<string, StaticImageData> = {
+  "Agent infrastructure": agentInfrastructureArt,
+  "Agent readiness": agentReadinessArt,
+  "Auth & identity": authIdentityArt,
+  "Data & integration": dataIntegrationArt,
+  Foundation: foundationArt,
+  "Memory & knowledge": memoryKnowledgeArt,
+  "Ops & lifecycle": opsLifecycleArt,
+  Payments: paymentsArt,
 };
 
 function CardPattern({ category }: { category: string }) {
-  return <LinePattern angle={LINE_ANGLES[category] ?? 0} />;
+  const art = CATEGORY_ART[category] ?? foundationArt;
+  return (
+    <span className="absolute inset-0 block">
+      <Image
+        src={art}
+        alt=""
+        fill
+        sizes="(min-width: 640px) 16rem, 50vw"
+        className="object-cover object-top mix-blend-multiply dark:opacity-85 dark:mix-blend-screen dark:invert"
+      />
+    </span>
+  );
 }
 
 const SPRING = { damping: 30, stiffness: 340, type: "spring" as const };
@@ -55,7 +75,7 @@ function GlossaryCard({
       whileHover={active ? undefined : { y: -3 }}
       transition={SPRING}
     >
-      <div className="flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <CardPattern category={term.category} />
       </div>
       <div className="px-4 pb-4 pt-3 text-left">

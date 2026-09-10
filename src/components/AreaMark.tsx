@@ -3,7 +3,7 @@ import { LinePattern } from "@/components/LinePattern";
 import { cn } from "@/lib/utils";
 
 // Angles match the glossary card patterns for the same subjects.
-const AREA_ANGLES: Record<string, number> = {
+export const AREA_ANGLES: Record<string, number> = {
   "auth-identity": 60,
   connections: 45,
   discoverability: 30,
@@ -12,7 +12,7 @@ const AREA_ANGLES: Record<string, number> = {
   usability: -45,
 };
 
-const AREA_PATHS: Record<string, ReactNode> = {
+export const AREA_PATHS: Record<string, ReactNode> = {
   // A signal reaching outward.
   discoverability: (
     <>

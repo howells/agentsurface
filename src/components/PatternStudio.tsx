@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Download, Link2, RotateCcw, Shuffle } from "lucide-react";
-import { AREA_PATTERNS } from "@/data/area-patterns";
+import { GLOSSARY_PATTERNS } from "@/data/glossary-patterns";
+import { RILEY_DEFAULTS as HATCH } from "@/lib/riley";
 import {
   KIND_LABELS,
   RILEY_DEFAULTS,
@@ -126,27 +127,29 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          {AREA_PATTERNS.map((preset) => {
-            const active = samePreset(preset.params, params);
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  setParams(preset.params);
-                }}
-                className={cn(
-                  "h-8 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
-                  active
-                    ? "border-fd-foreground bg-fd-foreground text-fd-background"
-                    : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
-                )}
-              >
-                {preset.name}
-              </button>
-            );
-          })}
+          {[{ category: "Hatch", params: HATCH, slug: "hatch" }, ...GLOSSARY_PATTERNS].map(
+            (preset) => {
+              const active = samePreset(preset.params, params);
+              return (
+                <button
+                  key={preset.slug}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setParams(preset.params);
+                  }}
+                  className={cn(
+                    "h-8 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
+                    active
+                      ? "border-fd-foreground bg-fd-foreground text-fd-background"
+                      : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
+                  )}
+                >
+                  {preset.category}
+                </button>
+              );
+            },
+          )}
         </div>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground shadow-sm">
