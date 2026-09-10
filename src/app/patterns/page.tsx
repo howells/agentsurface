@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageIntro } from "@/components/PageIntro";
 import { PatternStudio } from "@/components/PatternStudio";
 import { SiteHeader } from "@/components/SiteHeader";
 import { RILEY_DEFAULTS, decodeRiley } from "@/lib/riley";
@@ -26,15 +27,15 @@ export default async function PatternsPage({
     <>
       <SiteHeader />
       <main id="main" className="bg-fd-background text-fd-foreground">
-        <section className="mx-auto max-w-5xl px-6 pb-8 pt-14 sm:px-10">
-          <p className="type-body text-fd-accent-foreground">Pattern studio</p>
-          <h1 className="mt-4 max-w-2xl type-display">Line fields, after Bridget Riley.</h1>
-          <p className="mt-6 max-w-xl type-body text-fd-muted-foreground">
-            One curve, repeated. Change how it grows across the field, how it travels from line to
-            line, and how it tightens along its length. The result is the artwork on the area cards,
-            and you can download any variation as SVG.
-          </p>
-        </section>
+        <PageIntro
+          className="pb-8 pt-14"
+          eyebrow="Pattern studio"
+          title="Line fields, after Bridget Riley."
+        >
+          One curve, repeated. Change how it grows across the field, how it travels from line to
+          line, and how it tightens along its length. The result is the artwork on the area cards,
+          and you can download any variation as SVG.
+        </PageIntro>
         <section className="mx-auto max-w-5xl px-6 pb-20 sm:px-10">
           <PatternStudio initial={initial} />
         </section>

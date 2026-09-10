@@ -15,6 +15,7 @@ import {
   rileySvg,
 } from "@/lib/riley";
 import type { RileyParams } from "@/lib/riley";
+import { Pill } from "@/components/Pill";
 import { cn } from "@/lib/utils";
 
 type NumericKey = keyof typeof RILEY_RANGES;
@@ -131,22 +132,15 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
             (preset) => {
               const active = samePreset(preset.params, params);
               return (
-                <button
+                <Pill
                   key={preset.slug}
-                  type="button"
-                  aria-pressed={active}
+                  pressed={active}
                   onClick={() => {
                     setParams(preset.params);
                   }}
-                  className={cn(
-                    "h-8 rounded-full border px-3 type-small transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
-                    active
-                      ? "border-fd-foreground bg-fd-foreground text-fd-background"
-                      : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
-                  )}
                 >
                   {preset.category}
-                </button>
+                </Pill>
               );
             },
           )}
@@ -236,22 +230,16 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
           <legend className="type-small text-fd-accent-foreground">Kind</legend>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {RILEY_KINDS.map((kind) => (
-              <button
+              <Pill
                 key={kind}
-                type="button"
-                aria-pressed={params.kind === kind}
+                shape="square"
+                pressed={params.kind === kind}
                 onClick={() => {
                   setParams((prev) => ({ ...prev, kind }));
                 }}
-                className={cn(
-                  "h-7 rounded-md border px-2.5 type-small transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
-                  params.kind === kind
-                    ? "border-fd-foreground bg-fd-foreground text-fd-background"
-                    : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
-                )}
               >
                 {KIND_LABELS[kind]}
-              </button>
+              </Pill>
             ))}
           </div>
         </fieldset>

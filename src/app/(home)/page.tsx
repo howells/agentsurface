@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
 import { AreaMark } from "@/components/AreaMark";
 import { AreaNav } from "@/components/AreaNav";
+import { PageIntro } from "@/components/PageIntro";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
 import { RecommendationList } from "@/components/RecommendationList";
 import { glossaryTerms } from "@/data/glossary";
@@ -14,9 +15,6 @@ export const metadata: Metadata = {
     "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, sign-in, usability, and payments, with clear recommendations and detailed implementation docs.",
 };
 
-const focusStyle =
-  "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring";
-
 function AreaOverview() {
   return (
     <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -24,7 +22,7 @@ function AreaOverview() {
         <li key={stage.id}>
           <a
             href={`#${stage.id}`}
-            className="group flex min-h-44 flex-col rounded-2xl border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            className="group flex min-h-44 flex-col rounded-2xl border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <span className="flex items-baseline justify-between type-small tabular-nums text-fd-muted-foreground">
               <span>{String(index + 1).padStart(2, "0")}</span>
@@ -58,30 +56,30 @@ export default function HomePage() {
 
   return (
     <main id="main" className="bg-fd-background text-fd-foreground">
-      <section className="mx-auto max-w-5xl px-6 pb-14 pt-16 sm:px-10 sm:pt-20">
-        <p className="mb-5 type-body text-fd-accent-foreground">
-          A practical guide to agent-ready products
-        </p>
-        <h1 className="max-w-3xl type-display">Make your website and app work with AI agents.</h1>
-        <p className="mt-6 max-w-2xl type-body text-fd-muted-foreground">
-          Help agents find your product, understand what it offers, and use it on a customer’s
-          behalf. Here’s what to consider, why it matters, and where to start.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 type-body">
-          <a
-            href="#guide-map"
-            className={`inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground ${focusStyle}`}
-          >
-            See the six areas <ArrowDown aria-hidden="true" className="size-4" />
-          </a>
-          <Link
-            href="/docs"
-            className={`inline-flex items-center gap-2 underline-offset-4 hover:underline ${focusStyle}`}
-          >
-            Technical documentation <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <PageIntro
+        className="pb-14 pt-16 sm:pt-20"
+        eyebrow="A practical guide to agent-ready products"
+        title="Make your website and app work with AI agents."
+        actions={
+          <>
+            <a
+              href="#guide-map"
+              className="inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground focus-ring"
+            >
+              See the six areas <ArrowDown aria-hidden="true" className="size-4" />
+            </a>
+            <Link
+              href="/docs"
+              className="inline-flex items-center gap-2 underline-offset-4 hover:underline focus-ring"
+            >
+              Technical documentation <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </>
+        }
+      >
+        Help agents find your product, understand what it offers, and use it on a customer’s behalf.
+        Here’s what to consider, why it matters, and where to start.
+      </PageIntro>
 
       <section
         id="guide-map"
@@ -142,10 +140,7 @@ export default function HomePage() {
                 Plain-language definitions of the terms in this guide. Choose a card to learn more.
               </p>
             </div>
-            <Link
-              href="/glossary"
-              className={`type-body underline underline-offset-4 ${focusStyle}`}
-            >
+            <Link href="/glossary" className="type-body underline underline-offset-4 focus-ring">
               View all {glossaryTerms.length} terms
             </Link>
           </div>
@@ -169,14 +164,14 @@ export default function HomePage() {
               <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 type-body">
                 <Link
                   href="/docs/scoring/product-journeys"
-                  className={`underline underline-offset-4 ${focusStyle}`}
+                  className="underline underline-offset-4 focus-ring"
                 >
                   Evaluate a customer task
                 </Link>
-                <Link href="/docs" className={`underline underline-offset-4 ${focusStyle}`}>
+                <Link href="/docs" className="underline underline-offset-4 focus-ring">
                   Browse the docs
                 </Link>
-                <Link href="/glossary" className={`underline underline-offset-4 ${focusStyle}`}>
+                <Link href="/glossary" className="underline underline-offset-4 focus-ring">
                   Explore the glossary
                 </Link>
               </div>

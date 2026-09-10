@@ -1,5 +1,6 @@
 import { glossaryTerms } from "@/data/glossary";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
+import { PageIntro } from "@/components/PageIntro";
 import { SiteHeader } from "@/components/SiteHeader";
 import Link from "next/link";
 
@@ -13,19 +14,20 @@ export default function GlossaryPage() {
     <>
       <SiteHeader />
       <main className="flex flex-col items-center bg-fd-background text-fd-foreground">
-        {/* Hero */}
-        <section className="w-full max-w-5xl px-6 pt-14 pb-12 sm:px-10">
-          <p className="type-body text-fd-accent-foreground">Agentic glossary</p>
-          <h1 className="mt-4 max-w-2xl type-display">
-            The language of
-            <br />
-            intelligent software.
-          </h1>
-          <p className="mt-6 max-w-xl type-body text-fd-muted-foreground">
-            {glossaryTerms.length} terms for product, business, and engineering teams. Filter by
-            category or scroll through all. Click any card to go deeper.
-          </p>
-        </section>
+        <PageIntro
+          className="pt-14 pb-12"
+          eyebrow="Agentic glossary"
+          title={
+            <>
+              The language of
+              <br />
+              intelligent software.
+            </>
+          }
+        >
+          {glossaryTerms.length} terms for product, business, and engineering teams. Filter by
+          category or scroll through all. Click any card to go deeper.
+        </PageIntro>
 
         {/* Terms */}
         <section className="w-full border-t border-fd-border">

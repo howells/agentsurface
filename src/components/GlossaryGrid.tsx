@@ -3,6 +3,7 @@
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import Link from "next/link";
+import { Pill } from "@/components/Pill";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -68,7 +69,7 @@ function GlossaryCard({
       onClick={() => {
         onOpen(term.id);
       }}
-      className={`relative flex ${grid ? "w-full min-w-0" : "w-48"} h-60 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground transition-shadow duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring ${active ? "" : "shadow-sm hover:shadow-md"}`}
+      className={`relative flex ${grid ? "w-full min-w-0" : "w-48"} h-60 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground transition-shadow duration-200 focus-ring ${active ? "" : "shadow-sm hover:shadow-md"}`}
       aria-label={`Read about ${term.name}`}
       aria-haspopup="dialog"
       style={{ opacity: active ? 0 : 1 }}
@@ -227,7 +228,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
             {term.href && (
               <Link
                 href={term.href}
-                className="mt-5 inline-block type-body underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+                className="mt-5 inline-block type-body underline underline-offset-4 focus-ring"
               >
                 Read the implementation guide
               </Link>
@@ -256,20 +257,15 @@ function FilterPills({
   return (
     <div className="flex flex-wrap gap-2">
       {[ALL, ...categories].map((cat) => (
-        <button
+        <Pill
           key={cat}
-          aria-pressed={active === cat}
+          pressed={active === cat}
           onClick={() => {
             onChange(cat);
           }}
-          className={`rounded-full border px-3 py-1 type-small transition-colors ${
-            active === cat
-              ? "border-fd-foreground bg-fd-foreground text-fd-background"
-              : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground"
-          }`}
         >
           {cat}
-        </button>
+        </Pill>
       ))}
     </div>
   );
@@ -337,7 +333,7 @@ export function GlossaryGrid({
                       behavior: "auto",
                     })
                   }
-                  className="rounded-full border border-fd-border p-2 hover:bg-fd-muted focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+                  className="rounded-full border border-fd-border p-2 hover:bg-fd-muted focus-ring"
                 >
                   <Icon aria-hidden="true" className="size-4" />
                 </button>

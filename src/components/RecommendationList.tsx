@@ -115,7 +115,7 @@ function Row({
               </div>
               <Link
                 href={card.href}
-                className="inline-flex w-fit items-center gap-1.5 rounded-sm type-body text-fd-foreground underline decoration-fd-ring/50 underline-offset-4 hover:decoration-fd-ring focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring md:col-span-2"
+                className="inline-flex w-fit items-center gap-1.5 rounded-sm type-body text-fd-foreground underline decoration-fd-ring/50 underline-offset-4 hover:decoration-fd-ring focus-ring md:col-span-2"
               >
                 Read the guide<span className="sr-only">: {card.feature}</span>
                 <ArrowRight aria-hidden="true" className="size-3.5" />
