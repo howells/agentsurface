@@ -1,37 +1,30 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { LinePattern } from "@/components/LinePattern";
 import type { GlossaryTerm } from "@/data/glossary";
 
-// ── Line patterns by category (pure CSS, zero DOM elements) ─────────────────
+// ── Line patterns by category ───────────────────────────────────────────────
+// Auth, payments, readiness and foundation share angles with the homepage area marks.
 
 const LINE_ANGLES: Record<string, number> = {
-  "Auth & Identity": 60,
+  "Auth & identity": 60,
   Payments: -30,
-  "Agent Infrastructure": 45,
-  "Agent Readiness": 30,
-  "Data & Integration": -45,
+  "Agent infrastructure": 45,
+  "Agent readiness": 30,
+  "Data & integration": -45,
   Foundation: 0,
-  "Memory & Knowledge": 90,
-  "Ops & Lifecycle": -60,
+  "Memory & knowledge": 90,
+  "Ops & lifecycle": -60,
 };
 
 function CardPattern({ category }: { category: string }) {
-  const angle = LINE_ANGLES[category] ?? 0;
-  return (
-    <div
-      className="h-full w-full"
-      style={{
-        background: `repeating-linear-gradient(${angle}deg, currentColor 0 0.75px, transparent 0.75px 7px)`,
-        opacity: 0.12,
-      }}
-    />
-  );
+  return <LinePattern angle={LINE_ANGLES[category] ?? 0} />;
 }
 
 const SPRING = { damping: 30, stiffness: 340, type: "spring" as const };
@@ -55,31 +48,22 @@ function GlossaryCard({
       onClick={() => {
         onOpen(term.id);
       }}
-      className={`relative flex ${grid ? "w-full min-w-0" : "w-52"} h-72 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-fd-background text-fd-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring`}
+      className={`relative flex ${grid ? "w-full min-w-0" : "w-48"} h-60 shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground transition-shadow duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring ${active ? "" : "shadow-sm hover:shadow-md"}`}
       aria-label={`Read about ${term.name}`}
       aria-haspopup="dialog"
-      style={{
-        boxShadow: active ? "none" : "0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)",
-        opacity: active ? 0 : 1,
-      }}
-      whileHover={
-        active
-          ? undefined
-          : { boxShadow: "0 16px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.07)", y: -6 }
-      }
+      style={{ opacity: active ? 0 : 1 }}
+      whileHover={active ? undefined : { y: -3 }}
       transition={SPRING}
     >
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 overflow-hidden">
         <CardPattern category={term.category} />
       </div>
-      <div className="px-4 pb-5 pt-2 text-left">
-        <p className="font-mono text-[0.55rem] font-medium uppercase tracking-widest text-fd-muted-foreground">
-          {term.category}
-        </p>
-        <p className="mt-0.5 text-[1.6rem] font-semibold tracking-tight leading-none text-fd-foreground">
+      <div className="px-4 pb-4 pt-3 text-left">
+        <p className="text-[0.6875rem] leading-4 text-fd-muted-foreground">{term.category}</p>
+        <p className="mt-1 text-[1.6rem] font-semibold leading-none tracking-tight text-fd-foreground">
           {term.acronym}
         </p>
-        <p className="mt-0.5 text-[0.65rem] leading-4 text-fd-muted-foreground">{term.name}</p>
+        <p className="mt-1.5 truncate text-xs leading-4 text-fd-muted-foreground">{term.name}</p>
       </div>
     </motion.button>
   );
@@ -175,7 +159,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
 
           <div className="px-7 pb-8 pt-5">
             <motion.p
-              className="font-mono text-[0.6rem] font-medium uppercase tracking-widest text-fd-muted-foreground"
+              className="text-xs font-medium text-fd-accent-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.28 }}
@@ -300,7 +284,7 @@ export function GlossaryGrid({
   }, [activeId]);
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       {showFilters && categories.length > 1 && (
         <FilterPills categories={categories} active={filter} onChange={setFilter} />
       )}
@@ -388,6 +372,6 @@ export function GlossaryGrid({
           />
         )}
       </AnimatePresence>
-    </>
+    </MotionConfig>
   );
 }

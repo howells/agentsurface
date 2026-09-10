@@ -271,7 +271,7 @@ export const guideStages: GuideStage[] = [
   },
   {
     id: "auth-identity",
-    name: "Auth & identity",
+    name: "Sign-in & permissions",
     question: "Can agents act with the right permissions?",
     description:
       "Establish who is acting and whose account they represent. Explain how agents obtain access, what they can do, and how customers can revoke it.",

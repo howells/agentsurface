@@ -15,9 +15,7 @@ export default function GlossaryPage() {
       <main className="flex flex-col items-center bg-fd-background text-fd-foreground">
         {/* Hero */}
         <section className="w-full max-w-5xl px-6 pt-14 pb-12 sm:px-10">
-          <p className="text-xs font-medium uppercase tracking-widest text-fd-muted-foreground font-mono">
-            Agentic Glossary
-          </p>
+          <p className="text-sm font-medium text-fd-accent-foreground">Agentic glossary</p>
           <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
             The language of
             <br />

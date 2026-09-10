@@ -1,18 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowRight,
-  BookOpen,
-  Compass,
-  FileText,
-  MousePointer2,
-  ShieldCheck,
-  CreditCard,
-} from "lucide-react";
+import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
+import { AreaMark } from "@/components/AreaMark";
+import { AreaNav } from "@/components/AreaNav";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
+import { RecommendationList } from "@/components/RecommendationList";
 import { glossaryTerms } from "@/data/glossary";
-import type { GuideCard } from "@/data/homepage-guide";
 import { guideStages } from "@/data/homepage-guide";
 
 export const metadata: Metadata = {
@@ -21,46 +14,63 @@ export const metadata: Metadata = {
     "A practical guide to agent-ready websites and apps. Explore discovery, understanding, identity, usability, and payments, with clear recommendations and detailed implementation docs.",
 };
 
-const stageIcons = [Compass, FileText, ShieldCheck, MousePointer2, CreditCard];
 const focusStyle =
   "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring";
 
-function RecommendationCard({ card }: { card: GuideCard }) {
+function AreaOverview() {
   return (
-    <li id={card.id} className="scroll-mt-20">
-      <Link
-        href={card.href}
-        className={`group flex h-full flex-col rounded-xl border border-fd-border bg-fd-card p-6 transition-colors hover:border-fd-ring ${focusStyle}`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-medium text-fd-accent-foreground">{card.feature}</p>
-          <ArrowRight
-            aria-hidden="true"
-            className="size-4 shrink-0 text-fd-muted-foreground transition-transform group-hover:translate-x-0.5"
-          />
-        </div>
-        <h3 className="mt-3 text-lg font-medium leading-snug tracking-tight">{card.title}</h3>
-        <p className="mt-3 text-sm leading-6 text-fd-muted-foreground">{card.what}</p>
-        <p className="mt-3 text-sm leading-6">
-          <span className="font-medium">Why it matters. </span>
-          <span className="text-fd-muted-foreground">{card.why}</span>
-        </p>
-        <div className="mt-auto pt-6">
-          <p className="border-t border-fd-border pt-3 text-xs leading-5 text-fd-muted-foreground">
-            {card.applies}
-          </p>
-        </div>
-      </Link>
-    </li>
+    <ol className="divide-y divide-fd-border overflow-hidden rounded-2xl border border-fd-border bg-fd-card">
+      {guideStages.map((stage) => {
+        const foundations = stage.cards.filter((card) => card.applies === "Start here");
+        const highlights = foundations.length > 0 ? foundations : stage.cards;
+        return (
+          <li key={stage.id}>
+            <a
+              href={`#${stage.id}`}
+              className="group grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 px-5 py-5 transition-colors duration-150 hover:bg-fd-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] md:gap-x-7 md:px-6"
+            >
+              <AreaMark area={stage.id} />
+              <span>
+                <span className="block text-base font-medium leading-6">{stage.name}</span>
+                <span className="block text-sm leading-5 text-fd-muted-foreground">
+                  {stage.question}
+                </span>
+              </span>
+              <span className="col-span-2 col-start-2 text-sm leading-6 md:col-span-1 md:col-start-3 md:row-start-1">
+                <span className="mr-2 font-medium text-fd-foreground">
+                  {foundations.length > 0 ? "Start with" : "Choose from"}
+                </span>
+                <span className="text-fd-muted-foreground">
+                  {highlights.map((card) => card.feature).join(" · ")}
+                </span>
+              </span>
+              <span className="col-start-3 row-start-1 flex items-center gap-2 text-sm tabular-nums text-fd-muted-foreground md:col-start-4">
+                {stage.cards.length}
+                <span className="sr-only"> recommendations</span>
+                <ArrowDown
+                  aria-hidden="true"
+                  className="size-4 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+                />
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
 export default function HomePage() {
   const total = guideStages.reduce((count, stage) => count + stage.cards.length, 0);
+  const areas = guideStages.map((stage) => ({
+    count: stage.cards.length,
+    id: stage.id,
+    name: stage.name,
+  }));
 
   return (
     <main id="main" className="bg-fd-background text-fd-foreground">
-      <section className="mx-auto max-w-5xl px-6 pb-12 pt-16 sm:px-10 sm:pt-20">
+      <section className="mx-auto max-w-5xl px-6 pb-14 pt-16 sm:px-10 sm:pt-20">
         <p className="mb-5 text-sm font-medium text-fd-accent-foreground">
           A practical guide to agent-ready products
         </p>
@@ -76,7 +86,7 @@ export default function HomePage() {
             href="#guide-map"
             className={`inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 font-medium text-fd-primary-foreground ${focusStyle}`}
           >
-            Explore the guide <ArrowDown aria-hidden="true" className="size-4" />
+            See the five areas <ArrowDown aria-hidden="true" className="size-4" />
           </a>
           <Link
             href="/docs"
@@ -90,65 +100,50 @@ export default function HomePage() {
       <section
         id="guide-map"
         aria-labelledby="map-heading"
-        className="mx-auto max-w-5xl scroll-mt-20 px-6 pb-16 sm:px-10"
+        className="mx-auto max-w-5xl scroll-mt-20 px-6 pb-20 sm:px-10"
       >
-        <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3 border-t border-fd-border pt-8">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="map-heading" className="text-base font-medium">
-            Five parts of an agent-ready product
+            The five things to get right
           </h2>
           <p className="text-sm text-fd-muted-foreground">{total} recommendations</p>
         </div>
-        <nav aria-label="Explore the five areas" className="grid gap-3">
-          {guideStages.map((stage, index) => {
-            const Icon = stageIcons[index];
-            return (
-              <div
-                key={stage.id}
-                className="relative grid gap-5 rounded-xl border border-fd-border bg-fd-muted/40 p-5 md:grid-cols-[13rem_1fr] md:gap-8"
-              >
-                <div>
-                  <div className="mb-3 flex items-center gap-2 text-fd-accent-foreground">
-                    <Icon aria-hidden="true" className="size-4" strokeWidth={1.5} />
-                    <span className="text-xs tabular-nums">0{index + 1}</span>
-                  </div>
-                  <a href={`#${stage.id}`} className={`inline-block rounded-sm ${focusStyle}`}>
-                    <h3 className="text-lg font-medium tracking-tight">{stage.name}</h3>
-                    <p className="mt-1 text-sm text-fd-muted-foreground">{stage.question}</p>
-                  </a>
-                </div>
-                <ul
-                  className="flex flex-wrap content-start gap-1.5"
-                  aria-label={`${stage.name} features`}
-                >
-                  {stage.cards.map((card) => (
-                    <li key={card.id}>
-                      <a
-                        href={`#${card.id}`}
-                        className={`block rounded-md border border-fd-border bg-fd-background px-2 py-1 text-xs leading-5 text-fd-muted-foreground transition-colors hover:border-fd-ring hover:text-fd-foreground ${focusStyle}`}
-                      >
-                        {card.feature}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-                {index < guideStages.length - 1 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -bottom-3.5 left-7 z-10 rounded-full border border-fd-border bg-fd-background p-1"
-                  >
-                    <ArrowDown className="size-3" />
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-        <p className="mt-5 max-w-3xl text-sm leading-6 text-fd-muted-foreground">
-          Start with the foundations at the top of each section, then follow the recommendations
-          that fit your product. Labels explain when a feature applies. Every card links to the
-          relevant implementation guidance.
-        </p>
+        <AreaOverview />
       </section>
+
+      <div>
+        <AreaNav areas={areas} />
+        {guideStages.map((stage) => (
+          <section
+            key={stage.id}
+            id={stage.id}
+            aria-labelledby={`${stage.id}-heading`}
+            className="scroll-mt-24"
+          >
+            <div className="mx-auto max-w-5xl px-6 pb-4 pt-14 sm:px-10 sm:pt-16">
+              <div className="mb-7 grid gap-4 md:grid-cols-[1fr_1.15fr] md:gap-12">
+                <div>
+                  <div className="mb-4 flex items-center gap-2.5 text-sm font-medium text-fd-accent-foreground">
+                    <AreaMark area={stage.id} size="sm" />
+                    {stage.name}
+                  </div>
+                  <h2
+                    id={`${stage.id}-heading`}
+                    className="text-3xl font-semibold leading-tight tracking-tight"
+                  >
+                    {stage.question}
+                  </h2>
+                </div>
+                <p className="self-end text-base leading-7 text-fd-muted-foreground">
+                  {stage.description}
+                </p>
+              </div>
+              <RecommendationList stage={stage} />
+            </div>
+          </section>
+        ))}
+        <div className="h-16" aria-hidden="true" />
+      </div>
 
       <section
         id="glossary"
@@ -156,7 +151,7 @@ export default function HomePage() {
         className="scroll-mt-20 border-t border-fd-border"
         style={{ overflowX: "clip" }}
       >
-        <div className="mx-auto max-w-5xl px-6 py-12 sm:px-10">
+        <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <div>
               <h2 id="glossary-heading" className="text-2xl font-semibold tracking-tight">
@@ -176,51 +171,6 @@ export default function HomePage() {
           <GlossaryGrid terms={glossaryTerms} showFilters={false} />
         </div>
       </section>
-
-      {guideStages.map((stage, index) => {
-        const Icon = stageIcons[index];
-        return (
-          <section
-            key={stage.id}
-            id={stage.id}
-            aria-labelledby={`${stage.id}-heading`}
-            className="scroll-mt-12 border-t border-fd-border"
-          >
-            <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10 sm:py-16">
-              <div className="mb-8 grid gap-4 md:grid-cols-[1fr_1.15fr] md:gap-12">
-                <div>
-                  <div className="mb-3 flex items-center gap-2.5 text-sm font-medium text-fd-accent-foreground">
-                    <Icon aria-hidden="true" className="size-4" />
-                    <span>
-                      0{index + 1} / {stage.name}
-                    </span>
-                  </div>
-                  <h2
-                    id={`${stage.id}-heading`}
-                    className="text-3xl font-semibold leading-tight tracking-tight"
-                  >
-                    {stage.question}
-                  </h2>
-                </div>
-                <p className="self-end text-base leading-7 text-fd-muted-foreground">
-                  {stage.description}
-                </p>
-              </div>
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {stage.cards.map((card) => (
-                  <RecommendationCard key={card.id} card={card} />
-                ))}
-              </ul>
-              <a
-                href="#guide-map"
-                className={`mt-6 inline-block rounded-sm text-sm text-fd-muted-foreground underline-offset-4 hover:text-fd-foreground hover:underline ${focusStyle}`}
-              >
-                Back to the overview ↑
-              </a>
-            </div>
-          </section>
-        );
-      })}
 
       <section className="border-t border-fd-border" aria-labelledby="next-heading">
         <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
