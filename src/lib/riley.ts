@@ -53,6 +53,8 @@ export interface RileyParams {
   focusX: number;
   /** Where the structure sits, 0..1 down the square. */
   focusY: number;
+  /** How far down the square the field reaches, 0.2..1. Lines stay whole; the rest is empty. */
+  extent: number;
 }
 
 export const RILEY_DEFAULTS: RileyParams = {
@@ -60,6 +62,7 @@ export const RILEY_DEFAULTS: RileyParams = {
   amplitude: 0,
   compress: 0,
   drift: 0,
+  extent: 1,
   focusX: 0.5,
   focusY: 0.5,
   kind: "wave",
@@ -82,6 +85,7 @@ export const RILEY_RANGES: Record<
   amplitude: { max: 200, min: 0, step: 1 },
   compress: { max: 1, min: -1, step: 0.01 },
   drift: { max: 0.5, min: -0.5, step: 0.005 },
+  extent: { max: 1, min: 0.2, step: 0.01 },
   focusX: { max: 1.2, min: -0.2, step: 0.01 },
   focusY: { max: 1.2, min: -0.2, step: 0.01 },
   lines: { max: 160, min: 2, step: 1 },
@@ -152,7 +156,7 @@ function waveLines(p: RileyParams, size: number, zigzag: boolean): Line[] {
     const amp = p.amplitude * clamp(1 + p.ampGrow * (2 * t - 1), 0, 2);
     // Overshoot the edges by the wave height so waves never leave a bare margin.
     const margin = p.amplitude;
-    const base = -margin + (size + 2 * margin) * stackPosition(t, p.spacingGrow);
+    const base = -margin + (size * p.extent + 2 * margin) * stackPosition(t, p.spacingGrow);
     const phase0 = TAU * p.drift * index;
     const points: Point[] = [];
     const phases: number[] = [];

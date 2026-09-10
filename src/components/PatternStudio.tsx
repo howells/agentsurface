@@ -39,6 +39,7 @@ const GROUPS: { title: string; controls: { key: NumericKey; label: string; unit?
     controls: [
       { key: "ampGrow", label: "Height across the field" },
       { key: "spacingGrow", label: "Spacing across the field" },
+      { key: "extent", label: "How far down the field reaches" },
       { key: "compress", label: "Length along the line" },
     ],
   },
