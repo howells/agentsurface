@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
-import { AreaMark } from "@/components/AreaMark";
 import { AreaNav } from "@/components/AreaNav";
 import { PageIntro } from "@/components/PageIntro";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
@@ -107,10 +106,7 @@ export default function HomePage() {
             <div className="mx-auto max-w-5xl px-6 pb-4 pt-14 sm:px-10 sm:pt-16">
               <div className="mb-7 grid gap-4 md:grid-cols-[1fr_1.15fr] md:gap-12">
                 <div>
-                  <div className="mb-4 flex items-center gap-2.5 type-body text-fd-accent-foreground">
-                    <AreaMark area={stage.id} size="sm" />
-                    {stage.name}
-                  </div>
+                  <p className="mb-3 type-body text-fd-accent-foreground">{stage.name}</p>
                   <h2 id={`${stage.id}-heading`} className="type-heading">
                     {stage.question}
                   </h2>
