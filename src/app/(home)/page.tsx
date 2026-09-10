@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
 import { AreaMark } from "@/components/AreaMark";
@@ -7,6 +8,19 @@ import { GlossaryGrid } from "@/components/GlossaryGrid";
 import { RecommendationList } from "@/components/RecommendationList";
 import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
+import { cn } from "@/lib/utils";
+
+// Monochrome line engravings on white; hatching angles follow the glossary card patterns.
+// Placement lets some forms bleed off the card edge, so they read as printed on the card.
+const ILLUSTRATIONS: Record<string, { placement: string; src: string }> = {
+  "auth-identity": { placement: "-top-4 bottom-0", src: "/areas/auth-identity.png" },
+  discoverability: {
+    placement: "-right-14 left-2 top-0 -bottom-2",
+    src: "/areas/discoverability.png",
+  },
+  understandability: { placement: "top-2 bottom-0", src: "/areas/understandability.png" },
+  usability: { placement: "-left-14 right-4 top-0 -bottom-2", src: "/areas/usability.png" },
+};
 
 export const metadata: Metadata = {
   title: "Make your website and app work with AI agents",
@@ -19,38 +33,64 @@ const focusStyle =
 
 function AreaOverview() {
   return (
-    <ol className="divide-y divide-fd-border overflow-hidden rounded-2xl border border-fd-border bg-fd-card">
-      {guideStages.map((stage) => {
+    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      {guideStages.map((stage, index) => {
         const foundations = stage.cards.filter((card) => card.applies === "Start here");
         const highlights = foundations.length > 0 ? foundations : stage.cards;
+        const illustration = ILLUSTRATIONS[stage.id];
         return (
-          <li key={stage.id}>
+          <li
+            key={stage.id}
+            className={cn(
+              "lg:col-span-2",
+              index >= 3 && "lg:col-span-3",
+              index === guideStages.length - 1 && "sm:max-lg:col-span-2",
+            )}
+          >
             <a
               href={`#${stage.id}`}
-              className="group grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 px-5 py-5 transition-colors duration-150 hover:bg-fd-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring md:grid-cols-[3rem_14rem_minmax(0,1fr)_auto] md:gap-x-7 md:px-6"
+              className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <AreaMark area={stage.id} />
-              <span>
-                <span className="block text-base font-medium leading-6">{stage.name}</span>
-                <span className="block text-sm leading-5 text-fd-muted-foreground">
+              <span className="relative block h-44">
+                {illustration ? (
+                  <span className={cn("absolute inset-0", illustration.placement)}>
+                    <Image
+                      src={illustration.src}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 30rem, (min-width: 640px) 50vw, 100vw"
+                      className="object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
+                    />
+                  </span>
+                ) : (
+                  <span className="grid h-full place-items-center">
+                    <AreaMark area={stage.id} />
+                  </span>
+                )}
+              </span>
+              <span className="flex flex-1 flex-col px-5 pb-5 pt-1">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="text-base font-medium leading-6">{stage.name}</span>
+                  <span className="flex items-center gap-1.5 text-sm tabular-nums text-fd-muted-foreground">
+                    {stage.cards.length}
+                    <span className="sr-only"> recommendations</span>
+                    <ArrowDown
+                      aria-hidden="true"
+                      className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+                    />
+                  </span>
+                </span>
+                <span className="mt-1 text-sm leading-5 text-fd-muted-foreground">
                   {stage.question}
                 </span>
-              </span>
-              <span className="col-span-2 col-start-2 text-sm leading-6 md:col-span-1 md:col-start-3 md:row-start-1">
-                <span className="mr-2 font-medium text-fd-foreground">
-                  {foundations.length > 0 ? "Start with" : "Choose from"}
+                <span className="mt-auto pt-5 text-[0.8125rem] leading-5">
+                  <span className="block font-medium text-fd-foreground">
+                    {foundations.length > 0 ? "Start with" : "Choose from"}
+                  </span>
+                  <span className="text-fd-muted-foreground">
+                    {highlights.map((card) => card.feature).join(" · ")}
+                  </span>
                 </span>
-                <span className="text-fd-muted-foreground">
-                  {highlights.map((card) => card.feature).join(" · ")}
-                </span>
-              </span>
-              <span className="col-start-3 row-start-1 flex items-center gap-2 text-sm tabular-nums text-fd-muted-foreground md:col-start-4">
-                {stage.cards.length}
-                <span className="sr-only"> recommendations</span>
-                <ArrowDown
-                  aria-hidden="true"
-                  className="size-4 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
-                />
               </span>
             </a>
           </li>
