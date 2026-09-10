@@ -76,7 +76,7 @@ function samePreset(a: RileyParams, b: RileyParams) {
 }
 
 const buttonStyle =
-  "inline-flex h-8 items-center gap-1.5 rounded-md border border-fd-border px-2.5 text-xs font-medium text-fd-foreground transition-colors hover:bg-fd-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring disabled:opacity-50";
+  "inline-flex h-8 items-center gap-1.5 rounded-md border border-fd-border px-2.5 type-small text-fd-foreground transition-colors hover:bg-fd-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring disabled:opacity-50";
 
 export function PatternStudio({ initial }: { initial: RileyParams }) {
   const [params, setParams] = useState<RileyParams>(initial);
@@ -139,7 +139,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                     setParams(preset.params);
                   }}
                   className={cn(
-                    "h-8 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
+                    "h-8 rounded-full border px-3 type-small transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
                     active
                       ? "border-fd-foreground bg-fd-foreground text-fd-background"
                       : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
@@ -216,7 +216,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
           <span
             role="status"
             className={cn(
-              "ml-1 inline-flex items-center gap-1 text-xs text-fd-muted-foreground transition-opacity",
+              "ml-1 inline-flex items-center gap-1 type-small text-fd-muted-foreground transition-opacity",
               notice ? "opacity-100" : "opacity-0",
             )}
           >
@@ -233,7 +233,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
         aria-label="Pattern settings"
       >
         <fieldset>
-          <legend className="text-xs font-medium text-fd-accent-foreground">Kind</legend>
+          <legend className="type-small text-fd-accent-foreground">Kind</legend>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {RILEY_KINDS.map((kind) => (
               <button
@@ -244,7 +244,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                   setParams((prev) => ({ ...prev, kind }));
                 }}
                 className={cn(
-                  "h-7 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
+                  "h-7 rounded-md border px-2.5 type-small transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
                   params.kind === kind
                     ? "border-fd-foreground bg-fd-foreground text-fd-background"
                     : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
@@ -257,8 +257,8 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
         </fieldset>
 
         <fieldset>
-          <legend className="text-xs font-medium text-fd-accent-foreground">Direction</legend>
-          <div className="mt-2.5 grid grid-cols-2 gap-1 rounded-md border border-fd-border p-1 text-xs">
+          <legend className="type-small text-fd-accent-foreground">Direction</legend>
+          <div className="mt-2.5 grid grid-cols-2 gap-1 rounded-md border border-fd-border p-1 type-small">
             {[
               { label: "Across", vertical: false },
               { label: "Down", vertical: true },
@@ -271,7 +271,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
                   setParams((prev) => ({ ...prev, vertical: option.vertical }));
                 }}
                 className={cn(
-                  "h-7 rounded font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
+                  "h-7 rounded transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
                   params.vertical === option.vertical
                     ? "bg-fd-foreground text-fd-background"
                     : "text-fd-muted-foreground hover:text-fd-foreground",
@@ -285,14 +285,14 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
 
         {GROUPS.map((group) => (
           <fieldset key={group.title}>
-            <legend className="text-xs font-medium text-fd-accent-foreground">{group.title}</legend>
+            <legend className="type-small text-fd-accent-foreground">{group.title}</legend>
             <div className="mt-2.5 space-y-3.5">
               {group.controls.map(({ key, label, unit }) => {
                 const range = RILEY_RANGES[key];
                 const id = `riley-${key}`;
                 return (
                   <div key={key}>
-                    <div className="flex items-baseline justify-between text-xs">
+                    <div className="flex items-baseline justify-between type-small">
                       <label htmlFor={id} className="text-fd-foreground">
                         {label}
                       </label>

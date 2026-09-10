@@ -49,14 +49,14 @@ export function AreaNav({ areas }: { areas: AreaLink[] }) {
                 href={`#${area.id}`}
                 aria-current={active ? "location" : undefined}
                 className={cn(
-                  "relative flex h-11 items-center gap-2 px-3 text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring",
+                  "relative flex h-11 items-center gap-2 px-3 type-body transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring",
                   active
                     ? "text-fd-foreground"
                     : "text-fd-muted-foreground hover:text-fd-foreground",
                 )}
               >
                 {area.name}
-                <span className="text-xs tabular-nums opacity-60">{area.count}</span>
+                <span className="type-small tabular-nums opacity-60">{area.count}</span>
                 <span
                   aria-hidden="true"
                   className={cn(

@@ -79,11 +79,9 @@ function GlossaryCard({
         <CardPattern category={term.category} />
       </div>
       <div className="px-4 pb-4 pt-3 text-left">
-        <p className="text-[0.6875rem] leading-4 text-fd-muted-foreground">{term.category}</p>
-        <p className="mt-1 text-[1.6rem] font-semibold leading-none tracking-tight text-fd-foreground">
-          {term.acronym}
-        </p>
-        <p className="mt-1.5 truncate text-xs leading-4 text-fd-muted-foreground">{term.name}</p>
+        <p className="type-small text-fd-muted-foreground">{term.category}</p>
+        <p className="mt-1 type-heading text-fd-foreground">{term.acronym}</p>
+        <p className="mt-1.5 truncate type-small text-fd-muted-foreground">{term.name}</p>
       </div>
     </motion.button>
   );
@@ -179,7 +177,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
 
           <div className="px-7 pb-8 pt-5">
             <motion.p
-              className="text-xs font-medium text-fd-accent-foreground"
+              className="type-small text-fd-accent-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.28 }}
@@ -187,7 +185,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.category}
             </motion.p>
             <motion.p
-              className="mt-2 text-4xl font-semibold tracking-tight leading-none text-fd-foreground"
+              className="mt-2 type-heading text-fd-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.16, duration: 0.28 }}
@@ -196,7 +194,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
             </motion.p>
             <motion.p
               id={`term-title-${term.id}`}
-              className="mt-1 text-sm text-fd-muted-foreground"
+              className="mt-1 type-body text-fd-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.22, duration: 0.28 }}
@@ -211,7 +209,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               transition={{ delay: 0.28, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             />
             <motion.p
-              className="text-sm font-medium leading-6 text-fd-foreground"
+              className="type-body text-fd-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.34, duration: 0.28 }}
@@ -219,7 +217,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
               {term.definition}
             </motion.p>
             <motion.p
-              className="mt-3 text-sm leading-7 text-fd-muted-foreground"
+              className="mt-3 type-body text-fd-muted-foreground"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.28 }}
@@ -229,7 +227,7 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
             {term.href && (
               <Link
                 href={term.href}
-                className="mt-5 inline-block text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+                className="mt-5 inline-block type-body underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
               >
                 Read the implementation guide
               </Link>
@@ -264,7 +262,7 @@ function FilterPills({
           onClick={() => {
             onChange(cat);
           }}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-full border px-3 py-1 type-small transition-colors ${
             active === cat
               ? "border-fd-foreground bg-fd-foreground text-fd-background"
               : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground"

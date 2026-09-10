@@ -19,7 +19,7 @@ function Condition({ text }: { text: string }) {
   }
   return (
     <>
-      <span className="font-medium text-fd-accent-foreground">{status}</span> {rest}
+      <span className="text-fd-accent-foreground">{status}</span> {rest}
     </>
   );
 }
@@ -61,13 +61,11 @@ function Row({
           )}
         >
           <span className="min-w-0">
-            <span className="text-[0.9375rem] font-medium leading-6 text-fd-foreground">
-              {card.title}
-            </span>
-            <span className="ml-2.5 text-sm text-fd-muted-foreground max-md:hidden">
+            <span className="type-body text-fd-foreground">{card.title}</span>
+            <span className="ml-2.5 type-body text-fd-muted-foreground max-md:hidden">
               {card.feature}
             </span>
-            <span className="mt-0.5 block text-xs leading-5 text-fd-muted-foreground md:hidden">
+            <span className="mt-0.5 block type-small text-fd-muted-foreground md:hidden">
               {card.feature}
               {showCondition && (
                 <>
@@ -78,7 +76,7 @@ function Row({
             </span>
           </span>
           {showCondition && (
-            <span className="text-sm leading-5 text-fd-muted-foreground max-md:hidden">
+            <span className="type-body text-fd-muted-foreground max-md:hidden">
               <Condition text={card.applies} />
             </span>
           )}
@@ -108,16 +106,16 @@ function Row({
           >
             <div className="grid gap-5 px-5 pb-6 pt-1 md:grid-cols-2 md:gap-x-10">
               <div>
-                <p className="text-xs font-medium text-fd-foreground">What to do</p>
-                <p className="mt-1.5 text-sm leading-6 text-fd-muted-foreground">{card.what}</p>
+                <p className="type-small text-fd-foreground">What to do</p>
+                <p className="mt-1.5 type-body text-fd-muted-foreground">{card.what}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-fd-foreground">Why it matters</p>
-                <p className="mt-1.5 text-sm leading-6 text-fd-muted-foreground">{card.why}</p>
+                <p className="type-small text-fd-foreground">Why it matters</p>
+                <p className="mt-1.5 type-body text-fd-muted-foreground">{card.why}</p>
               </div>
               <Link
                 href={card.href}
-                className="inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-fd-foreground underline decoration-fd-ring/50 underline-offset-4 hover:decoration-fd-ring focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring md:col-span-2"
+                className="inline-flex w-fit items-center gap-1.5 rounded-sm type-body text-fd-foreground underline decoration-fd-ring/50 underline-offset-4 hover:decoration-fd-ring focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring md:col-span-2"
               >
                 Read the guide<span className="sr-only">: {card.feature}</span>
                 <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -185,7 +183,7 @@ export function RecommendationList({ stage }: { stage: GuideStage }) {
             {labelled && (
               <h3
                 id={headingId}
-                className="flex items-center gap-2 border-b border-fd-border bg-fd-muted/40 px-5 py-2.5 text-xs font-medium text-fd-muted-foreground"
+                className="flex items-center gap-2 border-b border-fd-border bg-fd-muted/40 px-5 py-2.5 type-small text-fd-muted-foreground"
               >
                 {group.key === "start" && (
                   <span

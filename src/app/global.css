@@ -257,3 +257,30 @@
     @apply font-sans;
   }
 }
+
+/* ── Type case ──────────────────────────
+   Every text element picks one role. Hierarchy comes from colour
+   (fd-foreground / fd-muted-foreground / fd-accent-foreground), never weight.
+   Sizes: display, 24, 16, 14, 12 (+ mono 12). `pnpm typography:check` enforces it
+   on the marketing pages and components. */
+
+@layer components {
+  .type-display {
+    @apply text-[clamp(2.25rem,1.5rem+3.2vw,3.5rem)] font-normal leading-[1.08] tracking-[-0.02em];
+  }
+  .type-heading {
+    @apply text-2xl font-normal leading-[1.2] tracking-[-0.015em];
+  }
+  .type-lead {
+    @apply text-base font-normal leading-[1.6] tracking-normal;
+  }
+  .type-body {
+    @apply text-sm font-normal leading-[1.6] tracking-normal;
+  }
+  .type-small {
+    @apply text-xs font-normal leading-[1.5] tracking-normal;
+  }
+  .type-data {
+    @apply font-mono text-xs font-normal leading-[1.5] tracking-normal;
+  }
+}

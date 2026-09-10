@@ -15,13 +15,13 @@ export default function GlossaryPage() {
       <main className="flex flex-col items-center bg-fd-background text-fd-foreground">
         {/* Hero */}
         <section className="w-full max-w-5xl px-6 pt-14 pb-12 sm:px-10">
-          <p className="text-sm font-medium text-fd-accent-foreground">Agentic glossary</p>
-          <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
+          <p className="type-body text-fd-accent-foreground">Agentic glossary</p>
+          <h1 className="mt-4 max-w-2xl type-display">
             The language of
             <br />
             intelligent software.
           </h1>
-          <p className="mt-6 max-w-xl text-[0.9375rem] leading-7 text-fd-muted-foreground">
+          <p className="mt-6 max-w-xl type-lead text-fd-muted-foreground">
             {glossaryTerms.length} terms for product, business, and engineering teams. Filter by
             category or scroll through all. Click any card to go deeper.
           </p>
@@ -37,7 +37,7 @@ export default function GlossaryPage() {
         {/* Footer note */}
         <section className="w-full border-t border-fd-border">
           <div className="mx-auto max-w-5xl px-6 py-12 sm:px-10">
-            <p className="text-sm leading-7 text-fd-muted-foreground max-w-lg">
+            <p className="type-body text-fd-muted-foreground max-w-lg">
               Definitions are written for product and business audiences. For technical depth, see
               the{" "}
               <Link

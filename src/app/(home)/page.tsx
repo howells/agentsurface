@@ -26,7 +26,7 @@ function AreaOverview() {
             href={`#${stage.id}`}
             className="group flex min-h-44 flex-col rounded-2xl border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
-            <span className="flex items-baseline justify-between text-xs tabular-nums text-fd-muted-foreground">
+            <span className="flex items-baseline justify-between type-small tabular-nums text-fd-muted-foreground">
               <span>{String(index + 1).padStart(2, "0")}</span>
               <span className="flex items-center gap-1">
                 {stage.cards.length}
@@ -37,12 +37,10 @@ function AreaOverview() {
                 />
               </span>
             </span>
-            <span className="mt-auto block pt-10 text-[1.0625rem] font-medium leading-snug tracking-[-0.01em] text-fd-foreground">
+            <span className="mt-auto block pt-10 type-body text-fd-foreground">
               {stage.question}
             </span>
-            <span className="mt-1.5 block text-[13px] leading-5 text-fd-muted-foreground">
-              {stage.name}
-            </span>
+            <span className="mt-1 block type-small text-fd-muted-foreground">{stage.name}</span>
           </a>
         </li>
       ))}
@@ -61,20 +59,18 @@ export default function HomePage() {
   return (
     <main id="main" className="bg-fd-background text-fd-foreground">
       <section className="mx-auto max-w-5xl px-6 pb-14 pt-16 sm:px-10 sm:pt-20">
-        <p className="mb-5 text-sm font-medium text-fd-accent-foreground">
+        <p className="mb-5 type-body text-fd-accent-foreground">
           A practical guide to agent-ready products
         </p>
-        <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.5rem]">
-          Make your website and app work with AI agents.
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-8 text-fd-muted-foreground">
+        <h1 className="max-w-3xl type-display">Make your website and app work with AI agents.</h1>
+        <p className="mt-6 max-w-2xl type-lead text-fd-muted-foreground">
           Help agents find your product, understand what it offers, and use it on a customer’s
           behalf. Here’s what to consider, why it matters, and where to start.
         </p>
-        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 text-sm">
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 type-body">
           <a
             href="#guide-map"
-            className={`inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 font-medium text-fd-primary-foreground ${focusStyle}`}
+            className={`inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground ${focusStyle}`}
           >
             See the six areas <ArrowDown aria-hidden="true" className="size-4" />
           </a>
@@ -93,10 +89,10 @@ export default function HomePage() {
         className="mx-auto max-w-5xl scroll-mt-20 px-6 pb-20 sm:px-10"
       >
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="map-heading" className="text-sm font-medium">
+          <h2 id="map-heading" className="type-body">
             The six things to get right
           </h2>
-          <p className="text-xs text-fd-muted-foreground">{total} recommendations</p>
+          <p className="type-small text-fd-muted-foreground">{total} recommendations</p>
         </div>
         <AreaOverview />
       </section>
@@ -113,20 +109,15 @@ export default function HomePage() {
             <div className="mx-auto max-w-5xl px-6 pb-4 pt-14 sm:px-10 sm:pt-16">
               <div className="mb-7 grid gap-4 md:grid-cols-[1fr_1.15fr] md:gap-12">
                 <div>
-                  <div className="mb-4 flex items-center gap-2.5 text-sm font-medium text-fd-accent-foreground">
+                  <div className="mb-4 flex items-center gap-2.5 type-body text-fd-accent-foreground">
                     <AreaMark area={stage.id} size="sm" />
                     {stage.name}
                   </div>
-                  <h2
-                    id={`${stage.id}-heading`}
-                    className="text-3xl font-semibold leading-tight tracking-tight"
-                  >
+                  <h2 id={`${stage.id}-heading`} className="type-heading">
                     {stage.question}
                   </h2>
                 </div>
-                <p className="self-end text-base leading-7 text-fd-muted-foreground">
-                  {stage.description}
-                </p>
+                <p className="self-end type-lead text-fd-muted-foreground">{stage.description}</p>
               </div>
               <RecommendationList stage={stage} />
             </div>
@@ -144,16 +135,16 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <div>
-              <h2 id="glossary-heading" className="text-2xl font-semibold tracking-tight">
+              <h2 id="glossary-heading" className="type-heading">
                 The language of agents
               </h2>
-              <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+              <p className="mt-2 type-body text-fd-muted-foreground">
                 Plain-language definitions of the terms in this guide. Choose a card to learn more.
               </p>
             </div>
             <Link
               href="/glossary"
-              className={`text-sm font-medium underline underline-offset-4 ${focusStyle}`}
+              className={`type-body underline underline-offset-4 ${focusStyle}`}
             >
               View all {glossaryTerms.length} terms
             </Link>
@@ -167,15 +158,15 @@ export default function HomePage() {
           <div className="grid gap-10 md:grid-cols-2 md:gap-16">
             <div>
               <BookOpen aria-hidden="true" className="mb-4 size-5 text-fd-accent-foreground" />
-              <h2 id="next-heading" className="text-2xl font-semibold tracking-tight">
+              <h2 id="next-heading" className="type-heading">
                 Put the guide to work
               </h2>
-              <p className="mt-3 text-sm leading-6 text-fd-muted-foreground">
+              <p className="mt-3 type-body text-fd-muted-foreground">
                 Choose a task a customer wants to complete and follow it from discovery to the final
                 result. Use the docs for implementation detail, examples, and the tradeoffs behind
                 each recommendation.
               </p>
-              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 text-sm font-medium">
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 type-body">
                 <Link
                   href="/docs/scoring/product-journeys"
                   className={`underline underline-offset-4 ${focusStyle}`}
@@ -191,22 +182,20 @@ export default function HomePage() {
               </div>
             </div>
             <div id="skill" className="min-w-0 scroll-mt-20">
-              <h3 className="text-lg font-medium tracking-tight">
-                Work through it with your coding agent
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-fd-muted-foreground">
+              <h3 className="type-body">Work through it with your coding agent</h3>
+              <p className="mt-3 type-body text-fd-muted-foreground">
                 Install the Surface skill to apply this guidance to your codebase: explain a topic,
                 assess what exists, or turn the findings into an implementation plan.
               </p>
-              <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 text-xs leading-6">
+              <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 type-data">
                 <code>npx skills add https://github.com/howells/agentsurface</code>
               </pre>
-              <p className="mt-3 text-xs leading-5 text-fd-muted-foreground">
+              <p className="mt-3 type-small text-fd-muted-foreground">
                 For Codex, Claude Code, Cursor, and other agents that support skills.
               </p>
             </div>
           </div>
-          <p className="mt-12 border-t border-fd-border pt-6 text-xs leading-6 text-fd-muted-foreground">
+          <p className="mt-12 border-t border-fd-border pt-6 type-small text-fd-muted-foreground">
             This guide brings together Agent Surface’s implementation guidance and practical lessons
             from{" "}
             <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
@@ -233,7 +222,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-fd-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-8 text-xs text-fd-muted-foreground sm:px-10">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-8 type-small text-fd-muted-foreground sm:px-10">
           <span>
             Agent Surface by{" "}
             <a href="https://danielhowells.com" className="hover:text-fd-foreground">
