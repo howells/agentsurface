@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Download, Link2, RotateCcw, Shuffle } from "lucide-react";
 import { AREA_PATTERNS } from "@/data/area-patterns";
 import {
+  KIND_LABELS,
   RILEY_DEFAULTS,
+  RILEY_KINDS,
   RILEY_RANGES,
   encodeRiley,
   randomRiley,
@@ -43,6 +45,13 @@ const GROUPS: { title: string; controls: { key: NumericKey; label: string; unit?
   {
     title: "Ribbon",
     controls: [{ key: "ribbon", label: "Swell on each crest" }],
+  },
+  {
+    title: "Position",
+    controls: [
+      { key: "focusX", label: "Across" },
+      { key: "focusY", label: "Down" },
+    ],
   },
   {
     title: "Loose bottom",
@@ -219,6 +228,30 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
         }}
         aria-label="Pattern settings"
       >
+        <fieldset>
+          <legend className="text-xs font-medium text-fd-accent-foreground">Kind</legend>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {RILEY_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                aria-pressed={params.kind === kind}
+                onClick={() => {
+                  setParams((prev) => ({ ...prev, kind }));
+                }}
+                className={cn(
+                  "h-7 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
+                  params.kind === kind
+                    ? "border-fd-foreground bg-fd-foreground text-fd-background"
+                    : "border-fd-border text-fd-muted-foreground hover:border-fd-ring hover:text-fd-foreground",
+                )}
+              >
+                {KIND_LABELS[kind]}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
         <fieldset>
           <legend className="text-xs font-medium text-fd-accent-foreground">Direction</legend>
           <div className="mt-2.5 grid grid-cols-2 gap-1 rounded-md border border-fd-border p-1 text-xs">
