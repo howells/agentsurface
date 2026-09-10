@@ -41,8 +41,6 @@ function AreaOverview() {
   return (
     <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {guideStages.map((stage) => {
-        const foundations = stage.cards.filter((card) => card.applies === "Start here");
-        const highlights = foundations.length > 0 ? foundations : stage.cards;
         const illustration = ILLUSTRATIONS[stage.id];
         return (
           <li key={stage.id}>
@@ -50,27 +48,25 @@ function AreaOverview() {
               href={`#${stage.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-fd-border bg-fd-card shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              {/* The field's lines fray out in its lower half, where the heading rises into it. */}
-              <span className="relative block aspect-square w-full">
+              <span className="relative block aspect-square w-full overflow-hidden">
                 {illustration ? (
                   <Image
                     src={illustration}
                     alt=""
                     fill
                     sizes="(min-width: 1024px) 20rem, (min-width: 640px) 50vw, 100vw"
-                    className="origin-top object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
+                    className="object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none dark:opacity-85 dark:mix-blend-screen dark:invert"
                   />
                 ) : (
-                  <span className="grid h-2/3 place-items-center">
+                  <span className="grid h-full place-items-center">
                     <AreaMark area={stage.id} />
                   </span>
                 )}
               </span>
-              {/* Percentage margins resolve against width, so this rises 30% into the square. */}
-              <span className="relative -mt-[30%] flex flex-1 flex-col px-5 pb-5">
+              <span className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="text-base font-medium leading-6">{stage.name}</span>
-                  <span className="flex items-center gap-1.5 text-sm tabular-nums text-fd-muted-foreground">
+                  <span className="text-sm font-medium leading-5">{stage.name}</span>
+                  <span className="flex items-center gap-1 text-xs tabular-nums text-fd-muted-foreground">
                     {stage.cards.length}
                     <span className="sr-only"> recommendations</span>
                     <ArrowDown
@@ -79,16 +75,8 @@ function AreaOverview() {
                     />
                   </span>
                 </span>
-                <span className="mt-1 text-sm leading-5 text-fd-muted-foreground">
+                <span className="mt-0.5 text-[13px] leading-5 text-fd-muted-foreground">
                   {stage.question}
-                </span>
-                <span className="mt-auto pt-5 text-[0.8125rem] leading-5">
-                  <span className="block font-medium text-fd-foreground">
-                    {foundations.length > 0 ? "Start with" : "Choose from"}
-                  </span>
-                  <span className="text-fd-muted-foreground">
-                    {highlights.map((card) => card.feature).join(" · ")}
-                  </span>
                 </span>
               </span>
             </a>
@@ -142,10 +130,10 @@ export default function HomePage() {
         className="mx-auto max-w-5xl scroll-mt-20 px-6 pb-20 sm:px-10"
       >
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="map-heading" className="text-base font-medium">
+          <h2 id="map-heading" className="text-sm font-medium">
             The six things to get right
           </h2>
-          <p className="text-sm text-fd-muted-foreground">{total} recommendations</p>
+          <p className="text-xs text-fd-muted-foreground">{total} recommendations</p>
         </div>
         <AreaOverview />
       </section>

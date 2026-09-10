@@ -8,9 +8,11 @@ export interface AreaPattern {
   params: RileyParams;
 }
 
-// Six shuffled wave fields from the generator. Each stops about halfway down, so the card
-// heading sits below whole lines, none cut. Edit them in the studio at /patterns,
-// then run `pnpm patterns:render`.
+// One full-square composition per area, all from the same generator so they read as a series.
+// Wave height stays under the line spacing so lines never cross. Edit them in the studio at
+// /patterns, then run `pnpm patterns:render`.
+const BASE: RileyParams = { ...RILEY_DEFAULTS, weight: 2 };
+
 export const AREA_PATTERNS: AreaPattern[] = [
   {
     id: "hatch",
@@ -18,93 +20,39 @@ export const AREA_PATTERNS: AreaPattern[] = [
     params: { ...RILEY_DEFAULTS },
   },
   {
-    // One broad swell with a travelling crest.
+    // A crest travelling diagonally through parallel waves, after Current.
     id: "discoverability",
     name: "Discoverability",
-    params: {
-      ...RILEY_DEFAULTS,
-      amplitude: 106,
-      compress: -0.07,
-      drift: 0.057,
-      lines: 12,
-      extent: 0.46,
-      seed: 5101,
-      wavelength: 897,
-    },
+    params: { ...BASE, amplitude: 40, drift: 0.03, lines: 46, wavelength: 520 },
   },
   {
-    // Near-straight lines settling into order.
+    // Waves tightening towards the bottom, after Fall.
     id: "understandability",
     name: "Understandability",
-    params: {
-      ...RILEY_DEFAULTS,
-      ampGrow: 0.33,
-      amplitude: 18,
-      drift: 0.097,
-      lines: 20,
-      extent: 0.46,
-      seed: 3784,
-      wavelength: 1005,
-    },
+    params: { ...BASE, amplitude: 16, drift: 0.02, lines: 50, spacingGrow: 0.3, wavelength: 220 },
   },
   {
-    // A crest running diagonally across the field.
+    // The same crest running across vertical lines.
     id: "connections",
     name: "Connections",
-    params: {
-      ...RILEY_DEFAULTS,
-      ampGrow: -0.34,
-      amplitude: 49,
-      compress: -0.5,
-      drift: 0.053,
-      lines: 20,
-      extent: 0.46,
-      seed: 2860,
-      wavelength: 408,
-    },
+    params: { ...BASE, amplitude: 40, drift: 0.035, lines: 46, vertical: true, wavelength: 560 },
   },
   {
-    // Tight on the left, opening out to the right.
+    // Each line a quarter-cycle behind the last, so pairs braid.
     id: "auth-identity",
     name: "Sign-in & permissions",
-    params: {
-      ...RILEY_DEFAULTS,
-      amplitude: 120,
-      compress: -0.56,
-      drift: -0.012,
-      lines: 18,
-      extent: 0.46,
-      seed: 4134,
-      wavelength: 745,
-    },
+    params: { ...BASE, amplitude: 10, drift: 0.25, lines: 40, wavelength: 520 },
   },
   {
-    // A long sweep rising to one side.
+    // A long sweep that tightens towards the right.
     id: "usability",
     name: "Usability",
-    params: {
-      ...RILEY_DEFAULTS,
-      amplitude: 120,
-      drift: 0.033,
-      lines: 16,
-      extent: 0.46,
-      seed: 5826,
-      wavelength: 741,
-    },
+    params: { ...BASE, amplitude: 36, compress: 0.9, drift: 0.015, lines: 44, wavelength: 1200 },
   },
   {
-    // Few, calm, evenly measured lines.
+    // Stacked chevrons, evenly measured.
     id: "payments",
     name: "Payments",
-    params: {
-      ...RILEY_DEFAULTS,
-      ampGrow: 0.53,
-      amplitude: 32,
-      drift: -0.072,
-      lines: 12,
-      extent: 0.46,
-      seed: 4485,
-      wavelength: 310,
-    },
+    params: { ...BASE, amplitude: 10, kind: "chevron", lines: 48, wavelength: 150 },
   },
 ];
