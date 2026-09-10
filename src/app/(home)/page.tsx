@@ -22,7 +22,7 @@ function AreaOverview() {
         <li key={stage.id}>
           <a
             href={`#${stage.id}`}
-            className="group flex min-h-44 flex-col rounded-2xl border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            className="group flex flex-col rounded-2xl sm:min-h-44 border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <span className="flex items-baseline justify-between type-small tabular-nums text-fd-muted-foreground">
               <span>{String(index + 1).padStart(2, "0")}</span>
@@ -35,7 +35,7 @@ function AreaOverview() {
                 />
               </span>
             </span>
-            <span className="mt-auto block pt-10 type-body text-fd-foreground">
+            <span className="mt-auto block pt-6 type-body sm:pt-10 text-fd-foreground">
               {stage.question}
             </span>
             <span className="mt-1 block type-small text-fd-muted-foreground">{stage.name}</span>

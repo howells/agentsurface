@@ -319,7 +319,10 @@ export function GlossaryGrid({
         </div>
       ) : (
         <div>
-          <div className="mt-5 flex justify-end gap-2" aria-label="Glossary carousel controls">
+          <div
+            className="mt-5 flex justify-end gap-2 max-sm:hidden"
+            aria-label="Glossary carousel controls"
+          >
             {([-1, 1] as const).map((direction) => {
               const Icon = direction === -1 ? ArrowLeft : ArrowRight;
               return (

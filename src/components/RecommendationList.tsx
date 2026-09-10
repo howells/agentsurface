@@ -55,17 +55,17 @@ function Row({
           aria-controls={panelId}
           onClick={onToggle}
           className={cn(
-            "grid min-h-14 w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 px-5 py-3 text-left transition-colors duration-150 hover:bg-fd-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring md:min-h-12",
-            showCondition && "md:grid-cols-[minmax(0,1fr)_15rem_1rem]",
+            "grid min-h-14 w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 px-5 py-3 text-left transition-colors duration-150 hover:bg-fd-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring lg:min-h-12",
+            showCondition && "lg:grid-cols-[minmax(0,1fr)_15rem_1rem]",
             open && "bg-fd-muted/60",
           )}
         >
           <span className="min-w-0">
             <span className="type-body text-fd-foreground">{card.title}</span>
-            <span className="ml-2.5 type-body text-fd-muted-foreground max-md:hidden">
+            <span className="ml-2.5 type-body text-fd-muted-foreground max-lg:hidden">
               {card.feature}
             </span>
-            <span className="mt-0.5 block type-small text-fd-muted-foreground md:hidden">
+            <span className="mt-0.5 block type-small text-fd-muted-foreground lg:hidden">
               {card.feature}
               {showCondition && (
                 <>
@@ -76,7 +76,7 @@ function Row({
             </span>
           </span>
           {showCondition && (
-            <span className="type-body text-fd-muted-foreground max-md:hidden">
+            <span className="type-body text-fd-muted-foreground max-lg:hidden">
               <Condition text={card.applies} />
             </span>
           )}
