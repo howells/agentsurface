@@ -26,7 +26,7 @@ You will receive a prompt containing:
 1. Read your reference file first
 2. Use the detected surfaces as starting points — do not re-discover from scratch
 3. Gather additional evidence using Glob and Grep as the reference file's "Evidence to gather" section directs
-4. Read key files to assess quality (not just presence) — check for M2M auth, client_credentials, scoped tokens, token exchange
+4. Read key files to assess quality (not just presence) — identify user-delegated versus service-owned access, then check the appropriate grant, PKCE where required, scoped tokens and validation. Do not penalize consumer OAuth for lacking Client Credentials
 5. Match evidence against the rubric's 0-3 criteria
 6. Score conservatively — when uncertain, score lower
 7. Generate findings for any score below 3

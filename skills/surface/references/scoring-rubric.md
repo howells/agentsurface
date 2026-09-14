@@ -85,14 +85,16 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 ## Dimension 5: Authentication
 
-**What it measures:** Whether agents can authenticate without human browser interaction.
+**What it measures:** Whether clients can obtain and use credentials appropriate to the acting identity. User-delegated access uses Authorization Code with PKCE; service-owned M2M access can use Client Credentials. Interactive consent at connection time is valid. Routine protected requests need scoped tokens and structured authentication failures.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | Browser-only auth. OAuth authorization code flow as only option. CAPTCHAs. Session cookies required. | Auth requires redirect to browser. No client_credentials grant. CAPTCHA in auth flow. Cookie-based sessions only. |
-| 1 | API keys exist but no M2M OAuth. Keys may be long-lived or overly broad. | API key auth available. No OAuth client_credentials. Keys may be permanent. No scope limitation. |
-| 2 | OAuth 2.1 Client Credentials grant. Scoped, short-lived tokens. Env var injection. JWT validation (iss, aud, exp). | OAuth config with client_credentials grant_type. Token scopes defined. JWT validation checking signature + claims. Tokens expire in hours. |
-| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance with RFC 9728 protected-resource metadata. | Token exchange endpoint. Audience/resource-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. |
+| Score | Criteria | Evidence |
+| --- | --- | --- |
+| 0 | No usable authorization path for the intended client and identity. | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete. |
+| 1 | Programmatic access works, but permissions, credential lifetime or validation are incomplete. | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour. |
+| 2 | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism. |
+| 3 | Level 2 plus verified discovery, isolation and credential recovery for the supported flows. | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
+
+Do not penalize a consumer integration for lacking Client Credentials. Score only flows its advertised capabilities require. [MCP authorization extensions](https://modelcontextprotocol.io/extensions/auth/overview) distinguish user consent from optional M2M support.
 
 **Key files:** auth config, OAuth setup, middleware, .well-known/ files, JWT validation code
 

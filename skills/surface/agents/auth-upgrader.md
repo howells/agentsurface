@@ -18,7 +18,7 @@ Upgrade authentication to agent-native patterns: OAuth 2.1 Client Credentials (n
 
 ## Mission
 
-Enable agents to authenticate without human intervention or browser interaction. Every auth path must be headless, scoped, and time-bounded.
+Enable clients to authenticate for the correct principal. User-delegated access may require interactive consent at connection time; service-owned M2M uses a supported unattended grant. Subsequent protected requests must be scoped and time-bounded. Do not replace user consent with a service identity.
 
 ## Inputs
 
@@ -30,11 +30,11 @@ Enable agents to authenticate without human intervention or browser interaction.
 
 1. **Assess current auth**:
    - Identify auth mechanisms (session cookies, JWT, OAuth, API keys)
-   - Check if browser-only (Oauth authorization code flow)
+   - Identify user-delegated versus service-owned access; preserve Authorization Code with PKCE for user consent
    - Identify scope model (if any)
    - Document token lifetime, rotation policy
 
-2. **Implement OAuth 2.1 Client Credentials** (primary M2M auth):
+2. **Implement Client Credentials only for service-owned M2M access**:
    - Grant type: `client_credentials`
    - Endpoint: `POST /oauth/token` (or `/.well-known/oauth-token-endpoint`)
    - Request:
@@ -56,11 +56,11 @@ Enable agents to authenticate without human intervention or browser interaction.
    - Token lifetime: 1-3 hours (not days)
    - Use short-lived secrets + rotation
 
-3. **Implement PKCE S256** (additional security):
-   - On token endpoint, require Proof-of-Key-Exchange (RFC 7636)
+3. **Implement PKCE S256 for Authorization Code flows**:
+   - Bind the authorization request to the code exchange (RFC 7636); do not add PKCE to Client Credentials
    - Agent generates: `code_verifier = random 128 bytes` (base64url)
    - Agent sends: `code_challenge = SHA256(code_verifier)` (base64url)
-   - Token request includes: `code_challenge_method=S256`, `code_verifier`
+   - Authorization request includes `code_challenge` and `code_challenge_method=S256`; the code exchange includes `code_verifier`
    - Example:
      ```typescript
      const verifier = base64url(crypto.randomBytes(32));

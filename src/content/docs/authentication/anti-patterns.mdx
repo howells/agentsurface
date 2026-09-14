@@ -5,11 +5,11 @@ description: Silent failures and late-stage breakage in agent auth workflows
 
 ## Recap
 
-Nine patterns that break agent auth silently: authorization-code-only API access, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silently or fail late.
+Nine patterns that break agent auth silently: an authorization flow that does not fit the acting identity, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silently or fail late.
 
 | Pattern                                | Fix                                                         |
 | -------------------------------------- | ----------------------------------------------------------- |
-| Authorization Code only for API access | Support Client Credentials or an explicit registration flow |
+| Wrong grant for the acting identity | Authorization Code + PKCE for user delegation; Client Credentials for service-owned M2M |
 | CAPTCHA on token endpoint              | Use rate limiting instead                                   |
 | Session cookies                        | Use Bearer tokens with explicit `exp`                       |
 | Long-lived broad-scope keys            | Short-lived, minimum-scope                                  |
@@ -21,28 +21,15 @@ Nine patterns that break agent auth silently: authorization-code-only API access
 
 Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silent or fail late.
 
-## Authorization Code as the Only API Path
+## Using the Wrong Grant for the Acting Identity
 
-Authorization Code flow requires a browser-mediated consent path. It redirects to a login page, the user clicks "Allow," and the server redirects back with a code. That can be acceptable for explicit user consent or client registration, but it is a poor default for unattended agent API access.
+Authorization Code with PKCE is the normal user-delegated MCP authorization flow. A person grants a client access during connection setup; subsequent protected requests use access tokens. That consent step is not a failure of agent readiness.
 
-```
-1. Agent navigates to https://auth.example.com/authorize?response_type=code&...
-2. Server returns HTTP 302 redirect to login page
-3. Agent cannot follow redirect or render HTML
-4. Flow stops; agent receives HTML where it expected JSON
-```
+Client Credentials serves a different identity: the service itself. Use it for supported unattended M2M access. It must not replace a shopper's consent or give a service principal implicit access to that shopper's private data.
 
-If your service only supports Authorization Code for all programmatic access, agents fail at step one.
+The failure is returning generic login HTML during a protected API request without the discovery and authorization flow the client supports. Remote MCP clients need discoverable authorization metadata and actionable authentication responses. An `auth.md` registration ceremony is separate and does not replace MCP OAuth requirements.
 
-Fix: support Client Credentials for service-owned machine-to-machine access. If the agent needs user-bound credentials, publish a bounded registration path such as `auth.md` rather than forcing agents through a generic sign-in page.
-
-```bash
-POST /oauth/token
-grant_type=client_credentials
-&client_id=...&client_secret=...&scope=...
-```
-
-See [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents).
+See [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) and the [official MCP authorization overview](https://modelcontextprotocol.io/extensions/auth/overview).
 
 ## CAPTCHA on Token Endpoint
 
@@ -186,7 +173,7 @@ For high-value resources and sensitive agent-to-agent communication, require DPo
 
 | Anti-pattern                           | Why it breaks                     | Fix                                                |
 | -------------------------------------- | --------------------------------- | -------------------------------------------------- |
-| Authorization Code only for API access | Requires browser-mediated consent | Support Client Credentials or bounded registration |
+| Wrong grant for the acting identity | User consent or service access cannot complete | Match the grant to the principal and client |
 | CAPTCHA on token endpoint              | Blocks automated requests         | Remove; use rate limiting                          |
 | Session cookies                        | Expire without structured signal  | Use Bearer tokens + explicit `exp`                 |
 | Long-lived broad-scope keys            | Maximum blast radius on leak      | Short-lived, minimum-scope                         |
