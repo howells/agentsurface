@@ -11,11 +11,11 @@ The Client Credentials grant is the baseline for service-owned agent credentials
 - Short-lived tokens (1–4 hours) cached and refreshed proactively
 - Scopes follow principle of least privilege (resource:action pairs)
 - JWT validation: always verify signature, issuer, audience, expiry
-- Optional: PKCE for authorization code flows, Token Exchange for narrowing scope, `auth.md` for user-bound registration
+- User-delegated access: Authorization Code with PKCE; Token Exchange where narrower downstream delegation is needed
 
 Agents need OAuth 2.1, but service-owned agents should not depend on a browser-based Authorization Code flow for routine API access. The baseline grant is **Client Credentials** ([RFC 6749 §4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)): the agent makes a single POST to the token endpoint with credentials, receives a short-lived JWT, caches it, and uses it on every request. No redirect, no session cookie, no login page in the request path.
 
-User-bound credentials are a separate problem. If an agent needs to register or claim credentials for a user, use a bounded registration flow such as [`auth.md`](/docs/authentication/auth-md), then return a credential that follows the same bearer-token validation rules described here.
+For user-delegated access, use Authorization Code with PKCE: the person grants access through the client-supported consent flow, then protected requests use access tokens. This is the core MCP authorization case; Client Credentials is an optional extension for service identities. A bounded registration flow such as [`auth.md`](/docs/authentication/auth-md) serves a separate registration need and does not replace MCP OAuth. See the [MCP authorization overview](https://modelcontextprotocol.io/extensions/auth/overview).
 
 ## Client Credentials Request
 
@@ -190,7 +190,7 @@ async function authorize(token: string, resourceOrgId: string): Promise<void> {
 
 ## Authorization Code + PKCE
 
-Authorization Code with PKCE is still valid for human-facing consent and some MCP client authorization flows. Treat it as a registration or consent path, not the default credential mechanism for unattended agents. After consent completes, the agent should use normal bearer tokens with explicit expiry, audience, and scopes.
+Authorization Code with PKCE is the standard choice for user-delegated MCP access. Consent happens during connection setup; subsequent protected calls use tokens with bounded lifetime, audience and scopes. PKCE binds the authorization request to the code exchange; it is not an extra step in the Client Credentials grant.
 
 ```http
 GET /authorize?response_type=code

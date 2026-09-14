@@ -6,7 +6,7 @@ lastVerified: 2026-08-27
 
 ## Summary
 
-Chat-only tool results flatten rich interactions. When a tool returns a table, a form, a chart, or a picker, a text-only client can only render a serialized blob and hope the model narrates it well. MCP Apps let an MCP server ship an interactive UI surface that any supporting client renders inline, so a "book a flight" tool can return a real date-and-seat picker instead of a paragraph describing one. The server declares the UI; the client hosts it in a sandbox; the interaction flows back through the same MCP connection.
+Chat-only tool results flatten rich interactions. When a tool returns a table, a form, a chart, or a picker, a text-only client can only render a serialized blob and hope the model narrates it well. MCP Apps let an MCP server ship an interactive UI surface that any supporting client renders inline, so a "book a flight" tool can return a real date-and-seat picker instead of a paragraph describing one. The server declares the UI; the client hosts it in a sandbox; the UI communicates with the host over a JSON-RPC bridge, and the host mediates calls to the server.
 
 Reach for MCP Apps when the value is in the interaction — selecting, filtering, previewing, confirming — and plain structured output when the client or the model can act on the data directly. Because client support is uneven, every MCP App must degrade gracefully to text.
 
@@ -43,14 +43,14 @@ The decision rule: if removing the UI would remove the point of the tool, ship a
 
 ## Architecture
 
-MCP Apps extend the normal tool-call flow with a UI resource. The shape is **tool result → UI resource → client rendering**:
+MCP Apps link a tool definition to an HTML resource. The shape is **tool metadata → UI resource → host rendering**, with tool results supplying the data:
 
-1. The agent calls a tool over the standard MCP connection.
-2. The server returns a result that references a UI resource — declarative UI plus the data to bind into it — instead of, or alongside, plain text content.
-3. The client fetches and renders that UI resource in a sandboxed surface inside its own interface.
-4. User interaction inside the rendered UI produces structured events that flow back to the server through the MCP connection, which can update the UI or return a final tool result.
+1. The server declares `_meta.ui.resourceUri` on the tool, pointing to a `ui://` resource. The host can discover and preload the UI before invoking the tool.
+2. The host fetches that resource through MCP. It contains HTML, commonly bundled with JavaScript and CSS, rather than a protocol-defined declarative component tree.
+3. The host renders the resource in a sandboxed iframe and delivers tool inputs and results to it. The tool still returns useful `structuredContent` and text.
+4. The app communicates with the host using the MCP Apps JSON-RPC dialect over `postMessage`. The host mediates permitted tool calls to the server through its MCP connection.
 
-Because the UI travels as a resource attached to a tool result, MCP Apps reuse MCP's existing transport, capability negotiation, and authorization rather than defining a parallel channel.
+The app-to-host bridge and host-to-server connection are distinct boundaries. Declaring a UI does not grant credentials or additional server permissions. See the [official MCP Apps architecture](https://modelcontextprotocol.io/extensions/apps/overview).
 
 ChatGPT has been fully MCP-Apps-compatible since 2026-02-22, and OpenAI directs new apps to the standard MCP Apps keys with a bridge over the older `window.openai` surface. One proprietary key is still in circulation: `_meta["openai/visibility"]` was deprecated on 2026-07-21 in favor of the standard `_meta.ui.visibility`. Emit the standard key; keep the OpenAI-prefixed one only as long as you need to support hosts that have not migrated.
 
@@ -58,12 +58,12 @@ ChatGPT has been fully MCP-Apps-compatible since 2026-02-22, and OpenAI directs 
 
 The lifecycle runs alongside the ordinary tool call:
 
-- **Declare** — the server advertises that a tool can return a UI resource, so a client can decide whether it supports rendering it before the call.
-- **Return** — the tool call resolves to a UI resource bound to the tool's data.
-- **Render** — the client mounts the UI in a sandbox and displays it inline in the conversation.
-- **Interact** — user actions in the UI emit structured messages back to the server.
-- **Resolve** — the server produces a final result, and the UI either updates in place or is replaced by the settled outcome.
-- **Degrade** — if the client cannot render the UI, it falls back to the text content the server included for exactly this case.
+- **Declare** — publish the tool's `_meta.ui.resourceUri` and register the HTML resource.
+- **Render** — the host fetches and mounts the resource; preloading may precede tool execution.
+- **Deliver** — the host passes tool inputs and results to the app. Keep text and structured data useful without the UI.
+- **Interact** — UI actions send messages to the host bridge, which mediates permitted server calls.
+- **Update** — render returned state; keep durable application state on the server rather than relying on the iframe's lifetime.
+- **Degrade** — a client without UI support consumes the tool's text and structured results.
 
 ## Security Model
 

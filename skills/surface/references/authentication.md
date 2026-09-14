@@ -2,43 +2,35 @@
 
 ## Summary
 
-Dimension 5 scores programmatic authentication capability for agents. Agents cannot depend on login pages, CAPTCHAs, session cookies, or generic browser redirects in the runtime request path. Baseline is OAuth 2.1 Client Credentials with scoped short-lived tokens injected via environment variables. Frontier includes token exchange (RFC 8693) for narrowly-scoped ephemeral tokens, agent identity as first-class principal, RFC 9728 protected-resource metadata, and emerging `auth.md` discovery for agentic user registration. Scores based on auth mechanism, token scope/lifetime, and agent-consumability.
+Whether clients can obtain and use credentials appropriate to the acting identity. User-delegated access uses Authorization Code with PKCE; service-owned M2M access can use Client Credentials. Interactive consent at connection time is valid. Routine protected requests need scoped tokens and structured authentication failures.
 
-- **0**: Browser-only auth or CAPTCHA (blocker)
-- **1**: API keys without M2M OAuth or overly broad scopes
-- **2**: OAuth 2.1 Client Credentials, scoped, short-lived tokens
-- **3**: Token Exchange (RFC 8693), agent identity tracking, RFC 9728 protected-resource metadata, optionally `auth.md` for user-bound agent registration
-- **Evidence**: client_credentials grants, Bearer token validation, scope definitions, env-var injection
-
----
-
-Agents cannot solve CAPTCHAs, complete generic OAuth authorization-code redirects, or interactively enter credentials during routine API calls. Machine-to-machine (M2M) authentication via OAuth 2.0 Client Credentials is the baseline; token exchange and agent-delegated identities represent the frontier. Bounded registration ceremonies, such as an `auth.md` OTP claim, are acceptable when they end by issuing a programmatic credential. Effective agent auth ensures credentials live in environment variables or a managed registration flow, tokens expire in hours, and every resource access is scoped to a minimal set of operations.
+Public read-only capabilities may require no authentication. For protected access, score the implemented identity boundary rather than requiring every service to support every grant. The [MCP authorization overview](https://modelcontextprotocol.io/extensions/auth/overview) treats user consent as the core case and Client Credentials as an optional M2M extension.
 
 ## Scoring rubric
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | Browser-only auth. OAuth authorization code flow as only option. CAPTCHAs. Session cookies required. | Auth requires redirect to browser. No client_credentials grant. CAPTCHA in auth flow. Cookie-based sessions only. |
-| 1 | API keys exist but no M2M OAuth. Keys may be long-lived or overly broad. | API key auth available. No OAuth client_credentials. Keys may be permanent. No scope limitation. |
-| 2 | OAuth 2.1 Client Credentials grant. Scoped, short-lived tokens. Env var injection. JWT validation (iss, aud, exp). | OAuth config with client_credentials grant_type. Token scopes defined. JWT validation checking signature + claims. Tokens expire in hours. |
-| 3 | Token Exchange (RFC 8693) for narrowly-scoped ephemeral tokens. Agent identity as first-class principal. Delegation patterns. MCP OAuth compliance with RFC 9728 protected-resource metadata. `auth.md` when agents need to register user-bound credentials. | Token exchange endpoint. Audience-restricted tokens. Agent identity tracking. .well-known/oauth-protected-resource present. auth.md and agent_auth metadata when applicable. |
+| Score | Criteria | Evidence |
+| --- | --- | --- |
+| 0 | No usable authorization path for the intended client and identity. | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete. |
+| 1 | Programmatic access works, but permissions, credential lifetime or validation are incomplete. | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour. |
+| 2 | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism. |
+| 3 | Level 2 plus verified discovery, isolation and credential recovery for the supported flows. | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
 
 ## Evidence to gather
 
-- Grep for `client_credentials`, `Bearer`, `JWT`, `iss`, `aud`, `exp` tokens
+- Grep for `authorization_code`, `code_challenge`, `code_verifier`, `client_credentials`, `Bearer`, `JWT`, `iss`, `aud`, `exp` tokens
 - Auth config files: Clerk, Auth0, WorkOS, Supabase Auth, NextAuth, better-auth
 - `.well-known/oauth-authorization-server` (RFC 8414) and `.well-known/oauth-protected-resource` (RFC 9728)
 - `auth.md` at the service root, plus `agent_auth` metadata in authorization server metadata
 - advertised identity and claim endpoints (the reference uses `/agent/identity`), plus OAuth token and revocation endpoints
 - API key generation endpoints and rotation mechanisms
 - Token exchange implementation and audience restrictions
-- CAPTCHAs in auth flow (anti-pattern)
+- Login HTML or CAPTCHA on protected API/token requests; distinguish these from human consent during connection setup
 - Long-lived API keys without scope (anti-pattern)
 - Env-var injection for `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `API_KEY`
 
 ## Deep dive
 
-### The M2M baseline: OAuth 2.0 Client Credentials
+### Service-owned M2M: OAuth 2.0 Client Credentials
 
 ([RFC 6749 section 4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)) defines the machine-to-machine flow. The client POSTs to the token endpoint with:
 

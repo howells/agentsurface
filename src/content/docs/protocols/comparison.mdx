@@ -113,7 +113,7 @@ Yes → MCP is the baseline. Implement MCP tools for every capability you want a
 Yes → Add A2A. The orchestrating agent uses A2A to delegate; the specialist uses MCP to do the actual work.
 
 **Does the agent need to complete a purchase?**
-Yes → Add ACP. Layer it on top of MCP using the MCP binding, or implement it directly over HTTP.
+Yes → Check the commerce platform and target host first. Use a supported hosted checkout handoff or a compatible UCP/ACP integration; MCP tool access alone does not establish payment or order support. See [Agentic Commerce](/docs/protocols/agentic-commerce).
 
 **Does the workflow have a defined multi-step sequence that agents should follow?**
 Yes → Add Arazzo. Write workflow definitions for your key user journeys.
@@ -169,7 +169,7 @@ When evaluating a protocol for production use, the spec stability matters less t
 
 1. Does the agent need tools/data/prompts? → **MCP** (always)
 2. Multi-agent delegation across teams? → **A2A** (add to MCP)
-3. Agent-initiated purchases? → **ACP** (add to MCP)
+3. Agent-initiated purchases? → **Platform/host commerce support** (hosted checkout or a compatible UCP/ACP integration)
 4. Complex multi-step API workflows? → **Arazzo** (layer on OpenAPI)
 5. Decentralized agent identity needed? → **ANP** (draft; monitor)
 6. Capability marketplaces? → **OASF** (early; monitor)
