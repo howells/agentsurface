@@ -28,10 +28,13 @@ walk(outputDir);
 if (functionConfigs.length === 0) {
   throw new Error("artifact contains no function configs");
 }
+const architectures = new Set(["x86_64", "arm64"]);
 for (const configPath of functionConfigs) {
   const functionConfig = JSON.parse(readFileSync(configPath, "utf-8"));
-  if (functionConfig.architecture !== "x86_64") {
-    throw new Error(`${configPath} is not x86_64`);
+  if (!architectures.has(functionConfig.architecture)) {
+    throw new Error(
+      `${configPath} targets ${JSON.stringify(functionConfig.architecture)}, expected x86_64 or arm64`,
+    );
   }
   const darwinTrace = Object.keys(functionConfig.filePathMap ?? {}).find((tracedPath) =>
     tracedPath.includes("darwin"),
@@ -55,5 +58,5 @@ for (const filePath of nativeBinaries) {
   }
 }
 process.stdout.write(
-  `Build Output API v3; ${functionConfigs.length} x86_64 functions; ${nativeBinaries.length} Linux ELF64 x86-64 native binaries\n`,
+  `Build Output API v3; ${functionConfigs.length} functions; ${nativeBinaries.length} Linux ELF64 x86-64 native binaries\n`,
 );

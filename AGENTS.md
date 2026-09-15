@@ -18,6 +18,7 @@ Use the `/surface` skill for all guide, audit, score, scaffold, transform and ge
 - Fast-decay docs pages carry a `lastVerified: YYYY-MM-DD` frontmatter stamp and go stale after 120 days. Bump the date only when you substantively re-verify a page, never for a string swap. `pnpm build` runs the integrity check with `--no-freshness`, so a stale page only fails standalone `pnpm docs:check`.
 - `postinstall` runs `fumadocs-mdx`, so `pnpm install` regenerates `.source/`. That's expected; don't flag it as drift, and never hand-edit generated Fumadocs output.
 - Docs integrity also checks internal link targets, `meta.json` coverage, and that template paths cited in prose actually exist.
+- Builds happen on an Apple Silicon Mac, so `next.config.mjs` drops the macOS sharp binaries from file tracing and `deploy:prod:build` parks the local `.env` under `.vercel/` first. Without both, the Vercel builder traces files it then refuses to upload. Don't ship `.env`; it holds the deploy token.
 - Never run `npm publish` here, under any circumstances.
 - Don't `git push` without an explicit instruction.
 
@@ -33,11 +34,21 @@ Use the `/surface` skill for all guide, audit, score, scaffold, transform and ge
 ## Commands
 
 - `pnpm dev` - Next/Fumadocs dev server on port 3900.
+- `pnpm check` - docs integrity, lint and typecheck in one pass.
 - `pnpm docs:check` - documentation integrity, including the freshness gate.
 - `pnpm build` - integrity check without freshness, then production build.
 - `pnpm lint` / `pnpm lint:fix` / `pnpm format` - the shared lint and format lanes.
 - `pnpm env:check` - validate local env through Envy.
 - `pnpm deploy:preview` - env check, load `.env`, then a Vercel preview deploy.
+
+## Checks and deploys run locally
+
+There are no GitHub Actions in this repo and nothing runs in CI. Every check, build and deploy happens on this machine.
+
+- Run `pnpm check` before pushing. It is the whole gate.
+- Deploy production with `pnpm deploy:prod:pull && pnpm deploy:prod:stamp && pnpm deploy:prod:build && pnpm deploy:prod:verify && pnpm deploy:prod:publish`.
+- Nothing merges or ships on its own. A push is not a deploy.
+- If `deploy:prod:publish` trips over a `<claude-code-hint>` line on stderr, deploy with `vercel deploy --prebuilt --prod --scope danielhowells` and check the routes by hand.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
