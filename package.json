@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "howells-husky",
     "dev": "next dev --port 3900",
     "check": "pnpm docs:check && pnpm lint && pnpm typecheck",
     "docs:check": "node scripts/check-docs-integrity.mjs",
@@ -49,9 +50,15 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@howells/husky": "^0.2.3",
     "@howells/lint": "catalog:",
     "@types/node": "catalog:",
+    "lint-staged": "^17.5.1",
     "oxlint-tsgolint": "7.0.2001"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx}": "howells-fix",
+    "*.{json,jsonc,css,md,mdx}": "howells-oxfmt"
   },
   "engines": {
     "node": ">=24.15.0 <25"
