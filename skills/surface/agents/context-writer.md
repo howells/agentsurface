@@ -31,25 +31,28 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 1. **Create AGENTS.md** (cross-tool Markdown context; authoring target ~150 lines ideal, <300 max — this is stricter than the <370-line audit tolerance used when scoring existing repos):
    - Location: project root
    - Structure:
-     ```markdown
+
+     ````markdown
      # [Project Name]
-     
+
      > One-line summary of what this project is.
-     
+
      ## Commands
-     
+
      Development:
+
      - `bun install` — Install dependencies
      - `bun run dev` — Start dev server on http://localhost:3000
      - `bun run build` — Build for production
      - `bun run test` — Run test suite (Vitest)
-     
+
      Operations:
-     - `bun run deploy` — Deploy to production (requires `VERCEL_TOKEN`)
+
+     - `bun run deploy` — Deploy to production (requires a Vercel token in the shell)
      - `bun run logs` — Tail live logs from staging
-     
+
      ## Stack
-     
+
      - **Runtime:** Bun (not Node.js)
      - **Framework:** Next.js 15 (App Router)
      - **Language:** TypeScript (strict mode)
@@ -57,24 +60,25 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      - **Auth:** OAuth 2.1 + PKCE
      - **API Communication:** Vercel AI SDK + @modelcontextprotocol/sdk
      - **Testing:** Vitest
-     
+
      (Omit obvious tooling: npm, git, etc.)
-     
+
      ## Conventions
-     
+
      Code style:
+
      ```typescript
      // Validation: Always use Zod, no `any`
      const userSchema = z.object({
        email: z.string().email(),
        age: z.number().int().min(18),
      });
-     
+
      // MCP tools: Include all four annotations
      server.registerTool({
-       name: 'delete_user',
+       name: "delete_user",
        annotations: {
-         type: ['DESTRUCTIVE'],
+         type: ["DESTRUCTIVE"],
          requiresConfirmation: true,
          idempotent: false,
          openWorld: false,
@@ -82,73 +86,79 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
        // ...
      });
      ```
-     
+     ````
+
      Naming:
      - Files: snake_case (e.g., `user_service.ts`)
      - Types: PascalCase (e.g., `UserSchema`)
      - Exports: Default export for page/layout, named for utilities
-     
+
      ## Testing
-     
      - Test file: `*.test.ts` in same directory
      - Runner: `bun run test`
      - Coverage: `bun run test -- --coverage`
      - Expected: >80% coverage for src/
-     
+
      Example test:
+
      ```typescript
-     import { describe, it, expect } from 'vitest';
-     import { getUserId } from './user_service';
-     
-     describe('getUserId', () => {
-       it('returns UUID for valid user', async () => {
-         const id = await getUserId('alice@example.com');
+     import { describe, it, expect } from "vitest";
+     import { getUserId } from "./user_service";
+
+     describe("getUserId", () => {
+       it("returns UUID for valid user", async () => {
+         const id = await getUserId("alice@example.com");
          expect(id).toMatch(/^[0-9a-f-]{36}$/);
        });
      });
      ```
-     
+
      ## Boundaries
-     
+
      ### Always (no approval needed)
      - Read any file (docs, src, tests)
      - List resources (e.g., list users, list builds)
      - Run tests
      - Look up API schema
-     
+
      ### Ask First
      - Create/update/delete non-prod resources
      - Run long operations (>30s)
      - Modify config files
-     
+
      ### Never
      - Access production database
      - Delete production resources
      - Modify auth configuration
      - Export or access secrets
      - Run migrations without approval
-     
+
      ## Secrets
-     
+
      `.env.local` (never commit):
+
      ```
      OPENAI_API_KEY=sk-...
      ANTHROPIC_API_KEY=sk-...
      DATABASE_URL=postgres://...
      ```
-     
+
      Load with: `import { env } from '@/lib/env'`
-     
+
      ## Troubleshooting
-     
+
      **Tests fail with "module not found":**
      - Run `bun install` again
      - Check TypeScript paths in `tsconfig.json`
-     
+
      **Dev server won't start:**
      - Kill existing process: `lsof -i :3000 | grep node | awk '{print $2}' | xargs kill`
      - Check `.env.local` is present
+
      ```
+
+     ```
+
    - Rules:
      - Exact commands FIRST (highest value)
      - Only non-obvious tooling (omit npm, git)
@@ -162,32 +172,35 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
    - Location: project root
    - Only if AGENTS.md exists
    - Content:
+
      ```markdown
      # Claude Code Notes
-     
+
      This project has been optimized for Claude Code agents.
      For universal agent info, see [AGENTS.md](AGENTS.md).
-     
+
      ## MCP Servers
-     
+
      Available in this project:
+
      - **@example/project-mcp**: Exposes user, project, and document tools
        - Endpoint: `http://localhost:3001/mcp` (Streamable HTTP)
        - Tools: list_users, create_project, search_documents
-     
+
      ## Custom Slash Commands
-     
+
      None yet. See `/docs/workflow.md` for recommended patterns.
-     
+
      ## Workflows
-     
+
      Common patterns:
+
      - **Add API endpoint**: See `/docs/create-endpoint.md`
      - **Add database migration**: Run `bun run migrate:create` + edit
      - **Deploy to staging**: `bun run deploy --env staging`
-     
+
      ## Tips
-     
+
      - Use MCP tools for domain operations (faster than file reads)
      - Run `bun run schema` to introspect API before writing code
      - Always run tests before deploying
@@ -196,31 +209,33 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 3. **Create monorepo topology** (if monorepo):
    - Location: `docs/monorepo.md` or `MONOREPO.md`
    - Content:
-     ```markdown
+
+     ````markdown
      # Monorepo Structure
-     
+
      ## Workspaces
-     
+
      - **packages/api**: Next.js API server
        - Exports: Schema types, API routes
        - Dependencies: packages/core
-     
+
      - **packages/core**: Shared utilities
        - Exports: User, Project, Document types
        - No external dependencies
-     
+
      - **packages/cli**: CLI tool
        - Depends on: packages/core, packages/api (runtime only)
-     
+
      ## Build Order
-     
+
      1. core (no deps)
      2. api, cli (both depend on core)
      3. tests (depend on all)
-     
+
      ## Cross-Package Links
-     
+
      Use workspace protocol in `package.json`:
+
      ```json
      {
        "dependencies": {
@@ -228,32 +243,39 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
        }
      }
      ```
+     ````
+
+     ```
+
      ```
 
 4. **Create .cursor/rules/** (if using Cursor):
    - Location: `.cursor/rules/`
    - `base.mdc`:
+
      ```markdown
      ---
      alwaysApply: true
      ---
-     
+
      # Base Rules
-     
+
      - Use TypeScript strict mode; no `any`
      - Use Zod for all validation
      - Add .describe() to every Zod field
      - Write tests for every new function
      - Commit messages: "verb: description" (e.g., "feat: add user deletion")
      ```
+
    - `nextjs.mdc`:
+
      ```markdown
      ---
      globs: ["app/**/*.ts", "app/**/*.tsx"]
      ---
-     
+
      # Next.js Rules
-     
+
      - Use App Router (not Pages Router)
      - Server components by default; `use client` only when needed
      - Use route handlers for API routes, not Next.js API routes
@@ -263,25 +285,26 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 5. **Create Copilot instructions** (VS Code):
    - Location: `.vscode/copilot-instructions.md`
    - Content:
+
      ```markdown
      # Copilot Instructions
-     
+
      ## Constraints
-     
+
      - Never suggest `any` type; always use strict types
      - Never suggest deleting files without explicit approval
      - Always suggest tests alongside new code
      - Always validate user input with Zod
-     
+
      ## Preferences
-     
+
      - Prefer functional components with hooks
      - Prefer Zod schemas over TypeScript interfaces for runtime validation
      - Prefer MCP tools over direct API calls where available
      - Prefer async/await over Promises
-     
+
      ## Project Context
-     
+
      This is a production Next.js app running on Bun. See AGENTS.md for full context.
      ```
 
