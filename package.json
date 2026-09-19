@@ -8,7 +8,7 @@
     "dev": "next dev --port 3900",
     "check": "pnpm docs:check && pnpm lint && pnpm typecheck",
     "docs:check": "node scripts/check-docs-integrity.mjs",
-    "deploy:preview": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel deploy . -y",
+    "deploy:preview": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel --scope danielhowells deploy . -y",
     "deploy:prod:pull": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel pull --yes --environment=production --scope danielhowells",
     "deploy:prod:stamp": "node scripts/stamp-build.mjs",
     "deploy:prod:build": "node scripts/build-vercel-prod.mjs",
