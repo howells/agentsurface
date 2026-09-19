@@ -1,54 +1,26 @@
 # Agent Surface
 
-A guide and implementation kit for making software legible to agents. It's a Fumadocs site plus a distributable skill, templates, and specialist agent prompts. Don't narrow it to one framework: Mastra is one supported orchestration option, not the default answer for every agent system.
+A guide and implementation kit for making software legible to agents: a Fumadocs site plus a distributable skill, templates and specialist agent prompts. Don't narrow it to one framework - Mastra is one supported orchestration option, not the default answer.
 
-Use the `/surface` skill for all guide, audit, score, scaffold, transform and generate work here rather than inventing parallel instructions. It installs with `npx skills add https://github.com/howells/agentsurface`.
+Use the `/surface` skill for all guide, audit, score, scaffold, transform and generate work here rather than inventing parallel instructions.
 
 ## Layout
 
-- `src/content/docs/` - the published docs, the canonical place for explanations.
-- `skills/surface/SKILL.md` - operative workflow. `skills/surface/references/` - skill reference pages. `skills/surface/agents/` - specialist agent prompts.
-- `templates/` - reusable templates cited by the docs.
-- `disciplines/` - cross-cutting discipline notes (agentic patterns, tool design, evaluation, orchestration, retrievability, readiness auditing, proactive agents).
-- `docs/surface/README.md` - the index of prior audits and active transformation plans. Read it before starting audit or remediation work so you don't repeat findings. Source documents live in `docs/` and `docs/arc/`.
+- `src/content/docs/` is the published docs and the canonical place for explanations. Keep this file operational; positioning lives in `README.md`.
+- `skills/surface/SKILL.md` is the operative workflow, with `references/` and `agents/` beside it. `templates/` holds the starter files a consumer repo copies, `disciplines/` the cross-cutting notes.
+- `docs/surface/README.md` indexes prior audits and transformation plans. Read it before audit work so you don't repeat findings.
 
-## Traps and gates
+## Gates and constraints
 
-- `src/content/docs/reference-links/models.mdx` is the single allowlist for model IDs used anywhere in docs, templates or skill references. `pnpm docs:check` enforces it. Update that page first, then sweep the examples.
-- Fast-decay docs pages carry a `lastVerified: YYYY-MM-DD` frontmatter stamp and go stale after 120 days. Bump the date only when you substantively re-verify a page, never for a string swap. `pnpm build` runs the integrity check with `--no-freshness`, so a stale page only fails standalone `pnpm docs:check`.
-- `postinstall` runs `fumadocs-mdx`, so `pnpm install` regenerates `.source/`. That's expected; don't flag it as drift, and never hand-edit generated Fumadocs output.
-- Docs integrity also checks internal link targets, `meta.json` coverage, and that template paths cited in prose actually exist.
-- Builds happen on an Apple Silicon Mac, so `next.config.mjs` drops the macOS sharp binaries from file tracing and `deploy:prod:build` parks the local `.env` under `.vercel/` first. Without both, the Vercel builder traces files it then refuses to upload. Don't ship `.env`; it holds the deploy token.
-- Never run `npm publish` here, under any circumstances.
-- Don't `git push` without an explicit instruction.
-
-## Conventions
-
-- Don't duplicate long explanations between this file and the docs. Update the canonical doc page instead, and keep `AGENTS.md` operational while product positioning lives in `README.md`, `INSTALL.md` and the docs content.
-- Don't claim framework, auth, CLI, MCP or eval support exists unless code or templates provide it. Keep every example aligned with files that actually exist in this repo.
-- Keep the scoring model, template names and specialist-agent names synchronised across docs and skill files.
-- Route lint and format through the existing `@howells/lint` scripts; don't add direct lint tool dependencies.
-- `rg` over `src/content/docs`, `skills/surface` and `templates` before creating new guidance, and search existing templates before adding a variant. For ambiguous agent terms, prefer this repo's docs and `skills/surface/references/` over general memory.
-- Say which surface a change improves: docs, skill, template, API, CLI, MCP, auth, evals or retrievability.
+- `src/content/docs/reference-links/models.mdx` is the single allowlist for model ids used anywhere in docs, templates or skill references, enforced by `pnpm docs:check`. Update that page first, then sweep the examples.
+- Fast-decay pages carry a `lastVerified: YYYY-MM-DD` stamp and go stale after 120 days. Bump it only on a real re-verification. `pnpm build` runs integrity with `--no-freshness`, so a stale page fails only standalone `pnpm docs:check`.
+- `postinstall` runs `fumadocs-mdx`, so `pnpm install` regenerates `.source/`. Generated Fumadocs output is never hand-edited.
+- Builds run on Apple Silicon, so `next.config.mjs` drops the macOS sharp binaries from file tracing and `deploy:prod:build` parks the local `.env` under `.vercel/` first. Without both, the Vercel builder traces files it then refuses to upload.
+- Never `npm publish` here.
 
 ## Commands
 
-- `pnpm dev` - Next/Fumadocs dev server on port 3900.
-- `pnpm check` - docs integrity, lint and typecheck in one pass.
-- `pnpm docs:check` - documentation integrity, including the freshness gate.
-- `pnpm build` - integrity check without freshness, then production build.
-- `pnpm lint` / `pnpm lint:fix` / `pnpm format` - the shared lint and format lanes.
-- `pnpm env:check` - validate local env through Envy.
-- `pnpm deploy:preview` - env check, load `.env`, then a Vercel preview deploy.
-
-## Checks and deploys run locally
-
-There are no GitHub Actions in this repo and nothing runs in CI. Every check, build and deploy happens on this machine.
-
-- Run `pnpm check` before pushing. It is the whole gate.
-- Deploy production with `pnpm deploy:prod:pull && pnpm deploy:prod:stamp && pnpm deploy:prod:build && pnpm deploy:prod:verify && pnpm deploy:prod:publish`.
-- Nothing merges or ships on its own. A push is not a deploy.
-- If `deploy:prod:publish` trips over a `<claude-code-hint>` line on stderr, deploy with `vercel deploy --prebuilt --prod --scope danielhowells` and check the routes by hand.
+`pnpm dev` serves Fumadocs on port 3900. `pnpm check` is the whole gate: docs integrity, lint, typecheck. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order. If `deploy:prod:publish` trips over a `<claude-code-hint>` line on stderr, deploy with `vercel deploy --prebuilt --prod --scope danielhowells` and check the routes by hand.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
