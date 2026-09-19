@@ -17,7 +17,7 @@ catalog:
   "@types/react": "^19.2.18"
   "@types/react-dom": "^19.2.5"
   "babel-plugin-react-compiler": "^1.0.0"
-  "cn": "^0.2.5"
+  "cn": "^0.3.0"
   "fumadocs-core": "^16.15.2"
   "fumadocs-mdx": "^14.3.2"
   "fumadocs-ui": "^16.15.2"
