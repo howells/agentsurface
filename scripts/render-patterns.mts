@@ -1,5 +1,5 @@
 // Render the glossary line fields from src/data/glossary-patterns.ts into src/assets/glossary/*.svg.
-// Run with `pnpm patterns:render` after changing a preset in the studio at /patterns.
+// Run with `pnpm generate:patterns` after changing a preset in the studio at /patterns.
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { GLOSSARY_PATTERNS } from "../src/data/glossary-patterns.ts";

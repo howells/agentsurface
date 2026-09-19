@@ -1,6 +1,8 @@
 // Typography gate: text shape comes from one `type-*` role defined in src/app/global.css.
 // Inline sizes, weights, families, tracking, leading and casing are violations on the
-// marketing pages and shared components. Run with `pnpm typography:check`.
+// marketing pages and shared components. Run with `pnpm typography:check`. This is `howells/no-raw-type-utilities` in
+// @howells/lint's policy plugin; it becomes an oxlint config entry once this repo
+// is off @howells/lint 0.5.0, whose plugin predates that rule.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 

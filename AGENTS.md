@@ -11,15 +11,15 @@ Use the `/surface` skill for all guide, audit, score, scaffold, transform and ge
 
 ## Gates and constraints
 
-- `src/content/docs/reference-links/models.mdx` is the single allowlist for model ids used anywhere in docs, templates or skill references, enforced by `pnpm docs:check`. Update that page first, then sweep the examples.
-- Fast-decay pages carry a `lastVerified: YYYY-MM-DD` stamp and go stale after 120 days. Bump it only on a real re-verification. `pnpm build` runs integrity with `--no-freshness`, so a stale page fails only standalone `pnpm docs:check`.
+- `src/content/docs/reference-links/models.mdx` is the single allowlist for model ids used anywhere in docs, templates or skill references, enforced by `pnpm test`. Update that page first, then sweep the examples.
+- Fast-decay pages carry a `lastVerified: YYYY-MM-DD` stamp and go stale after 120 days. Bump it only on a real re-verification. `pnpm build` and `pnpm test` run integrity with `--no-freshness`, so a stale page shows up only in `pnpm audit:docs-freshness`, which is a report rather than a gate.
 - `postinstall` runs `fumadocs-mdx`, so `pnpm install` regenerates `.source/`. Generated Fumadocs output is never hand-edited.
 - Builds run on Apple Silicon, so `next.config.mjs` drops the macOS sharp binaries from file tracing and `deploy:prod:build` parks the local `.env` under `.vercel/` first. Without both, the Vercel builder traces files it then refuses to upload.
 - Never `npm publish` here.
 
 ## Commands
 
-`pnpm dev` serves Fumadocs on port 3900. `pnpm check` is the whole gate: docs integrity, lint, typecheck. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order.
+`pnpm dev` serves Fumadocs on port 3900. `pnpm prepush` is the whole gate: typecheck, lint, then `test` for docs integrity. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

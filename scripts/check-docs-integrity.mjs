@@ -244,7 +244,7 @@ const STALE_AFTER_DAYS = 120;
 
 // --no-freshness demotes freshness findings to warnings instead of failures.
 // The build gate uses it so a page aging past the staleness window can never
-// fail an unrelated deploy; the standalone `pnpm docs:check` keeps freshness
+// fail an unrelated deploy; the standalone `pnpm audit:docs-freshness` keeps freshness
 // fatal as the re-verification cadence signal.
 const freshnessFatal = !process.argv.includes("--no-freshness");
 
