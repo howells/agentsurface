@@ -17,15 +17,15 @@ Use the existing project shape first. Read files before making claims or generat
 
 ## Quick Routing
 
-| User asks for | Route |
-| --- | --- |
-| explain, compare, choose, best practice, reference, guide, standards, tooling | Guide |
-| audit, score, assess, agent-ready, agent-readiness | Audit |
-| plan, transform, improve, fix agent DX | Audit, then optionally execute |
-| add MCP, create llms.txt, write AGENTS.md, improve discovery | Audit single-area transform unless they ask for direct generation |
-| create agent, add tool, build workflow, scaffold, init | Scaffold |
-| add retrieval, RAG, semantic search, memory, model routing, browser tool, sandbox tool | Scaffold |
-| ambiguous "make this agentic" | Start with Audit unless they clearly want new agent runtime code |
+| User asks for                                                                          | Route                                                             |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| explain, compare, choose, best practice, reference, guide, standards, tooling          | Guide                                                             |
+| audit, score, assess, agent-ready, agent-readiness                                     | Audit                                                             |
+| plan, transform, improve, fix agent DX                                                 | Audit, then optionally execute                                    |
+| add MCP, create llms.txt, write AGENTS.md, improve discovery                           | Audit single-area transform unless they ask for direct generation |
+| create agent, add tool, build workflow, scaffold, init                                 | Scaffold                                                          |
+| add retrieval, RAG, semantic search, memory, model routing, browser tool, sandbox tool | Scaffold                                                          |
+| ambiguous "make this agentic"                                                          | Start with Audit unless they clearly want new agent runtime code  |
 
 If the user explicitly wants a direct artifact, do not force a full audit. Do a narrow detection pass, create the artifact, and explain the skipped audit scope.
 
@@ -78,16 +78,16 @@ Use guide mode when the user wants agent information, architecture guidance, sta
 
 High-signal guide entry points:
 
-| Need | Docs path |
-| --- | --- |
-| Start or route through the guide | `src/content/docs/getting-started.mdx` |
-| Build agents | `src/content/docs/agents/`, `runtime-boundaries/`, `multi-agent/` |
-| Expose capabilities to agents | `api-surface/`, `tool-design/`, `cli-design/`, `mcp-servers/` |
-| Make software discoverable | `discovery/`, `context-files/` |
-| Secure and recover | `authentication/`, `error-handling/` |
-| Retrieval and memory | `data-retrievability/` |
-| Verify behavior | `testing/`, `scoring/` |
-| Standards and tools | `protocols/`, `reference-links/`, `tooling-catalog/` |
+| Need                             | Docs path                                                         |
+| -------------------------------- | ----------------------------------------------------------------- |
+| Start or route through the guide | `src/content/docs/getting-started.mdx`                            |
+| Build agents                     | `src/content/docs/agents/`, `runtime-boundaries/`, `multi-agent/` |
+| Expose capabilities to agents    | `api-surface/`, `tool-design/`, `cli-design/`, `mcp-servers/`     |
+| Make software discoverable       | `discovery/`, `context-files/`                                    |
+| Secure and recover               | `authentication/`, `error-handling/`                              |
+| Retrieval and memory             | `data-retrievability/`                                            |
+| Verify behavior                  | `testing/`, `scoring/`                                            |
+| Standards and tools              | `protocols/`, `reference-links/`, `tooling-catalog/`              |
 
 ## Audit Workflow
 
@@ -95,18 +95,18 @@ Read `references/audit-workflow.md` before running a full audit, scorecard, plan
 
 Also load dimension references only when needed:
 
-| Dimension | Reference |
-| --- | --- |
-| API Surface | `references/api-surface.md` |
-| CLI Design | `references/cli-design.md` |
-| MCP Server | `references/mcp-servers.md` |
-| Discovery & AEO | `references/discovery-aeo.md` |
-| Authentication | `references/authentication.md` |
-| Error Handling | `references/error-handling.md` |
-| Tool Design | `references/tool-design.md` |
-| Context Files | `references/context-files.md` |
-| Multi-Agent | `references/multi-agent.md` |
-| Testing | `references/testing.md` |
+| Dimension           | Reference                           |
+| ------------------- | ----------------------------------- |
+| API Surface         | `references/api-surface.md`         |
+| CLI Design          | `references/cli-design.md`          |
+| MCP Server          | `references/mcp-servers.md`         |
+| Discovery & AEO     | `references/discovery-aeo.md`       |
+| Authentication      | `references/authentication.md`      |
+| Error Handling      | `references/error-handling.md`      |
+| Tool Design         | `references/tool-design.md`         |
+| Context Files       | `references/context-files.md`       |
+| Multi-Agent         | `references/multi-agent.md`         |
+| Testing             | `references/testing.md`             |
 | Data Retrievability | `references/data-retrievability.md` |
 
 Do not load every reference at once. Load the workflow reference first, then only the relevant dimension files.
@@ -146,14 +146,14 @@ Read `references/scaffold-workflow.md` before generating or modifying agent infr
 
 Load additional scaffold references only as needed:
 
-| Need | Reference |
-| --- | --- |
-| Project layout and naming | `references/conventions.md` |
-| Agents, tools, security, workflow basics | `references/patterns.md` |
-| Multi-provider model routing | `references/model-routing.md` |
+| Need                                         | Reference                            |
+| -------------------------------------------- | ------------------------------------ |
+| Project layout and naming                    | `references/conventions.md`          |
+| Agents, tools, security, workflow basics     | `references/patterns.md`             |
+| Multi-provider model routing                 | `references/model-routing.md`        |
 | Branches, loops, parallelism, suspend/resume | `references/workflow-composition.md` |
-| Wiring and framework pitfalls | `references/gotchas.md` |
-| House style for generated docs/code | `references/house-style.md` |
+| Wiring and framework pitfalls                | `references/gotchas.md`              |
+| House style for generated docs/code          | `references/house-style.md`          |
 
 ### Scaffold Principles
 
@@ -192,8 +192,8 @@ For audits:
 
 1. Present detected stack and surfaces.
 2. Score the applicable dimensions.
-3. Write `docs/surface/audit-YYYY-MM-DD.md` for full audits.
-4. Write `docs/surface/plan.md` for plan mode.
+3. For a full audit, file the findings as a Linear issue on the repo's team, titled `Surface audit: <repo> <YYYY-MM-DD>`, with the scorecard as its first comment. Never write audit files into the repo.
+4. For plan mode, file the plan as a Linear issue with one sub-issue per task.
 5. Ask before executing transform work.
 
 For scaffolds:
@@ -209,9 +209,7 @@ For scaffolds:
 
 Use these defaults unless the project already has a better convention:
 
-- Audit report: `docs/surface/audit-YYYY-MM-DD.md`
-- Current scorecard/history: `docs/surface/scorecard.md`
-- Transformation plan: `docs/surface/plan.md`
+- Audit report, scorecard history and transformation plan: Linear issues on the repo's team, never markdown in the repo. The scorecard lives as comments on the audit issue so re-audits can diff it.
 - Agent context: `AGENTS.md` at repo root
 - Web discovery: `public/llms.txt`, `public/llms-full.txt`, or framework-equivalent routes
 - MCP discovery/auth: `.mcp.json`, `.mcp/mcp.json`, and `.well-known/*` where applicable
@@ -223,7 +221,7 @@ Use these defaults unless the project already has a better convention:
 - **Pure CLI**: Discovery & AEO may be N/A, but Context Files, CLI Design, Error Handling, Testing, and MCP still matter.
 - **No web presence**: do not penalize for missing public `llms.txt`; consider repo-local context files and package metadata instead.
 - **Existing generated context**: improve it surgically; avoid replacing hard-won local notes.
-- **Re-audit**: read previous `docs/surface/scorecard.md` and show deltas.
+- **Re-audit**: read the previous `Surface audit` issue's scorecard comment and show deltas.
 - **Transform mode**: execution requires explicit user confirmation after the plan.
 
 ## Current Standards Notes

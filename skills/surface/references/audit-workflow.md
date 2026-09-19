@@ -11,7 +11,7 @@ Detect:
 1. Stack, package manager, framework, runtime, deployment target.
 2. Surfaces: API, CLI, MCP, discovery, auth, errors, tools, context files, agents/workflows, tests, retrieval.
 3. Applicable dimensions.
-4. Previous reports in `docs/surface/`.
+4. Previous `Surface audit` issues on the repo's Linear team.
 
 Applicability has two levels:
 
@@ -22,19 +22,19 @@ Do not penalize an applicable dimension for an unrelated optional capability. A 
 
 Applicability:
 
-| Dimension | Applies when |
-| --- | --- |
-| API Surface | Project exposes HTTP endpoints or API specs |
-| CLI Design | Project is or ships a CLI |
-| MCP Server | Usually applicable; any useful project can expose one, but do not penalize tiny/internal scripts harshly |
-| Discovery & AEO | Project has public docs, website, package docs, or a web API |
-| Authentication | Project has protected APIs, hosted services, or secrets |
-| Error Handling | Always |
-| Tool Design | Project defines agent tools/functions or can expose operations as tools |
-| Context Files | Always |
-| Multi-Agent | Project orchestrates or contains agents |
-| Testing | Always |
-| Data Retrievability | Project exposes documents, knowledge, search, datasets, or RAG |
+| Dimension           | Applies when                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| API Surface         | Project exposes HTTP endpoints or API specs                                                              |
+| CLI Design          | Project is or ships a CLI                                                                                |
+| MCP Server          | Usually applicable; any useful project can expose one, but do not penalize tiny/internal scripts harshly |
+| Discovery & AEO     | Project has public docs, website, package docs, or a web API                                             |
+| Authentication      | Project has protected APIs, hosted services, or secrets                                                  |
+| Error Handling      | Always                                                                                                   |
+| Tool Design         | Project defines agent tools/functions or can expose operations as tools                                  |
+| Context Files       | Always                                                                                                   |
+| Multi-Agent         | Project orchestrates or contains agents                                                                  |
+| Testing             | Always                                                                                                   |
+| Data Retrievability | Project exposes documents, knowledge, search, datasets, or RAG                                           |
 
 Present detected surfaces before scoring.
 
@@ -101,12 +101,12 @@ Bars:
 
 Rating bands, based on scaled score:
 
-| Range | Rating |
-| --- | --- |
-| 0-7 | Human-only |
-| 8-14 | Agent-tolerant |
-| 15-22 | Agent-ready |
-| 23-30 | Agent-first |
+| Range | Rating         |
+| ----- | -------------- |
+| 0-7   | Human-only     |
+| 8-14  | Agent-tolerant |
+| 15-22 | Agent-ready    |
+| 23-30 | Agent-first    |
 
 Scaled score:
 
@@ -135,17 +135,17 @@ round((raw_score / max_applicable) * 30)
 
 ## Phase 2: Findings Report
 
-Write full findings to `docs/surface/audit-YYYY-MM-DD.md`.
+File the full findings as a Linear issue titled `Surface audit: <repo> <YYYY-MM-DD>` on the repo's team. Nothing is written into the repo.
 
 Every finding must include:
 
-| Field | Content |
-| --- | --- |
-| What | Specific issue with path/line when possible |
-| Why | Why this matters for agent consumption |
-| Fix | Concrete steps |
-| Impact | Dimension and current-to-target score |
-| Severity | Critical, High, Medium, Low |
+| Field    | Content                                     |
+| -------- | ------------------------------------------- |
+| What     | Specific issue with path/line when possible |
+| Why      | Why this matters for agent consumption      |
+| Fix      | Concrete steps                              |
+| Impact   | Dimension and current-to-target score       |
+| Severity | Critical, High, Medium, Low                 |
 
 Cluster findings by what should be fixed together, not by scoring dimension.
 
@@ -166,7 +166,7 @@ Severity:
 
 ## Phase 3: Transformation Plan
 
-Write `docs/surface/plan.md`.
+File the plan as a Linear issue with one sub-issue per task.
 
 Each task includes:
 
@@ -204,7 +204,7 @@ Execution steps:
 3. Apply changes with narrow diffs.
 4. Run targeted verification.
 5. Re-score affected dimensions.
-6. Update `docs/surface/scorecard.md`.
+6. Post the new scorecard as a comment on the audit issue.
 7. Present a delta scorecard.
 
 Delta format:
