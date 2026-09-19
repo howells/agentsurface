@@ -8,7 +8,6 @@ Use the `/surface` skill for all guide, audit, score, scaffold, transform and ge
 
 - `src/content/docs/` is the published docs and the canonical place for explanations. Keep this file operational; positioning lives in `README.md`.
 - `skills/surface/SKILL.md` is the operative workflow, with `references/` and `agents/` beside it. `templates/` holds the starter files a consumer repo copies, `disciplines/` the cross-cutting notes.
-- `docs/surface/README.md` indexes prior audits and transformation plans. Read it before audit work so you don't repeat findings.
 
 ## Gates and constraints
 
