@@ -19,7 +19,7 @@ Use the `/surface` skill for all guide, audit, score, scaffold, transform and ge
 
 ## Commands
 
-`pnpm dev` serves Fumadocs on port 3900. `pnpm check` is the whole gate: docs integrity, lint, typecheck. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order. If `deploy:prod:publish` trips over a `<claude-code-hint>` line on stderr, deploy with `vercel deploy --prebuilt --prod --scope danielhowells` and check the routes by hand.
+`pnpm dev` serves Fumadocs on port 3900. `pnpm check` is the whole gate: docs integrity, lint, typecheck. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

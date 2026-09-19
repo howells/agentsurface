@@ -9,6 +9,11 @@ let deploymentUrl;
 let child;
 let terminating = false;
 class TimeoutError extends Error {}
+// The `vercel` on PATH is a Claude Code plugin shim that writes a
+// `<claude-code-hint …/>` element to stderr on every invocation. It is not
+// output of the command, so strip it before anything parses these streams.
+const HINT_LINE = /^<claude-code-hint\b[^>]*\/>[ \t]*\r?\n?/gmu;
+const strip = (text) => text.replace(HINT_LINE, "");
 const remaining = () => Math.max(0, DEADLINE_MS - (Date.now() - startedAt));
 const run = async (args, timeoutMs, relay = false) =>
   new Promise((resolve, reject) => {
@@ -48,10 +53,10 @@ const run = async (args, timeoutMs, relay = false) =>
         return;
       }
       if (code !== 0) {
-        reject(new Error(`vercel ${args[0]} failed: ${stderr.trim()}`));
+        reject(new Error(`vercel ${args[0]} failed: ${strip(stderr).trim()}`));
         return;
       }
-      resolve({ stdout, stderr });
+      resolve({ stdout: strip(stdout), stderr: strip(stderr) });
     });
   });
 const json = (source, label) => {
