@@ -321,6 +321,16 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 - [ ] Universal Commerce Protocol or Agentic Commerce Protocol manifests exist only if agent-mediated commerce is a real product surface
 - [ ] Commerce manifests link to canonical product, price, refund, and support policies
 
+### Agentic Search Measurement
+
+- [ ] A fixed set of brand-name queries is run across assistants (ChatGPT, Claude, Gemini, Perplexity) on a regular cadence, and your domain appears in the top results
+- [ ] A fixed set of category or use-case queries ("a tool that does X") is run across the same assistants, tracking whether you are mentioned at all, not only your rank when named directly
+- [ ] An assistant that already surfaces your brand can locate your developer resources (API docs, OpenAPI spec, MCP server, auth docs, SDK docs) through a follow-up search
+- [ ] Exact queries, assistant, date, region, and returned URLs are recorded so a later run can be compared against this one
+- [ ] Wrong facts are fixed at the source - structured data and entity pages - not by trying to prompt the assistant into a different answer
+
+Ora's catalog names these checks `brand-search-accuracy`, `agentic-search-usecase`, and `agentic-search-specific`; see [Ora's checks catalog](https://ora.ai/api/checks). See [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery) for the underlying measurement method.
+
 ---
 
 ## Scoring Your Implementation

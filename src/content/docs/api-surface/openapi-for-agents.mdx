@@ -504,6 +504,17 @@ Before treating a spec as agent-ready:
 - [ ] Response schemas include a concrete `example`
 - [ ] `format` keywords are used on string fields wherever applicable
 
+## Publishing SDKs and Removing Onboarding Friction
+
+A well-formed spec still leaves an agent stuck if reaching a working call requires a human.
+
+- Publish an official JavaScript/TypeScript SDK to npm, generated from the OpenAPI spec. Set `repository` and `homepage` in `package.json` so an agent verifying the package can trace it back to your API.
+- For broader coverage, generate and publish SDKs for the other language ecosystems your users work in (Python/PyPI, Go modules, Ruby/RubyGems) from the same spec rather than maintaining them by hand.
+- Link every published SDK from your API documentation and from `llms.txt`, so an agent that finds the docs finds the install command in the same pass. See [llms.txt](/docs/discovery/llms-txt).
+- Minimize the steps that need a person: self-serve API keys, a sandbox or test-mode key that works without a sales call, and no mandatory approval gate before a first successful call.
+
+Ora's catalog names these checks `npm-sdk-package` (an npm-published JS/TS SDK with `repository` and `homepage` set), `rest-sdk-packages` (SDKs across npm, PyPI, Go modules, and RubyGems, generated from the OpenAPI spec), and `onboarding-friction` (whether an agent can go from discovery to a first successful API call with no human in the loop - free tier or trial, self-serve keys, sandbox environment). See [Ora's checks catalog](https://ora.ai/api/checks).
+
 ## Related Pages
 
 - [Tool Definitions](./tool-definitions) — how these OpenAPI operations become agent tool definitions

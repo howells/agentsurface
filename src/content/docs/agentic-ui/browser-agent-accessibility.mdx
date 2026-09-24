@@ -20,6 +20,30 @@ Use meaningful landmarks and heading hierarchy. Prefer native links, buttons, an
 
 Verify keyboard focus, submission, empty results, and errors in the actual page. Include dialogs, collapsed regions, and mobile layouts in the task when users encounter them. Avoid adding redundant hidden controls just to influence a scanner.
 
+Give every informative image an accurate `alt` description of its content or purpose, and mark purely decorative images with `alt=""` so assistive technology and browser agents skip them instead of reading a filename or a redundant caption.
+
+## Lighthouse's Agent Accessibility Audit
+
+Chrome Lighthouse's Agentic Browsing category runs an `agent-accessibility-tree` audit that checks a fixed subset of axe-core rules against the page's accessibility tree, not the full axe rule set. The targeted rules, from [`TARGET_RULES` in `core/audits/agentic/agent-accessibility-tree.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/audits/agentic/agent-accessibility-tree.js):
+
+`button-name`, `input-button-name`, `input-image-alt`, `label`, `link-name`, `select-name`, `document-title`, `aria-allowed-attr`, `aria-allowed-role`, `aria-command-name`, `aria-conditional-attr`, `aria-dialog-name`, `aria-hidden-body`, `aria-hidden-focus`, `aria-input-field-name`, `aria-prohibited-attr`, `aria-required-attr`, `aria-required-children`, `aria-required-parent`, `aria-roles`, `aria-text`, `aria-toggle-field-name`, `aria-tooltip-name`, `aria-treeitem-name`, `aria-valid-attr`, `aria-valid-attr-value`, `duplicate-id-aria`, `definition-list`, `table-duplicate-name`, `tabindex`, `autocomplete-valid`, `presentation-role-conflict`, `svg-img-alt`.
+
+These are mostly naming and ARIA-validity rules: every control needs a computed accessible name, every ARIA attribute needs to be allowed on its role and valid in value, and structural roles need their required parents and children. Run Lighthouse's Agentic Browsing category and treat a failure here as a defect in the accessibility tree an agent reads, not only in the visual page.
+
+## Layout Stability
+
+Lighthouse includes Cumulative Layout Shift (CLS) in its agentic scoring because a shifting layout moves the target out from under a click between the moment an agent decides where to click and the moment it clicks. [web.dev's CLS guidance](https://web.dev/articles/cls) applies directly to agent-driven interaction:
+
+- Reserve space for images, embeds, ads, and any content that loads after the initial render, so it does not push existing controls when it arrives.
+- Avoid inserting new content, banners, or promotions above content that is already on screen; append below instead.
+- Animate with `transform` (`scale`, `translate`) rather than properties that change layout, such as `width`, `height`, or `top`.
+
+A page that scores well on CLS for human visitors is also the page where an agent's click lands on the control it read, not on whatever moved into that spot.
+
+## Content Without Client-Side JavaScript
+
+Many browser agents and AI crawlers fetch a page's raw HTML and do not execute JavaScript. Vercel's analysis of crawler traffic with MERJ found that OpenAI's crawlers (GPTBot, ChatGPT-User, OAI-SearchBot) and Anthropic's ClaudeBot fetch pages but do not render JavaScript, even when they download the JavaScript files a page links: [The rise of the AI crawler](https://vercel.com/blog/the-rise-of-the-ai-crawler). Key content, primary navigation links, and forms a task depends on should exist in the server-rendered HTML response, not only after client-side hydration. Treat this the same way you would treat search-engine crawlability: what the initial HTML response contains is what a non-rendering agent or crawler can act on.
+
 ## Accessibility-tree injection
 
 Treat text from reviews, product descriptions, remote widgets, tool results, alt text, and accessible descriptions as untrusted data. Do not interpolate third-party instructions into first-party control labels or system-level agent guidance. Escape markup, constrain allowed attributes, and retain source boundaries.

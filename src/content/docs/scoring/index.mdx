@@ -21,7 +21,7 @@ Ambiguity that humans resolve through intuition becomes failure modes at scale w
 
 ## Repository Audit vs Public-Site Scan
 
-The Surface score is a source-backed review across code, documentation, runtime contracts, and tests. Public scanners such as [Is Agentic](https://is-agentic.com/) and [Agent Readiness](https://isitagentready.com/) observe the deployed website from the outside. They are complementary, but their scores are not interchangeable.
+The Surface score is a source-backed review across code, documentation, runtime contracts, and tests. Public scanners such as [Is Agentic](https://is-agentic.com/), [Agent Readiness](https://isitagentready.com/), and [Google Lighthouse's Agentic Browsing category](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) observe the deployed website from the outside. They are complementary, but their scores are not interchangeable.
 
 Use a public scan to catch deployment reality: blocked crawlers, missing discovery files, unreadable HTML, or a capability that is not actually reachable. Use the Surface audit to find the source-level cause, assess private and authenticated surfaces, and decide whether a recommendation fits the product. Record the scanner, report URL, and scan timestamp as evidence; do not copy its headline number into the 0–30 Surface score.
 

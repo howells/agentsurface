@@ -14,6 +14,27 @@ Maintain the Markdown representation from the same source as the visible price. 
 
 For `llms.txt`, split large product families into section-level indexes only when that improves retrieval. Link those indexes from the root; use descriptive Markdown links, stable URLs, and a concise “when to use” summary with limitations. Verify every link, media type, canonical redirect, and relevant regional variant. See [llms.txt](/docs/discovery/llms-txt) and [content negotiation](/docs/discovery/content-negotiation).
 
+## Product-page structured data for shopping agents
+
+A shopping agent reads a product page the same way a search crawler does: only the parts that are machine-parsable. Mark up every purchasable product with `schema.org/Product` and a nested `Offer` (not `AggregateOffer` - merchant listing eligibility requires a single `Offer` per purchasable URL).
+
+Required on the `Offer`:
+
+- `price` (a number greater than zero) and `priceCurrency` (ISO 4217), or `priceSpecification` in place of both
+- `availability` (`InStock`, `OutOfStock`, `PreOrder`, and so on)
+
+Strongly recommended:
+
+- Identifiers: `sku`, one of `gtin`/`gtin8`/`gtin12`/`gtin13`/`gtin14`, `mpn`, and `brand`
+- `shippingDetails` (`OfferShippingDetails`) for shipping cost and delivery estimate
+- `hasMerchantReturnPolicy` (`MerchantReturnPolicy`) for the return window and terms
+- `aggregateRating` and `review` where real reviews exist
+- For variants (size, color, and so on), `ProductGroup` with `hasVariant` linking the individual `Product` entries, or `isVariantOf` / `inProductGroupWithID` on each variant
+
+This is Google's merchant-listing structured data requirement set; see [Merchant listing structured data](https://developers.google.com/search/docs/appearance/structured-data/merchant-listing) for the full property list and validation rules. Shopify's [agentic readiness product-page audit](https://www.shopify.com/agentic-readiness) checks a live product page against comparable structured-data, real-time pricing accuracy, and trust-signal criteria and is a useful second check specifically for a commerce storefront.
+
+Keep the purchase surface itself discoverable: a stable `/pricing` page (see above) and `Offer` data that points at the actual buy page, not a marketing page. The `payment` link relation (`rel="payment"`) is registered in the [IANA link relations registry](https://www.iana.org/assignments/link-relations/link-relations.xhtml) under RFC 8288 as "a resource where payment is accepted." It predates agentic commerce, is not required by UCP, AP2, ACP, or x402 (see [Agentic Commerce Protocols](/docs/protocols/agentic-commerce)), and sees little real-world use - treat it as an optional, documented signal rather than something to implement for agent readiness.
+
 ## Entity identity and independent coverage
 
 Use stable Organization identifiers and [JSON-LD](/docs/discovery/structured-data). Add `sameAs` only for pages representing the same entity; a press article mentioning a company is not necessarily an equivalent identity. Keep names, official URLs, real contact details, and ownership consistent. Publish useful About, Contact, and Privacy pages; do not add fictional addresses, ratings, or testimonials to broaden schema coverage.
@@ -33,6 +54,19 @@ For a retail task, verify price visibility, product identity, availability, deli
 Package related skills and MCP connections as a plugin only for supported hosts. The [Agent Plugins specification](https://agent-plugins.org/specification) describes its manifest and packaging contract; other platforms can have different requirements. Validate the declared schema, resolve every referenced artifact, and perform an installation in the intended host. Keep publisher identity, permissions, configuration, and update behavior explicit.
 
 For SDKs, select the language ecosystems your customers use. Check the published package's homepage and repository links, installation command, supported API version, authentication example, and error behavior. Generating a package from a schema is a starting point; execute a representative operation from the distributed artifact before calling it supported.
+
+## Directory and registry listings
+
+Agents that discover a product or tool through a registry expect the same identity and freshness checks as any other listing.
+
+| Directory                   | Covers                                                                         | URL                                                                          | Submission                                                                                                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP Registry                | Canonical, namespace-verified list of MCP servers                              | [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io) | `mcp-publisher` CLI publishes a `server.json`; ownership is verified via GitHub OAuth/OIDC or DNS/HTTP. See the [publishing guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/quickstart.mdx). |
+| skills.sh                   | Agent skills ranked by install volume, browsable by topic and compatible agent | [skills.sh](https://skills.sh)                                               | Publish the skill as a GitHub repo, then register with `npx skills add <owner>/<repo>`                                                                                                                                                      |
+| ChatGPT app directory       | Apps a user can pull into a ChatGPT conversation by name                       | [chatgpt.com/apps](https://chatgpt.com/apps)                                 | Submit through the OpenAI Developer Platform, built on the Apps SDK / MCP; review covers connectivity, testing instructions, and directory metadata                                                                                         |
+| Claude Connectors Directory | Vetted remote MCP servers, desktop extensions, and MCP Apps for Claude         | listed inside Claude.ai                                                      | Submission portal in your organization's Claude.ai settings (Team or Enterprise, with Directory or Libraries permission); manual review. See the [submission guide](https://claude.com/docs/connectors/building/submission).                |
+
+Keep display name, icon, and description current on every listing; an entry that predates a rename or carries a dead icon reads as abandoned. Ora's catalog checks these as `mcp-registry-listed` (which also credits entries on community registries such as Smithery and mcp.so), `skills-sh-listed`, `chatgpt-app-listed`, and `registry-branding`; see [Ora's checks catalog](https://ora.ai/api/checks).
 
 ## Revalidate before commitment
 

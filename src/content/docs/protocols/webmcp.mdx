@@ -62,6 +62,44 @@ registration.abort();
 
 Keep the registered tool set synchronized with the page state. A checkout tool should disappear when the cart is empty; a destructive tool should not remain registered merely because the component that created it unmounted incorrectly.
 
+## Declarative Form Tools
+
+Chrome's [declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api) turns a plain `<form>` into a WebMCP tool with HTML attributes instead of JavaScript. A form registers a tool only when it carries both `toolname` and `tooldescription`; removing either unregisters it.
+
+```html
+<form
+  toolname="supportRequestTool"
+  tooldescription="Submit a request for support."
+  action="/submit"
+>
+  <label for="firstName">First Name</label>
+  <input id="firstName" type="text" name="firstName" />
+
+  <select
+    name="team"
+    required
+    toolparamdescription="Determines what team this request is routed to."
+  >
+    <option value="Customer happiness team">Return my purchase.</option>
+    <option value="Distribution team">Check where my package is.</option>
+  </select>
+
+  <button type="submit">Submit</button>
+</form>
+```
+
+Each field needs a `name` attribute so the browser can include it in the generated schema. Describe each field with `toolparamdescription`; without it, the browser falls back to the field's associated `<label>` text or `aria-description`, so a plain field with neither has no description at all. An optional `toolautosubmit` attribute submits the form automatically when an agent invokes the tool.
+
+## Tool Set Size and Verification
+
+Chrome Lighthouse's Agentic Browsing category audits WebMCP directly, in [`core/audits`](https://github.com/GoogleChrome/lighthouse/tree/main/core/audits):
+
+- `webmcp-registered-tools` lists every registered tool, imperative and declarative, and warns once a page registers more than 40 - Lighthouse's own `MAX_RECOMMENDED_TOOLS` constant - because a larger set spends model context tokens, adds latency, and increases the risk of tool confusion.
+- `webmcp-form-coverage` flags forms that carry neither `toolname` nor `tooldescription`, so an agent has no way to know the form is a tool.
+- `webmcp-schema-validity` fails a form missing `toolname` or `tooldescription`, and a required field with no `name`; it warns on a field with no `toolparamdescription`/label/`aria-description`, and on an optional field with no `name`.
+
+Keep the registered tool set small and page-relevant rather than exposing every possible action up front, describe every parameter, and run Lighthouse's Agentic Browsing category before shipping to check both the count and the schema.
+
 ## Security Boundary
 
 Treat every tool description and result as untrusted content. The draft calls out prompt injection, tool poisoning, output injection, ambiguous destructive intent, privacy leakage, and over-parameterization. A browser confirmation prompt is a user-experience safeguard, not an authorization policy.
@@ -93,4 +131,6 @@ When a requirement says "support WebMCP," identify which surface it means:
 - [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
 - [WebMCP Community Group repository](https://github.com/webmachinelearning/webmcp)
 - [Chrome WebMCP documentation](https://developer.chrome.com/docs/ai/webmcp)
+- [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+- [Lighthouse Agentic Browsing audits](https://github.com/GoogleChrome/lighthouse/tree/main/core/audits)
 - [webmcp.dev legacy library](https://webmcp.dev/)

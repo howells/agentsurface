@@ -14,7 +14,7 @@ delay = base * 2^attempt + random(0, base)  (capped at 60s)
 - Exponential backoff: 1s, 2s, 4s, 8s, 16s (with jitter and 60s cap)
 - Full jitter: random(0, base \* 2^attempt) for large populations
 - Circuit breaker: stop after N consecutive failures, cool down, probe
-- Rate limit handling: use Retry-After header and X-RateLimit-Remaining
+- Rate limit handling: use Retry-After, plus the IETF draft's RateLimit and RateLimit-Policy fields where available (X-RateLimit-Remaining is the older, unstandardized convention)
 - Idempotency-Key required for write operations
 - is_retriable from problem body overrides status code heuristics
 
@@ -248,6 +248,54 @@ class RateLimitAwareClient {
 }
 ```
 
+## The IETF RateLimit Header Fields
+
+`X-RateLimit-*` above is a widespread but unstandardized convention - every API picks its own field names and semantics. The IETF HTTPAPI working group's [draft-ietf-httpapi-ratelimit-headers](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) standardizes two fields instead. As of this writing it is at draft -11 (May 2026) and remains an Internet-Draft, not an RFC - field names could still change before it ships, so treat it as the emerging convention rather than a settled contract.
+
+**`RateLimit`** - current quota state, as an HTTP structured field:
+
+```
+RateLimit: "default"; r=42; t=30
+```
+
+`r` is the remaining quota, `t` is the number of seconds until the window resets.
+
+**`RateLimit-Policy`** - the policy itself, independent of current state:
+
+```
+RateLimit-Policy: "default"; q=100; w=60
+```
+
+`q` is the quota, `w` is the window in seconds.
+
+Emit both alongside `Retry-After` on a 429, and on successful responses so clients can throttle proactively:
+
+```typescript
+function setRateLimitHeaders(
+  res: Response,
+  remaining: number,
+  windowSeconds: number,
+  quota: number,
+) {
+  res.headers.set("RateLimit", `"default"; r=${remaining}; t=${windowSeconds}`);
+  res.headers.set("RateLimit-Policy", `"default"; q=${quota}; w=${windowSeconds}`);
+}
+```
+
+Clients parse `r` and `t` out of the structured field the same way they'd read any other rate limit header:
+
+```typescript
+function parseRateLimit(header: string | null): { remaining: number; resetSeconds: number } | null {
+  if (!header) return null;
+  const r = /r=(\d+)/.exec(header);
+  const t = /t=(\d+)/.exec(header);
+  if (!r || !t) return null;
+  return { remaining: Number(r[1]), resetSeconds: Number(t[1]) };
+}
+```
+
+Support both while the draft is unsettled: read `RateLimit` when present, fall back to `X-RateLimit-Remaining` for APIs that haven't migrated.
+
 ## Idempotency Keys
 
 Retries and idempotency are inseparable: an agent retrying a write operation without an idempotency guarantee risks creating duplicate resources — an invoice creation retried after a network timeout can create two invoices if the first request succeeded before the connection dropped. The rule for any retry loop is that every write it may re-issue must carry an `Idempotency-Key`, generated once per logical operation and sent unchanged on each attempt, so the server can deduplicate.
@@ -295,7 +343,7 @@ The `is_retriable` field in the RFC 9457 Problem Details body takes precedence o
 - [ ] Maximum delay is capped (60 seconds recommended)
 - [ ] Circuit breakers stop retrying after N consecutive failures
 - [ ] 429 responses use the `Retry-After` header value as the wait time
-- [ ] `X-RateLimit-Remaining` is tracked to throttle proactively before hitting limits
+- [ ] `RateLimit` / `RateLimit-Policy` (or `X-RateLimit-Remaining` as a fallback) are tracked to throttle proactively before hitting limits
 - [ ] All write operations that may be retried use idempotency keys
 - [ ] Idempotency key is generated once per logical operation — not per attempt
 - [ ] Non-retriable errors (4xx validation, auth failures) are not retried

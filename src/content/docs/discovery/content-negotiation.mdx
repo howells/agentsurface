@@ -183,6 +183,22 @@ x-markdown-tokens: 1847
 Cache-Control: public, max-age=3600
 ```
 
+## Link Headers (RFC 8288)
+
+The `<link rel="alternate">` tag below only works when a client parses HTML. [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288.html) defines an HTTP `Link` header carrying the same relation types, so any response - including the HTML page itself before a client has decided to fetch the Markdown - can advertise the alternate representation without a body to parse:
+
+```
+Link: </docs/authentication.md>; rel="alternate"; type="text/markdown"
+```
+
+Send the reverse relation on the Markdown response, so the HTML page stays the canonical URL:
+
+```
+Link: <https://docs.example.com/authentication>; rel="canonical"
+```
+
+Without a canonical link, a Markdown mirror looks like a duplicate page rather than an alternate representation of the HTML original - `rel="canonical"` tells search engines and agents which URL is authoritative when the same content is served at more than one path.
+
 ## Cloudflare Markdown for Agents
 
 Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown conversion at the edge. When enabled, Cloudflare intercepts requests with `Accept: text/markdown`, fetches the HTML origin response, converts it to Markdown, and returns the Markdown to the agent. Cloudflare docs also expose `.md` paths such as `/index.md`, which gives agents a URL fallback when they cannot set request headers.
@@ -285,4 +301,4 @@ Strip:
 
 A missing page must return HTTP 404 rather than redirecting every unknown path to the homepage or returning a successful empty shell. For a Markdown request, provide a short explanation and links to the documentation index, search, or the nearest valid section. API failures should use the [structured error contract](/docs/error-handling/rfc-9457). Verify status, media type, and recovery links on the deployed host.
 
-If an explicit agent view or User-Agent-based Markdown variant exists, compare its facts, prices, links, and permissions with ordinary HTML. User-Agent strings are spoofable and must not grant authorization. Prefer explicit content negotiation where possible and test cache separation. Add title, canonical source URL, and source-derived modification metadata to Markdown frontmatter when the consuming client uses it; never stamp every request as a content update.
+If an explicit agent view or User-Agent-based Markdown variant exists, compare its facts, prices, links, and permissions with ordinary HTML. User-Agent strings are spoofable and must not grant authorization. Prefer explicit content negotiation where possible and test cache separation. Frontmatter on the Markdown response is optional but useful when the consuming client reads it: `title`, `description`, and a source-derived `dateModified` cover the common case. Never stamp `dateModified` as the current request time - derive it from the underlying content's actual last-modified date.

@@ -74,6 +74,16 @@ An MCP App is untrusted UI from a third-party server running inside a trusted cl
 
 Treat interactive results with the same posture as any other tool output: the UI can propose actions, but irreversible side effects still belong behind the approval and authorization layers described in [Session Control](/docs/agentic-ui/session-control) and [Human-in-the-Loop](/docs/multi-agent/human-in-the-loop).
 
+## Declaring CSP and a Public View Origin
+
+A UI resource that a host cannot load its allowed connections for, or cannot reach at all, fails silently in front of the user rather than degrading to text. Two declarations cover this:
+
+**Content-Security-Policy.** The standard extension declares network access on the resource's `_meta.ui.csp` object, not in a response header: `connectDomains` for fetch/XHR/WebSocket origins, `resourceDomains` for scripts, stylesheets, images, and fonts, `frameDomains` for nested iframes, and `baseUriDomains` for allowed base URIs. A host enforces these declarations and allows nothing beyond them, so every origin the UI touches - including `localhost` in development - must be listed. See the [MCP Apps CSP and CORS reference](https://apps.extensions.modelcontextprotocol.io/api/documents/csp-and-cors.html). If the UI instead serves from an external HTTP origin with its own CSP header, that policy needs `frame-ancestors` including the hosts that will embed it (for example `https://chatgpt.com` and `https://claude.ai`) alongside a scoped `connect-src`, `form-action`, `img-src`, `script-src`, and `style-src` - never a `*` wildcard.
+
+**Domain.** `_meta.ui.domain` gives the view a stable sandbox origin, useful for OAuth callbacks, CORS allowlisting, and API key restrictions; the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx) notes the exact origin format is host-dependent. Whatever origin the view resolves to, it must load publicly and serve real HTML with no auth wall: a 401/403 response or a login form in the body breaks the view in front of the user instead of degrading gracefully.
+
+OpenAI's Apps SDK bridge still reads its own legacy keys - `openai/widgetDomain` for the origin and `openai/widgetCSP` with `connect_domains`/`resource_domains` (snake_case) for the same connect and resource origins. As with `_meta["openai/visibility"]` above, emit the standard `_meta.ui` keys and keep the OpenAI-prefixed ones only for hosts that have not migrated.
+
 ## Failure Modes
 
 - **Assuming universal support:** Client support is a matrix, not a guarantee. A UI resource that renders in ChatGPT or Claude may arrive at a client that cannot host it. Always include text content the client can fall back to.

@@ -330,9 +330,41 @@ function toApiError(err: unknown): ProblemDetails {
 }
 ```
 
+## Agent-Friendly 404s and 410s
+
+A missing or removed resource should return the real status - 404 for not found, 410 for gone - never a 200 with an empty or generic page. A "soft 404" gives an agent no signal to stop treating the response as real content, and it will often extract an answer from whatever boilerplate came back.
+
+The status code alone is only half the signal. The body should say what happened and where to go next, in a format the agent can actually read: Markdown, or [RFC 9457](/docs/error-handling/rfc-9457) `application/problem+json` when the request's `Accept` header asks for structured data.
+
+```json
+// 404, application/problem+json
+{
+  "type": "https://api.example.com/errors/not-found",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "No invoice with id 'inv_0000' exists. Invoice IDs look like 'inv_01HV3K8MNP2QRS3TUVWX'.",
+  "is_retriable": false,
+  "suggestions": ["List existing invoices with GET /invoices to find a valid id"]
+}
+```
+
+```markdown
+<!-- 404, text/markdown -->
+
+# Not Found
+
+No invoice with id `inv_0000` exists. Invoice IDs look like `inv_01HV3K8MNP2QRS3TUVWX`.
+
+- List existing invoices: `GET /invoices`
+- Documentation index: [docs.example.com](https://docs.example.com)
+```
+
+Ora's `agent-friendly-404` check scores this in two tiers: "A real 404/410 status earns partial credit. Full credit also requires a Markdown error body, so agents can read what happened and where to go next" ([ora.ai/api/checks](https://ora.ai/api/checks)).
+
 ## Checklist
 
 - [ ] Every error body includes `is_retriable` — agents should never have to guess
+- [ ] Missing or removed resources return a real 404/410 status, never a 200 soft-404
 - [ ] Validation errors include per-field details with JSON Pointer paths and correction guidance
 - [ ] Tool order errors include the name and arguments of the prerequisite operation
 - [ ] Error type URIs are stable and versioned like API endpoints

@@ -155,6 +155,17 @@ Cache-Control: public, max-age=86400
 
 A 24-hour cache is appropriate since `llms.txt` changes infrequently. If your documentation deploys frequently, use a shorter TTL or add a `Last-Modified` header so agents can revalidate efficiently.
 
+## What Lighthouse Checks
+
+Lighthouse's `llms-txt` audit verifies the file is actually usable, not just present ([source](https://github.com/GoogleChrome/lighthouse/blob/main/core/audits/agentic/llms-txt.js)):
+
+- The file must be fetchable. A failed fetch or a 5xx response fails the audit outright; a 4xx response marks it not applicable.
+- The content must include a Markdown H1 (`# Title`).
+- The content must include at least one Markdown link.
+- The content must be at least 50 characters long.
+
+These map directly onto the canonical format above: the required H1, and a link list with real entries rather than a placeholder file.
+
 You can also reference `llms.txt` from `robots.txt`:
 
 ```
@@ -237,6 +248,8 @@ The genuine, confirmed value is narrow: **coding agents and IDE assistants — C
 
 **Recommendation:** worth shipping for documentation and developer-tool sites — it is cheap to generate and there is real coding-agent consumption. Do not ship it expecting an AEO benefit on a general marketing or content site; there is no evidence it changes how answer engines see you.
 
-## Product-area indexes and pricing
+## Modular, per-section indexes
 
-For a large site, link section-level llms.txt files from the root index and verify both levels. Keep authoritative prices in sync across visible pages and a pricing.md representation when useful. See [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery) for scope, provenance, and validation.
+For a large site, publish section-level `llms.txt` files alongside the root index - `/docs/llms.txt` for documentation, `/api/llms.txt` for API reference - so an agent working in one area loads a focused index instead of the whole site. Link each section file from the root index and verify both levels independently. Ora's `modular-llms-txt` check looks for this pattern by name: "Per-section llms.txt files (like /docs/llms.txt) so an agent working in one area gets a focused index instead of your whole site" ([ora.ai/api/checks](https://ora.ai/api/checks)).
+
+Keep authoritative prices in sync across visible pages and a pricing.md representation when useful. See [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery) for scope, provenance, and validation.

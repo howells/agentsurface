@@ -91,6 +91,13 @@ function verifySignature(
 
 This section is complete. An agent can retrieve it and answer "how do I verify webhook signatures" without needing the surrounding page.
 
+## Canonical URL and Language
+
+Two page-level signals sit underneath everything else on this page, and both are checked by name in Lighthouse's SEO and accessibility audits:
+
+- `<link rel="canonical" href="https://docs.example.com/authentication" />` in `<head>` - Lighthouse's `canonical` audit fails a page without one. When the same content is reachable at more than one URL (tracking parameters, trailing slashes, a staging mirror), the canonical link tells an agent which one to cite and revisit.
+- `<html lang="en">` on the root element - Lighthouse's `html-has-lang` audit fails a page without it. Ora's `metadata-completeness` check groups both together: "The basics AIs use to identify a page: canonical URL, language, and Open Graph image and type. Missing pieces mean mangled citations and wrong previews" ([ora.ai/api/checks](https://ora.ai/api/checks)).
+
 ## Heading Hierarchy
 
 Never skip heading levels. `H1 → H3` without an `H2` confuses the document outline that agents use for navigation and retrieval.
@@ -139,6 +146,8 @@ async function* getAllProjects(apiKey: string) {
 ````
 
 When `next_cursor` is absent or null, you have reached the last page.
+
+Always tag the fence with a language (` ```typescript `, not a bare ` ``` `). [CommonMark](https://spec.commonmark.org/0.31.2/#fenced-code-blocks) defines this as the fence's info string, whose first word is "typically used to specify the language of the code sample." An untagged fence forces an agent to guess the language before it can reason about the code correctly.
 
 ````
 
@@ -294,17 +303,19 @@ Search-augmented agents parse HTML. Semantic structure helps them identify the m
 Use:
 
 ```html
-<article>
-  <!-- main content area -->
-  <header>
-    <h1>Rate Limits</h1>
-    <time datetime="2025-03-15">March 15, 2025</time>
-  </header>
-  <section>
-    <h2>Default Limits</h2>
-    <p>...</p>
-  </section>
-</article>
+<main>
+  <article>
+    <!-- main content area -->
+    <header>
+      <h1>Rate Limits</h1>
+      <time datetime="2025-03-15">March 15, 2025</time>
+    </header>
+    <section>
+      <h2>Default Limits</h2>
+      <p>...</p>
+    </section>
+  </article>
+</main>
 
 <nav aria-label="Documentation navigation">
   <!-- navigation links -->
@@ -324,3 +335,9 @@ Avoid:
 ```
 
 Both render identically in a browser. To a parser or agent reading the HTML structure, the first is unambiguous; the second requires CSS class analysis to infer hierarchy.
+
+A single `<main>` region matters beyond the landmark itself: it is what lets an agent (or a screen reader) separate the content it came for from navigation chrome, promo banners, and related-articles rails. Ora's `ax-document-structure` check reads this the same way a screen reader would: "Agents navigate your page the way screen readers do: by landmarks and headings. We check your HTML is a real document, with a main region, nav, and a sane heading order" ([ora.ai/api/checks](https://ora.ai/api/checks)). Keep the actual content inside `<main>` large relative to the surrounding chrome - a page that is mostly navigation links, a cookie banner, and a footer around a few sentences of content gives a retrieval agent little to extract regardless of how clean the markup is.
+
+## Avoid Redirect Chains
+
+Serve the final content URL directly rather than routing through a redirect chain, a meta-refresh stub, or a client-side `window.location` hop. Ora's `redirect-hygiene` check states the requirement directly: "Pages reach real content without meta-refresh stubs, JavaScript-only redirects, or cross-domain hops that strand non-JS agents" ([ora.ai/api/checks](https://ora.ai/api/checks)). Most agent fetchers don't execute JavaScript, so a client-side redirect isn't slow for them - it's a dead end. Lighthouse's `redirects` audit flags the same pattern from a page-speed angle: each hop in the chain adds latency before any content is reachable at all.
