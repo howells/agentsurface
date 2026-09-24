@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   openGraph: {
     description:
       "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
-    images: [{ url: "/og/Agent%20Surface", width: 1200, height: 630 }],
+    images: [{ url: "/og/Make%20software%20legible%20to%20agents", width: 1200, height: 630 }],
     siteName: "Agent Surface",
     title: "Agent Surface — Make Software Legible to Agents",
     type: "website",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     description:
       "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
-    images: ["/og/Agent%20Surface"],
+    images: ["/og/Make%20software%20legible%20to%20agents"],
     title: "Agent Surface — Make Software Legible to Agents",
   },
 };
