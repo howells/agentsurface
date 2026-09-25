@@ -189,33 +189,6 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <p className="mt-12 border-t border-fd-border pt-6 type-small text-fd-muted-foreground">
-              This guide brings together Agent Surface’s implementation guidance and practical
-              lessons from public scanners:{" "}
-              <a href="https://isitagentready.com/" className="underline underline-offset-4">
-                Cloudflare
-              </a>
-              ,{" "}
-              <a href="https://ora.ai/methodology" className="underline underline-offset-4">
-                Ora
-              </a>
-              ,{" "}
-              <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
-                Vercel’s Is Agentic
-              </a>
-              , and{" "}
-              <a
-                href="https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring"
-                className="underline underline-offset-4"
-              >
-                Google Lighthouse
-              </a>
-              . Priorities reflect the task and product; the{" "}
-              <Link href="/docs/scoring/public-scanners" className="underline underline-offset-4">
-                reference docs
-              </Link>{" "}
-              explain how external assessments fit into an evaluation.
-            </p>
           </div>
         </section>
       </main>
