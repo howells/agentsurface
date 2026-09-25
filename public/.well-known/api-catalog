@@ -1,19 +1,45 @@
 {
   "linkset": [
     {
-      "anchor": "https://agentsurface.dev",
+      "anchor": "https://agentsurface.dev/.well-known/api-catalog",
+      "item": [
+        {
+          "href": "https://agentsurface.dev/api/docs/search",
+          "title": "Documentation search"
+        },
+        {
+          "href": "https://agentsurface.dev/api/md/index",
+          "title": "Documentation page as Markdown"
+        }
+      ]
+    },
+    {
+      "anchor": "https://agentsurface.dev/api/docs/search",
       "service-desc": [
         {
           "href": "https://agentsurface.dev/openapi.json",
-          "type": "application/vnd.oai.openapi+json",
-          "title": "Agent Surface documentation API"
+          "type": "application/vnd.oai.openapi+json"
         }
       ],
       "service-doc": [
         {
           "href": "https://agentsurface.dev/docs",
-          "type": "text/html",
-          "title": "Agent Surface documentation"
+          "type": "text/html"
+        }
+      ]
+    },
+    {
+      "anchor": "https://agentsurface.dev/api/md/index",
+      "service-desc": [
+        {
+          "href": "https://agentsurface.dev/openapi.json",
+          "type": "application/vnd.oai.openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://agentsurface.dev/docs",
+          "type": "text/html"
         }
       ]
     }

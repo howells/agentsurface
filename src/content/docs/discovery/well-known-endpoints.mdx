@@ -23,13 +23,17 @@ The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for si
 
 API Catalog (RFC 9727) gives agents one place to discover public APIs, their specs, docs, status pages, and related metadata. Use it when a product exposes APIs that should be callable or wrapped as tools.
 
-The catalog is a linkset ([RFC 9264](https://www.rfc-editor.org/rfc/rfc9264.html)), not a free-form JSON list. Each API is an `anchor` with typed links: `service-desc` for the machine-readable spec, `service-doc` for human docs, `service-meta` for other metadata and `status` for a status page. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
+The catalog is a linkset ([RFC 9264](https://www.rfc-editor.org/rfc/rfc9264.html)). The first entry is anchored at the catalog itself and lists each API with an `item` link. Each API can then have its own entry with typed links: `service-desc` for the machine-readable spec, `service-doc` for human docs, `service-meta` for other metadata and `status` for a status page. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
 
 ```json
 {
   "linkset": [
     {
-      "anchor": "https://api.example.com/v2",
+      "anchor": "https://example.com/.well-known/api-catalog",
+      "item": [{ "href": "https://api.example.com/v1", "title": "Public REST API" }]
+    },
+    {
+      "anchor": "https://api.example.com/v1",
       "service-desc": [
         {
           "href": "https://api.example.com/openapi.json",

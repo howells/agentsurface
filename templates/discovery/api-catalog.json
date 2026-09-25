@@ -1,6 +1,15 @@
 {
   "linkset": [
     {
+      "anchor": "https://example.com/.well-known/api-catalog",
+      "item": [
+        {
+          "href": "https://api.example.com/v1",
+          "title": "Public REST API"
+        }
+      ]
+    },
+    {
       "anchor": "https://api.example.com/v1",
       "service-desc": [
         {

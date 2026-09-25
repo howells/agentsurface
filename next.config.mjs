@@ -13,6 +13,10 @@ const config = {
   },
   async headers() {
     return [
+      // The proxy serves Markdown from these URLs to clients that ask for it, so
+      // caches must key the HTML response on Accept as well.
+      { source: "/", headers: [{ key: "Vary", value: "Accept" }] },
+      { source: "/docs/:path*", headers: [{ key: "Vary", value: "Accept" }] },
       {
         source: "/.well-known/api-catalog",
         headers: [

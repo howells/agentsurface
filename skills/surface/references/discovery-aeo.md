@@ -484,13 +484,17 @@ See https://a2a-protocol.org/latest/specification/ for full schema.
 
 Publish `/.well-known/api-catalog` when a service has one or more public APIs. The catalog points agents to OpenAPI specs, docs, status pages, and related machine-readable assets without forcing them to scrape a developer portal.
 
-The catalog is an RFC 9264 linkset, not a free-form list. Each API is an `anchor` with `service-desc` (spec), `service-doc` (human docs), `service-meta` and `status` links. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
+The catalog is an RFC 9264 linkset. The first entry is anchored at the catalog and lists each API as an `item` link; each API then gets its own entry with `service-desc` (spec), `service-doc` (human docs), `service-meta` and `status` links. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
 
 Minimal shape:
 
 ```json
 {
   "linkset": [
+    {
+      "anchor": "https://example.com/.well-known/api-catalog",
+      "item": [{ "href": "https://api.example.com/v1", "title": "Public REST API" }]
+    },
     {
       "anchor": "https://api.example.com/v1",
       "service-desc": [
