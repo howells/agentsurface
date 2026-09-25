@@ -1,13 +1,16 @@
 {
-  "title": "Agent Scaffolding",
+  "title": "Build Agents",
   "pages": [
     "index",
-    "design-principles",
-    "framework-selection",
-    "anthropic-platform",
-    "openai-platform",
-    "browser-access",
-    "sandboxes-and-workspaces",
-    "runtime-guardrails"
+    "frameworks",
+    "platforms",
+    "orchestration",
+    "memory",
+    "durable-execution",
+    "browser-and-sandboxes",
+    "guardrails",
+    "prompts-and-configuration",
+    "channels",
+    "background-agents"
   ]
 }

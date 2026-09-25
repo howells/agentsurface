@@ -1,6 +1,7 @@
 ---
 title: Raw Payload Input
 description: Accepting structured JSON input so agents can pass API payloads directly without lossy flag translation
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -13,7 +14,7 @@ API-wrapping CLIs typically force agents to translate rich JSON payloads into be
 - Support both approaches: --json for agents, flags for humans
 - Validate raw payloads with same rigor as flag-based input
 
-Every CLI that wraps an API faces the translation problem: the underlying API accepts a rich JSON payload, but the CLI exposes it through bespoke flags that map — imperfectly — to that payload. For human users, this is a convenience. For agents, it is a liability.
+Every CLI that wraps an API faces the translation problem: the underlying API accepts a rich JSON payload, but the CLI exposes it through bespoke flags that map - imperfectly - to that payload. Humans work around the mismatch; agents propagate it into wrong invocations.
 
 ## The Translation Problem
 
@@ -73,7 +74,7 @@ echo '{"type":"MX","name":"@","content":"mail.example.com","priority":10}' | myt
 mytool dns create < record.json
 ```
 
-All three forms pass the JSON body directly to the underlying API call with no field translation. The agent can use the API schema — which it likely already has from the OpenAPI spec or a previous schema introspection — as its documentation.
+All three forms pass the JSON body directly to the underlying API call with no field translation. The agent can use the API schema - which it likely already has from the OpenAPI spec or a previous schema introspection - as its documentation.
 
 ## Zero Translation Loss
 
@@ -156,9 +157,9 @@ Document this precedence explicitly in `--help --json` output (see [Schema Intro
 
 ## Stdin Conventions
 
-Accepting JSON from stdin is essential for composability in agent pipelines. Follow these conventions:
+Accepting JSON from stdin makes agent pipelines composable. Follow these conventions:
 
-- **Check for piped stdin automatically.** Do not require `--stdin` — detect `!isatty(0)` and read stdin as the payload.
+- **Check for piped stdin automatically.** Do not require `--stdin` - detect `!isatty(0)` and read stdin as the payload.
 - **Require explicit opt-in when both piped stdin and flags are present.** This prevents silent errors where an agent accidentally pipes unrelated output.
 - **Support `-` as an explicit stdin marker.** `mytool dns create -` reads from stdin explicitly, even in a TTY.
 
@@ -222,6 +223,6 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
 ## Related Pages
 
-- [Schema Introspection](./schema-introspection) — letting agents discover the payload schema at runtime
-- [Input Hardening](./input-hardening) — validating payload content against agent-specific failure patterns
-- [The Agent DX CLI Scale](./cli-scale) — full scoring framework
+- [Schema Introspection](./schema-introspection) - letting agents discover the payload schema at runtime
+- [Input Hardening](./input-hardening) - validating payload content against agent-specific failure patterns
+- [The Agent DX CLI Scale](./cli-scale) - full scoring framework

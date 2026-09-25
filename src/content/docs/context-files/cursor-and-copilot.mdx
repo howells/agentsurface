@@ -1,26 +1,28 @@
 ---
 title: Cursor Rules and GitHub Copilot
 description: Tool-specific overrides with progressive disclosure and sync patterns
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Tool-specific overrides layered on AGENTS.md. Cursor reads `.cursor/rules/*.mdc` files (can scope by glob patterns per file); GitHub Copilot reads `.github/copilot-instructions.md`. Both should reference AGENTS.md and add tool-only guidance. Cursor rules support file-level frontmatter (globs) and multiple rule files scoped to different directories/languages. Keep minimal, avoid duplication, link to shared conventions in AGENTS.md.
+Tool-specific overrides layered on AGENTS.md. Cursor reads `AGENTS.md` natively (root and nested, closest file wins) and also reads `.cursor/rules/*.mdc` files for glob-scoped rules; GitHub Copilot reads `.github/copilot-instructions.md` for repo-wide guidance and `.github/instructions/*.instructions.md` for path-scoped guidance via `applyTo` glob frontmatter. Keep tool-specific files minimal, avoid duplication, link to shared conventions in AGENTS.md.
 
-- **Cursor rules**: `.cursor/rules/*.mdc` with globs metadata
-- **Copilot instructions**: `.github/copilot-instructions.md` (single file)
-- **Glob scoping**: Apply rules per file pattern (src/\*_/_.ts)
+- **Cursor**: reads `AGENTS.md` natively (root and nested, closest file wins), with `.cursor/rules/*.mdc` adding glob-scoped detail on top
+- **Copilot instructions**: `.github/copilot-instructions.md` (repo-wide) plus `.github/instructions/*.instructions.md` (path-scoped via `applyTo`)
+- **Copilot coding agent and code review**: read `AGENTS.md` directly (GA 2026)
+- **Glob scoping**: apply rules per file pattern in both tools
 - **Reference AGENTS.md**: "See AGENTS.md for project conventions"
 - **Add tool-only**: Cursor/Copilot-specific guidance
-- **Avoid duplication**: Don't repeat AGENTS.md content
+- **Avoid duplication**: don't repeat AGENTS.md content
 
 ---
 
-Cursor reads `.cursor/rules/*.mdc` files. GitHub Copilot reads `.github/copilot-instructions.md`. Both are tool-specific overrides on top of AGENTS.md. Keep them thin and focused: reference shared conventions from AGENTS.md, add tool-only guidance.
+Cursor reads `AGENTS.md` directly - root and nested subdirectories, with the closest file to the current context winning - and layers `.cursor/rules/*.mdc` files on top for glob-scoped detail `AGENTS.md` doesn't need to carry everywhere. GitHub Copilot reads `AGENTS.md` directly too, for its coding agent and code review features (GA 2026), and additionally reads `.github/copilot-instructions.md` (repo-wide) and `.github/instructions/*.instructions.md` (path-scoped, via `applyTo` glob frontmatter). Keep all of these thin and focused: reference shared conventions from AGENTS.md, add tool-only guidance.
 
 ## Cursor Rules (.cursor/rules)
 
-Cursor supports multiple rule files scoped by glob patterns. Each file is a `.mdc` (Markdown Cursor) file that specifies where it applies.
+Use `.cursor/rules/*.mdc` files when you need guidance scoped to a specific glob that doesn't belong in the shared `AGENTS.md`. Cursor supports multiple rule files scoped by glob patterns. Each file is a `.mdc` (Markdown Cursor) file that specifies where it applies. The older single-file `.cursorrules` format is deprecated in Cursor's own docs - migrate it to `.cursor/rules/*.mdc` or to `AGENTS.md`.
 
 ### Structure
 
@@ -163,7 +165,17 @@ Test structure: describe, it, expect
 
 ## GitHub Copilot Instructions
 
-GitHub Copilot reads `.github/copilot-instructions.md`. Similar to Cursor rules but without glob scoping—applies to all files.
+GitHub Copilot reads `.github/copilot-instructions.md` for repo-wide guidance. For path-scoped guidance, add `.github/instructions/*.instructions.md` files with `applyTo` glob frontmatter - the same idea as Cursor's per-file globs:
+
+```markdown
+---
+applyTo: "src/api/**/*.ts"
+---
+
+# API Route Instructions
+
+Routes follow RESTful conventions: /api/v1/[resource]/[id]?
+```
 
 ### Structure
 
@@ -224,7 +236,7 @@ See AGENTS.md for project conventions.
 - Paginate lists (max 50); validate all inputs
 ```
 
-This is ~80 words—tight and actionable.
+This is ~80 words - tight and actionable.
 
 ## Keeping Files in Sync
 
@@ -413,9 +425,9 @@ Too long. Keep rules focused on non-obvious patterns. AGENTS.md covers the rest.
 
 ## See also
 
-- `/docs/context-files/agents-md` — AGENTS.md spec
-- `/docs/context-files/claude-md` — Claude overrides
-- ([Cursor rules docs](https://docs.cursor.com/context/rules))
-- ([GitHub Copilot custom-instruction support](https://docs.github.com/en/copilot/reference/custom-instructions-support))
-- `/templates/discovery/cursor-rules.mdc` — starter Cursor rules file
-- `/templates/discovery/copilot-instructions.md` — starter Copilot instructions
+- `/docs/context-files/agents-md` - AGENTS.md spec
+- `/docs/context-files/claude-md` - Claude overrides
+- ([Cursor rules docs](https://docs.cursor.com/context/rules)) - includes AGENTS.md support
+- ([GitHub Copilot repository instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)) - repo-wide and path-scoped instructions
+- `/templates/discovery/cursor-rules.mdc` - starter Cursor rules file
+- `/templates/discovery/copilot-instructions.md` - starter Copilot instructions

@@ -1,6 +1,7 @@
 ---
 title: Idempotency and the Idempotency-Key Header
 description: Safe retry semantics for agent-driven write operations using request deduplication
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -14,20 +15,20 @@ Retry:          Idempotency-Key: abc123 → returns cached response
 ```
 
 - Generate key once per logical operation, not per attempt
-- Prefer UUIDv7 keys — the embedded timestamp lets old keys expire naturally
+- Prefer UUIDv7 keys - the embedded timestamp lets old keys expire naturally
 - Send same key on every retry of the same logical operation
-- Server caches only successful responses (2xx), not errors
+- Server caches both successful and failed responses, so a permanent error doesn't get retried into a different outcome
 - Cache with 24-hour TTL (allow delayed retries)
 - Use Redis for multi-instance deployments
 - Combine with Retry-After header for explicit wait times
 
 An agent retrying a write operation without idempotency guarantees risks creating duplicate resources. An invoice creation that is retried after a network timeout might create two invoices if the first request actually succeeded before the connection dropped.
 
-Idempotency keys prevent this. The client generates a unique key per logical operation and includes it in every retry. The server deduplicates — if a request with a given key has already been processed, it returns the original response without executing the operation again.
+Idempotency keys prevent this. The client generates a unique key per logical operation and includes it in every retry. The server deduplicates - if a request with a given key has already been processed, it returns the original response without executing the operation again.
 
 ## The Idempotency-Key Header
 
-The IETF draft (in progress toward standardization) defines the `Idempotency-Key` header. Generate a unique key per logical operation and send it on every retry:
+The `Idempotency-Key` header comes from an IETF draft (`draft-ietf-httpapi-idempotency-key-header`) that expired April 2026 without advancing to a standard; it is not an active working-group document. Treat the header as a de facto convention established by wide production use - Stripe's implementation is the most-cited reference - rather than a ratified spec. Generate a unique key per logical operation and send it on every retry:
 
 ```http
 POST /api/invoices HTTP/1.1
@@ -193,9 +194,9 @@ async function handleCreateInvoice(req: Request, res: Response) {
 
 See `/templates/errors-and-auth/idempotency-middleware.ts` for a production Next.js middleware implementation.
 
-## When Idempotency Keys Are Critical
+## When Idempotency Keys Are Required
 
-Idempotency is essential for operations that:
+Idempotency keys are required for operations that:
 
 - Consume limited resources (API quota, balance, inventory)
 - Trigger external side effects (email, SMS, webhook, payment processing)
@@ -242,5 +243,5 @@ async function createWithRetry(data: InvoiceData): Promise<Invoice> {
 
 ## Related Pages
 
-- [Retry Patterns](/docs/error-handling/retry-patterns) — when and how to retry
-- [Agent extensions](/docs/error-handling/rfc-9457#recommended-extensions-for-agent-apis) — `is_retriable` flag
+- [Retry Patterns](/docs/error-handling/retry-patterns) - when and how to retry
+- [Agent extensions](/docs/error-handling/rfc-9457#recommended-extensions-for-agent-apis) - `is_retriable` flag

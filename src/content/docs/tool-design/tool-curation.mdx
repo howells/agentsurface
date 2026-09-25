@@ -1,24 +1,25 @@
 ---
 title: Tool Curation
-description: Managing tool registries, role-based subsets, and dynamic tool selection
+description: Managing tool registries, role-based subsets, sprawl prevention, and dynamic tool selection
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Curate task-specific tool subsets from a centralized registry, not monolithic all-at-once loading. An API with 100 endpoints shouldn't show all 100 tools; instead expose read-only set for auditors, mutation set for admins, focused set per workflow. Improves agent reasoning, reduces token cost, enforces permission boundaries. Patterns: role-based subsets (read, write, admin, dangerous categories), dynamic tool selection (BM25 search when >20 tools), pagination (cursor-based list), registry metadata (category, requiresAuth, rateLimit). Avoid tool sprawl: >20 tools hurt agent reasoning.
+Curate task-specific tool subsets from a centralized registry rather than loading everything at once. An API with 100 endpoints shouldn't show all 100 tools; expose a read-only set for auditors, a mutation set for admins, a focused set per workflow. This improves agent reasoning, reduces token cost, and enforces permission boundaries. Left unmanaged, a tool registry accumulates duplicate and overlapping tools - sprawl - that degrades selection accuracy the same way an oversized single request does.
 
-- **Registry structure**: Metadata (category, auth, rate limit), handler, schema
+- **Registry structure**: metadata (category, auth, rate limit), handler, schema
 - **Subsets**: read-only, mutations, admin, dangerous (role-based)
-- **Dynamic selection**: BM25 when >20 tools exist (don't load all)
-- **Pagination**: Cursor-based for large tool lists
-- **Metadata**: Category, requiresAuth, rateLimit per tool
-- **Anti-pattern**: >20 tools at once (agent reasoning degrades)
+- **Guidance, not a hard ceiling**: OpenAI calls "fewer than 20 functions available at the start of a turn" a soft suggestion; Anthropic's tool search tool notes selection accuracy degrades past 30-50 available tools
+- **Dynamic selection**: keyword/BM25 filtering, embedding-based ranking, or Anthropic's server-side Tool Search Tool once a registry is large
+- **Namespacing**: `billing__get_invoice` avoids name collisions across domains
+- **Ownership**: every tool has an owner, a status (active/deprecated/experimental), and a removal path
 
 ---
 
-An API might expose 100 endpoints. An agent should not see all 100 tools at once. Tool curation means curating a task-specific subset: read-only tools for auditors, mutation tools only for admins, a focused set for a specific workflow. This improves agent reasoning, reduces token cost, and enforces permission boundaries.
+An API might expose 100 endpoints. An agent should not see all 100 tools at once. Tool curation means curating a task-specific subset: read-only tools for auditors, mutation tools only for admins, a focused set for a specific workflow.
 
-Agent frameworks route tool calls by semantic similarity between the user's request and each tool's description, so every extra tool raises the chance of routing to the wrong one. OpenAI recommends fewer than 10 tools per agent session; selection accuracy degrades sharply past a hard ceiling of about 20. If your surface is larger than that, group, filter, and compose rather than exposing everything.
+Agent frameworks route tool calls by matching the user's request against each tool's name and description, so every extra tool raises the chance of routing to the wrong one. There's no single hard ceiling across vendors: OpenAI describes "fewer than 20 functions available at the start of a turn" as a soft suggestion, and Anthropic notes that Claude's tool-selection accuracy degrades once a session exceeds roughly 30-50 available tools. Treat 20 as a review threshold regardless of provider - above it, curate a subset, namespace, or introduce dynamic selection rather than loading everything.
 
 ## Tool Registries
 
@@ -38,6 +39,8 @@ interface ToolMetadata {
   category: "read" | "write" | "admin" | "dangerous";
   requiresAuth: boolean;
   rateLimit?: { requestsPerMinute: number };
+  owner: string;
+  status: "active" | "deprecated" | "experimental";
 }
 
 const toolRegistry: Record<string, ToolMetadata> = {
@@ -48,17 +51,9 @@ const toolRegistry: Record<string, ToolMetadata> = {
     handler: searchIssuesHandler,
     category: "read",
     requiresAuth: false,
+    owner: "platform-team",
+    status: "active",
   },
-
-  create_issue: {
-    name: "create_issue",
-    description: "Create a new issue in the tracker...",
-    schema: createIssueSchema,
-    handler: createIssueHandler,
-    category: "write",
-    requiresAuth: true,
-  },
-
   delete_issue: {
     name: "delete_issue",
     description: "Permanently delete an issue (cannot be undone)...",
@@ -67,33 +62,17 @@ const toolRegistry: Record<string, ToolMetadata> = {
     category: "dangerous",
     requiresAuth: true,
     rateLimit: { requestsPerMinute: 1 },
+    owner: "platform-team",
+    status: "active",
   },
-
-  // ... more tools
 };
 
 export const getAllTools = () => Object.values(toolRegistry);
-```
 
-### Filtering by Category
-
-```typescript
-export function getToolsByCategory(category: string): ToolMetadata[] {
-  return Object.values(toolRegistry).filter((t) => t.category === category);
-}
-
-// Usage
-const readOnlyTools = getToolsByCategory("read");
-const adminTools = getToolsByCategory("admin");
-```
-
-### Filtering by Permission
-
-```typescript
 export function getToolsForUser(userId: string): ToolMetadata[] {
   const user = await getUserPermissions(userId);
-
   return Object.values(toolRegistry).filter((tool) => {
+    if (tool.status !== "active") return false;
     if (tool.requiresAuth && !user.authenticated) return false;
     if (tool.category === "admin" && !user.isAdmin) return false;
     if (tool.category === "dangerous" && !user.isDangerousActionsAllowed) return false;
@@ -102,9 +81,29 @@ export function getToolsForUser(userId: string): ToolMetadata[] {
 }
 ```
 
+### Namespacing
+
+Prefix tool names by domain to prevent collision and make ownership unambiguous - double underscore is the conventional separator:
+
+```json
+[
+  {
+    "name": "billing__get_invoice",
+    "description": "Get invoice details from the billing system..."
+  },
+  {
+    "name": "billing__create_invoice",
+    "description": "Create a new invoice in the billing system..."
+  },
+  { "name": "docs__get_document", "description": "Get a document from the document store..." }
+]
+```
+
+The namespace prefix makes the owning system clear even when the tool name itself is generic (`get_invoice` vs. `billing__get_invoice`).
+
 ## Role-Based Tool Kits
 
-Different roles need different tools. Create curated kits per role:
+Different roles need different tools. Create curated kits per role, defined at a shared specification level rather than per agent instance:
 
 ```typescript
 const toolKits = {
@@ -112,7 +111,6 @@ const toolKits = {
     description: "Read-only access for compliance audits",
     tools: ["search_issues", "get_issue", "list_users", "get_user", "search_audit_logs"],
   },
-
   developer: {
     description: "Create and update issues, code review workflows",
     tools: [
@@ -121,76 +119,36 @@ const toolKits = {
       "update_issue",
       "search_pull_requests",
       "create_pull_request",
-      "approve_pull_request",
-      "search_docs",
     ],
   },
-
   admin: {
     description: "Full access including dangerous operations",
-    tools: [
-      // All tools
-      ...Object.keys(toolRegistry),
-    ],
+    tools: [...Object.keys(toolRegistry)],
   },
 };
 
 export function getToolKitForRole(role: string): ToolMetadata[] {
   const kit = toolKits[role];
   if (!kit) throw new Error(`Unknown role: ${role}`);
-
   return kit.tools.map((name) => toolRegistry[name]).filter((t) => t !== undefined);
 }
 ```
 
+## Why Sprawl Happens
+
+Left unmanaged, a tool registry grows monotonically: a new capability needs a tool, the existing set isn't checked for overlap, a slightly different variant gets added instead of extending the original, experimental tools are never removed, and deprecated endpoints stay registered because removing them feels risky. The result is a namespace with several tools that do roughly the same thing under different names - the agent may call the wrong one, call all of them, or fail to call any confidently.
+
 ## Dynamic Tool Selection
 
-When a tool registry has >20 tools, do not load all tools into context at once. Use dynamic selection to load only the relevant tools for the current task.
+When a registry has more tools than a single session should see, don't load every definition upfront. Three approaches, in increasing order of setup cost:
 
-### BM25 Search (Anthropic Pattern)
+### Keyword Filtering
 
-```typescript
-import { bm25Search } from "@anthropic-ai/sdk/utils";
-
-async function selectRelevantTools(
-  userQuery: string,
-  allTools: ToolMetadata[],
-  topK: number = 5,
-): Promise<ToolMetadata[]> {
-  const scored = bm25Search(userQuery, allTools, {
-    topK,
-    fields: {
-      name: { boost: 2 }, // Tool name is most important
-      description: { boost: 1 },
-    },
-  });
-
-  return scored;
-}
-
-// Usage
-const userQuery = "Find all open bugs assigned to alice";
-const relevant = await selectRelevantTools(userQuery, getAllTools());
-
-const response = await query({
-  prompt: userQuery,
-  tools: relevant.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: zodToJsonSchema(t.schema),
-    execute: t.handler,
-  })),
-});
-```
-
-### Keyword-Based Selection
-
-Simple approach for explicit categories:
+The simplest approach for explicit categories - no embedding infrastructure required:
 
 ```typescript
 function selectToolsByKeywords(userQuery: string, allTools: ToolMetadata[]): ToolMetadata[] {
   const keywords = userQuery.toLowerCase().split(/\s+/);
-
   return allTools.filter((tool) => {
     const toolText = `${tool.name} ${tool.description}`.toLowerCase();
     return keywords.some((kw) => toolText.includes(kw));
@@ -201,157 +159,112 @@ function selectToolsByKeywords(userQuery: string, allTools: ToolMetadata[]): Too
 ### Active Tools (Vercel AI SDK)
 
 ```typescript
-const allTools = [...];
-
 const result = await generateText({
   model,
   tools: allTools,
-  activeTools: ['search_issues', 'create_issue'],  // Only these are loaded
-  prompt: userMessage
+  activeTools: ["search_issues", "create_issue"], // Only these are loaded
+  prompt: userMessage,
 });
 ```
 
-### Embedding-Based Selection
+### Anthropic's Tool Search Tool
 
-BM25 matches on keywords; embedding-based selection ranks tools by semantic similarity between the user's message and each tool description, catching relevant tools even when the wording differs. Embed every tool description once at startup, cache the vectors, then at each step select the top candidates by cosine similarity — roughly 12 per turn is a good starting point, tuned against your tool set and evals. Pair it with a small "always-active" set of critical tools (web search, a `search_tools` meta-tool) that bypass ranking, so the agent can always discover what selection missed.
+For Claude, the server-side tool search tool discovers and loads tool definitions on demand instead of front-loading everything. Mark tools you don't need up front with `defer_loading: true`, include a `tool_search_tool_bm25_20251119` (natural-language queries) or `tool_search_tool_regex_20251119` (Python-regex patterns) entry in `tools`, and Claude searches names, descriptions, and argument fields to discover and expand the tools it needs - typically loading only 3-5 tools per turn out of a catalog of thousands. No beta header is required; it's a standard tool type. See [Anthropic's tool search tool docs](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) for the request/response shape.
 
-The applied production walkthrough — the `toolpick` library, the Vercel AI SDK `prepareStep` hook, embedding caches, and cross-tool dependency maps — is in [Semantic Tool Selection at Scale](/docs/cookbook/semantic-tool-selection).
+### Embedding-Based Selection at Scale
+
+Keyword and regex search match on literal text; embedding-based selection ranks tools by semantic similarity between the user's message and each tool's description, catching relevant tools even when the wording differs. This is the right choice when you're building the ranking yourself rather than delegating to a provider's server-side search:
+
+1. Embed every tool description once at startup; cache the vectors (file or Redis) so restarts don't recompute them.
+2. On each turn, compute cosine similarity between the user's message and the cached vectors; select the top ~12 candidates as a starting point, tuned against your tool set and evals.
+3. Keep a small "always-active" set (web search, a `search_tools` meta-tool) that bypasses ranking, so the agent can always discover what the top-N selection missed.
+4. Maintain a `relatedTools` map for write operations that depend on a read tool the embedding wouldn't surface on its own - e.g. `invoices_create` needs `customers_list` pre-loaded even though "create an invoice for $500" has no semantic overlap with "list customers." Keep this map to observed dependencies; don't add transitive ones speculatively.
+5. Expose a `search_tools` meta-tool so the model can look outside the top-N selection when it needs a tool that didn't rank:
+
+```typescript
+server.registerTool(
+  "search_tools",
+  {
+    description:
+      "Search for a tool by name or capability. Use when you can't find the tool you need.",
+    inputSchema: z.object({ query: z.string() }),
+  },
+  async (params) => {
+    const results = await toolIndex.search(params.query, { maxResults: 5 });
+    return { content: [{ type: "text", text: JSON.stringify(results) }] };
+  },
+);
+```
+
+Token savings are the main payoff: a 50-tool list at ~500 tokens shrinks to a 12-tool selection at ~120 tokens per request. The tradeoffs are embedding latency (tens of milliseconds per request), a cold-start cost on the first request after a restart, and coverage - a tool outside the top-N is unreachable except through `search_tools`.
 
 ## Read-Only vs Mutating Kits
 
-Distinguish safe (read) from risky (write) tools:
+Distinguish safe (read) from risky (write) tools when assembling an agent's tool set:
 
 ```typescript
-export const readOnlyKit = {
-  description: "Safe read operations for audit and discovery",
-  tools: Object.values(toolRegistry)
-    .filter((t) => t.category === "read")
-    .map((t) => t.name),
-};
+export const readOnlyKit = Object.values(toolRegistry).filter((t) => t.category === "read");
+export const mutatingKit = Object.values(toolRegistry).filter((t) =>
+  ["read", "write"].includes(t.category),
+);
+export const dangerousKit = Object.values(toolRegistry); // requires approval: see Human Approval
 
-export const mutatingKit = {
-  description: "All read and write operations",
-  tools: Object.values(toolRegistry)
-    .filter((t) => ["read", "write"].includes(t.category))
-    .map((t) => t.name),
-};
-
-export const dangerousKit = {
-  description: "Full access including destructive operations",
-  tools: Object.keys(toolRegistry),
-};
-```
-
-Usage:
-
-```typescript
-// Audit agent — read-only
-const auditAgent = agent({
-  tools: readOnlyKit.tools.map((name) => toolRegistry[name]),
-  model: "claude-sonnet-5",
-});
-
-// Data migration — read + write
-const migrationAgent = agent({
-  tools: mutatingKit.tools.map((name) => toolRegistry[name]),
-  model: "claude-opus-5",
-  requiresHumanApproval: true,
-});
-
-// Admin — dangerous operations (requires approval)
+const auditAgent = agent({ tools: readOnlyKit, model: "claude-sonnet-5" });
 const adminAgent = agent({
-  tools: dangerousKit.tools.map((name) => toolRegistry[name]),
-  model: "claude-opus-5",
-  requiresHumanApproval: (toolName) => toolRegistry[toolName].category === "dangerous",
+  tools: dangerousKit,
+  model: "claude-opus-5-5",
+  requireApproval: (toolName) => toolRegistry[toolName].category === "dangerous",
 });
 ```
+
+See [Human Approval](/docs/tool-design/human-approval) for the approval contract behind `requireApproval`.
 
 ## Tool Deprecation and Evolution
 
-Tag tools with stability metadata:
+Tag tools with stability metadata and filter production/beta selections by it:
 
 ```typescript
-interface ToolMetadata {
-  name: string;
-  // ... other fields
-  stability: "stable" | "beta" | "deprecated";
-  deprecatedAt?: Date;
-  replacedBy?: string; // Name of successor tool
-}
-
 export function selectToolsForProduction(allTools: ToolMetadata[]): ToolMetadata[] {
-  return allTools.filter((t) => t.stability === "stable");
-}
-
-export function selectToolsForBeta(allTools: ToolMetadata[]): ToolMetadata[] {
-  return allTools.filter((t) => t.stability === "stable" || t.stability === "beta");
+  return allTools.filter((t) => t.status === "active");
 }
 ```
 
-In descriptions, note deprecated tools:
-
-```typescript
-deprecated_search_issues: {
-  description: 'DEPRECATED: Use `search_issues` instead (supports more filters). ' +
-    'This tool will be removed 2026-06-01.',
-  // ...
-},
-```
-
-## Tool Discoverability
-
-Help users find the right tool:
-
-```typescript
-export function listToolsByPurpose(purpose: string): ToolMetadata[] {
-  const descriptions = Object.values(toolRegistry)
-    .map((t) => ({ ...t, relevance: t.description.includes(purpose) ? 1 : 0 }))
-    .sort((a, b) => b.relevance - a.relevance);
-
-  return descriptions.filter((t) => t.relevance > 0).map(({ relevance, ...t }) => t);
-}
-
-// Usage
-listToolsByPurpose("search"); // Returns search_* tools
-listToolsByPurpose("delete"); // Returns delete_* tools
-listToolsByPurpose("notification"); // Returns notify_* tools
-```
+In descriptions, note deprecated tools and their replacement: `"DEPRECATED: Use \`search_issues\` instead. Removed 2026-12-01."` Never keep a deprecated tool registered out of fear of breakage - removal is safer than an agent discovering and calling a stale tool.
 
 ## Rate Limiting at the Registry Level
 
-Track tool call counts to enforce rate limits:
-
 ```typescript
-const toolCallCounts = new Map<string, number>();
-const resetInterval = 60000; // 1 minute
-
-setInterval(() => {
-  toolCallCounts.clear();
-}, resetInterval);
-
 async function executeToolWithRateLimit(toolName: string, params: any): Promise<any> {
   const tool = toolRegistry[toolName];
   if (!tool) throw new Error(`Unknown tool: ${toolName}`);
-
   if (tool.rateLimit) {
     const count = toolCallCounts.get(toolName) || 0;
     if (count >= tool.rateLimit.requestsPerMinute) {
       return {
         isError: true,
         content: [
-          {
-            type: "text",
-            text: `Rate limit exceeded: ${tool.rateLimit.requestsPerMinute} calls per minute max.`,
-          },
+          { type: "text", text: `Rate limit exceeded: ${tool.rateLimit.requestsPerMinute}/min.` },
         ],
       };
     }
     toolCallCounts.set(toolName, count + 1);
   }
-
   return await tool.handler(params);
 }
 ```
+
+## Sprawl Prevention Checklist
+
+Before adding a new tool:
+
+- [ ] Search the registry for an existing tool that covers this capability
+- [ ] If a similar tool exists, is the new one genuinely different enough to warrant a separate entry?
+- [ ] Does the new tool have an owner assigned?
+- [ ] Is the tool name unique and does it follow the namespace convention?
+- [ ] Will this tool be added to an approved role kit, or only used experimentally?
+- [ ] Is the target agent's tool set already at or near the ~20-tool review threshold?
+
+Review tool call metrics monthly - a tool with zero calls in 90 days is a removal candidate; a tool with a high error rate needs a description fix.
 
 ## Project Layout
 
@@ -362,17 +275,16 @@ src/
 │   ├── kits.ts               # Role-based subsets
 │   ├── selection.ts          # Dynamic selection logic
 │   └── handlers/
-│       ├── search.ts
-│       ├── create.ts
-│       └── ...
 └── test/
-    ├── registry.test.ts      # Kit selection tests
-    └── selection.test.ts     # BM25 search tests
+    ├── registry.test.ts
+    └── selection.test.ts
 ```
 
 ## See also
 
-- `/docs/tool-design/cross-framework-portability` — adapting registry tools to frameworks
-- `/templates/tools-and-orchestration/tool-registry.ts` — starter template
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - the read/write/destructive classification that role-based kits filter on
+- [Human Approval](/docs/tool-design/human-approval) - gating the dangerous kit behind approval
+- `/docs/tool-design/cross-framework-portability` - adapting registry tools to frameworks
 - ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
-- ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
+- ([Anthropic tool search tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool))
+- ([OpenAI function calling guide](https://developers.openai.com/api/docs/guides/function-calling))

@@ -1,7 +1,7 @@
 ---
 title: MCP Authorization
 description: OAuth protected-resource metadata, client registration, and token handling for HTTP MCP servers
-lastVerified: 2026-08-27
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -103,7 +103,7 @@ When several options exist, clients should prefer pre-registered client details,
 
 ## Client ID Metadata Documents
 
-Client ID Metadata Documents are an OAuth client registration mechanism, not an MCP-specific `/.well-known/mcp-client.json` file.
+Client ID Metadata Documents are an OAuth client registration mechanism.
 
 The client uses an HTTPS URL as its `client_id`. That URL points to a JSON document containing OAuth client metadata. The document must include at least:
 
@@ -137,6 +137,8 @@ The authorization server should fetch the metadata document, validate that the d
 
 Clients may use `private_key_jwt` for token endpoint authentication when the metadata document provides the required JWKS configuration.
 
+This is already shipping outside the spec text: OpenAI's [Apps SDK](https://developers.openai.com/apps-sdk/changelog/) (2026-08-21) uses a Client ID Metadata Document at `https://chatgpt.com/oauth/client.json` as ChatGPT's stable client ID, and pairs it with a stable OAuth redirect URL, whenever the authorization server supports RFC 9207 issuer identification. Servers that don't support RFC 9207 fall back to the older per-connector callback behaviour - a concrete illustration of why issuer validation (below) and Client ID Metadata Document support are worth implementing together.
+
 ## Token Use
 
 MCP clients must send access tokens in the authorization header:
@@ -163,17 +165,19 @@ Clients should treat a challenged scope as authoritative for satisfying that req
 
 ## Current 2026-07-28 Requirements
 
-The current `2026-07-28` revision hardens this model in four places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
+The current `2026-07-28` revision changes this model in six places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
 
-**Issuer validation (SEP-2468)** — clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer.
+**Issuer validation (SEP-2468)** - clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer.
 
-**Credentials bound to their issuing authorization server (SEP-2352)** — client credentials must be stored keyed by issuer, used only with the authorization server that issued them, and re-registered when a server's issuer changes. A credential cached against an MCP server URL rather than an issuer is the bug this closes.
+**Credentials bound to their issuing authorization server (SEP-2352)** - client credentials must be stored keyed by issuer, used only with the authorization server that issued them, and re-registered when a server's issuer changes. A credential cached against an MCP server URL rather than an issuer is the bug this closes.
 
-**`application_type` required in dynamic client registration (SEP-837)** — where you still support RFC 7591 registration, the request must declare `application_type`. Registration requests that omit it are no longer well-formed.
+**`application_type` required in dynamic client registration (SEP-837)** - where you still support RFC 7591 registration, the request must declare `application_type`. Registration requests that omit it are no longer well-formed.
 
-**Dynamic client registration Deprecated** — RFC 7591 registration is Deprecated in favor of Client ID Metadata Documents, as described above.
+**Dynamic client registration Deprecated** - RFC 7591 registration is Deprecated in favor of Client ID Metadata Documents, as described above.
 
-Two structural changes also touch authorization even though they are not auth features. Sessions are removed, so there is no connect-time authentication step and every request must carry and be validated against its own token — which is what this page already requires. And Streamable HTTP POSTs must carry `Mcp-Method` and `Mcp-Name` headers, which gives a gateway or proxy enough information to apply per-method authorization policy without parsing the JSON-RPC body.
+**Sessions removed** - there is no connect-time authentication step whose proof a later request could ride on; every request must carry and be validated against its own token, which is what this page already requires.
+
+**`Mcp-Method` and `Mcp-Name` headers required** - Streamable HTTP POSTs must carry both, which gives a gateway or proxy enough information to apply per-method authorization policy without parsing the JSON-RPC body.
 
 ## Checklist
 
@@ -190,11 +194,11 @@ Two structural changes also touch authorization even though they are not auth fe
 - [ ] Server rejects tokens issued for a different resource.
 - [ ] Scope challenges include actionable `WWW-Authenticate` metadata.
 
-## Related
+## See Also
 
-- [MCP Authentication](/docs/mcp-servers/authentication) — practical server-implementer guide: bearer tokens, identity proxies, PKCE, JWT validation, and scope enforcement
+- [MCP Authentication](/docs/mcp-servers/authentication) - practical server-implementer guide: bearer tokens, identity proxies, PKCE, JWT validation, and scope enforcement
 - [Protected Resource Metadata](/docs/authentication/protected-resource-metadata)
 - [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents)
 - [auth.md](/docs/authentication/auth-md)
-- [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) — the revision this page describes
-- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) — current authorization requirements
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) - current authorization requirements
+- [MCP Specification 2025-11-25 Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) - the predecessor revision, superseded by the link above

@@ -1,7 +1,7 @@
 ---
 title: "DPoP: Demonstrating Proof-of-Possession"
 description: "RFC 9449 sender-constrained tokens, preventing token replay attacks"
-lastVerified: 2026-08-27
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -17,13 +17,13 @@ Client: (with private key)        Server: (verifies)
 
 - Each request includes a DPoP proof: unique jti, htm (method), htu (URI), iat (timestamp)
 - Server validates signature, claim values, and jti uniqueness (prevents replay)
-- Token includes `dpop_jkt`: thumbprint of the DPoP proof's JWK
+- Token includes a `cnf.jkt` claim: thumbprint of the DPoP proof's JWK
 - Required for financial operations, user data access, administrative actions
 - Use ES256 or Ed25519 for DPoP proof signing
 
-When an access token is stolen — via a log, a memory dump, a man-in-the-middle attack — the attacker can replay it against the resource server until it expires. Demonstrating Proof-of-Possession (DPoP, RFC 9449) solves this by binding the token to the client's public key. If the token is stolen, it cannot be replayed because the attacker lacks the private key.
+When an access token is stolen - via a log, a memory dump, a man-in-the-middle attack - the attacker can replay it against the resource server until it expires. Demonstrating Proof-of-Possession (DPoP, RFC 9449) solves this by binding the token to the client's public key. If the token is stolen, it cannot be replayed because the attacker lacks the private key.
 
-DPoP is critical for high-value operations and agent-to-agent communication where token compromise is a real risk.
+Use DPoP for high-value operations and agent-to-agent communication where token compromise is a real risk.
 
 ## How DPoP Works
 
@@ -97,7 +97,7 @@ The `jti` must be globally unique per request to prevent replay. Use a UUID or a
 ## Server-Side: Validating DPoP Proofs
 
 ```typescript
-import { jwtVerify } from "jose";
+import { jwtVerify, decodeProtectedHeader, importJWK } from "jose";
 
 // Store of seen JTIs to prevent replay
 const seenJtis = new Set<string>();
@@ -108,21 +108,19 @@ async function validateDPopProof(
   method: string,
   uri: string,
 ): Promise<{ thumbprint: string; sub: string }> {
-  const { payload, protectedHeader } = await jwtVerify(dpopHeader, null, {
-    algorithms: ["ES256", "RS256"],
-    // Do NOT verify signature yet; extract the public key from the header
-  });
+  // Read the header first, without verifying: the proof's own public key
+  // is embedded in it, so there is nothing to verify against yet.
+  const protectedHeader = decodeProtectedHeader(dpopHeader);
 
-  // Extract the public key from the JWT header
   if (!protectedHeader.jwk) {
     throw new Error("DPoP JWT missing public key in header");
   }
 
-  const publicKey = await importJWK(protectedHeader.jwk);
+  const publicKey = await importJWK(protectedHeader.jwk, protectedHeader.alg);
 
   // Now verify the signature
-  await jwtVerify(dpopHeader, publicKey, {
-    algorithms: ["ES256", "RS256"],
+  const { payload } = await jwtVerify(dpopHeader, publicKey, {
+    algorithms: ["ES256", "EdDSA"],
   });
 
   // Verify claims
@@ -160,14 +158,16 @@ async function validateDPopProof(
 
 ## Binding DPoP to Access Tokens
 
-When issuing an access token, the authorization server includes the DPoP proof's JWK thumbprint in a `dpop_jkt` claim:
+When issuing an access token, the authorization server includes the DPoP proof's JWK thumbprint in the token's `cnf.jkt` claim (RFC 9449 §6.1; `dpop_jkt` is the parameter the client sends in the authorization request, not a token claim):
 
 ```json
 {
   "sub": "client_01HV3K8MNP",
   "aud": "https://api.example.com/",
   "scope": "invoices:read",
-  "dpop_jkt": "fUHyO2r...rg",
+  "cnf": {
+    "jkt": "fUHyO2r...rg"
+  },
   "iat": 1700000000,
   "exp": 1700003600
 }
@@ -176,12 +176,12 @@ When issuing an access token, the authorization server includes the DPoP proof's
 On every request, the server verifies:
 
 1. The DPoP proof is valid (signature, `htm`, `htu`, `jti`)
-2. The DPoP proof's JWK thumbprint matches the token's `dpop_jkt` claim
+2. The DPoP proof's JWK thumbprint matches the token's `cnf.jkt` claim
 
 If an attacker steals the token but not the private key, they cannot create a valid DPoP proof with the matching thumbprint.
 
 ```typescript
-import { calculateJwkThumbprint, importJWK } from "jose";
+import { jwtVerify, calculateJwkThumbprint, decodeProtectedHeader, importJWK } from "jose";
 
 async function validateTokenAndDPoP(
   token: string,
@@ -192,12 +192,17 @@ async function validateTokenAndDPoP(
   // Validate the JWT token
   const { payload: tokenPayload } = await jwtVerify(token, jwks);
 
-  // Validate the DPoP proof
-  const { payload: dpopPayload, protectedHeader } = await jwtVerify(dpopHeader, null);
+  // Validate the DPoP proof: read its embedded key, then verify against it
+  const protectedHeader = decodeProtectedHeader(dpopHeader);
+  const publicKey = await importJWK(protectedHeader.jwk!, protectedHeader.alg);
+  const { payload: dpopPayload } = await jwtVerify(dpopHeader, publicKey, {
+    algorithms: ["ES256", "EdDSA"],
+  });
 
   // Compare thumbprints
   const dpopThumbprint = await calculateJwkThumbprint(protectedHeader.jwk!);
-  if (dpopThumbprint !== tokenPayload.dpop_jkt) {
+  const cnf = tokenPayload.cnf as { jkt?: string } | undefined;
+  if (dpopThumbprint !== cnf?.jkt) {
     throw new Error("DPoP thumbprint does not match token");
   }
 
@@ -223,7 +228,9 @@ For read-only operations on public data, the overhead may not be justified.
 
 ## MCP and DPoP
 
-MCP has encouraged DPoP for remote servers that expose sensitive operations since the `2025-11-25` revision, and the current `2026-07-28` revision retains that guidance. An MCP server can require DPoP proofs on every resource access:
+DPoP is not part of the ratified MCP specification. The current `2026-07-28` revision's authorization and security-considerations pages make no mention of it. A DPoP profile for MCP exists only as an open, unmerged proposal ([SEP-1932](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1932)) - do not describe DPoP as an MCP requirement or recommendation until that lands.
+
+None of this stops an MCP server from adopting DPoP on its own: DPoP is an OAuth-layer mechanism, and an MCP server is still an OAuth resource server underneath. A server that wants sender-constrained tokens for sensitive operations can require DPoP proofs independent of anything MCP-specific:
 
 ```typescript
 // MCP server validating DPoP
@@ -248,11 +255,12 @@ server.setRequestHandler(
 See [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) for advertising DPoP requirements.
 
 <Callout type="info">
-  Two `2026-07-28` changes make DPoP easier to reason about on MCP servers. Sessions are removed, so
-  there is no connect-time authentication step whose proof a later request could ride on — every
-  request carries its own token and its own proof, which is what DPoP wanted anyway. And client
-  credentials must now be keyed by issuing authorization server (SEP-2352), which means the
-  `dpop_jkt` thumbprint you validate is unambiguously tied to one issuer's key material rather than
+  Two `2026-07-28` MCP changes are not DPoP-specific, but they make a server-side DPoP
+  implementation easier to reason about if you add one. Sessions are removed, so there is no
+  connect-time authentication step whose proof a later request could ride on - every request already
+  carries its own token, which is the same per-request model DPoP proofs assume. And client
+  credentials must now be keyed by issuing authorization server (SEP-2352), so a `cnf.jkt`
+  thumbprint you choose to validate is unambiguously tied to one issuer's key material rather than
   to a client identity that might have been registered in several places.
 </Callout>
 
@@ -261,15 +269,16 @@ See [Protected Resource Metadata](/docs/authentication/protected-resource-metada
 - [ ] Clients generate Ed25519 or ES256 keypairs at startup
 - [ ] Every request includes a unique `DPoP` proof with `jti`, `htm`, `htu`, `iat`
 - [ ] Server validates DPoP signature, claims, and JTI uniqueness
-- [ ] Access tokens include `dpop_jkt` claim with the proof's JWK thumbprint
+- [ ] Access tokens include a `cnf.jkt` claim with the proof's JWK thumbprint
 - [ ] Server validates that DPoP thumbprint matches token claim
 - [ ] JTI store prevents reuse (Redis or equivalent for distributed systems)
 - [ ] DPoP is required for sensitive operations (financial, user data, admin)
 
 ## See Also
 
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — advertising DPoP requirements
-- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) — nonce stores and DPoP `jti`
-- ([RFC 9449: Demonstrating Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — full specification
-- ([jose on npm](https://www.npmjs.com/package/jose)) — JWT signing and validation
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - token issuance
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) - advertising DPoP requirements
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) - nonce stores and DPoP `jti`
+- [RFC 9449: Demonstrating Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html) - full specification
+- [SEP-1932: DPoP Profile for MCP](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1932) - open, unmerged proposal to standardize this at the MCP layer
+- [jose on npm](https://www.npmjs.com/package/jose) - JWT signing and validation

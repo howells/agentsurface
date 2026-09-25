@@ -4,7 +4,7 @@ globs: ["src/**/*.ts", "src/**/*.tsx", "tests/**/*", "AGENTS.md", "package.json"
 ---
 
 <!--
-cursor-rules.mdc — Cursor IDE rules for agent-focused development.
+cursor-rules.mdc - Cursor IDE rules for agent-focused development.
 
 What: A Cursor rules file (YAML frontmatter + markdown) that guides Cursor's code
 completion and refactoring behavior. Scoped to specific file patterns.
@@ -29,7 +29,7 @@ Usage:
 4. alwaysApply: true = apply to all matched files (not optional)
 -->
 
-# Cursor IDE Rules — Acme Agent Tools
+# Cursor IDE Rules - Acme Agent Tools
 
 ## Overview
 
@@ -247,9 +247,9 @@ Return errors as data, not thrown exceptions:
 
 ### Filtered commands (use these!)
 
-- `pnpm --filter=@acme/sdk dev` — Fast development in one package
-- `pnpm --filter=@acme/api test:watch` — Watch tests in one package
-- `turbo run build --filter=@acme/dashboard` — Build single package
+- `pnpm --filter=@acme/sdk dev` - Fast development in one package
+- `pnpm --filter=@acme/api test:watch` - Watch tests in one package
+- `turbo run build --filter=@acme/dashboard` - Build single package
 
 ### Avoid
 
@@ -312,6 +312,6 @@ IDE debugging (breakpoints) also requires this.
 ## See also
 
 - [Cursor documentation](https://docs.cursor.com)
-- [AGENTS.md](../../AGENTS.md) — Shared project context
-- [CLAUDE.md](../../CLAUDE.md) — Claude Code-specific rules (different tool)
-- `.github/copilot-instructions.md` — GitHub Copilot rules (different tool)
+- [AGENTS.md](../../AGENTS.md) - Shared project context
+- [CLAUDE.md](../../CLAUDE.md) - Claude Code-specific rules (different tool)
+- `.github/copilot-instructions.md` - GitHub Copilot rules (different tool)

@@ -1,0 +1,29 @@
+---
+title: Freshness and Provenance Signals
+description: Telling an agent how current a retrieved result is and where it came from
+lastVerified: 2026-09-25
+---
+
+A retrieved result without a timestamp or source is a claim an agent cannot verify. Freshness and provenance are what let an agent decide whether to trust a result, cite it, or check it against something more current.
+
+## Freshness
+
+Every retrievable record should carry:
+
+- **`updated_at` (or equivalent last-modified timestamp)**, in ISO 8601, on the record itself, so it reaches every response that returns the record.
+- **A documented staleness policy** where relevant: how often the underlying data refreshes, and whether a retrieved result can be out of date by design (a cached price, a nightly-synced inventory count).
+- **A way to ask for current data explicitly** when the endpoint's default response may be cached - a `?fresh=true` parameter, a documented cache TTL, or a separate real-time endpoint for volatile facts like price or availability.
+
+An agent using a stale price or availability figure to make a purchasing decision is a correctness failure. Treat volatile decision facts (price, stock, appointment slots) differently from stable reference facts (a product's dimensions, a policy's text).
+
+## Provenance
+
+Every retrieved result should be traceable back to where it came from:
+
+- **A stable identifier and canonical URL** for the source document or record, rather than the retrieval system's internal ID.
+- **A citation-ready reference**: section, page, or anchor when the source supports it, so an agent quoting the result can point to the exact origin.
+- **Source attribution when a result is derived or aggregated** - a summary, a computed value, or a merged record should say what it was built from, not present itself as a primary source.
+
+## How this differs from page-level freshness signals
+
+[Content Structure](/docs/discovery/content-structure) covers `article:modified_time` and sitemap `lastmod` as page-level signals for crawlers and agents. Those help a crawler decide what to recrawl and let an agent judge a page's age. Freshness and provenance on a retrieval _response_ are a different contract: they let the calling agent decide, at the moment it reads a result, whether that specific record is current enough and attributable enough to act on.

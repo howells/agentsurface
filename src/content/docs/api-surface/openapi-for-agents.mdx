@@ -1,25 +1,26 @@
 ---
 title: OpenAPI for Agents
 description: Writing OpenAPI specifications that AI agents can use as executable contracts
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-OpenAPI specs are executable contracts when agents consume them. This document explains how spec semantics — operationId, descriptions, schema constraints — directly shape agent behavior at runtime. Vague descriptions become routing failures. Missing operationId values break tool generation. Schema constraints are enforced, not suggested.
+OpenAPI specs are executable contracts when agents consume them. This document explains how spec semantics - operationId, descriptions, schema constraints - directly shape agent behavior at runtime. Vague descriptions become routing failures. Missing operationId values break tool generation.
 
-- operationId must be globally unique and verb_noun format
-- Descriptions are prompts, not documentation — be precise and specific
+- operationId must be globally unique, verb-first, and in one consistent case
+- Descriptions are prompts, not documentation - be precise and specific
 - Schema constraints are enforced strictly by agents
 - Ambiguous descriptions lead to silent failures and misrouting
 - Token-heavy prose degrades LLM routing accuracy
 
-OpenAPI is no longer just documentation. When an agent framework ingests your spec to generate tool definitions, every field becomes executable instructions. A vague description is a bug. A missing `operationId` is a build failure. This page covers what makes an OpenAPI spec agent-ready.
+When an agent framework ingests your spec to generate tool definitions, every field becomes executable instructions. A vague description is a bug. A missing `operationId` is a build failure. This page covers what makes an OpenAPI spec agent-ready.
 
-## The Conceptual Shift: Specs as Agent Contracts
+## Specs as Agent Contracts
 
 An OpenAPI spec written for human developers communicates intent through prose. A developer reads the description, infers the behavior, and writes code. That pipeline breaks entirely when an agent is the consumer.
 
-Agents do not infer. They pattern-match. Every decision an agent makes about when to call an operation, what parameters to pass, and how to interpret the response is based on the literal text you wrote. This means your spec is not documentation — it is a contract that the agent executes verbatim.
+Agents pattern-match: every decision about when to call an operation, what parameters to pass, and how to interpret the response is based on the literal text you wrote, so the spec is a contract the agent executes verbatim.
 
 The practical consequences:
 
@@ -27,7 +28,7 @@ The practical consequences:
 - **Descriptions are prompts.** The LLM generating tool calls reads your `description` as part of its context window. Token-heavy, prose-heavy descriptions degrade routing accuracy.
 - **Schema constraints are enforced, not suggested.** Unlike a human who reads "string, max 100 chars" and uses judgment, an agent runtime validates strictly and rejects calls that violate the schema.
 
-## Critical Fields
+## Key Fields
 
 ### `operationId`
 
@@ -35,22 +36,22 @@ The practical consequences:
 
 - **Globally unique** across your entire spec
 - **Verb-noun format** that unambiguously describes the action and resource
-- **Snake_case or camelCase** — pick one and be consistent
+- **Snake_case or camelCase** - pick one and be consistent
 
 ```yaml
-# Bad — no operationId, frameworks generate names from path + method
+# Bad - no operationId, frameworks generate names from path + method
 paths:
   /users/{id}:
     get:
       summary: Get user
 
-# Bad — noun only, ambiguous between list and get
+# Bad - noun only, ambiguous between list and get
 paths:
   /users/{id}:
     get:
       operationId: user
 
-# Good — verb_noun, unambiguous
+# Good - verb_noun, unambiguous
 paths:
   /users/{id}:
     get:
@@ -69,20 +70,13 @@ Common verb prefixes: `get_`, `list_`, `create_`, `update_`, `delete_`, `search_
 
 ### `description`
 
-The `description` field on an operation is the primary signal an agent uses to decide whether to call it. It answers three questions:
-
-1. **When should I call this?** (trigger conditions)
-2. **When should I use something else?** (negative conditions and disambiguation)
-3. **What do I get back?** (return value summary)
+The `description` field on an operation is the primary signal an agent uses to decide whether to call it - it becomes the generated tool's description verbatim. The rules for writing that description as a routing prompt (what it does, when to use it, when not to, prerequisites and edge cases) are OpenAPI-agnostic and live in [Naming and Descriptions: Descriptions as Prompts](/docs/tool-design/naming-and-descriptions#descriptions-as-prompts); apply them here exactly as written for MCP tools.
 
 ```yaml
-# Bad — describes the endpoint, not the agent's decision
+# Bad - describes the endpoint, not the agent's decision
 description: Returns a user object from the database by user ID.
 
-# Bad — just the summary repeated
-description: Get user by ID.
-
-# Good — answers when/why/what, includes disambiguation
+# Good - trigger condition, disambiguation, return summary
 description: >
   Retrieves a single user's full profile including account settings,
   subscription tier, and usage statistics. Use this when you have a
@@ -96,45 +90,14 @@ description: >
 `summary` is a single-line label shown in tool pickers and sidebars. It should be a complete human-readable sentence under 100 characters. Do not repeat the `operationId`.
 
 ```yaml
-# Bad — repeats the operationId
+# Bad - repeats the operationId
 summary: get_user
 
-# Bad — too long
+# Bad - too long
 summary: Retrieves a user object from the database given a valid user identifier
 
 # Good
 summary: Get a user's full profile by ID
-```
-
-## The "When / Why / How" Description Pattern
-
-Structure operation descriptions around three phases:
-
-**When:** What triggers this call? What context requires this operation?
-**Why (vs alternatives):** When should the agent prefer this over similar operations?
-**How:** Prerequisites, parameter notes, return summary, errors.
-
-```yaml
-paths:
-  /documents/{id}/publish:
-    post:
-      operationId: publish_document
-      summary: Publish a document to make it publicly visible
-      description: >
-        Publishes a draft document, making it visible to all users with
-        read access to the containing workspace. Call this after the user
-        confirms they want to make a document public, or when an automated
-        workflow reaches the publication step.
-
-        Use update_document instead if the document content still needs
-        changes. Use schedule_document_publish if publication should happen
-        at a future time. Publishing is irreversible through this endpoint —
-        to unpublish, call archive_document.
-
-        Requires the document to be in "draft" or "review" status.
-        Returns the updated document with status "published" and a
-        public_url field. Returns 409 if the document is already published
-        or archived.
 ```
 
 ## Parameter Design
@@ -154,7 +117,7 @@ When an operation genuinely requires many inputs, group related parameters into 
 Agents handle flat parameter lists more reliably than deeply nested objects. Nesting creates ambiguity about which level holds which constraint.
 
 ```yaml
-# Bad — nested, agent must navigate structure
+# Bad - nested, agent must navigate structure
 requestBody:
   content:
     application/json:
@@ -172,7 +135,7 @@ requestBody:
                   email:
                     type: string
 
-# Better — flat structure with clear field names
+# Better - flat structure with clear field names
 requestBody:
   content:
     application/json:
@@ -231,10 +194,10 @@ properties:
 
 ### Essential Fields Only
 
-Include only fields agents need to make decisions or pass to subsequent operations. Avoid exposing large internal objects with dozens of fields — most will never be read and inflate token usage.
+Include only fields agents need to make decisions or pass to subsequent operations. Avoid exposing large internal objects with dozens of fields - most will never be read and inflate token usage.
 
 ```yaml
-# Bad — exposes every database column
+# Bad - exposes every database column
 responses:
   '200':
     content:
@@ -242,7 +205,7 @@ responses:
         schema:
           $ref: '#/components/schemas/UserFull'  # 40+ fields
 
-# Good — returns the fields agents actually use
+# Good - returns the fields agents actually use
 responses:
   '200':
     content:
@@ -306,19 +269,10 @@ responses:
 
 ## Explicit Disambiguation
 
-When your API has operations with similar names or overlapping functionality, add explicit comparison language to descriptions. This prevents agents from calling the wrong operation.
+When operations have similar names or overlapping functionality, add explicit comparison language to their descriptions so agents don't call the wrong one - the same disambiguation rule as [Naming and Descriptions: Disambiguation Patterns](/docs/tool-design/naming-and-descriptions#disambiguation-patterns), applied to `operationId`/`description` pairs instead of MCP tool names:
 
 ```yaml
 paths:
-  /users:
-    get:
-      operationId: list_users
-      description: >
-        Returns a paginated list of users matching optional filters.
-        Use this to find users by email, name, or status. For retrieving
-        a single user when you already have the ID, use get_user instead —
-        it is faster and returns more complete profile data.
-
   /users/{id}:
     get:
       operationId: get_user
@@ -326,34 +280,11 @@ paths:
         Returns the complete profile for a single user by ID. Use this
         when you have a specific user ID. For searching or listing multiple
         users, use list_users instead.
-
-  /users/search:
-    get:
-      operationId: search_users
-      description: >
-        Full-text search across user names, emails, and profile fields.
-        Use this for fuzzy or partial matching. For exact-match filtering
-        by status or role, use list_users with query parameters — it is
-        more efficient. For retrieving a known user ID, use get_user.
 ```
 
 ## Token Efficiency
 
-Every description field becomes part of the context window when an agent is choosing which tool to call. Excessive description length degrades accuracy.
-
-| Description length       | Effect                                                   |
-| ------------------------ | -------------------------------------------------------- |
-| ~200 tokens (~150 words) | Acceptable — full context fits in tool selection window  |
-| ~500 tokens              | Marginal — monitor routing accuracy                      |
-| ~2000 tokens             | Problematic — crowds out other tools, degrades selection |
-
-Write descriptions that are precise, not exhaustive. If you find yourself writing paragraphs of edge cases, that is a signal the operation should be split into more focused operations.
-
-<Callout type="warn">
-  Long descriptions hurt agent performance more than they help. A 2000-token description does not
-  make an agent smarter about when to use a tool — it makes every other tool harder to select.
-  Target under 150 words per operation description.
-</Callout>
+Every description field enters the context window when an agent is choosing which tool to call, so excessive length degrades routing accuracy the same way it does for any tool description - see [Naming and Descriptions: Length Guidelines](/docs/tool-design/naming-and-descriptions#length-guidelines) for the target ranges. Write descriptions that stay precise; paragraphs of edge cases are a signal the operation should be split.
 
 ## OpenAPI 3.1 Features That Matter
 
@@ -402,7 +333,7 @@ webhooks:
 
 ## OpenAPI 3.2 Features
 
-OpenAPI 3.2 (in development as of 2025) introduces two features with direct agent relevance.
+OpenAPI 3.2 shipped in September 2025 and is current at 3.2.1 (released 2026-09-10). It introduces two features with direct agent relevance.
 
 ### Streaming Media Types
 
@@ -413,10 +344,8 @@ responses:
   "200":
     content:
       application/jsonl:
-        schema:
-          type: array
-          items:
-            $ref: "#/components/schemas/StreamChunk"
+        itemSchema:
+          $ref: "#/components/schemas/StreamChunk"
 ```
 
 ### `$self` for Multi-Document Specs
@@ -500,7 +429,7 @@ Before treating a spec as agent-ready:
 - [ ] All enum values are listed with semantic descriptions
 - [ ] No operation has more than 10 parameters
 - [ ] All error responses are documented with status codes
-- [ ] Descriptions are under 150 words per operation
+- [ ] Descriptions fall inside the [Length Guidelines](/docs/tool-design/naming-and-descriptions#length-guidelines) ranges
 - [ ] Response schemas include a concrete `example`
 - [ ] `format` keywords are used on string fields wherever applicable
 
@@ -511,12 +440,13 @@ A well-formed spec still leaves an agent stuck if reaching a working call requir
 - Publish an official JavaScript/TypeScript SDK to npm, generated from the OpenAPI spec. Set `repository` and `homepage` in `package.json` so an agent verifying the package can trace it back to your API.
 - For broader coverage, generate and publish SDKs for the other language ecosystems your users work in (Python/PyPI, Go modules, Ruby/RubyGems) from the same spec rather than maintaining them by hand.
 - Link every published SDK from your API documentation and from `llms.txt`, so an agent that finds the docs finds the install command in the same pass. See [llms.txt](/docs/discovery/llms-txt).
-- Minimize the steps that need a person: self-serve API keys, a sandbox or test-mode key that works without a sales call, and no mandatory approval gate before a first successful call.
+- Minimize the steps that need a person: self-serve API keys, a sandbox or test-mode key that works without a sales call, and no mandatory approval gate before a first successful call. See [Test-Mode Keys and Sandbox Environments](/docs/authentication/api-keys#test-mode-keys-and-sandbox-environments) for the key-prefix and seeded-data conventions that make this self-serve.
 
 Ora's catalog names these checks `npm-sdk-package` (an npm-published JS/TS SDK with `repository` and `homepage` set), `rest-sdk-packages` (SDKs across npm, PyPI, Go modules, and RubyGems, generated from the OpenAPI spec), and `onboarding-friction` (whether an agent can go from discovery to a first successful API call with no human in the loop - free tier or trial, self-serve keys, sandbox environment). See [Ora's checks catalog](https://ora.ai/api/checks).
 
 ## Related Pages
 
-- [Tool Definitions](./tool-definitions) — how these OpenAPI operations become agent tool definitions
-- [Arazzo Workflows](./arazzo-workflows) — composing operations into multi-step workflows
-- [OpenAPI Extensions](./openapi-extensions) — semantic extensions for agent behavior hints
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - the framework-agnostic rules for writing descriptions as prompts, disambiguation, and length that this page applies to OpenAPI fields
+- [Tool Definitions](./tool-definitions) - how these OpenAPI operations become agent tool definitions
+- [Arazzo Workflows](./arazzo-workflows) - composing operations into multi-step workflows
+- [OpenAPI Extensions](./openapi-extensions) - semantic extensions for agent behavior hints

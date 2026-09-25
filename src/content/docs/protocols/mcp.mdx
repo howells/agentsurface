@@ -1,12 +1,12 @@
 ---
 title: Model Context Protocol (MCP)
 description: Protocol for connecting AI agents to external tools, data sources, and services
-lastVerified: 2026-08-27
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-MCP defines how agents discover and use tools, read resources, and invoke prompts. It is the baseline protocol for connecting AI applications to external systems. Current spec revision: `2026-07-28`, with a stateless core, no initialization handshake, and no protocol sessions. All Tier 1 SDKs — TypeScript, Python, Go, and C# — support it. Transport options are stdio for local processes and Streamable HTTP for remote servers. Protected HTTP servers use OAuth-based authorization discovery.
+MCP defines how agents discover and use tools, read resources, and invoke prompts. It is the baseline protocol for connecting AI applications to external systems. Current spec revision: `2026-07-28`, with a stateless core, no initialization handshake, and no protocol sessions. All Tier 1 SDKs - TypeScript, Python, Go, and C# - support it. Transport options are stdio for local processes and Streamable HTTP for remote servers. Protected HTTP servers use OAuth-based authorization discovery.
 
 ```
 Agent → connects via stdio/HTTP → MCP Server
@@ -21,10 +21,10 @@ Agent → connects via stdio/HTTP → MCP Server
 - Async Tasks are the official `io.modelcontextprotocol/tasks` extension, not a core primitive
 - Authorization for protected HTTP servers via OAuth protected-resource metadata and authorization-server discovery
 - Server advertises capabilities; agent selects which to use
-- MCP Apps — the first official MCP extension (SEP-1865, Stable `2026-01-26`) — add interactive UI surfaces inside compatible clients (ChatGPT, Claude, VS Code, Goose, Postman); see [MCP Apps](/docs/agentic-ui/mcp-apps)
+- MCP Apps - the first official MCP extension (SEP-1865, Stable `2026-01-26`) - add interactive UI surfaces inside compatible clients (ChatGPT, Claude, VS Code, Goose, Postman); see [MCP Apps](/docs/agentic-ui/mcp-apps)
 - Agent Skills complement MCP by packaging reusable instructions, scripts, references, and assets
 
-MCP is the protocol that connects AI models to the external world. It defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and negotiate extensions. Implement MCP first when you are exposing remote tools, data, or workflows to external agents. For page-scoped browser tools, see [WebMCP](/docs/protocols/webmcp).
+MCP defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and negotiate extensions. Implement MCP first when you are exposing remote tools, data, or workflows to external agents. For page-scoped browser tools, see [WebMCP](/docs/protocols/webmcp).
 
 ## Origin and Governance
 
@@ -43,9 +43,11 @@ The current specification revision is [`2026-07-28`](https://modelcontextprotoco
   `2026-07-28`; add predecessor compatibility only when a supported client requires it.
 </Callout>
 
+The [MCP roadmap update (2026-08-22)](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) sets direction for what lands next: server-initiated events (webhooks and channels, replacing polling) alongside maturing the Tasks extension; a unified HTTP-native transport that extends Streamable HTTP to local servers currently reached over stdio; agent identity work (DPoP adoption and Workload Identity Federation for delegation without long-lived tokens); standardized tool-result handling and progressive discovery so a server can expose a small entry point and reveal more of a large tool catalogue as a conversation narrows; and SDK ergonomics and spec-conformance work. None of this is shipped spec behavior yet; build against shipped features only.
+
 ## Core Primitives and Extensions
 
-MCP exposes four core capability types. Each primitive has a different controller — the entity that decides when and how it is used.
+MCP exposes three core primitives plus negotiated extensions. Each primitive has a different controller - the entity that decides when and how it is used.
 
 ### Tools (Model-Controlled)
 
@@ -55,7 +57,7 @@ Tools are functions the model calls autonomously to take action or retrieve info
 {
   "type": "tool",
   "name": "billing_create_invoice",
-  "description": "Creates a new invoice for a customer. Call this when the user wants to bill a customer for services. Requires a valid customer_id — use billing_list_customers first if you only have a name.",
+  "description": "Creates a new invoice for a customer. Call this when the user wants to bill a customer for services. Requires a valid customer_id - use billing_list_customers first if you only have a name.",
   "inputSchema": {
     "type": "object",
     "required": ["customer_id", "amount_cents", "currency"],
@@ -89,7 +91,7 @@ The `description` field is the primary routing signal. It should answer: when to
 
 ### Resources (Application-Controlled)
 
-Resources expose data that the application makes available for an agent to read. Unlike tools, resources are not called autonomously — the application controls which resources are exposed and when. Resources are identified by URI and can represent files, database records, API responses, or any other data source.
+Resources expose data that the application makes available for an agent to read. Unlike tools, resources are not called autonomously - the application controls which resources are exposed and when. Resources are identified by URI and can represent files, database records, API responses, or any other data source.
 
 ```json
 {
@@ -110,7 +112,7 @@ Resource URIs follow standard URI syntax. Custom URI schemes are common for appl
 }
 ```
 
-Servers that implement resource subscriptions notify clients when resource content changes. Declare this capability at server construction time (see [Capability Declaration](#capability-declaration)).
+Servers that implement resource subscriptions notify clients when resource content changes. In `2025-11-25`, declare this capability at server construction time (see [Capability Declaration](#capability-declaration)); in the current `2026-07-28` revision, `resources/subscribe` is removed and a client opts into `resourceSubscriptions` notifications on the `subscriptions/listen` stream instead (see [What Changed in 2026-07-28](#what-changed-in-2026-07-28)).
 
 ### Prompts (User-Controlled)
 
@@ -153,7 +155,7 @@ The official `io.modelcontextprotocol/tasks` extension allows long-running, asyn
 }
 ```
 
-Use tasks when an operation cannot complete in a single RPC roundtrip — report generation, data exports, compliance audits, or expensive batch work. Clients can poll task state and receivers may send optional task status notifications.
+Use tasks when an operation cannot complete in a single RPC roundtrip - report generation, data exports, compliance audits, or expensive batch work. Clients can poll task state and receivers may send optional task status notifications.
 
 <Callout type="info">
   Compatibility note: `2025-11-25` treated Tasks as experimental core behavior and used
@@ -344,37 +346,37 @@ Annotations are hints, not enforcement. Clients may use them to require user con
 
 The November 2025 revision adds several important capabilities:
 
-**Tasks** — Experimental durable requests with polling and deferred result retrieval.
+**Tasks** - Experimental durable requests with polling and deferred result retrieval.
 
-**Client ID Metadata Documents** — Recommended OAuth client registration mechanism for clients and authorization servers that do not have a prior relationship.
+**Client ID Metadata Documents** - Recommended OAuth client registration mechanism for clients and authorization servers that do not have a prior relationship.
 
-**Authorization-server discovery** — HTTP authorization now leans on OAuth protected-resource metadata and supports OAuth or OpenID Connect discovery for authorization servers.
+**Authorization-server discovery** - HTTP authorization now leans on OAuth protected-resource metadata and supports OAuth or OpenID Connect discovery for authorization servers.
 
-**URL Mode Elicitation** — Servers can direct users to external URLs for sensitive out-of-band interactions that should not pass through the MCP client.
+**URL Mode Elicitation** - Servers can direct users to external URLs for sensitive out-of-band interactions that should not pass through the MCP client. Removed in `2026-07-28`; see the multi round-trip replacement below.
 
-**Tool-call support in sampling** — Sampling can include `tools` and `toolChoice` parameters.
+**Tool-call support in sampling** - Sampling can include `tools` and `toolChoice` parameters.
 
 ## What Changed in 2026-07-28
 
 Beyond the stateless core, the removal of sessions, and the Tasks extension covered above, the `2026-07-28` revision made the following changes. Avoid reintroducing the predecessor behavior in new systems.
 
-**Sessions are gone** (SEP-2567) — the `Mcp-Session-Id` header disappears from Streamable HTTP and list endpoints no longer vary per connection. Cross-call state moves to explicit server-minted handles passed as ordinary tool arguments.
+**Sessions are gone** (SEP-2567) - the `Mcp-Session-Id` header disappears from Streamable HTTP and list endpoints no longer vary per connection. Cross-call state moves to explicit server-minted handles passed as ordinary tool arguments.
 
-**`subscriptions/listen` replaces the HTTP GET stream** (SEP-2575) — one long-lived POST-response stream carries `toolsListChanged`, `promptsListChanged`, `resourcesListChanged`, and `resourceSubscriptions` notifications, opted into per type and tagged with `io.modelcontextprotocol/subscriptionId`. `resources/subscribe` and `resources/unsubscribe` are removed. Request-scoped notifications such as progress and log messages stay on the originating request's response stream.
+**`subscriptions/listen` replaces the HTTP GET stream** (SEP-2575) - one long-lived POST-response stream carries `toolsListChanged`, `promptsListChanged`, `resourcesListChanged`, and `resourceSubscriptions` notifications, opted into per type and tagged with `io.modelcontextprotocol/subscriptionId`. `resources/subscribe` and `resources/unsubscribe` are removed. Request-scoped notifications such as progress and log messages stay on the originating request's response stream.
 
-**Multi round-trip requests replace server-initiated calls** (SEP-2322) — instead of the server calling `roots/list`, `sampling/createMessage`, or `elicitation/create`, it returns an `InputRequiredResult` (`resultType: "input_required"`) carrying `inputRequests`, and the client retries the original request with `inputResponses`. Every result now carries a required `resultType` of `"complete"` or `"input_required"`; results from older servers that omit it MUST be treated as `"complete"`. URL-mode elicitation's `notifications/elicitation/complete` and `elicitationId` are removed — the outcome is learned by retrying and correlated through `requestState`.
+**Multi round-trip requests replace server-initiated calls** (SEP-2322) - instead of the server calling `roots/list`, `sampling/createMessage`, or `elicitation/create`, it returns an `InputRequiredResult` (`resultType: "input_required"`) carrying `inputRequests`, and the client retries the original request with `inputResponses`. Every result now carries a required `resultType` of `"complete"` or `"input_required"`; results from older servers that omit it MUST be treated as `"complete"`. URL-mode elicitation's `notifications/elicitation/complete` and `elicitationId` are removed - the outcome is learned by retrying and correlated through `requestState`.
 
-**Removed utilities** — `ping`, `logging/setLevel`, and `notifications/roots/list_changed` all go away. Log level is set per request through `io.modelcontextprotocol/logLevel` in `_meta`. SSE resumability goes with them: there are no event IDs or `Last-Event-ID` replay, so a broken stream is re-issued as a new request with a new ID.
+**Removed utilities** - `ping`, `logging/setLevel`, and `notifications/roots/list_changed` all go away. Log level is set per request through `io.modelcontextprotocol/logLevel` in `_meta`. SSE resumability goes with them: there are no event IDs or `Last-Event-ID` replay, so a broken stream is re-issued as a new request with a new ID.
 
-**Deprecated with a 12-month minimum window** (SEP-2577) — Roots, Sampling, and Logging are all Deprecated. Replace Roots with tool parameters, resource URIs, or server configuration; replace Sampling with a direct call to your own LLM provider API; replace Logging with stderr on stdio or OpenTelemetry on HTTP. The `includeContext` values `"thisServer"` and `"allServers"` are Deprecated, and the legacy HTTP+SSE transport is formally Deprecated under the new lifecycle policy. New implementations should not adopt any of these.
+**Deprecated with a 12-month minimum window** (SEP-2577) - Roots, Sampling, and Logging are all Deprecated. Replace Roots with tool parameters, resource URIs, or server configuration; replace Sampling with a direct call to your own LLM provider API; replace Logging with stderr on stdio or OpenTelemetry on HTTP. The `includeContext` values `"thisServer"` and `"allServers"` are Deprecated, and the legacy HTTP+SSE transport is formally Deprecated under the new lifecycle policy. New implementations should not adopt any of these.
 
-**Transport and caching requirements** — Streamable HTTP POSTs must carry `Mcp-Method` and `Mcp-Name` headers, with custom headers namespaced under `x-mcp-header` (SEP-2243). List and read results must carry `ttlMs` and a `cacheScope` of `"public"` or `"private"` via `CacheableResult` (SEP-2549). `tools/list` SHOULD return a deterministic order so clients get prompt-cache hits.
+**Transport and caching requirements** - Streamable HTTP POSTs must carry `Mcp-Method` and `Mcp-Name` headers, with custom headers namespaced under `x-mcp-header` (SEP-2243). List and read results must carry `ttlMs` and a `cacheScope` of `"public"` or `"private"` via `CacheableResult` (SEP-2549). `tools/list` SHOULD return a deterministic order so clients get prompt-cache hits.
 
-**Schemas and errors** — tool `inputSchema` and `outputSchema` accept any JSON Schema 2020-12 keywords including `$ref`, and `structuredContent` may be any JSON value (SEP-2106). Resource-not-found moves from `-32002` to `-32602` for JSON-RPC alignment, and a new allocation policy reserves `-32020..-32099` for the spec while leaving `-32000..-32019` implementation-defined.
+**Schemas and errors** - tool `inputSchema` and `outputSchema` accept any JSON Schema 2020-12 keywords including `$ref`, and `structuredContent` may be any JSON value (SEP-2106). Resource-not-found moves from `-32002` to `-32602` for JSON-RPC alignment, and a new allocation policy reserves `-32020..-32099` for the spec while leaving `-32000..-32019` implementation-defined.
 
-**Extensions and tracing** — `ClientCapabilities` and `ServerCapabilities` gain an `extensions` field using reverse-DNS identifiers, and OpenTelemetry trace context (`traceparent`, `tracestate`, `baggage`) travels in `_meta` (SEP-414).
+**Extensions and tracing** - `ClientCapabilities` and `ServerCapabilities` gain an `extensions` field using reverse-DNS identifiers, and OpenTelemetry trace context (`traceparent`, `tracestate`, `baggage`) travels in `_meta` (SEP-414).
 
-**Authorization** — see [MCP Authorization](/docs/authentication/mcp-auth-model) for the six authorization changes, including `iss` validation per RFC 9207 and the deprecation of RFC 7591 dynamic client registration in favor of Client ID Metadata Documents.
+**Authorization** - see [MCP Authorization](/docs/authentication/mcp-auth-model) for the six authorization changes, including `iss` validation per RFC 9207 and the deprecation of RFC 7591 dynamic client registration in favor of Client ID Metadata Documents.
 
 ## Advanced Capabilities
 
@@ -406,7 +408,7 @@ Sampling allows an MCP server to request that the client (the AI model) generate
 }
 ```
 
-Sampling requires the client to declare the `sampling` capability during initialization. Not all clients support it.
+Sampling requires the client to declare the `sampling` capability - during initialization in `2025-11-25`, or per request in `_meta` under the stateless `2026-07-28` core. Not all clients support it.
 
 <Callout type="warn">
   Deprecated in `2026-07-28` (SEP-2577). Sampling stays available through the 12-month minimum
@@ -435,13 +437,13 @@ Servers that respect roots will not access paths outside the declared roots, pro
 <Callout type="warn">
   Deprecated in `2026-07-28` (SEP-2577), along with the `notifications/roots/list_changed`
   notification, which is removed outright. Express scope boundaries as explicit tool parameters,
-  resource URIs, or server configuration instead — all three survive the stateless core, whereas a
+  resource URIs, or server configuration instead - all three survive the stateless core, whereas a
   client-declared root list does not.
 </Callout>
 
 ### Elicitation
 
-Elicitation allows a server to request additional information from the user during a tool execution — mid-call user input rather than pre-declared parameters. A server handling a file operation might elicit confirmation before overwriting an existing file.
+Elicitation allows a server to request additional information from the user during a tool execution - mid-call user input rather than pre-declared parameters. A server handling a file operation might elicit confirmation before overwriting an existing file.
 
 ```json
 {
@@ -462,6 +464,13 @@ Elicitation allows a server to request additional information from the user duri
   }
 }
 ```
+
+<Callout type="warn">
+  Deprecated in `2026-07-28` (SEP-2577). Server-initiated `elicitation/create` stays available
+  through the 12-month minimum deprecation window, but the replacement path is a multi round-trip
+  request: the server returns `resultType: "input_required"` and the client retries with
+  `inputResponses`.
+</Callout>
 
 ### Progress Notifications
 
@@ -537,7 +546,7 @@ This is the appropriate transport for:
 }
 ```
 
-The process is isolated at the OS level. Each MCP client instance gets its own subprocess. This provides natural process isolation — a crash in one MCP server does not affect others.
+The process is isolated at the OS level. Each MCP client instance gets its own subprocess. This provides natural process isolation - a crash in one MCP server does not affect others.
 
 ### Streamable HTTP (Remote Services)
 
@@ -585,7 +594,7 @@ The MCP server exposes protected-resource metadata, not necessarily authorizatio
 GET /.well-known/oauth-protected-resource
 ```
 
-Tokens must be validated on every request — not cached across sessions. Validate the audience (`aud`) claim to ensure tokens issued for other services are rejected.
+Tokens must be validated on every request - not cached across sessions. Validate the audience (`aud`) claim to ensure tokens issued for other services are rejected.
 
 ### Process Isolation for stdio
 
@@ -594,7 +603,7 @@ Each MCP server launched via stdio runs as its own OS process. This provides:
 - Memory isolation between MCP servers
 - Separate environment variable namespaces
 - OS-level resource limits per server
-- Clean failure containment — a crashing server does not cascade
+- Clean failure containment - a crashing server does not cascade
 
 Do not share credentials between MCP servers. Each server should have its own scoped credentials with the minimum permissions required for its domain.
 
@@ -626,7 +635,7 @@ Each layer fails closed. A request that cannot be authenticated is rejected, not
 
 ## Capability Declaration
 
-Declare capabilities at server construction time. Only declare what you actually implement — undeclared capabilities are simply absent from the server's offerings, which is always preferable to declaring a capability and failing to implement its handler.
+Declare capabilities at server construction time. Only declare what you actually implement - undeclared capabilities are simply absent from the server's offerings, which is always preferable to declaring a capability and failing to implement its handler.
 
 ```json
 {
@@ -654,12 +663,12 @@ Declaring `resources.subscribe: true` without implementing `resources/subscribe`
 
 ## Spec & References
 
-- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) — the revision this page teaches against, with all wire format details
-- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) — current normative specification
-- [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/) — migration summary and SDK support status
-- [modelcontextprotocol.io](https://modelcontextprotocol.io) — official docs and server registry
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) - the predecessor revision, for compatibility work with clients that have not migrated
+- [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) - current normative specification
+- [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/) - migration summary and SDK support status
+- [modelcontextprotocol.io](https://modelcontextprotocol.io) - official docs and server registry
 
 ## Related Pages
 
-- [A2A Protocol](/docs/protocols/a2a) — agent-to-agent delegation, the horizontal complement to MCP
-- [Protocol Comparison](/docs/protocols/comparison) — when to use MCP vs A2A vs ACP
+- [A2A Protocol](/docs/protocols/a2a) - agent-to-agent delegation, the horizontal complement to MCP
+- [Protocol Comparison](/docs/protocols/comparison) - when to use MCP vs A2A vs ACP

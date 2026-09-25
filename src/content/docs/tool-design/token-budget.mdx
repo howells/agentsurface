@@ -1,11 +1,12 @@
 ---
 title: Token Budget
 description: Estimating tool-call token cost and designing lean responses
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Every tool definition, parameter, and response consumes context tokens. Over many calls in a long session, cost compounds exponentially. Minimize tool-definition tokens: descriptions `` `<100` `` tokens first paragraph (link detailed docs for edge cases), parameter descriptions `` `<5` `` tokens, avoid redundancy. Minimize response tokens with concise summaries, pagination (return top-5 not top-1000), and shallow objects. A response 5x larger than necessary is 5x more expensive and may cause context truncation.
+Every tool definition, parameter, and response consumes context tokens. Over many calls in a long session, cost adds up. Minimize tool-definition tokens: descriptions `` `<100` `` tokens first paragraph (link detailed docs for edge cases), parameter descriptions `` `<5` `` tokens, avoid redundancy. Minimize response tokens with concise summaries, pagination (return top-5 not top-1000), and shallow objects. A response 5x larger than necessary is 5x more expensive and may cause context truncation.
 
 - **Description cost**: First paragraph `` `<100` `` tokens, link docs for details
 - **Parameter descriptions**: `` `<5` `` tokens each, no redundancy with tool description
@@ -25,11 +26,11 @@ Tool definitions are included in every agent request. Minimize this cost:
 ### Description Length
 
 ```typescript
-// 15 tokens — concise
+// 15 tokens: concise
 ("Search for issues by text or assignee.",
-  // 50 tokens — good
+  // 50 tokens: good
   "Search for open issues by text, assignee, or status. Use for finding bugs or feature requests. Do not use for creating new issues (use create_issue instead). Returns paginated results.",
-  // 200+ tokens — bloated
+  // 200+ tokens: bloated
   "This advanced search tool provides comprehensive filtering capabilities across multiple dimensions including text matching, assignee filtering, status transitions, priority levels, custom fields, date ranges, and many other powerful options that let you slice and dice your issue data in countless ways...");
 ```
 
@@ -41,17 +42,17 @@ Keep first paragraph under 100 tokens. Link to detailed docs for edge cases rath
 // 5 tokens
 query: z.string().describe('Search query'),
 
-// 12 tokens — better
+// 12 tokens: better
 query: z.string().describe('Free text search. Examples: "bug fix", "status:open"'),
 
-// 40+ tokens — excessive
+// 40+ tokens: excessive
 query: z.string().describe('The query string that will be used to search across all issue titles, descriptions, labels, assignee names, and custom fields, supporting boolean operators like AND, OR, and NOT, with wildcard support via asterisks for prefix matching, regex patterns enclosed in slashes, and special syntax for advanced queries'),
 ```
 
 ### Schema Size
 
 ```typescript
-// Bad — bloated
+// Bad: bloated
 const schema = z
   .object({
     query: z.string(),
@@ -70,7 +71,7 @@ const schema = z
   })
   .strict();
 
-// Good — split into two tools
+// Good: split into two tools
 search_issues_simple({ query, limit, offset });
 search_issues_advanced({ ...all_filters_above });
 ```
@@ -84,7 +85,7 @@ Tool responses are inserted into the conversation for the agent to reason over. 
 ### Lean Response Example
 
 ```typescript
-// Bad — return entire record
+// Bad: return entire record
 async (params) => {
   const issue = await db.issues.findById(params.id);
   return {
@@ -97,7 +98,7 @@ async (params) => {
   };
 };
 
-// Good — return only what agents act on
+// Good: return only what agents act on
 async (params) => {
   const issue = await db.issues.findById(params.id);
   return {
@@ -242,42 +243,7 @@ const searchSchema = z.object({
 
 ## Dynamic Tool Loading
 
-When a server has >20 tools, use MCP lazy loading or dynamic selection to avoid loading all definitions upfront:
-
-**MCP lazy loading:**
-
-```typescript
-// Define tool metadata once
-const tools = [
-  { name: 'search_issues', description: '...', schema: {...} },
-  { name: 'create_issue', description: '...', schema: {...} },
-  // ... 50 more tools
-];
-
-// Load only when client requests
-server.setRequestHandler(ListToolsRequestHandler, async () => {
-  return {
-    tools: tools.map(t => ({
-      name: t.name,
-      description: t.description,
-      // Schema loaded on-demand via GetToolDefinitionHandler
-    })),
-  };
-});
-```
-
-**Dynamic selection (BM25 search):**
-
-Before each agent request, search the tool registry by relevance:
-
-```typescript
-async function selectToolsForQuery(userQuery: string, allTools: Tool[]) {
-  const ranked = bm25Search(userQuery, allTools, { topK: 5 });
-  return ranked; // Only inject top 5 tools into context
-}
-```
-
-This keeps tool definitions in context proportional to task relevance, not total tool count.
+When a registry has more tools than a session should see at once, don't inject every definition upfront. MCP itself has no built-in per-tool lazy-loading handler - the server always returns full definitions from `tools/list`. Deferred loading is a client- or provider-side pattern instead: Claude's server-side tool search tool (`tool_search_tool_bm25_20251119` / `tool_search_tool_regex_20251119`, with candidate tools marked `defer_loading: true`) discovers and expands only the tools a turn needs, and the Vercel AI SDK's `activeTools` filters a per-step candidate list client-side. The full mechanics and an embedding-based DIY alternative are in [Tool Curation](/docs/tool-design/tool-curation#dynamic-tool-selection).
 
 ## Session-Level Token Budgeting
 
@@ -312,11 +278,11 @@ async function callTool(toolName: string, params: object) {
 | Tool description       | `` `<100` `` tokens per tool   | `` `>200` `` tokens (link to deeper docs)           |
 | Parameter descriptions | `` `<30` `` tokens combined    | Paragraphs (condense or split schema)               |
 | Response size          | `` `<500` `` tokens per result | `` `>2000` `` tokens (paginate, compress, or split) |
-| Tool count             | `` `<15` `` per agent session  | `` `>25` `` tools without dynamic selection         |
+| Tool count             | `` `~20` `` per agent session  | well past 20 without dynamic selection              |
 | Single response        | `` `<1000` `` tokens           | `` `>5000` `` tokens (use pagination or summaries)  |
 
 ## See also
 
-- `/docs/api-surface/openapi` — pagination patterns in specs
+- `/docs/api-surface/openapi-for-agents` - pagination patterns in specs
 - ([Anthropic tool-writing guidance](https://www.anthropic.com/engineering/writing-tools-for-agents))
-- ([Prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching))
+- ([Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching))

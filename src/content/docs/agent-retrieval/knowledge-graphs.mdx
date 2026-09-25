@@ -1,0 +1,48 @@
+---
+title: Knowledge Graphs
+description: When graph retrieval justifies its maintenance cost compared with vectors - condensed current practice
+lastVerified: 2026-09-25
+---
+
+Knowledge graphs represent entities and relationships as nodes and edges. They excel at multi-hop reasoning and schema-driven queries, and they are a maintenance commitment - add one only when relationships are explicit and queried often.
+
+## When to use a graph
+
+| Use case                                 | Graph? | Why                                                  |
+| ---------------------------------------- | ------ | ---------------------------------------------------- |
+| Semantic search (synonyms, paraphrasing) | No     | Vectors handle this                                  |
+| Multi-hop relationships (A → B → C)      | Yes    | Traversal is the native operation                    |
+| Exact entity lookup by name              | No     | Index + SQL is simpler                               |
+| Supply chain or org hierarchy queries    | Yes    | Relationship queries are the point                   |
+| Recommendation (similar items)           | No     | Vectors are usually better and cheaper               |
+| Document Q&A                             | Maybe  | Only if relationships genuinely matter to the answer |
+
+## GraphRAG versus LightRAG
+
+GraphRAG builds entity communities and traverses them at query time; it is thorough and expensive - public benchmarks put it around 610K+ tokens per query. LightRAG indexes entities and relationships for more direct retrieval without full community-building, reporting query costs in the low hundreds of tokens in the same benchmarks - roughly three orders of magnitude cheaper, though the exact ratio depends on corpus and query mix. Verify current figures against the [LightRAG paper](https://arxiv.org/abs/2410.05779) before using them to justify a technology choice.
+
+Use GraphRAG when the domain has stable entities, multi-hop reasoning and global summarization across communities matter, and you can maintain entity resolution. Use LightRAG when graph structure helps but full community-building is too heavy, and update speed matters. Use neither when the corpus is mostly unstructured prose with weak entity relationships - hybrid vector retrieval will outperform both at a fraction of the engineering cost.
+
+## Implementation shape
+
+```typescript
+// Vector search narrows to candidate entities, then graph traversal expands from them
+const nearestEntities = await pgvector.query(
+  `SELECT id, name FROM entities ORDER BY embedding <-> $1 LIMIT 5`,
+  [queryEmbedding],
+);
+
+const traversed = await neo4j.run(
+  `MATCH (n:Entity)-[*1..2]-(m:Entity) WHERE n.id IN $ids RETURN DISTINCT m.name, m.type`,
+  { ids: nearestEntities.map((e) => e.id) },
+);
+```
+
+Neo4j is the common enterprise graph database; Memgraph is a self-hosted alternative with a source-available licence (Business Source License). Verify current project status and licensing before adopting either into a production dependency chain.
+
+## See also
+
+- [Neo4j docs](https://neo4j.com/docs/)
+- [Microsoft GraphRAG](https://github.com/microsoft/graphrag)
+- [LightRAG GitHub](https://github.com/hkuds/lightrag)
+- [Memgraph docs](https://memgraph.com/docs)

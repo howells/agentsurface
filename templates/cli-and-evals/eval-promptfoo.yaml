@@ -1,6 +1,6 @@
 # Promptfoo Eval Config — Compare Claude, GPT, Gemini on agent tasks
 #
-# **What it is:** YAML-based eval suite comparing claude-opus-5, gpt-5.6-sol, and
+# **What it is:** YAML-based eval suite comparing claude-opus-5-5, gpt-5.6-sol, and
 # gemini-3.1-pro-preview on agent routing tasks. Includes assertions (equality, contains, js, llm-rubric),
 # defaultTest with provider options, and derivedMetrics (pass rate, avg latency, $/run).
 #
@@ -31,10 +31,10 @@
 providers:
   - id: claude-opus
     config:
-      model: claude-opus-5
+      model: claude-opus-5-5
       temperature: 0 # Deterministic routing
       maxTokens: 1000
-    label: Claude Opus 5
+    label: Claude Opus 5.5
 
   - id: gpt-5.6-sol
     config:

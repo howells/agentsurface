@@ -1,0 +1,104 @@
+---
+title: Prompts and Configuration
+description: Treating the system prompt as versioned, testable configuration built from trusted server context.
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+A system prompt built once and reused everywhere cannot adapt to who is asking, what platform they are on, or what just happened. The reliable pattern is a `buildSystemPrompt(context)` function that composes the prompt from trusted server-side context on every request: identity and locale, safety rules, tool routing, formatting rules, and platform-specific blocks. The result is testable, versioned, and reusable - the agent's own logic never branches on platform or context; the prompt does.
+
+- **Dynamic composition** - user/session context in, a finished prompt string out.
+- **Safety rules as data** - encoded once, applied through every generated prompt, not scattered through application code.
+- **Testable** - prompt output is a plain string; assert on its content in unit tests.
+- **Platform-aware** - one agent core, different prompt blocks per surface.
+- **No branching in agent logic** - the prompt varies; the code that runs the agent does not.
+
+## The Anti-Pattern
+
+A static system prompt plus `if (platform === "whatsapp") { ... }` branching in application code puts platform logic in the wrong layer: it does not adapt to timezone, locale, or currency, it has no routing rules or confirmation workflow encoded anywhere, and a prompt change requires a code review rather than a prompt-file diff. Move all of that into the prompt builder.
+
+## The Pattern: A Dynamic Prompt Builder
+
+```typescript
+export function buildSystemPrompt(ctx: UserContext): string {
+  return `You are an assistant for ${ctx.teamName ?? "the user"}.
+
+## User Context
+- Name: ${ctx.fullName ?? "unknown"}
+- Timezone: ${ctx.timezone}
+- Locale: ${ctx.locale}
+- Current time: ${ctx.localTime}
+
+## Critical Rules
+1. Never invent data. Every number, date, or ID must come from a tool call.
+2. Confirm before destructive actions: state what will happen, ask "Confirm?", wait for explicit approval.
+3. Pass ISO 8601 dates to tools regardless of the display locale.
+
+## Tool Usage
+Internal tools for the user's own data. Web search for real-time external facts.
+If no tool fits, call \`search_tools\` with a short query.
+`;
+}
+```
+
+Compose from typed sections (identity, safety, tool routing, formatting) rather than one long template literal once the prompt grows - each section becomes independently testable and reusable across prompt variants.
+
+## Safety And Confirmation Vocabulary
+
+The rules that matter most are the ones an agent is most tempted to skip under pressure to be helpful. State them explicitly and keep the wording consistent across every prompt in the system, because [tool design](/docs/tool-design) and [guardrails](/docs/agents/guardrails) pages assume this same vocabulary:
+
+- **Never invent data** - every number, date, name, or ID must come from a tool call; ask or call a tool rather than guess.
+- **Confirm before destructive actions** - before delete, cancel, send, or bulk update, state what will happen and ask "Confirm?"; wait for explicit approval before proceeding. This is the prompt-side half of the contract [Human Approval](/docs/tool-design/human-approval) covers at the tool surface.
+- **No preamble, direct results** - after a tool call returns, present results directly rather than narrating that you are about to.
+
+## Platform-Specific Composition
+
+For a multi-platform agent, append a platform block after the shared core rather than forking the whole prompt:
+
+```typescript
+export function buildSystemPromptForPlatform(ctx: UserContext, platform: Platform): string {
+  return `${buildSystemPrompt(ctx)}\n\n${getPlatformRules(platform)}`;
+}
+```
+
+Typical platform differences: a dashboard can render markdown tables and clickable entity links; WhatsApp and Telegram need plain text, numbered lists instead of tables, and a single confirmation message per action because of SMS-length and rendering limits; Slack supports block-kit formatting and longer messages. See [Channels](/docs/agents/channels) for the adapter layer that carries these platform-shaped concerns; this page is only about what changes in the prompt text itself.
+
+## DateTime Normalization
+
+Force ISO 8601 at the tool boundary rather than trusting the model to convert correctly:
+
+```typescript
+export function normalizeDateTime(value: string): string {
+  const withTz = /[Zz]|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`;
+  const parsed = new Date(withTz);
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid datetime: "${value}"`);
+  return parsed.toISOString();
+}
+```
+
+Pre-computing date ranges ("this month," "this quarter") in the prompt context eliminates a whole class of errors where the model calculates a relative range incorrectly across a month or year boundary.
+
+## Versioning And Testing
+
+Treat prompts as versioned code, not prose that lives only in a string literal:
+
+- Write unit tests asserting the prompt contains expected content for a given context (user name, safety rules, platform-specific formatting instructions).
+- Version the builder function in git and review prompt changes the same way as any other logic change.
+- Measure prompt effectiveness against real traffic rather than assuming a wording change is an improvement.
+
+## Checklist
+
+- [ ] `buildSystemPrompt(context)` composes from trusted server context, not model-controlled input.
+- [ ] Identity, locale, timezone, and currency are included, not hard-coded.
+- [ ] Safety rules - never invent data, confirm before destructive actions - are present in every prompt variant.
+- [ ] Tool routing guidance matches the tools actually available to that agent.
+- [ ] Platform-specific rules are a block appended to the shared core, not a forked prompt.
+- [ ] Prompt output has unit tests.
+
+## Related
+
+- [Channels](/docs/agents/channels) - platform adapters that call this builder
+- [Human Approval](/docs/tool-design/human-approval)
+- [Guardrails](/docs/agents/guardrails)
+- [Design Defaults](/docs/agents)

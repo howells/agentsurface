@@ -1,23 +1,23 @@
 ---
 title: Cross-Framework Portability
-description: Defining tools once and exporting adapters for MCP, Claude Code SDK, and OpenAI
-lastVerified: 2026-07-28
+description: Defining tools once and exporting adapters for MCP, Claude Agent SDK, and OpenAI
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Code SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). This reduces drift and duplication, but each adapter still needs framework-specific tests. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations).
+Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Agent SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). This reduces drift and duplication, but each adapter still needs framework-specific tests. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations).
 
 - **Shared registry**: Tool metadata, handler, schema (Zod)
 - **MCP adapter**: server.tool() registration
-- **Claude Code SDK adapter**: expose the registry as MCP or allowed SDK tools
+- **Claude Agent SDK adapter**: expose the registry as MCP or allowed SDK tools
 - **OpenAI adapter**: FunctionDeclaration with handler wrapper
 - **Vercel AI SDK adapter**: tools object
 - **Benefits**: Reduced duplication, lower drift, adapter-specific tests
 
 ---
 
-Tool definitions are business logic. Frameworks are deployment targets. Define your tool once in a framework-neutral module; emit adapters for each framework (MCP, Claude Code SDK, @openai/agents, Vercel AI SDK). This keeps logic centralized and ensures consistency across platforms.
+Tool definitions are business logic. Frameworks are deployment targets. Define your tool once in a framework-neutral module; emit adapters for each framework (MCP, Claude Agent SDK, @openai/agents, Vercel AI SDK). This keeps logic centralized and ensures consistency across platforms.
 
 ## The Pattern
 
@@ -26,7 +26,7 @@ Tool definitions are business logic. Frameworks are deployment targets. Define y
 Define tool metadata and handler once:
 
 ```typescript
-// tools/registry.ts — shared across all frameworks
+// tools/registry.ts: shared across all frameworks
 import { z } from "zod";
 
 const searchDocsSchema = z
@@ -105,22 +105,26 @@ server.tool(
   searchDocsTool.name,
   searchDocsTool.description,
   searchDocsTool.schema,
-  searchDocsTool.handler,
   {
-    readOnlyHint: true,
-    idempotentHint: true,
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+    },
   },
+  searchDocsTool.handler,
 );
 
 server.tool(
   createDocTool.name,
   createDocTool.description,
   createDocTool.schema,
-  createDocTool.handler,
   {
-    destructiveHint: false,
-    idempotentHint: true, // Supports idempotency_key parameter
+    annotations: {
+      destructiveHint: false,
+      idempotentHint: true, // Supports idempotency_key parameter
+    },
   },
+  createDocTool.handler,
 );
 
 // ... register remaining tools
@@ -128,9 +132,9 @@ server.tool(
 export default server;
 ```
 
-### Step 3: Claude Code SDK / MCP Adapter
+### Step 3: Claude Agent SDK / MCP Adapter
 
-Claude Code and the Claude Code SDK are usually best served by exposing the same shared registry through MCP. That keeps the tool contract portable to Claude Code, Claude Desktop-style clients, OpenAI remote MCP, Gemini connectors, and other MCP clients.
+Claude Code and the Claude Agent SDK are usually best served by exposing the same shared registry through MCP. That keeps the tool contract portable to Claude Code, Claude Desktop-style clients, OpenAI remote MCP, Gemini connectors, and other MCP clients.
 
 ```json
 // .mcp.json
@@ -147,10 +151,10 @@ Claude Code and the Claude Code SDK are usually best served by exposing the same
 }
 ```
 
-Then use the Claude Code SDK with the repo or service MCP configuration and an allowlist:
+Then use the Claude Agent SDK with the repo or service MCP configuration and an allowlist:
 
 ```typescript
-import { query } from "@anthropic-ai/claude-code";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 
 for await (const message of query({
   prompt: "Find the authentication guide and summarize the setup steps.",
@@ -222,7 +226,7 @@ export const searchDocsTool = vercelTools.find((t) => t.name === "search_docs");
 
 ## Adapters for Other Frameworks
 
-The same registry entry — name, description, schema, handler — projects onto every other runtime's native tool shape. The frameworks differ in surface syntax, not in the four fields.
+The same registry entry - name, description, schema, handler - projects onto every other runtime's native tool shape. The frameworks differ in surface syntax, not in the four fields.
 
 ### LangChain
 
@@ -301,7 +305,7 @@ order_agent = Agent(
 
 ### Semantic Kernel
 
-Semantic Kernel annotates class methods with `@kernel_function`, groups them into plugins, and injects services through dependency injection.
+Semantic Kernel has been in maintenance mode (critical fixes and security patches only) since Microsoft Agent Framework reached general availability in April 2026; new tool-design work targets Agent Framework instead. Semantic Kernel annotates class methods with `@kernel_function`, groups them into plugins, and injects services through dependency injection - the shape below still applies to existing Semantic Kernel codebases.
 
 ```python
 from semantic_kernel.functions import kernel_function
@@ -325,7 +329,7 @@ class OrderPlugin:
 
 ### Amazon Bedrock
 
-Bedrock accepts tools two ways. For Bedrock Agents, describe the entire API in OpenAPI 3.0 and upload it as an action group — see [OpenAPI for Agents](/docs/api-surface/openapi-for-agents) for spec design. For direct tool use in the Converse API, pass a `toolSpec` with an inline JSON input schema.
+Bedrock accepts tools two ways. For Bedrock Agents, describe the entire API in OpenAPI 3.0 and upload it as an action group - see [OpenAPI for Agents](/docs/api-surface/openapi-for-agents) for spec design. For direct tool use in the Converse API, pass a `toolSpec` with an inline JSON input schema.
 
 ```python
 tool_config = {
@@ -369,8 +373,8 @@ for (const toolDef of allTools) {
     toolDef.name,
     toolDef.description,
     toolDef.schema,
+    { annotations: toolAnnotations[toolDef.name] || {} },
     toolDef.handler,
-    toolAnnotations[toolDef.name] || {},
   );
 }
 ```
@@ -400,8 +404,8 @@ server.tool(
   "search_docs",
   searchDocsTool.description,
   searchDocsTool.schema,
-  searchDocsTool.handler,
   { outputSchema: SearchDocsOutputSchema },
+  searchDocsTool.handler,
 );
 ```
 
@@ -409,35 +413,15 @@ The MCP adapter is also the layer where schema dialect differences bite. MCP's `
 
 ### Dynamic Tool Selection (Anthropic/OpenAI)
 
-For agents with >20 tools, use framework-specific dynamic loading:
+For agents with a large tool surface, both providers support server-side deferred loading rather than a client-side pre-filter:
 
-**Anthropic BM25 search:**
+**Anthropic tool search tool:** include a `tool_search_tool_bm25_20251119` (natural-language queries) or `tool_search_tool_regex_20251119` (regex patterns) entry in `tools`, and mark the tools you don't need up front with `defer_loading: true`. Claude searches names, descriptions, and argument fields and the API expands matches into full definitions on demand - see [Tool Curation](/docs/tool-design/tool-curation#dynamic-tool-selection) for the full mechanics.
 
-```typescript
-import { bm25Search } from "@anthropic-ai/sdk/utils";
-
-async function selectTools(query: string, allTools: Tool[]) {
-  return bm25Search(query, allTools, { topK: 5 });
-}
-
-async function main() {
-  const selected = await selectTools(userQuery, claudeTools);
-
-  const response = await query({
-    prompt: userQuery,
-    tools: selected, // Only active tools
-  });
-}
-```
-
-**OpenAI defer_loading:**
+**OpenAI deferred loading:** pair `defer_loading: true` on each candidate tool with a `ToolSearchTool()` added exactly once to the agent - `defer_loading` alone on every tool with no search tool present does not work.
 
 ```typescript
 const agent = new Agent({
-  tools: allTools.map((t) => ({
-    ...t,
-    defer_loading: true, // Load on demand
-  })),
+  tools: [ToolSearchTool(), ...allTools.map((t) => ({ ...t, defer_loading: true }))],
 });
 ```
 
@@ -487,7 +471,7 @@ describe("MCP adapter", () => {
 // test/claude-agent-sdk.test.ts
 import { searchDocsTool } from "../tools/claude-agent-sdk";
 
-describe("Claude Code SDK adapter", () => {
+describe("Claude Agent SDK adapter", () => {
   it("tool has correct shape", () => {
     expect(searchDocsTool).toHaveProperty("name", "search_docs");
     expect(searchDocsTool).toHaveProperty("description");
@@ -504,7 +488,7 @@ src/
 ├── tools/
 │   ├── registry.ts           # Shared handlers + metadata
 │   ├── mcp.ts                # MCP Server adapter
-│   ├── claude-agent-sdk.ts   # Claude Code SDK adapter
+│   ├── claude-agent-sdk.ts   # Claude Agent SDK adapter
 │   ├── openai-agents.ts      # OpenAI Agents SDK adapter
 │   └── vercel-ai.ts          # Vercel AI SDK adapter
 ├── test/
@@ -516,17 +500,17 @@ src/
 
 ## Benefits
 
-- **Single source of truth** — Tool logic defined once, tested once, deployed many ways
-- **Consistency** — Same behavior across all frameworks; no drift
-- **Maintainability** — Update description, schema, or handler in one place
-- **Testing** — Unit tests on shared handlers apply to all adapters
-- **Flexibility** — Add a new framework by writing a new adapter without touching core logic
+- **Single source of truth** - Tool logic defined once, tested once, deployed many ways
+- **Consistency** - Same behavior across all frameworks; no drift
+- **Maintainability** - Update description, schema, or handler in one place
+- **Testing** - Unit tests on shared handlers apply to all adapters
+- **Flexibility** - Add a new framework by writing a new adapter without touching core logic
 
 ## See also
 
-- `/templates/tools-and-orchestration/tool-definition.ts` — starter template
-- `/templates/tools-and-orchestration/tool-registry.ts` — registry pattern for >10 tools
-- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) — current JSON Schema 2020-12 behavior
-- ([Claude Code SDK](https://docs.anthropic.com/en/docs/claude-code/sdk))
+- `/templates/tools/tool-definition.ts` - starter template
+- `/templates/tools/tool-registry.ts` - registry pattern for >10 tools
+- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - current JSON Schema 2020-12 behavior
+- ([Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Vercel AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/))

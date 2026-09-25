@@ -1,40 +1,46 @@
 ---
 name: surface
-description: Make software legible to agents and guide production agent-system design. Use when asked for Agent Surface guidance, agent-readable software, agent readiness, AGENTS.md/llms.txt/MCP/OpenAPI/CLI/tool surfaces, agent protocols or tooling, audits or scorecards, transformation plans, or scaffolding agents/tools/workflows/memory/model routing/browser/sandbox capabilities across APIs, CLIs, docs, auth, errors, tests, retrieval, and multi-agent systems.
+description: Make software legible to agents. Use when asked for Agent Surface guidance, agent-readable software, agent readiness, AGENTS.md/llms.txt/MCP/OpenAPI/CLI/tool surfaces, agent protocols, audits or scorecards, transformation plans, or scaffolding a discovery/API/CLI/MCP/tool/retrieval surface and its evaluation harness.
 ---
 
 # Surface
 
-Make software easier for agents to discover, understand, call, test, safely modify, and build upon.
+Make software easier for agents to discover, understand, call, recover from, and be
+evaluated against. This skill is product-side and framework-neutral: it improves the
+contact points agents use to reach existing software, not the internals of an agent you are
+building. For agent-internal architecture (frameworks, orchestration, memory, model routing,
+an agent's own retrieval/RAG pipeline), see the agent-building inventory at `/docs/agents`
+and `/docs/agent-retrieval` - that inventory sits outside this skill.
 
-Surface has three main workflows:
+Surface has three routes:
 
-- **Guide**: explain agent concepts, standards, tool choices, and implementation patterns.
-- **Audit**: detect project surfaces, score agent readiness, produce findings, and write improvement plans.
-- **Scaffold**: add or extend agent infrastructure such as agents, tools, workflows, model routing, retrieval/RAG, memory, browser access, sandbox execution, and MCP.
+- **Guide**: explain agent-surface concepts, standards, and implementation patterns.
+- **Audit**: detect project surfaces, score agent readiness, produce findings, and write transformation plans (plan and transform are Audit modes, not separate routes).
+- **Scaffold**: create or extend agent surfaces (discovery files, API/CLI/MCP surfaces, tool contracts, retrieval endpoints) and the evaluation harnesses that verify them.
 
 Use the existing project shape first. Read files before making claims or generating code.
 
 ## Quick Routing
 
-| User asks for                                                                          | Route                                                             |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| explain, compare, choose, best practice, reference, guide, standards, tooling          | Guide                                                             |
-| audit, score, assess, agent-ready, agent-readiness                                     | Audit                                                             |
-| plan, transform, improve, fix agent DX                                                 | Audit, then optionally execute                                    |
-| add MCP, create llms.txt, write AGENTS.md, improve discovery                           | Audit single-area transform unless they ask for direct generation |
-| create agent, add tool, build workflow, scaffold, init                                 | Scaffold                                                          |
-| add retrieval, RAG, semantic search, memory, model routing, browser tool, sandbox tool | Scaffold                                                          |
-| ambiguous "make this agentic"                                                          | Start with Audit unless they clearly want new agent runtime code  |
+| User asks for                                                               | Route                                                               |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| explain, compare, choose, best practice, reference, guide, standards        | Guide                                                               |
+| audit, score, assess, agent-ready, agent-readiness                          | Audit                                                               |
+| plan, transform, improve, fix agent DX                                      | Audit, then optionally execute                                      |
+| add MCP, create llms.txt, write AGENTS.md, improve discovery                | Audit single-area transform unless they ask for direct generation   |
+| scaffold an API/CLI/MCP/tool/search surface, init agent-surface conventions | Scaffold                                                            |
+| ambiguous "make this agentic"                                               | Start with Audit unless they clearly want a new agent surface built |
 
 If the user explicitly wants a direct artifact, do not force a full audit. Do a narrow detection pass, create the artifact, and explain the skipped audit scope.
+
+If the user wants agent-internal architecture built (an agent, an orchestration workflow, durable memory, model routing, or a RAG/retrieval pipeline for an agent's own knowledge), say that this skill covers the product's surface, not agent internals, and point to `/docs/agents` and `/docs/agent-retrieval`.
 
 ## Modes
 
 Guide modes:
 
 - `concept`: explain an agent surface, protocol, pattern, or tradeoff.
-- `decision`: recommend a stack, protocol, runtime, or surface design.
+- `decision`: recommend a surface design or protocol choice.
 - `reference`: point to canonical docs, standards, and Agent Surface pages.
 
 Audit modes:
@@ -47,15 +53,12 @@ Audit modes:
 
 Scaffold modes:
 
-- `init`: initialize agent infrastructure.
-- `agent <name>`: create a bounded agent.
-- `tool <name>`: create a typed tool.
-- `workflow <name>`: create a deterministic or partly agentic workflow.
-- `retrieval`: add document retrieval, RAG, semantic search, or search-backed agent context.
-- `memory`: add durable memory only when the use case requires it.
-- `model`: add multi-provider model routing.
-- `browser`: add browser/web access with guardrails.
-- `sandbox`: add isolated code execution with guardrails.
+- `init`: initialize baseline agent-surface conventions (AGENTS.md, llms.txt, `.well-known`).
+- `api`: scaffold or upgrade API descriptions for agent tool generation.
+- `cli`: scaffold or upgrade CLI JSON output, schema introspection, exit codes.
+- `mcp`: scaffold or extend an MCP server exposing existing capabilities.
+- `tool <name>`: create or refine one typed tool contract exposed to agents.
+- `test-harness`: scaffold an evaluation harness that validates a surface (MCP conformance tests, CLI contract tests, retrievability evals, or a browser-driven task test).
 
 ## Required Context Discipline
 
@@ -63,31 +66,36 @@ Scaffold modes:
 2. Use fast file discovery (`rg`, `rg --files`, `find`) and read the important files. Do not infer from filenames alone.
 3. Keep findings evidence-based. Cite paths and line numbers where possible.
 4. Prefer project-native conventions over generic templates.
-5. Treat destructive, authenticated, browser, sandbox, and production operations as high-risk. Require clear confirmation before executing them.
-6. Preserve user edits. Do not overwrite existing AGENTS.md, CLAUDE.md, llms.txt, MCP servers, or agent files without reading and merging.
+5. Treat destructive, authenticated, and production operations as high-risk. Require clear confirmation before executing them.
+6. Preserve user edits. Do not overwrite existing AGENTS.md, CLAUDE.md, llms.txt, or MCP server files without reading and merging.
 
 ## Guide Workflow
 
-Use guide mode when the user wants agent information, architecture guidance, standards context, or tool selection without asking to modify a project.
+Use guide mode when the user wants agent information, standards context, or surface design guidance without asking to modify a project.
 
 1. Identify whether the user needs concepts, a decision, or implementation guidance.
 2. Prefer the docs site when available: `src/content/docs/` is the canonical Agent Surface guide.
 3. Read only the relevant docs pages. Start with section indexes, then load leaf pages as needed.
 4. Keep answers dense and decision-oriented. Name tradeoffs, failure modes, and adjacent surfaces.
-5. For fast-moving standards, tools, models, and vendor platforms, verify current primary sources before making "latest", "current", or "recommended" claims.
+5. For fast-moving standards, tools, and vendor platforms, verify current primary sources before making "latest", "current", or "recommended" claims.
 
 High-signal guide entry points:
 
-| Need                             | Docs path                                                         |
-| -------------------------------- | ----------------------------------------------------------------- |
-| Start or route through the guide | `src/content/docs/getting-started.mdx`                            |
-| Build agents                     | `src/content/docs/agents/`, `runtime-boundaries/`, `multi-agent/` |
-| Expose capabilities to agents    | `api-surface/`, `tool-design/`, `cli-design/`, `mcp-servers/`     |
-| Make software discoverable       | `discovery/`, `context-files/`                                    |
-| Secure and recover               | `authentication/`, `error-handling/`                              |
-| Retrieval and memory             | `data-retrievability/`                                            |
-| Verify behavior                  | `testing/`, `scoring/`                                            |
-| Standards and tools              | `protocols/`, `reference-links/`, `tooling-catalog/`              |
+| Need                             | Docs path                                                     |
+| -------------------------------- | ------------------------------------------------------------- |
+| Start or route through the guide | `src/content/docs/getting-started.mdx`                        |
+| Expose capabilities to agents    | `api-surface/`, `tool-design/`, `cli-design/`, `mcp-servers/` |
+| Make software discoverable       | `discovery/`, `context-files/`                                |
+| Secure and recover               | `authentication/`, `error-handling/`                          |
+| Retrieval and structured content | `retrievability/`                                             |
+| Rich UI for agent clients        | `agentic-ui/`                                                 |
+| Let agents buy from you          | `agentic-commerce/`                                           |
+| Verify behavior                  | `testing/`, `scoring/`                                        |
+| Standards                        | `protocols/`, `reference-links/`                              |
+
+The agent-building inventory (`agents/`, `agent-retrieval/`, `tooling-catalog/`) is a
+secondary reference outside the core guide - point users there explicitly rather than
+folding it into a guide answer about the product's own surface.
 
 ## Audit Workflow
 
@@ -95,19 +103,20 @@ Read `references/audit-workflow.md` before running a full audit, scorecard, plan
 
 Also load dimension references only when needed:
 
-| Dimension           | Reference                           |
-| ------------------- | ----------------------------------- |
-| API Surface         | `references/api-surface.md`         |
-| CLI Design          | `references/cli-design.md`          |
-| MCP Server          | `references/mcp-servers.md`         |
-| Discovery & AEO     | `references/discovery-aeo.md`       |
-| Authentication      | `references/authentication.md`      |
-| Error Handling      | `references/error-handling.md`      |
-| Tool Design         | `references/tool-design.md`         |
-| Context Files       | `references/context-files.md`       |
-| Multi-Agent         | `references/multi-agent.md`         |
-| Testing             | `references/testing.md`             |
-| Data Retrievability | `references/data-retrievability.md` |
+| Dimension       | Reference                      |
+| --------------- | ------------------------------ |
+| API Surface     | `references/api-surface.md`    |
+| CLI Design      | `references/cli-design.md`     |
+| MCP Server      | `references/mcp-servers.md`    |
+| Discovery & AEO | `references/discovery-aeo.md`  |
+| Authentication  | `references/authentication.md` |
+| Error Handling  | `references/error-handling.md` |
+| Tool Design     | `references/tool-design.md`    |
+| Context Files   | `references/context-files.md`  |
+| Testing         | `references/testing.md`        |
+| Retrievability  | `references/retrievability.md` |
+
+Load `references/agentic-commerce.md` alongside the relevant dimension references above when the audited project has an agent-mediated commerce surface (storefront, marketplace, or purchasable product/service) - it is cross-cutting guidance, not an eleventh dimension.
 
 Do not load every reference at once. Load the workflow reference first, then only the relevant dimension files.
 
@@ -118,13 +127,13 @@ Gather these surfaces before scoring:
 - Stack files: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `deno.json`, `bun.lockb`, lockfiles.
 - API specs/routes: OpenAPI, Swagger, `app/api`, `pages/api`, route handlers, controllers.
 - CLI: `bin` field, command entrypoints, argument parsers, TTY/output handling.
-- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/sdk`, `mcp-handler`, `@mastra/mcp`, server transports, protocol version, roots, sampling, elicitation, and task support.
+- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/sdk`, `mcp-handler`, server transports, protocol version, roots, sampling, elicitation, and task support.
 - Discovery: `AGENTS.md`, `CLAUDE.md`, Cursor/Copilot/Windsurf rules, `llms.txt`, `llms-full.txt`, `robots.txt`, `sitemap.xml`, `.well-known`.
 - Agent web readiness: Markdown content negotiation, JSON-LD, OpenAPI links, API catalog, MCP metadata, OAuth protected-resource metadata.
 - Auth: OAuth, API keys, bearer/JWT validation, scopes, token exchange, env-var handling.
-- Tools/agents/workflows: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, Cloudflare Agents, custom tool registries.
-- Retrieval: RAG pattern family, document ingestion, embeddings, vector/search stores, hybrid search, rerankers, graph/structured retrieval, metadata filters, eval scripts.
-- Tests/evals: unit, integration, MCP transport tests, CLI contract tests, agent evals, CI.
+- Tools: typed tool/function-calling definitions the product exposes for agents to call.
+- Retrievability: search/query endpoints, pagination and freshness contracts, structured content, feeds.
+- Tests/evals: unit, integration, MCP transport tests, CLI contract tests, task-level evals, CI.
 
 For Discovery & AEO, activate optional checks only when the corresponding surface is detected. For example, require Agent Skills discovery only when skills are published, MCP metadata only for a remote MCP server, OAuth metadata only for protected resources, and commerce manifests only for a commerce flow. Validate the returned content and linked capability, not merely the presence of a file or an HTTP 200 response.
 
@@ -142,43 +151,22 @@ For the exact scorecard, finding, plan, and delta formats, use `references/audit
 
 ## Scaffold Workflow
 
-Read `references/scaffold-workflow.md` before generating or modifying agent infrastructure.
-
-Load additional scaffold references only as needed:
-
-| Need                                         | Reference                            |
-| -------------------------------------------- | ------------------------------------ |
-| Project layout and naming                    | `references/conventions.md`          |
-| Agents, tools, security, workflow basics     | `references/patterns.md`             |
-| Multi-provider model routing                 | `references/model-routing.md`        |
-| Branches, loops, parallelism, suspend/resume | `references/workflow-composition.md` |
-| Wiring and framework pitfalls                | `references/gotchas.md`              |
-| House style for generated docs/code          | `references/house-style.md`          |
+Read `references/scaffold-workflow.md` before generating or extending an agent surface. It
+covers Phase 0 detection, shared scaffolding rules, and every mode (`init`, `api`, `cli`,
+`mcp`, `tool`, `test-harness`) in full - this skill no longer ships separate per-mode
+reference files, since scaffolding stays inside a project's existing framework and
+conventions rather than a house stack.
 
 ### Scaffold Principles
 
-1. **Tools over prompt knowledge**: external facts, mutations, and retrieval belong in tools.
-2. **Narrow ownership**: one agent owns one decision boundary.
-3. **Bounded execution**: every agent or workflow needs a step budget, stop condition, and failure path.
-4. **Workflow first**: predictable, resumable, auditable sequences should be workflows; use agents for judgment-heavy steps.
-5. **Prompt as configuration**: prompts encode role, constraints, and format, not hidden application branching.
-6. **Memory is earned**: add durable memory only for cross-turn recall, durable entity state, or retrieval over durable data.
-7. **Eval hooks ship with scaffolds**: note the first tests/evals that should verify routing, recovery, and guardrails.
-8. **High-risk tools need policy**: browser, sandbox, write, auth, and production tools need allowlists, quotas, audit logs, timeouts, and confirmation gates.
+1. **Surfaces over internals**: scaffold what an external agent calls (API, CLI, MCP, tool contract, search endpoint), not the calling agent's own architecture.
+2. **Typed contracts**: every scaffolded surface gets typed input/output schemas and documented error shapes.
+3. **Identity stays server-side**: never accept user/tenant identity as a tool or API parameter; resolve it from authenticated request context.
+4. **Eval hooks ship with the surface**: every scaffold includes the first test/eval that verifies it works, not a follow-up task.
+5. **High-risk surfaces need policy**: authenticated, destructive, and production-facing surfaces need confirmation gates, scoping, and audit logging.
+6. **Browser/sandbox only to validate**: use a browser or sandboxed run to build a test harness that proves a surface works end to end; do not scaffold general-purpose browser or code-execution capability here.
 
 When execution would benefit from focused specialist instructions, load only the matching prompt from `agents/*.md`. These files are task resources, not required context for ordinary guide, audit, or scaffold routing.
-
-## Framework Guidance
-
-- Prefer the project's existing deliberate agent framework first.
-- Prefer OpenAI Agents SDK when the project is OpenAI-native, uses the Responses API, needs OpenAI tracing/evals/handoffs, hosted tools, remote MCP, realtime voice, files, or sandbox execution close to OpenAI's platform.
-- Prefer Claude Managed Agents when the project is Claude-native and needs Anthropic-managed sessions, containers/sandboxing, Agent Skills, built-in tools, memory, vault credentials, webhooks, multiagent sessions, or outcomes.
-- Prefer Claude Code SDK when the project is building coding/repo agents that need the Claude Code harness, tool permissions, file/shell/code execution, session management, and MCP extensibility.
-- Prefer Vercel AI SDK for Next.js/Vercel apps that already use streaming UI, tool calling, provider routing, AI Gateway, or route-handler based chat. Pair it with Vercel Workflow when execution must pause, resume, retry, wait on approvals, or span minutes to months.
-- Prefer Cloudflare Agents when the project is Workers-native or needs Durable Objects, WebSockets, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, Queues, or Sandbox close to the Worker runtime.
-- Prefer Mastra for TypeScript projects that need a full local agent/workflow/memory/RAG/MCP framework and do not already have a stronger platform constraint.
-- Adapt to existing LangGraph, MCP, or custom runtime patterns when already present.
-- Do not generate Node-only APIs in Workers-native projects.
 
 ## Interaction Pattern
 
@@ -198,7 +186,7 @@ For audits:
 
 For scaffolds:
 
-1. Present detected stack, framework, and existing inventory.
+1. Present detected stack and existing surfaces.
 2. Ask only the missing decisions needed to generate useful code.
 3. Preview file changes and key decisions.
 4. Generate narrowly scoped files.
@@ -226,31 +214,25 @@ Use these defaults unless the project already has a better convention:
 
 ## Current Standards Notes
 
-- AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files as overlays.
+- AGENTS.md is a Markdown convention for project-specific agent instructions. Treat it as the cross-tool baseline and keep tool-specific files (CLAUDE.md, `.cursor/rules`, `.github/copilot-instructions.md`) as overlays. Some tools import AGENTS.md content automatically; verify the current import behavior for the tools in play before assuming duplication is required.
 - `llms.txt` is a useful Markdown discovery convention for inference-time retrieval, not a guaranteed SEO or citation signal. Pair it with crawlable docs, structured data, sitemap, and stable canonical URLs.
-- Choose RAG architecture by data shape and query need, not by trend: dense-only for prototypes, hybrid + rerank for most production knowledge search, graph/LightRAG when relationships drive answers, multimodal retrieval for visual/audio corpora, and compiled/optimized retrieval when the query workload is stable enough to justify preprocessing.
 - MCP `2026-07-28` is the current revision and all Tier 1 SDKs support it. It removes sessions and the initialize handshake, offers optional `server/discover`, adds `subscriptions/listen`, moves Tasks into an official extension, and deprecates roots, sampling, and logging. Audit against `2026-07-28`; retain `2025-11-25` compatibility only when an actual client requires it. Check tools, resources, prompts, negotiated extensions, Streamable HTTP, per-request protocol metadata, and explicit state handles where relevant.
 - WebMCP is a separate browser-native draft for page-scoped tools through `document.modelContext`. Do not confuse it with remote MCP or the older `webmcp.dev` JavaScript library.
-- Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request.
+- Remote protected MCP servers should publish OAuth protected-resource metadata using RFC 9728, point clients to authorization-server metadata, and validate issuer, audience/resource, expiry, and scopes on every protected request. DPoP (RFC 9449) is a separate sender-constraining mechanism, not part of the MCP authorization spec itself; only claim DPoP support when the server actually implements RFC 9449, not because it is MCP-protected.
 - MCP tool descriptions and annotations are advisory hints, not authorization policy. Treat them as untrusted unless the server is trusted, and enforce approvals, auth, and scope checks in the server or workflow.
 - MCP tools should provide input schemas, `outputSchema` plus `structuredContent` for structured results, annotations, resource links where useful, and structured recoverable errors.
-- Anthropic guidance changes quickly. For Claude-native scaffolds, check Claude Platform release notes for Managed Agents, Agent Skills, MCP connector limits, current model IDs, context limits, and beta headers before hard-coding recommendations.
+- Anthropic guidance changes quickly. For Claude-native surfaces, check Claude Platform release notes for current model IDs, context limits, and beta headers before hard-coding recommendations.
 
 ## Useful References
 
-- AGENTS.md and Agentic AI Foundation: https://openai.com/index/agentic-ai-foundation/
 - AGENTS.md format: https://agents.md
 - llms.txt proposal: https://llmstxt.org
 - MCP specification: https://modelcontextprotocol.io/specification
-- OpenAI Agents SDK: https://openai.github.io/openai-agents-js/
-- Claude Platform release notes: https://platform.claude.com/docs/en/release-notes/overview
-- Claude Managed Agents: https://platform.claude.com/docs/en/managed-agents/overview
-- Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
-- Vercel AI SDK: https://ai-sdk.dev/docs
-- Vercel Workflow: https://vercel.com/docs/workflow
 - OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html
-- Agent Surface RAG patterns: /docs/data-retrievability/rag-patterns
-- Agent Surface tooling catalog: /docs/tooling-catalog
+- DPoP (RFC 9449): https://www.rfc-editor.org/rfc/rfc9449.html
+- Claude Platform release notes: https://platform.claude.com/docs/en/release-notes/overview
+- Agent Surface retrievability guide: /docs/retrievability
+- Agent Surface agent-building inventory: /docs/agents, /docs/agent-retrieval
 - Agent Surface disciplines (longer-form design guidance): `disciplines/`
 
 ## Skill Folder Structure

@@ -1,11 +1,12 @@
 ---
 title: Tool Definitions from API Operations
 description: Mapping OpenAPI operations to agent tool definitions; universal tool-design guidance lives in Tool Design
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Every generated tool has three fields — `name`, `description`, and input `schema` — and each maps mechanically from one OpenAPI operation. This page covers only that mapping: how an operation's `operationId`, `summary`, parameters, request body, and responses become a tool definition. The portable rules for _writing_ good names, descriptions, schemas, and curated tool sets are not API-specific and live in the [Tool Design](/docs/tool-design) section — this page links there rather than repeating them.
+Every generated tool has three fields - `name`, `description`, and input `schema` - and each maps mechanically from one OpenAPI operation. This page covers only that mapping: how an operation's `operationId`, `summary`, parameters, request body, and responses become a tool definition. The portable rules for _writing_ good names, descriptions, schemas, and curated tool sets are not API-specific and live in the [Tool Design](/docs/tool-design) section - this page links there rather than repeating them.
 
 - `operationId` → tool `name`
 - `summary` / `description` → tool `description`
@@ -19,14 +20,14 @@ When a framework ingests your OpenAPI spec, it generates one tool per operation 
 
 | OpenAPI element           | Tool field    | Notes                                                                  |
 | ------------------------- | ------------- | ---------------------------------------------------------------------- |
-| `operationId`             | `name`        | Must be globally unique and `verb_noun` — it becomes the function name |
+| `operationId`             | `name`        | Must be globally unique and `verb_noun` - it becomes the function name |
 | `summary` + `description` | `description` | The agent's routing prompt; write it as trigger conditions, not docs   |
 | path/query `parameters`   | input schema  | Flattened into the schema's `properties`                               |
 | `requestBody` schema      | input schema  | Merged with parameters into one flat object                            |
 | `2xx` response schema     | output schema | Enables downstream tools to reason over typed results                  |
 | `x-agent-*` extensions    | annotations   | Confirmation, idempotency, destructive hints                           |
 
-Because the generated `name` and `description` come straight from `operationId` and `summary`, spec quality is tool quality. A vague `summary` becomes a vague routing prompt; a missing `operationId` breaks tool generation entirely. See [OpenAPI for Agents](./openapi-for-agents) for the spec-authoring rules that make this mapping produce good tools.
+Because the generated `name` and `description` come straight from `operationId`, `summary`, and `description`, spec quality is tool quality. A vague `summary` or `description` becomes a vague routing prompt; a missing `operationId` breaks tool generation entirely. See [OpenAPI for Agents](./openapi-for-agents) for the spec-authoring rules that make this mapping produce good tools.
 
 ## Worked Example
 
@@ -37,7 +38,8 @@ paths:
   /orders/{orderId}:
     get:
       operationId: get_order
-      summary: >
+      summary: Get an order by ID
+      description: >
         Retrieves full details for a single order including line items and
         shipping status. Use when you have an order ID. For searching orders,
         use search_orders instead.
@@ -82,14 +84,14 @@ Agent-facing behavior that has no native OpenAPI field is carried by `x-agent-*`
 
 ## Generating the Tools
 
-Turning a spec into a running MCP server — generator choice, transport, and lifecycle — is covered in [MCP Servers: Auto-Generation from OpenAPI](/docs/mcp-servers/auto-generation). For Bedrock Agents, the same OpenAPI document is uploaded directly as an action group rather than compiled into individual tools.
+Turning a spec into a running MCP server - generator choice, transport, and lifecycle - is covered in [MCP Servers: Auto-Generation from OpenAPI](/docs/mcp-servers/auto-generation). For Bedrock Agents, the same OpenAPI document is uploaded directly as an action group rather than compiled into individual tools.
 
 ## Checklist
 
 Before generating tools from your API:
 
 - [ ] Every operation you want exposed has a unique `verb_noun` `operationId`
-- [ ] Each `summary` reads as an agent trigger condition, not human documentation
+- [ ] Each `description` reads as an agent trigger condition, not human documentation
 - [ ] Path and query parameters carry `description` and constraints
 - [ ] Request bodies reference reusable component schemas
 - [ ] `2xx` responses declare a schema so output types survive generation
@@ -98,9 +100,9 @@ Before generating tools from your API:
 
 ## Related Pages
 
-- [Tool Design](/docs/tool-design) — the cross-framework rules for names, descriptions, schemas, safety, and curation
-- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) — write `operationId` and `summary` that route correctly
-- [OpenAPI for Agents](./openapi-for-agents) — the spec that generates these tool definitions
-- [OpenAPI Extensions](./openapi-extensions) — `x-agent-*` hints for confirmations, idempotency, and destructive actions
-- [Arazzo Workflows](./arazzo-workflows) — composing operations into multi-step workflow tools
-- [MCP Servers: Auto-Generation](/docs/mcp-servers/auto-generation) — turning the spec into a running server
+- [Tool Design](/docs/tool-design) - the cross-framework rules for names, descriptions, schemas, safety, and curation
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - write `operationId` and `summary` that route correctly
+- [OpenAPI for Agents](./openapi-for-agents) - the spec that generates these tool definitions
+- [OpenAPI Extensions](./openapi-extensions) - `x-agent-*` hints for confirmations, idempotency, and destructive actions
+- [Arazzo Workflows](./arazzo-workflows) - composing operations into multi-step workflow tools
+- [MCP Servers: Auto-Generation](/docs/mcp-servers/auto-generation) - turning the spec into a running server

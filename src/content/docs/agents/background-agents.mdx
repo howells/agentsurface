@@ -1,0 +1,66 @@
+---
+title: Background Agents
+description: Scheduled, proactive agent work that runs independent of a user request - the same tools and prompts as an interactive agent, run in a worker instead of a chat loop.
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+Background agents run on a schedule (hourly, daily, weekly) or in response to an event, independent of a user waiting for a response: generating a weekly summary, reconciling records, sending overdue reminders, batching notifications. They reuse the same tools, prompts, and step budgets as interactive agents; only the runtime differs.
+
+- **Separate from chat agents** - no user in the loop; triggered by cron or an event, not a message.
+- **Batched** - collect changes during a window and send one summary instead of many notifications.
+- **Idempotent** - track a per-run execution ID so a retry does not reprocess or re-notify.
+- **Short and restart-safe** - if a job can safely restart from the beginning on failure, a plain scheduler is enough; if not, it needs [durable execution](/docs/agents/durable-execution) instead.
+
+## When A Plain Scheduler Is Enough
+
+Use a cron worker or event-driven function, not a full durable-execution engine, when the job is short, produces no expensive irreversible side effect if it reruns from scratch, and completes well within the runtime's timeout. Most proactive notification and reconciliation jobs fit this shape. Reach for [durable execution](/docs/agents/durable-execution) instead when losing an in-flight run means re-paying for completed model calls or re-running an irreversible action - a multi-step agent research task that spans hours, or a workflow with a human-approval pause measured in hours rather than seconds.
+
+## Idempotency
+
+If a job runs twice - a retry, a redeploy mid-run, an at-least-once delivery - it must not double-process or double-notify. Track a unique execution ID per scheduled run (a cron tick, an event ID) and check it before doing the work:
+
+```typescript
+const existing = await db.getExecution({ jobId, executionId });
+if (existing?.completed) return existing.result;
+
+try {
+  const result = await runJob();
+  await db.markExecution({ jobId, executionId, completed: true, result });
+  return result;
+} catch (err) {
+  await db.markExecution({ jobId, executionId, completed: false, error: err.message });
+  throw err;
+}
+```
+
+Durable-workflow engines (Temporal, Inngest) track execution IDs for you as part of step memoization; a plain cron worker needs this tracked explicitly.
+
+## Batching Windows
+
+Different events warrant different urgency. Categorize into immediate (the user just acted and expects instant confirmation) and batched (aggregate then summarize):
+
+| Event                       | Window    | Rationale                                      |
+| --------------------------- | --------- | ---------------------------------------------- |
+| Document/receipt match      | Immediate | User just uploaded; wants confirmation now     |
+| New records synced          | 10 min    | Frequent; batching avoids notification fatigue |
+| Item paid / resolved        | 10 min    | Good news, not time-sensitive                  |
+| Item overdue                | 30 min    | Important, but action is not instant           |
+| Upcoming/recurring reminder | 60 min    | Awareness only, no immediate action needed     |
+
+Collect events in the window, then send one summary per recipient rather than one notification per event. For user-facing digests, schedule relative to the recipient's local timezone, not server UTC - a "Monday morning" summary should land at 7am for the recipient, which usually means running the check hourly and firing only for users whose local hour matches, rather than a single fixed UTC cron.
+
+## Scheduling
+
+Any of the durable-execution engines in [Durable Execution](/docs/agents/durable-execution) can also drive a simple schedule (Temporal schedules, Inngest cron triggers, Cloudflare Cron Triggers plus Queues). For jobs simple enough not to need replay or checkpointing, a plain cron runner with the idempotency tracking above is sufficient - the choice follows the job's durability need.
+
+## Monitoring
+
+Track last-run time and error state per job, and alert when a job is overdue relative to its expected interval or has a logged failure. A background job with no monitoring fails silently - the first sign of trouble is usually a user asking why a weekly summary never arrived.
+
+## Related
+
+- [Durable Execution](/docs/agents/durable-execution) - the harder case, where restarting from scratch is not acceptable
+- [Channels](/docs/agents/channels) - where the batched notifications from this page actually get delivered
+- [Frameworks](/docs/agents/frameworks) - the loop implementation background jobs reuse from interactive agents

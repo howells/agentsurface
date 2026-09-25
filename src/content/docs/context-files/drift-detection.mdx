@@ -1,11 +1,12 @@
 ---
 title: Drift Detection
 description: Keeping context files current through CI checks and automated audits
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Context files go stale as code evolves: commands removed, directories moved, tech stack upgraded, permissions changed. Agents following outdated files fail silently. Detect drift via CI checks: run all commands in AGENTS.md to verify they exist and succeed, verify referenced directories exist, grep tech stack to confirm current versions, compare permission boundaries to actual code. Run automated audits (surface score --dimension=context) monthly or quarterly. Add lint rules for AGENTS.md format consistency. Version control changes with git history indicating maintenance.
+Context files go stale as code evolves: commands removed, directories moved, tech stack upgraded, permissions changed. Agents following outdated files fail silently. Detect drift via CI checks: run all commands in AGENTS.md to verify they exist and succeed, verify referenced directories exist, grep tech stack to confirm current versions, compare permission boundaries to actual code. Run the /surface skill's scorecard (context dimension) monthly or quarterly. Add lint rules for AGENTS.md format consistency. Track changes in git; recent commits on the file signal maintenance.
 
 - **Stale commands**: pnpm dev removed from package.json
 - **Deleted directories**: src/components moved to packages/web/components
@@ -16,7 +17,7 @@ Context files go stale as code evolves: commands removed, directories moved, tec
 
 ---
 
-Context files go stale. Commands change, directories move, conventions evolve. Agents that follow outdated instructions fail silently—running non-existent commands, trying to access deleted files, applying superceded conventions.
+Context files go stale. Commands, directories and conventions change. Agents that follow outdated instructions fail silently - running non-existent commands, trying to access deleted files, applying superseded conventions.
 
 Drift detection catches this via CI checks and automated audits.
 
@@ -164,54 +165,36 @@ for section in "${required_sections[@]}"; do
     (echo "✗ Required section '## $section' missing from AGENTS.md" && exit 1)
 done
 
-# Check line count (warn if >370)
+# Check line count (warn if over 370)
 lines=$(wc -l < AGENTS.md)
 if [ "$lines" -gt 370 ]; then
-  echo "⚠ AGENTS.md is $lines lines (recommend `` `<370` ``)"
+  echo "AGENTS.md is $lines lines (recommend under 370)"
   exit 1
 fi
 
 echo "✓ AGENTS.md structure valid"
 ```
 
-### Automated: Tool Integration
+### Skill-Based Audit
 
-Use the `surface` skill to audit context files:
+Run the `/surface` skill's scorecard against context files from an agent session:
 
-```bash
-# Command-line audit
-surface score --dimension=context
+```
+/surface score --dimension=context
 
 # Outputs:
 # context-files dimension:
 #   Score: 2/3
 #   Issues:
-#     - AGENTS.md: 425 lines (recommend `` `<370` ``)
-#     - CLAUDE.md: Last verified 2026-02-01 (>60 days stale)
+#     - AGENTS.md: 425 lines (recommend under 370)
+#     - CLAUDE.md: Last verified 2026-02-01 (>3 months stale)
 #     - Missing .cursor/rules/ for Cursor users
 #   Recommendations:
 #     - Split AGENTS.md or link to deeper docs
 #     - Re-verify CLAUDE.md against current behavior
 ```
 
-Integrate into CI:
-
-```yaml
-# .github/workflows/lint.yml
-name: Lint
-
-on: [push, pull_request]
-
-jobs:
-  context-files:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: npx skills add https://github.com/howells/agentsurface
-      - run: surface score --dimension=context --fail-below 2
-```
-
-This CI gate fails if context files score `` `<2` `` (poor).
+This is a skill invocation inside an agent session, not a CLI binary - there is nothing here for a CI job to shell out to. Run it on a cadence (monthly or quarterly) or after a change that touches commands, tech stack, or boundaries, and treat a low score as a prompt to investigate and fix, not a merge gate. The shell scripts above are what actually belongs in CI: they run as ordinary commands and can fail a build.
 
 ## Maintenance Cadence
 
@@ -290,10 +273,10 @@ Remove sections that are no longer relevant:
 ```markdown
 ## Legacy Setup
 
-If using Node `` `<20` ``, install node-gyp separately:
+If using Node <20, install node-gyp separately:
 npm install -g node-gyp
 
-(Node `` `<20` `` no longer supported — Next.js 16 requires 20+; .nvmrc enforces 20+)
+(Node <20 no longer supported - Next.js 16 requires 20+; .nvmrc enforces 20+)
 ```
 
 **After:** Delete the section. Update instead:
@@ -346,14 +329,9 @@ jobs:
 
       - name: Check structure
         run: bash scripts/validate-agents-content.sh
-
-      - name: Run surface audit
-        run: |
-          npx skills add https://github.com/howells/agentsurface
-          surface score --dimension=context --fail-below 2
 ```
 
-Blocks merge if validation fails.
+Blocks merge if the shell scripts fail. The `/surface` scorecard from the previous section runs separately, in an agent session on a cadence - it has no CLI form for CI to call, and its purpose is diagnostic, not a merge gate.
 
 ### Manual Audit Checklist
 
@@ -370,7 +348,7 @@ Before merging code changes, verify context files:
 - [ ] Permission boundaries match actual permissions
 - [ ] Testing commands match actual test setup
 - [ ] No deprecated libraries or patterns
-- [ ] File count reasonable (`` `<370` `` lines for AGENTS.md)
+- [ ] File count reasonable (<370 lines for AGENTS.md)
 - [ ] Links to deeper docs still valid
 - [ ] CLAUDE.md references AGENTS.md (no duplication)
 - [ ] Cursor rules and Copilot instructions reference AGENTS.md
@@ -416,6 +394,6 @@ Log metrics in CI and track over time. Alert if stalenessScore drops below 80%.
 
 ## See also
 
-- `/docs/context-files/agents-md` — AGENTS.md spec
-- `/docs/context-files/anti-patterns` — stale content patterns
-- `/templates/discovery/AGENTS.md` — starter template
+- `/docs/context-files/agents-md` - AGENTS.md spec
+- `/docs/context-files/anti-patterns` - stale content patterns
+- `/templates/discovery/AGENTS.md` - starter template

@@ -171,6 +171,14 @@ export default function HomePage() {
                   Explore the glossary
                 </Link>
               </div>
+              <p className="mt-5 type-small text-fd-muted-foreground">
+                This guide covers making your product work for agents. Building your own agents
+                instead?{" "}
+                <Link href="/docs/agents" className="underline underline-offset-4 focus-ring">
+                  See the agent-building guide
+                </Link>
+                .
+              </p>
             </div>
             <div id="skill" className="min-w-0 scroll-mt-20">
               <h3 className="type-body">Work through it with your coding agent</h3>
@@ -188,23 +196,27 @@ export default function HomePage() {
           </div>
           <p className="mt-12 border-t border-fd-border pt-6 type-small text-fd-muted-foreground">
             This guide brings together Agent Surface’s implementation guidance and practical lessons
-            from{" "}
-            <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
-              Is Agentic
+            from public scanners:{" "}
+            <a href="https://isitagentready.com/" className="underline underline-offset-4">
+              Cloudflare
             </a>
             ,{" "}
             <a href="https://ora.ai/methodology" className="underline underline-offset-4">
               Ora
             </a>
-            , and{" "}
-            <a href="https://isitagentready.com/" className="underline underline-offset-4">
-              Cloudflare Agent Readiness
+            ,{" "}
+            <a href="https://is-agentic.com/methodology" className="underline underline-offset-4">
+              Vercel’s Is Agentic
             </a>
-            . Priorities reflect the task and product; the{" "}
-            <Link
-              href="/docs/tooling-catalog/evaluation-and-observability"
+            , and{" "}
+            <a
+              href="https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring"
               className="underline underline-offset-4"
             >
+              Google Lighthouse
+            </a>
+            . Priorities reflect the task and product; the{" "}
+            <Link href="/docs/scoring/public-scanners" className="underline underline-offset-4">
               reference docs
             </Link>{" "}
             explain how external assessments fit into an evaluation.

@@ -1,6 +1,7 @@
 ---
 title: Braintrust Evals
 description: End-to-end eval platform with dataset versioning, experiment tracking, and human review
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -20,10 +21,10 @@ Braintrust ([braintrust.dev](https://www.braintrust.dev)) is a managed evaluatio
 
 ## Core concepts
 
-- **Dataset** — versioned collection of test cases (task, inputs, expected output)
-- **Scorer** — async function that grades a single execution (returns number 0-1 or pass/fail)
-- **Eval** — runs your agent on every test case in a dataset, scores each, aggregates results
-- **Experiment** — versioned eval run with metadata (model, prompt, etc.). Braintrust diffs experiments to show improvement
+- **Dataset** - versioned collection of test cases (task, inputs, expected output)
+- **Scorer** - async function that grades a single execution (returns number 0-1 or pass/fail)
+- **Eval** - runs your agent on every test case in a dataset, scores each, aggregates results
+- **Experiment** - versioned eval run with metadata (model, prompt, etc.). Braintrust diffs experiments to show improvement
 
 ## Basic eval
 
@@ -59,7 +60,7 @@ Is this summary coherent and complete?
 Summary: ${output}
 Expected tone: ${expected}
     `,
-    model: "claude-opus-5",
+    model: "claude-opus-5-5",
   });
 
   return grade.score;
@@ -109,7 +110,7 @@ await dataset.insert([
 // New evals can target 2025-04-18
 ```
 
-For how to decide _what belongs_ in these versioned datasets — sourcing, labeling, leakage checks, and drift detection — see [Datasets and experiments](/docs/testing/datasets-and-experiments). This page covers the platform mechanics; that page covers the curation methodology.
+For how to decide _what belongs_ in these versioned datasets - sourcing, labeling, leakage checks, and drift detection - see [Datasets and experiments](/docs/testing/datasets-and-experiments). This page covers the platform mechanics; that page covers the curation methodology.
 
 ## Experiment tracking
 
@@ -126,14 +127,20 @@ async function compareModels() {
     },
     data: () => dataset.fetch(),
     task: async (input) => {
-      const response = await fetch("https://api.anthropic.com/messages", {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+        },
         body: JSON.stringify({
           model: "claude-haiku-4-5",
+          max_tokens: 1024,
           messages: [{ role: "user", content: input.text }],
         }),
       });
-      return response.json().content[0].text;
+      return (await response.json()).content[0].text;
     },
     scores: { quality: scoreQuality },
   });
@@ -142,19 +149,25 @@ async function compareModels() {
   const opusResults = await Braintrust.eval({
     projectName: "model_comparison",
     metadata: {
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       promptVersion: "v1",
     },
     data: () => dataset.fetch(),
     task: async (input) => {
-      const response = await fetch("https://api.anthropic.com/messages", {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+        },
         body: JSON.stringify({
-          model: "claude-opus-5",
+          model: "claude-opus-5-5",
+          max_tokens: 1024,
           messages: [{ role: "user", content: input.text }],
         }),
       });
-      return response.json().content[0].text;
+      return (await response.json()).content[0].text;
     },
     scores: { quality: scoreQuality },
   });
@@ -180,7 +193,7 @@ async function comparePinnedToBaseline() {
     // Diff this run against a named baseline experiment
     baseExperimentName: "opus-prompt-v1",
     metadata: {
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       promptVersion: "v2",
       datasetVersion: "2025-04-18", // provenance: reproducible later
     },
@@ -195,7 +208,7 @@ async function comparePinnedToBaseline() {
 }
 ```
 
-If the baseline and candidate resolve to different dataset versions, the diff is meaningless — gate on a version match before trusting the delta.
+If the baseline and candidate resolve to different dataset versions, the diff is meaningless - gate on a version match before trusting the delta.
 
 ## Human review integration
 
@@ -249,7 +262,7 @@ async function tracedTask(input) {
       name: "summarize",
     },
     async (span) => {
-      span.setTag("model", "claude-opus-5");
+      span.setTag("model", "claude-opus-5-5");
       span.setTag("input_length", input.text.length);
 
       const summary = await agent.summarize(input.text);
@@ -280,10 +293,10 @@ jobs:
   evals:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 18
+          node-version: 22
       - run: npm ci
       - run: npm run evals
         env:
@@ -306,11 +319,11 @@ jobs:
 
 - Braintrust docs: https://braintrust.dev/docs
 - TypeScript SDK: https://www.npmjs.com/package/braintrust
-- Template: `/templates/cli-and-evals/eval-braintrust.ts` — full working example
+- Template: `/templates/cli-and-evals/eval-braintrust.ts` - full working example
 
 ## See also
 
-- `/docs/testing/datasets-and-experiments` — golden-dataset curation methodology behind these versioned datasets
-- `/docs/testing/evaluation-framework` — grader patterns
-- `/docs/testing/ci-integration` — running evals in GitHub Actions
-- `/docs/testing/observability` — trace-driven debugging
+- `/docs/testing/datasets-and-experiments` - golden-dataset curation methodology behind these versioned datasets
+- `/docs/testing/evaluation-framework` - grader patterns
+- `/docs/testing/ci-integration` - running evals in GitHub Actions
+- `/docs/testing/observability` - trace-driven debugging

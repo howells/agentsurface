@@ -1,6 +1,6 @@
 /**
  * MCP tool error handling via RFC 9457 Problem Details
- * Canonical spec: https://modelcontextprotocol.io/specification/2025-11-25
+ * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
  * Use: Return structured errors from MCP tools as { isError: true, content: [...] }
  *
  * <CUSTOMISE>
@@ -9,7 +9,7 @@
  * </CUSTOMISE>
  */
 
-import type { TextContent, ToolResultBlockParam } from "@modelcontextprotocol/sdk/types";
+import type { TextContent } from "@modelcontextprotocol/server";
 import type { ProblemDetails } from "./problem-details";
 import { problemDetails } from "./problem-details";
 
@@ -165,23 +165,28 @@ export function withToolErrorHandling(
 }
 
 /**
- * MCP SDK v1 (TypeScript SDK) style wrapper
- * If using @modelcontextprotocol/sdk:
+ * MCP TypeScript SDK v2 style wrapper
+ * If using `@modelcontextprotocol/server` (v2 replaced the monolithic
+ * `@modelcontextprotocol/sdk` package with separate server/client packages):
  *
  * ```typescript
- * import { Tool } from '@modelcontextprotocol/sdk/types';
+ * import { McpServer } from '@modelcontextprotocol/server';
  * import { withToolErrorHandling, toolOk } from './mcp-tool-error';
  *
- * const myTool: Tool = {
- *   name: 'fetch_data',
- *   description: 'Fetch data by ID',
- *   inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
- *   execute: withToolErrorHandling(async (input) => {
+ * const server = new McpServer({ name: 'example', version: '1.0.0' });
+ *
+ * server.registerTool(
+ *   'fetch_data',
+ *   {
+ *     description: 'Fetch data by ID',
+ *     inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+ *   },
+ *   withToolErrorHandling(async (input) => {
  *     if (!input.id) throw new Error('ID is required');
  *     const data = await fetchData(input.id);
  *     return toolOk({ data });
  *   }),
- * };
+ * );
  * ```
  */
 

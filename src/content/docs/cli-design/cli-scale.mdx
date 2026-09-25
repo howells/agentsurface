@@ -1,11 +1,12 @@
 ---
 title: The Agent DX CLI Scale
 description: A seven-axis scoring framework for evaluating how well a CLI supports AI agent operation
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-The Agent DX CLI Scale scores CLIs on seven axes (0-3 each, 0-21 total): machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, and command structure. The score maps to readiness tiers from Human-only (0-6) to Agent-first (18-21). This framework quantifies gaps and helps prioritize work.
+The Agent DX CLI Scale scores CLIs on seven axes (0-3 each, 0-21 total): machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, and agent knowledge packaging. The score maps to readiness tiers from Human-only (0-5) to Agent-first (16-21). This framework quantifies gaps and helps prioritize work.
 
 ```
 Axis 1: Machine-Readable Output    (0-3)
@@ -14,14 +15,12 @@ Axis 3: Schema Introspection        (0-3)
 Axis 4: Context Window Discipline   (0-3)
 Axis 5: Input Hardening            (0-3)
 Axis 6: Safety Rails               (0-3)
-Axis 7: Command Structure           (0-3)
+Axis 7: Agent Knowledge Packaging   (0-3)
 ────────────────────────────────
 Total Score: 0-21
 ```
 
 The Agent DX CLI Scale is a systematic rubric for evaluating any CLI's agent-readiness. It scores seven axes on a 0–3 scale, producing a total between 0 and 21. The score maps to four readiness tiers, from Human-only to Agent-first.
-
-> Human DX optimizes for discoverability and forgiveness. Agent DX optimizes for predictability and defense-in-depth.
 
 The scale exists because "does it have `--json`?" is not a useful question. A CLI can have `--json` on three commands out of thirty and score a 1 on the machine-readable output axis. The scale quantifies the gaps precisely enough to prioritize work.
 
@@ -61,7 +60,7 @@ Can an agent discover what the CLI accepts at runtime without pre-stuffed docume
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | Only `--help` text. No machine-readable schema.                                                                                                         |
 | 1     | `--help --json` or a `describe` command for some surfaces, but incomplete.                                                                              |
-| 2     | Full schema introspection for all commands — params, types, required fields — as JSON.                                                                  |
+| 2     | Full schema introspection for all commands - params, types, required fields - as JSON.                                                                  |
 | 3     | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
 
 See [Schema Introspection](./schema-introspection) for implementation guidance.
@@ -88,7 +87,7 @@ Does the CLI defend against the specific ways agents fail (hallucinations, not t
 | 0     | No input validation beyond basic type checks.                                                                                                                                         |
 | 1     | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding).                                            |
 | 2     | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs.                                          |
-| 3     | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
+| 3     | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture - "The agent is not a trusted operator." |
 
 See [Input Hardening](./input-hardening) for implementation guidance.
 
@@ -96,12 +95,12 @@ See [Input Hardening](./input-hardening) for implementation guidance.
 
 Can agents validate before acting, and are responses sanitized against prompt injection?
 
-| Score | Criteria                                                                                                                                                        |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No dry-run mode. No response sanitization.                                                                                                                      |
-| 1     | `--dry-run` exists for some mutating commands.                                                                                                                  |
-| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                                        |
-| 3     | Dry-run plus response sanitization (e.g., via Model Armor) to defend against prompt injection embedded in API data. The full request→response loop is defended. |
+| Score | Criteria                                                                                                                                                                                                                      |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No dry-run mode. No response sanitization.                                                                                                                                                                                    |
+| 1     | `--dry-run` exists for some mutating commands.                                                                                                                                                                                |
+| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                                                                                                      |
+| 3     | Dry-run plus response screening (for example, running API responses through a screening service such as Google Cloud Model Armor) to catch prompt injection embedded in API data. The full request→response loop is defended. |
 
 See [Safety Rails](./safety-rails) for implementation guidance.
 
@@ -131,9 +130,9 @@ See [Agent Knowledge Packaging](./agent-knowledge-packaging) for implementation 
 
 Not scored, but note whether the CLI exposes multiple agent surfaces from the same binary:
 
-- **MCP (stdio JSON-RPC)** — typed tool invocation without shell escaping; agents treat the CLI as a native tool rather than a subprocess
-- **Extension / plugin install** — the agent can install the CLI as a capability within its tool ecosystem, rather than shelling out to it
-- **Headless auth** — environment variables for all credentials, with no browser redirect or interactive setup required
+- **MCP (stdio JSON-RPC)** - typed tool invocation without shell escaping; agents treat the CLI as a native tool rather than a subprocess
+- **Extension / plugin install** - the agent can install the CLI as a capability within its tool ecosystem, rather than shelling out to it
+- **Headless auth** - environment variables for all credentials, with no browser redirect or interactive setup required
 
 A CLI that scores 18/21 but requires browser-based OAuth for authentication is still unusable in headless agent environments. Multi-surface readiness is the difference between "can be used by agents with careful setup" and "works in any agent deployment context."
 
@@ -148,7 +147,7 @@ Work through each axis methodically. For each one:
 A useful shortcut: run the CLI in a pipe and observe its behavior.
 
 ```bash
-# TTY detection check — does it auto-detect non-interactive context?
+# TTY detection check - does it auto-detect non-interactive context?
 mytool users list | cat
 
 # Error structured output check
@@ -171,34 +170,36 @@ Score what you observe, not what the documentation claims.
 
 ## Example Evaluation: Stripe CLI
 
-The Stripe CLI (`stripe`) is a widely-used API CLI that scores well on several axes and illustrates the tradeoffs.
+The Stripe CLI (`stripe`) is a widely-used API CLI that scores well on several axes and illustrates the tradeoffs. Stripe has shipped dedicated agent tooling, which moves three of the seven axes.
 
-| Axis                      | Score  | Notes                                                                                                                           |
-| ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Machine-Readable Output   | 2      | Consistent JSON output with `--` flags; no automatic TTY detection that defaults to JSON when piped                             |
-| Raw Payload Input         | 3      | `stripe post /v1/customers -d 'param=value'` maps directly to API params; raw flag-based API access with full API schema parity |
-| Schema Introspection      | 1      | `stripe completion` for shell completions; no `--help --json` or structured describe output                                     |
-| Context Window Discipline | 1      | No `--fields` flag; returns full API objects; some pagination support                                                           |
-| Input Hardening           | 1      | Basic type validation; no explicit control-character or path-traversal defense documented                                       |
-| Safety Rails              | 1      | No `--dry-run` on mutations; `--confirm` on some destructive operations                                                         |
-| Agent Knowledge Packaging | 1      | No SKILL.md or AGENTS.md; documentation is human-oriented                                                                       |
-| **Total**                 | **10** | **Agent-tolerant**                                                                                                              |
+| Axis                      | Score  | Notes                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Machine-Readable Output   | 2      | `stripe login --non-interactive` auto-activates and prints JSON once stdin isn't a terminal; `post`/`get`/`delete` return the Stripe API's native JSON by default; `pay` requires `--agent`/`--json` for scripted use. NDJSON streaming for paginated list output is not documented, so this stops short of a 3.                                                           |
+| Raw Payload Input         | 3      | `stripe post /v1/customers -d 'param=value'` maps directly to API params; raw flag-based API access with full API schema parity                                                                                                                                                                                                                                            |
+| Schema Introspection      | 1      | `stripe completion` for shell completions; no `--help --json` or structured describe output                                                                                                                                                                                                                                                                                |
+| Context Window Discipline | 1      | No `--fields` flag; returns full API objects; some pagination support                                                                                                                                                                                                                                                                                                      |
+| Input Hardening           | 1      | Basic type validation; no explicit control-character or path-traversal defense documented                                                                                                                                                                                                                                                                                  |
+| Safety Rails              | 1      | `--dry-run` exists on `stripe pay` (the money-moving command) with a `confirmation_required` JSON contract gating `--yes`, so an agent can validate a transfer before it sends money; the generic `post`/`delete` mutation commands have no `--dry-run`, only an interactive confirm prompt (`--confirm` to skip it) - coverage is one command, not all mutating commands. |
+| Agent Knowledge Packaging | 2      | `stripe agent setup` detects Claude Code, Codex, and Cursor and installs a Stripe plugin, skills, and an MCP server; `stripe projects init` and `stripe projects llm-context` generate a project `AGENTS.md`.                                                                                                                                                              |
+| **Total**                 | **11** | **Agent-ready**                                                                                                                                                                                                                                                                                                                                                            |
 
-Score of 10 means: an agent can use the Stripe CLI, but will waste tokens on full API responses, cannot do runtime schema discovery, and has no dry-run protection for mutations. It needs heavy prompt engineering to compensate.
+Source for the current behavior: https://docs.stripe.com/stripe-cli/reference (fetched 2026-09-25).
 
-Reaching Agent-ready (11–15) would require: automatic JSON output in piped contexts, `--fields` on read commands, and `--dry-run` on mutations. Reaching Agent-first (16+) would additionally require: runtime schema resolution, comprehensive input hardening, response sanitization, and a SKILL.md.
+Score of 11 means: an agent can use the Stripe CLI with structured output and packaged agent knowledge already in place, but still cannot do runtime schema discovery, still gets full API objects with no field-selection flag, and only the highest-stakes mutating command (`pay`) has a validate-before-acting path.
+
+Reaching Agent-first (16+) would require: runtime schema resolution (Schema Introspection), a `--fields` flag on read commands (Context Window Discipline), comprehensive input hardening, and `--dry-run` extended from `pay` to the generic `post`/`delete` mutation commands.
 
 ## Using the Scale to Prioritize Work
 
 Not all axes have equal impact. The ordering below reflects which improvements deliver the most agent-reliability per unit of implementation effort:
 
-1. **Machine-Readable Output (Axis 1)** — without this, nothing else works. Implement first.
-2. **Safety Rails (Axis 6)** — `--dry-run` prevents irreversible errors. High impact, relatively simple.
-3. **Schema Introspection (Axis 3)** — enables agents to self-discover without pre-loaded docs. Medium effort, high impact.
-4. **Context Window Discipline (Axis 4)** — `--fields` is low effort; streaming takes more work.
-5. **Raw Payload Input (Axis 2)** — high impact for API-backed CLIs; relatively simple to add.
-6. **Agent Knowledge Packaging (Axis 7)** — AGENTS.md is fast; full SKILL.md takes more writing.
-7. **Input Hardening (Axis 5)** — comprehensive hardening takes the most careful implementation.
+1. **Machine-Readable Output (Axis 1)** - without this, nothing else works. Implement first.
+2. **Safety Rails (Axis 6)** - `--dry-run` prevents irreversible errors. High impact, relatively simple.
+3. **Schema Introspection (Axis 3)** - enables agents to self-discover without pre-loaded docs. Medium effort, high impact.
+4. **Context Window Discipline (Axis 4)** - `--fields` is low effort; streaming takes more work.
+5. **Raw Payload Input (Axis 2)** - high impact for API-backed CLIs; relatively simple to add.
+6. **Agent Knowledge Packaging (Axis 7)** - AGENTS.md is fast; full SKILL.md takes more writing.
+7. **Input Hardening (Axis 5)** - comprehensive hardening takes the most careful implementation.
 
 Start with Axes 1 and 6. A CLI that always outputs structured JSON and supports `--dry-run` on every mutation is already much safer and more useful for agents than one that does neither, even if everything else scores 0.
 

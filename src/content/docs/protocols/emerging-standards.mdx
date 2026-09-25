@@ -1,17 +1,17 @@
 ---
 title: Emerging Standards Watchlist
-description: Draft and early-stage agent standards worth tracking — WebMCP, Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP — plus pointers to standards that have graduated to stable coverage elsewhere in Agent Surface.
-lastVerified: 2026-08-27
+description: Draft and early-stage agent standards worth tracking - Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP - plus pointers to standards that have graduated to stable coverage elsewhere in Agent Surface.
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
 This page is a watchlist for draft and early-stage standards in the agent ecosystem. Everything here is unstable: pre-consensus specs, origin trials, single-vendor proposals, or specs defined by adoption rather than a pinned version. Track them; do not build production dependencies on them without a concrete reason.
 
-Standards that have stabilized enough to earn dedicated coverage no longer live here — they moved to their canonical homes and are listed in "Graduated to stable coverage" below.
+Standards that have stabilized enough to earn dedicated coverage no longer live here - they moved to their canonical homes and are listed in "Graduated to stable coverage" below.
 
-- Watch, do not depend without a concrete compatibility reason: Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, OASF, ANP
-- Payment-network protocols are watchlist-only; substantive agentic commerce protocols get their own page
+- Watch, do not depend without a concrete compatibility reason: Web Bot Auth, A2UI, AG-UI, OpenUI, AIPREF, NLWeb, AGNTCY/OASF, ANP
+- Agentic commerce and payment protocols (UCP, ACP, AP2, x402, MPP, and card-network schemes) moved to their own section - see [Agentic Commerce](/docs/agentic-commerce)
 - Everything on this page carries a status and a date so you can judge staleness
 
 ## Graduated to Stable Coverage
@@ -27,54 +27,54 @@ These were once tracked here as emerging. They are now stable enough to have can
 
 ## Draft & Emerging Watchlist
 
-### Web Bot Auth — Signed Bot Identity
+### Web Bot Auth - Signed Bot Identity
 
 An IETF effort: the WebBotAuth working group is chartered, building on RFC 9421 HTTP Message Signatures so that an accountable agent can cryptographically sign its requests and a site can distinguish it from anonymous automation. Cloudflare has run it in production since March 2026, which gives it real deployment signal ahead of a finished RFC. Relevant to anyone deciding how to let "good bots" through bot-management controls.
 
-### A2UI v0.9 — Generative UI Over Agent Transports
+### A2UI v0.9 - Generative UI Over Agent Transports
 
-A Google generative-UI specification (v0.9, July 2026) for agents that emit UI rather than only text. It is designed to ride existing transports — AG-UI, A2A, and MCP — rather than define a new one. Extremely new: a sub-1.0 spec with essentially no production track record. Track it as a signal of where generative-UI standardization is heading, not as something to adopt.
+A Google generative-UI specification (v0.9, July 2026) for agents that emit UI rather than only text. It is designed to ride existing transports - AG-UI, A2A, and MCP - rather than define a new one. Extremely new: a sub-1.0 spec with essentially no production track record. Track it as a signal of where generative-UI standardization is heading.
 
-### AG-UI — Defined by Adoption, Not a Version
+### AG-UI - Adoption Without a Pinned Version
 
-AG-UI is an agent-to-UI event protocol that originated at CopilotKit and has no canonical pinned spec version — its status is best read through its SDK adoption. Implementations span Microsoft Agent Framework, Google ADK, AWS Strands, Mastra, Pydantic AI, LangGraph, and CrewAI. The multi-vendor SDK support makes it the current de facto layer for streaming agent state to a UI, but the absence of a versioned specification means the contract can shift under you. Adopt via a maintained SDK, not by hand-implementing the wire format.
+AG-UI is an agent-to-UI event protocol that originated at CopilotKit and has no canonical pinned spec version - its status is best read through its SDK adoption. Implementations span Microsoft Agent Framework, Google ADK, AWS Strands, Mastra, Pydantic AI, LangGraph, and CrewAI. The multi-vendor SDK support makes it the current de facto layer for streaming agent state to a UI, but the absence of a versioned specification means the contract can shift under you. Adopt via a maintained SDK, not by hand-implementing the wire format.
 
-### OpenUI — Vendor-Authored Generative-UI Standard
+### OpenUI - Vendor-Authored Generative-UI Standard
 
-OpenUI ([openui.com](https://openui.com)) is an open generative-UI standard from Thesys, MIT-licensed and unversioned: a compact streaming UI language that a model emits as a component tree, plus a renderer-agnostic runtime with first-party React support and community Vue and Svelte ports. Its pitch is efficiency against the obvious alternative — Thesys claims roughly 3x faster rendering and about 67% fewer tokens than streaming equivalent JSON — which is a real problem, since JSON component trees are an expensive way to spend an output budget.
+OpenUI ([openui.com](https://openui.com)) is an open generative-UI standard from Thesys, MIT-licensed and unversioned: a compact streaming UI language that a model emits as a component tree, plus a renderer-agnostic runtime with first-party React support and community Vue and Svelte ports. Its pitch is efficiency against the obvious alternative - Thesys claims roughly 3x faster rendering and about 67% fewer tokens than streaming equivalent JSON - which is a real problem, since JSON component trees are an expensive way to spend an output budget.
 
 It does not define its own transport. Framework integrations ride AG-UI, the entry above: an AG-UI adapter emits the event stream and OpenUI's client-side `agUIAdapter()` parses it, the same layering A2UI uses. That makes it a peer of A2UI rather than a competitor to AG-UI, and it means AG-UI's missing version pin is inherited here too.
 
 Status: single-vendor, no published spec version, real download volume but no cross-vendor governance. Watch it as the second serious attempt to standardize what an agent emits when it emits UI; if you adopt it, pin the packages yourself, because upstream ships unpinned.
 
-### AIPREF — Content-Usage Preferences
+### AIPREF - Content-Usage Preferences
 
 An IETF effort to standardize a `Content-Usage` HTTP header (and companion signals) letting publishers express how their content may be used for AI. It is pre-consensus: the working group is still shaping the vocabulary, and nothing is settled. Watch it alongside Content Signals as the AI-usage-preference space converges.
 
-### NLWeb — Structured Retrieval
+### NLWeb - Structured Retrieval
 
 NLWeb provides server-side natural-language retrieval over structured site content. Its [reference implementation](https://github.com/nlweb-ai/NLWeb) supports MCP integration. WebMCP exposes page-local browser tools and serves a different execution context. Assess NLWeb against your retrieval needs and intended clients; see [catalogs, feeds, and query verification](/docs/discovery/catalogs-and-feeds). Evaluate feed freshness, query correctness, and streaming behavior separately.
 
-### OASF — Open Agent Schema Framework
+### AGNTCY / OASF - Multi-Agent Infrastructure and Capability Discovery
 
-OASF defines normalized schemas for describing agent and tool capabilities, with the goal of making capability discovery work like a package registry — search by what a tool does, not who publishes it. The schemas are still under active development and have not converged on a stable version; the surrounding tooling (search indexes, registry operators) remains nascent. A spec to contribute to and monitor, not to build production dependencies on.
+AGNTCY is a Linux Foundation project (donated by Cisco, July 2025) building shared infrastructure for cross-organization agent systems: discovery, identity, messaging (SLIM), and observability. Cisco, Dell, Google Cloud, Oracle, and Red Hat are formative members, with 65+ supporting companies.
 
-### ANP — W3C AI Agent Protocol
+OASF (Open Agent Schema Framework) is AGNTCY's discovery component: normalized schemas for describing agent and tool capabilities, with the goal of making capability discovery work like a package registry - search by what a tool does, not who publishes it. OASF is at v1.2.0 and integrates with Oracle's Open Agent Specification, but the schemas have not converged on a stable version and the surrounding tooling (search indexes, registry operators) remains nascent. A spec to contribute to and monitor.
+
+AGNTCY Dir is the registry/tooling half - the CLI and gateway agents use to publish and query OASF records. [Dir v1.7.0](https://agntcy.org/changelog) (2026-08-18) added an HTTP `POST /v1/search` endpoint with parity to the `dirctl search` CLI, so a caller no longer needs a gRPC client, plus a `POST /v1/extract` endpoint that pulls OASF taxonomy out of free-form text using the same extractor the CLI and gateway share. Dir v1.7.1 (2026-09-22) is a stability release: an install manifest becomes the source of truth for package state (so uninstall no longer requires contacting the server), bare-name lookups resolve to the highest version instead of the most recently pushed one, and it adds upgrade/prune/outdated/pin-unpin lifecycle commands. Same maturity read as OASF above: real tooling, not yet something to build a production dependency on.
+
+### ANP - W3C AI Agent Protocol
 
 ANP, from the W3C AI Agent Protocol Community Group, targets the problem MCP and A2A leave open: how agents establish trusted identity and communicate when they share no central authority. It combines Decentralized Identifiers (DIDs), JSON-LD capability metadata, and end-to-end encryption. It remains a draft with published working drafts but no production reference implementation. Worth monitoring for cross-organization agent networks where no single OAuth provider can anchor trust.
 
-## Payment-Network Protocols (Watchlist Only)
+## Agentic Commerce - Moved
 
-Card networks are publishing their own agent-payment schemes. These are watchlist pointers only:
-
-- **Visa Trusted Agent Protocol** — Visa's scheme for identifying and authorizing trusted agents in card-network purchase flows.
-- **Mastercard Agent Pay** — Mastercard's agent-initiated payment framework.
-
-The substantive, foundation-backed agentic commerce protocols (UCP, AP2, x402) are covered on their own dedicated page — [Agentic Commerce Protocols](/docs/protocols/agentic-commerce); the card-network schemes above are tracked here until they show durable, cross-vendor adoption.
+Agent-initiated commerce and payment protocols - UCP, ACP, AP2, x402, MPP, and the Visa and Mastercard card-network agent schemes (Trusted Agent Protocol, Agent Pay, Verifiable Intent) - have their own section: [Agentic Commerce](/docs/agentic-commerce). They no longer live on this watchlist; the card-network schemes have real, sourced backing (Visa + Cloudflare, Mastercard + Google) even though they remain single-network efforts without the cross-vendor governance UCP or AP2 have.
 
 ## Related Pages
 
-- [Protocol Comparison](/docs/protocols/comparison) — when to use MCP, A2A, and ACP
-- [MCP Protocol](/docs/protocols/mcp) — the stable foundation for tool connectivity
-- [A2A Protocol](/docs/protocols/a2a) — agent-to-agent delegation
-- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) — where discovery documents live today
+- [Protocol Comparison](/docs/protocols/comparison) - when to use MCP, A2A, Arazzo, ANP, and OASF
+- [MCP Protocol](/docs/protocols/mcp) - the stable foundation for tool connectivity
+- [A2A Protocol](/docs/protocols/a2a) - agent-to-agent delegation
+- [Agentic Commerce](/docs/agentic-commerce) - UCP, ACP, payments, and trust and risk
+- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) - where discovery documents live today

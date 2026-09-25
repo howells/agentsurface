@@ -1,21 +1,24 @@
 ---
 title: MCP Apps
-description: Interactive UI delivered through MCP — how a server ships rich, sandboxed interfaces to any supporting client via tool results, when to use it over plain structured output, and its client support matrix.
-lastVerified: 2026-08-27
+description: Interactive UI delivered through MCP - how a server ships rich, sandboxed interfaces to any supporting client via tool results, when to use it over plain structured output, and its client support matrix.
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
 Chat-only tool results flatten rich interactions. When a tool returns a table, a form, a chart, or a picker, a text-only client can only render a serialized blob and hope the model narrates it well. MCP Apps let an MCP server ship an interactive UI surface that any supporting client renders inline, so a "book a flight" tool can return a real date-and-seat picker instead of a paragraph describing one. The server declares the UI; the client hosts it in a sandbox; the UI communicates with the host over a JSON-RPC bridge, and the host mediates calls to the server.
 
-Reach for MCP Apps when the value is in the interaction — selecting, filtering, previewing, confirming — and plain structured output when the client or the model can act on the data directly. Because client support is uneven, every MCP App must degrade gracefully to text.
+Reach for MCP Apps when the value is in the interaction - selecting, filtering, previewing, confirming - and plain structured output when the client or the model can act on the data directly. Because client support is uneven, every MCP App must degrade gracefully to text.
 
 <Callout type="info">
   MCP Apps is the first official MCP extension (SEP-1865, extension id
   `io.modelcontextprotocol/ui`), Stable at version `2026-01-26`. It merges the earlier MCP-UI and
-  OpenAI Apps SDK lineages into one standard; the reference SDK is v1.7.5 (2026-07-23). Supporting
-  clients include ChatGPT, Claude, VS Code, Goose, Postman, and Microsoft 365 Copilot, and OpenAI
-  now directs new ChatGPT apps to the MCP Apps standard keys rather than a proprietary surface.
+  OpenAI Apps SDK lineages into one standard; the reference SDK (`@modelcontextprotocol/ext-apps` on
+  npm) is at v2.0.1 (2026-09-24). Per the official [client support
+  matrix](https://modelcontextprotocol.io/extensions/client-matrix), supporting clients are Claude
+  (web), Claude Desktop, VS Code GitHub Copilot, Microsoft 365 Copilot, Goose, Postman, MCPJam,
+  ChatGPT, Cursor, Archestra.AI, and PostHog Code - and OpenAI directs new ChatGPT apps to the MCP
+  Apps standard keys rather than a proprietary surface.
 </Callout>
 
 <Callout type="warn">
@@ -29,7 +32,7 @@ Reach for MCP Apps when the value is in the interaction — selecting, filtering
 
 Use MCP Apps when:
 
-- the useful output is an interaction, not a value — a form to fill, a list to filter, a range to select, a diff to accept
+- the useful output is an interaction, not a value - a form to fill, a list to filter, a range to select, a diff to accept
 - the result benefits from custom controls or a visual layout that text cannot carry (charts, maps, media, side-by-side comparisons)
 - the user should act inside the result and send a structured response back, rather than typing a follow-up message
 
@@ -52,50 +55,50 @@ MCP Apps link a tool definition to an HTML resource. The shape is **tool metadat
 
 The app-to-host bridge and host-to-server connection are distinct boundaries. Declaring a UI does not grant credentials or additional server permissions. See the [official MCP Apps architecture](https://modelcontextprotocol.io/extensions/apps/overview).
 
-ChatGPT has been fully MCP-Apps-compatible since 2026-02-22, and OpenAI directs new apps to the standard MCP Apps keys with a bridge over the older `window.openai` surface. One proprietary key is still in circulation: `_meta["openai/visibility"]` was deprecated on 2026-07-21 in favor of the standard `_meta.ui.visibility`. Emit the standard key; keep the OpenAI-prefixed one only as long as you need to support hosts that have not migrated.
+ChatGPT has shipped MCP Apps support since 2026-02-22, and OpenAI directs new apps to the standard MCP Apps keys with a bridge over the older `window.openai` surface. One proprietary key is still in circulation: `_meta["openai/visibility"]` was deprecated on 2026-07-21 in favor of the standard `_meta.ui.visibility`. Emit the standard key; keep the OpenAI-prefixed one only as long as you need to support hosts that have not migrated.
 
 ## Tool-UI Lifecycle
 
 The lifecycle runs alongside the ordinary tool call:
 
-- **Declare** — publish the tool's `_meta.ui.resourceUri` and register the HTML resource.
-- **Render** — the host fetches and mounts the resource; preloading may precede tool execution.
-- **Deliver** — the host passes tool inputs and results to the app. Keep text and structured data useful without the UI.
-- **Interact** — UI actions send messages to the host bridge, which mediates permitted server calls.
-- **Update** — render returned state; keep durable application state on the server rather than relying on the iframe's lifetime.
-- **Degrade** — a client without UI support consumes the tool's text and structured results.
+- **Declare** - publish the tool's `_meta.ui.resourceUri` and register the HTML resource.
+- **Render** - the host fetches and mounts the resource; preloading may precede tool execution.
+- **Deliver** - the host passes tool inputs and results to the app. Keep text and structured data useful without the UI.
+- **Interact** - UI actions send messages to the host bridge, which mediates permitted server calls.
+- **Update** - render returned state; keep durable application state on the server rather than relying on the iframe's lifetime.
+- **Degrade** - a client without UI support consumes the tool's text and structured results.
 
 ## Security Model
 
 An MCP App is untrusted UI from a third-party server running inside a trusted client. The security model rests on two boundaries:
 
-- **Sandboxed rendering** — the client hosts the UI in an isolated surface with no direct access to the client's privileges, the host page, or the user's other sessions. The UI can only communicate through the constrained MCP message channel.
-- **Capability boundaries** — what the UI can request and what the server can do on the user's behalf are still governed by MCP's authorization and capability declarations. Rendering a UI does not widen a server's permissions; the same token, scope, and approval rules apply as for any tool call.
+- **Sandboxed rendering** - the client hosts the UI in an isolated surface with no direct access to the client's privileges, the host page, or the user's other sessions. The UI can only communicate through the constrained MCP message channel.
+- **Capability boundaries** - what the UI can request and what the server can do on the user's behalf are still governed by MCP's authorization and capability declarations. Rendering a UI does not widen a server's permissions; the same token, scope, and approval rules apply as for any tool call.
 
-Treat interactive results with the same posture as any other tool output: the UI can propose actions, but irreversible side effects still belong behind the approval and authorization layers described in [Session Control](/docs/agentic-ui/session-control) and [Human-in-the-Loop](/docs/multi-agent/human-in-the-loop).
+Treat interactive results with the same posture as any other tool output: the UI can propose actions, but irreversible side effects still belong behind the approval and authorization layers described in [Session Control](/docs/agentic-ui/session-control) and [Human Approval](/docs/tool-design/human-approval).
 
 ## Declaring CSP and a Public View Origin
 
-A UI resource that a host cannot load its allowed connections for, or cannot reach at all, fails silently in front of the user rather than degrading to text. Two declarations cover this:
+A UI resource the host cannot load, or cannot reach at all, fails silently in front of the user instead of degrading to text. Two declarations cover this:
 
 **Content-Security-Policy.** The standard extension declares network access on the resource's `_meta.ui.csp` object, not in a response header: `connectDomains` for fetch/XHR/WebSocket origins, `resourceDomains` for scripts, stylesheets, images, and fonts, `frameDomains` for nested iframes, and `baseUriDomains` for allowed base URIs. A host enforces these declarations and allows nothing beyond them, so every origin the UI touches - including `localhost` in development - must be listed. See the [MCP Apps CSP and CORS reference](https://apps.extensions.modelcontextprotocol.io/api/documents/csp-and-cors.html). If the UI instead serves from an external HTTP origin with its own CSP header, that policy needs `frame-ancestors` including the hosts that will embed it (for example `https://chatgpt.com` and `https://claude.ai`) alongside a scoped `connect-src`, `form-action`, `img-src`, `script-src`, and `style-src` - never a `*` wildcard.
 
 **Domain.** `_meta.ui.domain` gives the view a stable sandbox origin, useful for OAuth callbacks, CORS allowlisting, and API key restrictions; the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx) notes the exact origin format is host-dependent. Whatever origin the view resolves to, it must load publicly and serve real HTML with no auth wall: a 401/403 response or a login form in the body breaks the view in front of the user instead of degrading gracefully.
 
-OpenAI's Apps SDK bridge still reads its own legacy keys - `openai/widgetDomain` for the origin and `openai/widgetCSP` with `connect_domains`/`resource_domains` (snake_case) for the same connect and resource origins. As with `_meta["openai/visibility"]` above, emit the standard `_meta.ui` keys and keep the OpenAI-prefixed ones only for hosts that have not migrated.
+OpenAI's Apps SDK bridge still reads its own legacy keys - `openai/widgetDomain` for the origin and `openai/widgetCSP` with `connect_domains`/`resource_domains` (snake_case) for the same connect and resource origins.
 
 ## Failure Modes
 
-- **Assuming universal support:** Client support is a matrix, not a guarantee. A UI resource that renders in ChatGPT or Claude may arrive at a client that cannot host it. Always include text content the client can fall back to.
+- **Assuming universal support:** Client support varies across the matrix. A UI resource that renders in ChatGPT or Claude may arrive at a client that cannot host it. Always include text content the client can fall back to.
 - **No graceful degradation:** The tool returns only a UI resource, so an unsupporting client shows nothing useful. Every MCP App must carry a text representation of the same result.
 - **UI as the source of truth:** Trusting values the sandboxed UI sends back without server-side validation. The UI is untrusted input; validate its events like any other tool arguments.
 - **Privilege leakage:** Expecting the sandbox to grant the UI access to client internals or user credentials. The sandbox exists precisely to deny that; design the UI to work within the constrained channel.
 - **Assuming extension parity:** Core revision support does not prove MCP Apps support. Pin to the Stable `2026-01-26` extension and recheck the client matrix before release.
-- **Writing deprecated vendor keys:** Emitting only `_meta["openai/visibility"]`, deprecated 2026-07-21, instead of the standard `_meta.ui.visibility`. Vendor-prefixed metadata is a compatibility shim, not the contract.
+- **Writing deprecated vendor keys:** Emitting only `_meta["openai/visibility"]`, deprecated 2026-07-21, instead of the standard `_meta.ui.visibility`. Treat vendor-prefixed metadata as a compatibility shim.
 
 ## Related
 
-- [MCP Protocol](/docs/protocols/mcp) — the tool, resource, and authorization primitives MCP Apps build on
-- [MCP Servers](/docs/mcp-servers) — server implementation patterns, including how tools return results
-- [Agentic UI](/docs/agentic-ui) — the broader interface surface MCP Apps render inside
-- [Session Control](/docs/agentic-ui/session-control) — approval and controller layer around interactive results
+- [MCP Protocol](/docs/protocols/mcp) - the tool, resource, and authorization primitives MCP Apps build on
+- [MCP Servers](/docs/mcp-servers) - server implementation patterns, including how tools return results
+- [Agentic UI](/docs/agentic-ui) - the broader interface surface MCP Apps render inside
+- [Session Control](/docs/agentic-ui/session-control) - approval and controller layer around interactive results

@@ -1,5 +1,5 @@
 <!--
-llms-full.txt — Full documentation concatenation for token-constrained agents or offline crawling.
+llms-full.txt - Full documentation concatenation for token-constrained agents or offline crawling.
 
 This is an auto-generated file. Regenerate periodically by running:
   node scripts/generate-llms-full.js > public/llms-full.txt
@@ -7,7 +7,7 @@ This is an auto-generated file. Regenerate periodically by running:
 See llms-full-generator.ts (bottom of this file) for the script.
 -->
 
-# Acme Agent Tools — Full Documentation
+# Acme Agent Tools - Full Documentation
 
 <!--- llms-full.txt auto-generated 2026-04-17 from 18 pages, ~52k tokens --->
 
@@ -102,7 +102,7 @@ const agent = new Agent({
   name: string;                    // Identifier (lowercase, hyphenated)
   description: string;             // One-liner for agent introspection
   tools: Tool[];                   // Array of Tool definitions
-  model?: 'opus-4-7' | 'sonnet-4-6';  // Default: opus-4-7
+  model?: 'claude-opus-5-5' | 'claude-sonnet-5';  // Default: claude-opus-5-5
   systemPrompt?: string;           // Optional system instructions
   mcpServers?: MCPServerConfig[];  // Remote MCP servers
 });
@@ -182,7 +182,7 @@ Example error response:
 
 ### Server setup
 
-MCP (Model Context Protocol) 2025-11-25 servers expose tools, resources, and prompts to agents.
+MCP (Model Context Protocol) 2026-07-28 servers expose tools, resources, and prompts to agents.
 
 ```typescript
 // server.ts
@@ -234,7 +234,7 @@ server.tools.register({
 });
 ```
 
-### Resource endpoints (MCP 2025-11-25)
+### Resource endpoints (MCP 2026-07-28)
 
 Resources expose static or dynamic data that agents can read:
 
@@ -392,7 +392,7 @@ https://github.com/acme/agent-tools/blob/main/AGENTS.md
 
 See canonical spec: https://agents.md
 
-### Agent card (A2A v1.0 RC)
+### Agent card (A2A v1.0)
 
 If you run an MCP server or agent interface, advertise yourself at `/.well-known/agent.json`:
 
@@ -541,8 +541,8 @@ Spec: https://www.rfc-editor.org/rfc/rfc9457.html
 
 - [Repository](https://github.com/acme/agent-tools)
 - [AGENTS.md](https://example.com/AGENTS.md)
-- [MCP 2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25)
-- [A2A v1.0 RC spec](https://a2a-protocol.org/latest/specification/)
+- [MCP 2026-07-28 spec](https://modelcontextprotocol.io/specification/2026-07-28)
+- [A2A v1.0 spec](https://a2a-protocol.org/latest/specification/)
 - [RFC 9457 (Problem+JSON)](https://www.rfc-editor.org/rfc/rfc9457.html)
 - [schema.org types](https://schema.org)
 

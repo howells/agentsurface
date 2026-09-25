@@ -1,0 +1,57 @@
+---
+title: Embeddings
+description: Model selection, Matryoshka truncation, and multimodal embeddings - condensed current practice
+lastVerified: 2026-09-25
+---
+
+Embeddings are dense vectors that represent text (or images, audio, video) semantically, powering nearest-neighbor search. Choose based on cost, latency, privacy boundary, and corpus shape, then validate on your own data.
+
+## Model selection
+
+| Model                                         | Dims               | Cost (per 1M tokens)     | Notes                                                                               |
+| --------------------------------------------- | ------------------ | ------------------------ | ----------------------------------------------------------------------------------- |
+| OpenAI `text-embedding-3-large`               | 3,072 (Matryoshka) | $0.13                    | Highest-quality OpenAI embedding; use with the Responses API file-search tool.      |
+| OpenAI `text-embedding-3-small`               | 1,536 (Matryoshka) | $0.02                    | Cheaper, nearly comparable quality for many domains.                                |
+| Voyage 4 Large                                | 1,536              | $0.12                    | Highest-quality Voyage retrieval embedding.                                         |
+| Voyage 4                                      | 1,536              | $0.06                    | Balanced Voyage embedding.                                                          |
+| Voyage 4 Lite                                 | 1,536              | $0.02                    | Lower cost and latency; shares a vector space with the rest of the Voyage 4 family. |
+| Cohere Embed v4 `embed-v4`                    | 1,536 (Matryoshka) | $0.12 text / $0.47 image | Multimodal (text + image), 128K-token context.                                      |
+| Gemini Embedding 2                            | 768                | Verify current pricing   | Google's current embedding model; check modality support before relying on it.      |
+| Open-source (BGE-M3, E5-Mistral, Nomic Embed) | Varies             | Free (self-hosted)       | Competitive on MTEB for many domains; you own infrastructure, latency, and updates. |
+
+Voyage's 4-generation models share one vector space, so you can index with a larger model and query with a smaller one without re-indexing. Confirm current pricing and model availability before committing - this table is a snapshot.
+
+## Matryoshka truncation
+
+Matryoshka-trained models (OpenAI 3-large/small, Voyage 4 family, Cohere Embed v4) let you truncate both stored and query vectors to a smaller dimension without re-embedding the corpus. Stored and query vectors must use the same dimension - a nearest-neighbour comparison across mismatched dimensions doesn't work:
+
+```typescript
+const stored = await openai.embeddings.create({
+  model: "text-embedding-3-large",
+  input: text,
+  dimensions: 256, // stored at the truncated dimension
+});
+
+const query = await openai.embeddings.create({
+  model: "text-embedding-3-large",
+  input: userQuery,
+  dimensions: 256, // must match the stored dimension
+});
+```
+
+Truncating to 256–512 dimensions typically costs 2–5% accuracy versus the full vector, in exchange for faster queries and lower storage.
+
+## API versus self-hosted
+
+Use a hosted API when scale is under roughly 1M documents/month, latency under 500ms is acceptable, and you want a vendor-maintained model. Self-host when embedding volume is high enough that per-token cost dominates, or when data cannot leave your infrastructure. Domain-specific or specialized models (legal, medical, code) can outperform generalist embeddings on niche corpora - compare with recall@k or nDCG on your own data before switching.
+
+## Multimodal embeddings
+
+Use multimodal embeddings when source documents include images, slides, charts, or video, or when queries need to cross modalities ("find documents with a chart like this image"). Voyage Multimodal 3.5 (text, image, video; unified 1,024-dim space) and Cohere Embed v4 (`embed-v4`; text, image) are the current commercial options; CLIP and SigLIP are common open-source baselines. For PDFs and visually complex documents, a late-interaction approach (ColPali-style, treating pages as images) can outperform OCR-then-chunk pipelines - see [RAG Patterns](/docs/agent-retrieval/rag-patterns).
+
+## See also
+
+- [OpenAI Embeddings API](https://platform.openai.com/docs/guides/embeddings)
+- [Voyage AI pricing](https://docs.voyageai.com/docs/pricing)
+- [Cohere Embed docs](https://docs.cohere.com/docs/embeddings)
+- [MTEB Leaderboard](https://huggingface.co/mteb)

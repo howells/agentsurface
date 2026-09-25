@@ -1,9 +1,10 @@
 /**
  * MCP Client Test Harness — Test tools against stdio or HTTP servers
  *
- * Canonical spec: https://modelcontextprotocol.io/specification/2025-11-25
+ * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
  * Testing pattern: InMemoryTransport.createLinkedPair()
  * Framework: vitest
+ * SDK: @modelcontextprotocol/server + @modelcontextprotocol/client (v2)
  *
  * When to use:
  * - Unit testing MCP servers before deployment
@@ -28,43 +29,35 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { Client, TextContent } from "@modelcontextprotocol/sdk/client/index.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { Client, TextContent } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/client";
 import { z } from "zod";
 
 // ===== MCP Server Factory =====
 
 function createTestServer(): McpServer {
-  const server = new McpServer(
-    {
-      name: "test-server",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {
-        prompts: {},
-        resources: {},
-        tools: {},
-      },
-    },
-  );
+  const server = new McpServer({
+    name: "test-server",
+    version: "1.0.0",
+  });
 
   // search_docs tool
-  server.tool(
+  server.registerTool(
     "search_docs",
-    "Search documentation by keyword.",
     {
-      schema: z.object({
+      description: "Search documentation by keyword.",
+      inputSchema: z.object({
         limit: z.number().int().min(1).max(50).default(10),
         query: z.string().min(1),
       }),
+      annotations: { openWorldHint: true, readOnlyHint: true },
     },
     async (input) => {
       const results = [
         {
           title: "MCP Specification",
-          url: "https://modelcontextprotocol.io/specification/2025-11-25",
+          url: "https://modelcontextprotocol.io/specification/2026-07-28",
         },
         {
           title: "Tool Design Guide",
@@ -81,19 +74,19 @@ function createTestServer(): McpServer {
         ],
       };
     },
-    { annotations: { openWorldHint: true, readOnlyHint: true } },
   );
 
   // create_issue tool
-  server.tool(
+  server.registerTool(
     "create_issue",
-    "Create a new issue in the tracker.",
     {
-      schema: z.object({
+      description: "Create a new issue in the tracker.",
+      inputSchema: z.object({
         description: z.string(),
         priority: z.enum(["low", "medium", "high"]).default("medium"),
         title: z.string().min(1),
       }),
+      annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (input) => {
       const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
@@ -111,17 +104,17 @@ function createTestServer(): McpServer {
         ],
       };
     },
-    { annotations: { destructiveHint: true, idempotentHint: true } },
   );
 
   // error_demo tool (demonstrates isError handling)
-  server.tool(
+  server.registerTool(
     "error_demo",
-    "Intentionally fail to demonstrate error handling.",
     {
-      schema: z.object({
+      description: "Intentionally fail to demonstrate error handling.",
+      inputSchema: z.object({
         should_fail: z.boolean().default(true),
       }),
+      annotations: { readOnlyHint: true },
     },
     async (input) => {
       if (input.should_fail) {
@@ -144,7 +137,6 @@ function createTestServer(): McpServer {
         ],
       };
     },
-    { annotations: { readOnlyHint: true } },
   );
 
   // config resource

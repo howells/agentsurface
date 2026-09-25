@@ -1,0 +1,78 @@
+---
+title: Frameworks
+description: Choosing where agent work runs and which runtime or framework fits - request handlers versus background workflows, and the current framework landscape.
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Two decisions sit underneath every agent build: where the work runs, and which runtime builds the agent loop on top of that. Both are deployment choices; pick the smallest runtime that fits the boundary already present in the repo, and do not add a second framework for novelty.
+
+- The agentic loop itself (call model, run tool, repeat until done) is a commodity problem every current framework solves. The differentiator is tools, prompts, and error handling.
+- Match the runtime to where the agent actually executes: request handler, long-running server, serverless function, edge runtime, or background worker.
+- Prefer an existing deliberate framework choice already in the repo over introducing a new one.
+
+## Where The Work Runs
+
+| Runtime             | Best for                                                 | Avoid when                                            |
+| ------------------- | -------------------------------------------------------- | ----------------------------------------------------- |
+| Request handler     | Short chat turns, routing, one or two bounded tool calls | Work may exceed the platform timeout or needs retries |
+| Long-running server | Rich agents, streaming, many tools, local queues         | Scale-to-zero or edge locality is required            |
+| Serverless function | Stateless API tools, small model steps, webhooks         | Stateful loops, large uploads, long workflows         |
+| Edge runtime        | Low-latency routing, lightweight model calls             | Node-only packages, heavy compute, private networks   |
+| Background worker   | Batch jobs, scheduled agents, retries, approvals         | The user is waiting on an immediate answer            |
+
+Authenticate before constructing model context, derive tenant and user IDs from trusted server state (never let the model choose them), enforce a step budget, and emit spans for model calls, tool calls, and the final response regardless of which runtime is chosen.
+
+Do not hide multi-minute work inside a request. If the user needs progress, create a job and stream status from durable state. Short, idempotent, restart-from-scratch background jobs are covered in [Background Agents](/docs/agents/background-agents); long runs where restarting from the beginning is unacceptable need [Durable Execution](/docs/agents/durable-execution).
+
+## Choosing A Framework
+
+| Project shape                                                                                                  | Prefer                        | Why                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without a stronger platform signal | Mastra                        | Coherent app-owned framework for TypeScript agent infrastructure                                               |
+| OpenAI-native app: Responses API, hosted tools, remote MCP, tracing/evals, realtime                            | OpenAI Agents SDK             | Keeps OpenAI response items, traces, hosted tools, and handoffs visible                                        |
+| Claude-native autonomous work, managed sandboxes, Agent Skills, multiagent sessions                            | Claude Managed Agents         | Anthropic owns the harness, sandbox, credential vaulting, and events - see [Platforms](/docs/agents/platforms) |
+| Coding-agent work embedded in an app or service                                                                | Claude Agent SDK              | Embeds the Claude Code harness with permission modes and MCP configuration                                     |
+| Next.js/Vercel app with streaming UI, provider routing, durable agent steps, tool approvals                    | Vercel AI SDK 7               | `WorkflowAgent` adds durability, timeouts, and sandboxes on top of the streaming core                          |
+| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs                          | LangGraph                     | Mature graph model for stateful multi-step flows                                                               |
+| Workers-native app: Durable Objects, WebSockets, Browser Run, edge-hosted MCP                                  | Cloudflare Agents             | Keeps stateful agents and supporting infrastructure in the Worker runtime                                      |
+| .NET/Python enterprise systems already on Azure                                                                | Microsoft Agent Framework 1.0 | Production-ready successor that unifies AutoGen and Semantic Kernel into one SDK                               |
+| The product mainly exposes tools, resources, or workflows to outside agents                                    | MCP-first                     | The public contract is MCP; the internal runtime is an implementation detail                                   |
+
+Microsoft shipped Agent Framework 1.0 on 2026-04-03: it merges AutoGen's multi-agent orchestration patterns with Semantic Kernel's enterprise state management, filters, and telemetry into one stable, long-term-supported SDK. Microsoft positions it as the successor for new agent work; Semantic Kernel and AutoGen both still receive maintenance releases, but new builds should start on Agent Framework.
+
+Vercel AI SDK 7 (shipped 2026-06-25) is the current major version and adds a production agent layer on top of the streaming core: `WorkflowAgent` for durable, restart-safe runs, HMAC-signed tool approvals, timeouts, and sandbox support. Approval is set on the agent with `toolApproval` (per tool or as a policy function returning approved, denied, user-approval or not-applicable), while `WorkflowAgent` tools still declare `needsApproval` - check code written against AI SDK 6 before reusing it.
+
+For the full vendor list, including Pydantic AI, Google ADK, Agno, Strands Agents, and coding-agent tooling, see [Frameworks and Runtimes](/docs/tooling-catalog/frameworks-and-runtimes).
+
+## Selection Rules
+
+1. If the repo already has a deliberate agent framework, extend it rather than introducing a second one.
+2. If the project is platform-native (Cloudflare Workers, Azure, a specific model vendor's SDK), use that platform's primitives.
+3. If the product's job is external agent interoperability, design MCP first and adapt the app runtime around it.
+4. If the work is deterministic and long-running, make it a workflow before adding an agent loop on top.
+5. If the need is just tool calling inside a chat route, use the app's existing AI SDK surface - do not reach for a second framework.
+
+## The Loop Is Commodity
+
+Do not hand-roll the request/tool-call/response cycle. Streaming, schema validation, max-step enforcement, and conversation-history management are solved problems in every current framework:
+
+- **Vercel AI SDK**: `ToolLoopAgent` or `generateText`/`streamText` with `stopWhen: stepCountIs(n)`.
+- **Claude Agent SDK**: `query()` reuses the Claude Code harness, permission modes, and MCP configuration.
+- **OpenAI Agents SDK**: `Agent` and `run()` (JS: `import { Agent, run } from '@openai/agents'`; Python: `from agents import Agent, Runner`) handle handoffs, guardrails, sessions, and tracing.
+
+Start step budgets small (5-10 steps) and tune from traces rather than defaulting to a framework's higher ceiling. Use `onFinish`-style cleanup hooks to close MCP clients and flush pending writes regardless of how the agent exits - a crashed or timed-out run should not leak connections.
+
+## Model Routing
+
+Keep model selection behind a single stable interface - one `agentModel()` or provider-selection function - rather than hardcoding a model ID at every call site. Define named quality tiers (quick, standard, rigorous) instead: callers ask for a tier, and the routing function resolves it to a current model ID and provider. Swapping a provider, adding a gateway, or reacting to a model deprecation then changes one function instead of rippling through every call site. See [Model Providers and Gateways](/docs/tooling-catalog/model-providers-and-gateways) for the router and gateway options that implement this in front of multiple providers.
+
+## Related
+
+- [Agent Design Defaults](/docs/agents)
+- [Platforms](/docs/agents/platforms)
+- [Orchestration](/docs/agents/orchestration)
+- [Durable Execution](/docs/agents/durable-execution)
+- [Background Agents](/docs/agents/background-agents)
+- [Frameworks and Runtimes catalog](/docs/tooling-catalog/frameworks-and-runtimes)

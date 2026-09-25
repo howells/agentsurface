@@ -1,0 +1,61 @@
+---
+title: Shopify
+description: Shopify's agent surface for merchants and app developers - UCP, Catalog API, MCP servers, WebMCP, Checkout Kit, and the product-page audit
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Shopify has shipped most of the agentic-commerce stack described elsewhere in this section as platform features rather than things a merchant builds by hand. If you sell through Shopify, most of your work is confirming these are switched on and keeping the data behind them accurate - not implementing UCP or a checkout protocol yourself. Verify every item here against [shopify.dev](https://shopify.dev) before depending on it; Shopify ships changes on a rolling changelog, not a fixed release cycle.
+
+- Product catalog integration, WebMCP tools, and cart/checkout APIs are automatic - nothing to install
+- A merchant must still host a UCP profile at a well-known URL and configure order webhooks
+- Four MCP servers cover documentation, storefront browsing, checkout, and post-purchase - each with a different job
+- Checkout Kit and the product-page audit are the two pieces worth checking by hand
+
+## UCP support
+
+Shopify storefronts support [UCP](/docs/agentic-commerce/checkout-protocols) `2026-08-25` as of 2026-09-04, with the capability set unchanged from the platform's earlier UCP support. UCP capability is delivered through Shopify's MCP servers and Catalog endpoints (below) rather than a separate integration - a merchant hosts a UCP profile at a well-known URL for agent verification and capability negotiation, and Shopify's platform handles catalog, cart, and checkout behind it.
+
+## MCP servers
+
+Shopify exposes commerce as MCP tools across four servers, each scoped to a different job:
+
+- **Dev MCP** - documentation and development guidance (Admin API docs, GraphQL schemas) for coding tools like Claude Code and Cursor. Does not touch live store data.
+- **Storefront MCP** - customer-facing shopping: search, browse, cart, and checkout operations through the Storefront API. Requires zero merchant setup - every Shopify store already has the endpoint active.
+- **Checkout MCP** - converts a cart into a checkout and completes purchases for trusted agents; in preview for select partners.
+- **Customer Account MCP** - post-purchase interactions, including order status via a `get_order` tool.
+
+Catalog access comes in two variants - Global Catalog and Storefront Catalog - covering product discovery at platform scale versus a single store. Access tiers are trust-based: higher tiers unlock direct checkout completion rather than discovery-only access.
+
+## Catalog API media-type filter
+
+Shopify's Catalog API added a media-type filter on 2026-09-15, letting a caller narrow catalog search results by media format rather than returning every asset type for a match. See the [changelog entry](https://shopify.dev/changelog) for the exact parameters.
+
+## WebMCP for Liquid and Hydrogen
+
+Shopify shipped WebMCP support for Liquid and Hydrogen storefronts on 2026-08-05. [WebMCP](/docs/protocols/webmcp) is the browser-native draft that lets a page register tools directly with an in-tab agent; Shopify's implementation exposes catalogue tools (`search_catalog`, `browse_store`, `get_product`, `show_variant`) reading product, collection, and search data through the Storefront API, plus cart tools (`get_cart`, `update_cart`, `cancel_cart`) calling standard storefront actions, and shop-policy/FAQ lookup. There is nothing to install or configure - the tools are live on every Liquid storefront and the Hydrogen developer preview without merchant action. This is the mechanism behind an agent browsing your store in its own tab, distinct from the server-side MCP servers above which serve remote agent clients.
+
+## Checkout Kit and agentic checkout
+
+[Checkout Kit](https://shopify.dev/docs/agents/carts-and-checkout/checkout-kit) is an open-source SDK (early preview) for embedding Shopify checkout - the same checkout buyers see on the web, with store branding, checkout UI extensions, and Shopify Functions - inside any surface: iOS (Swift 5.7+), Android (Java 11, SDK 23+), React Native (0.70+), and web (Safari 16.4+, modern Chrome/Firefox). It builds on the Embedded Checkout Protocol (ECP): the SDK handles the `ec.ready`/`ec.start`/`ec.complete` lifecycle, capability negotiation, and recovery over JSON-RPC 2.0, so an integrator passes a `checkoutUrl` from cart creation and handles completion, failure, and cancellation callbacks rather than implementing ECP directly.
+
+For agentic checkout specifically: an agent using Shopify's MCP servers can take a shopper from discovery to purchase - search, selection, and checkout - inside the agent's own surface. When a checkout step needs a buyer action that isn't supported over MCP (3DS challenges, certain payment methods), the agent falls back to opening web checkout in a browser or presenting it through Checkout Kit or ECP directly for a native, embedded experience rather than failing the flow.
+
+## Product-page audit
+
+Shopify's [agentic-readiness product-page audit](https://www.shopify.com/agentic-readiness) scans a product URL and checks the structured data, real-time pricing accuracy, and trust signals an AI shopping agent would read - the same checks described in [Product Data](/docs/agentic-commerce/product-data). Shopify frames this as informational rather than a guarantee: it states explicitly that passing signals help agents discover, evaluate, and recommend a product but do not guarantee it will be surfaced. Shopify's own Catalog automatically structures product data to feed this, and "Agentic Storefronts" - Shopify's branded feature for surfacing products directly inside ChatGPT, Gemini, and similar chat surfaces - is enabled automatically for eligible stores.
+
+## What a merchant must configure vs what arrives automatically
+
+**Automatic:** product catalog structuring and Catalog API access, Storefront MCP, WebMCP tools on Liquid and Hydrogen, cart and checkout APIs for authenticated agents, Agentic Storefronts eligibility.
+
+**A merchant must configure:** the UCP well-known profile for capability negotiation, order webhooks so an external system can track fulfilment, refunds, and returns (see [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase)), and - as with any storefront - accurate product data, return policy, and pricing at the source, since none of the automatic surfaces above fix a wrong price or a missing return policy for you.
+
+## Related Pages
+
+- [Agentic Commerce](/docs/agentic-commerce) - the five-layer overview
+- [Product Data](/docs/agentic-commerce/product-data) - what the structured-data and feed layer needs, platform-agnostic
+- [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) - UCP at the protocol level
+- [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase) - order webhooks and post-purchase operations
+- [WebMCP](/docs/protocols/webmcp) - the underlying browser standard

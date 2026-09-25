@@ -1,0 +1,31 @@
+---
+title: Filters and Pagination for Retrieval
+description: Scoping and paging retrieval results so agents get bounded, relevant sets instead of noise
+lastVerified: 2026-09-25
+---
+
+Pagination and job mechanics for any collection endpoint are covered in [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts). This page covers what is specific to retrieval: scoping a query before ranking runs, so an agent is not left to filter a wall of results itself.
+
+## Scope before you rank
+
+A retrieval endpoint that ranks first and lets the caller filter client-side wastes tokens and hides irrelevant results inside the response. Apply mandatory scope filters - tenant, permission boundary, workspace - before ranking, and expose optional filters the caller can combine with a query:
+
+| Filter type           | Example                                     | Applied                                      |
+| --------------------- | ------------------------------------------- | -------------------------------------------- |
+| Mandatory scope       | tenant ID, authenticated user's permissions | Always, server-side, before ranking          |
+| Category or namespace | document type, product category             | Optional query parameter                     |
+| Date range            | `updated_after`, `created_before`           | Optional query parameter                     |
+| Source or collection  | which index or corpus to search             | Optional query parameter, documented default |
+
+Document every filter's type, whether it is required, and its default when omitted. An agent that does not know the "last 30 days" default exists will misinterpret why a known-relevant result is missing.
+
+## Pagination for retrieval results
+
+Use the same cursor-based pattern as any other collection endpoint: an opaque `next_cursor`, an explicit `has_more` or end-of-results signal, and a bounded default page size. Retrieval adds two considerations pagination for other collections does not:
+
+- **Result sets can be approximate.** If your index returns an estimated total rather than an exact count, say so (`total_estimate` rather than `total`). An agent that treats an estimate as exact will draw wrong conclusions from small differences.
+- **Ranking can shift between pages.** If the underlying index changes between a caller's page-1 and page-2 requests, document whether pagination is a stable snapshot or may reflect concurrent updates. Silent reordering across pages causes an agent to see the same result twice or miss one entirely.
+
+## Anti-pattern: unbounded results
+
+Returning hundreds or thousands of results in one response forces an agent to spend its context window on items it cannot reason about. Cap default page size, require an explicit larger size when needed, and rerank or filter server-side rather than pushing the problem onto the caller.

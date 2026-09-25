@@ -1,6 +1,7 @@
 ---
 title: AGENTS.md
 description: The baseline repository context file for coding agents
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -26,7 +27,7 @@ Never: Deploy prod
 
 ---
 
-AGENTS.md is documented at [agents.md](https://agents.md). It is plain markdown with no schema—no YAML frontmatter, no JSON. This simplicity is intentional: agents must parse it with regex and heuristics, so readability and structural consistency matter more than strict formats.
+AGENTS.md is documented at [agents.md](https://agents.md). It is plain markdown with no schema - no YAML frontmatter, no JSON. This simplicity is intentional: agents must parse it with regex and heuristics, so readability and structural consistency matter more than strict formats.
 
 AGENTS.md is read by multiple coding-agent and IDE tools, including Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, Aider, Jules, Zed, Warp, and RooCode.
 
@@ -43,9 +44,9 @@ repo-root/
       AGENTS.md      ← overrides src/ for auth/ and below
 ```
 
-This lets you set repository-wide defaults and override them for specific subsystems — the authentication module can carry stricter modification rules while test fixtures stay permissive. Keep nested files scoped to what genuinely differs; see [Monorepos](/docs/context-files/monorepos) for per-package patterns.
+This lets you set repository-wide defaults and override them for specific subsystems - the authentication module can carry stricter modification rules while test fixtures stay permissive. Keep nested files scoped to what genuinely differs; see [Monorepos](/docs/context-files/monorepos) for per-package patterns.
 
-The maximum file size is 32 KiB. Files larger than that may be truncated or ignored by some agents, which is another reason to keep the root file tight and push detail into nested files or linked docs.
+The [agents.md specification](https://agents.md) sets no maximum file size. Keep the root file tight anyway: large files consume more of an agent's context budget on every session, which is reason enough to push detail into nested files or linked docs.
 
 ## Structure
 
@@ -186,7 +187,7 @@ Never:
 - Run sudo or system-wide commands
 ```
 
-Make boundaries rules, not aspirations.
+Write boundaries as enforceable rules.
 
 ### 7. Non-Obvious Gotchas
 
@@ -195,7 +196,7 @@ Conventions with code references.
 ```markdown
 ## Gotchas
 
-- pnpm install requires Node 18.12+ (enforced in .nvmrc)
+- pnpm install requires Node 20.12+ (enforced in .nvmrc)
 - TypeScript strict mode enabled; use // @ts-expect-error with comment if needed
 - Changesets required for npm publish; CI blocks merge without them
 - Database: migrations are append-only; rollback only in dev
@@ -229,11 +230,11 @@ Point to ADRs, architecture guides, runbooks, CONTRIBUTING guide.
 
 ## Length Guidelines
 
-- **Ideal**: 80–200 lines. Command-dense, boundary-explicit, ready to ship.
+- **Ideal**: ~150 lines, under 300. Command-dense, boundary-explicit, ready to ship.
 - **Acceptable**: Up to 370 lines (split if longer).
 - **Red flag**: >500 lines. Break into per-package files or link to deeper docs.
 
-Longer is not better. Research from ETH Zurich found that hand-curated `AGENTS.md` files improved agent task completion by roughly +4%, while LLM-generated files reduced it by roughly -2% at a +20% token cost. If you are over the line limit, the file probably contains a codebase overview or a style guide — both anti-patterns. Move style rules to lint config where they are enforced automatically, and write context files by hand.
+Research from ETH Zurich (Gloaguen et al., ["Evaluating AGENTS.md"](https://arxiv.org/abs/2602.11988)) found that context files had no significant effect on task success on average: developer-committed files improved it marginally (+4%), LLM-generated files made it slightly worse (-3%), and both added to inference cost (LLM-generated files by 20-23%, developer-committed files by up to 19%). A repository overview, though popular and recommended by model providers, was specifically found not to help agents discover relevant files any faster. If you are over the line limit, the file probably contains a codebase overview or a style guide - both anti-patterns. Move style rules to lint config where they are enforced automatically, and write context files by hand.
 
 ## Example: TypeScript Monorepo
 
@@ -311,7 +312,7 @@ Never:
 
 ## Gotchas
 
-- Node 18.12+ required (.nvmrc enforced)
+- Node 20.12+ required (.nvmrc enforced)
 - Changesets required for version bumps (CI gate)
 - Strict TypeScript; use // @ts-expect-error sparingly
 - DB migrations append-only; only rollback in dev
@@ -329,17 +330,17 @@ This example is ~110 lines, command-first, boundary-explicit.
 
 ## Cross-Tool Compatibility
 
-Each tool reads AGENTS.md slightly differently:
+Each tool reads AGENTS.md differently - treat it as several independent, all-or-nothing behaviors rather than one shared resolution order:
 
-- **Claude Code** reads all sections; supports AGENTS.md + CLAUDE.md overlay.
-- **Cursor** reads structure via regex; `.cursor/rules/` overrides specific sections.
-- **GitHub Copilot** reads full file but has smaller token budget; keep concise.
-- **Gemini CLI** reads AGENTS.md if GEMINI.md missing; treats as fallback.
+- **Claude Code** reads `AGENTS.md` directly only when no `CLAUDE.md` (or `CLAUDE.local.md`) exists in the working directory or above it. If a `CLAUDE.md` exists, Claude Code reads that instead and skips `AGENTS.md` entirely, unless the `CLAUDE.md` imports it with a literal `@AGENTS.md` line. See [CLAUDE.md](/docs/context-files/claude-md) for the full behavior.
+- **Cursor** reads `AGENTS.md` natively - root and nested subdirectories, closest file wins - with `.cursor/rules/*.mdc` rules layered on top for glob-scoped detail.
+- **GitHub Copilot** reads the full file, plus path-scoped `.github/instructions/*.instructions.md` files with `applyTo` glob frontmatter; keep the root file concise since Copilot's context budget is smaller than Claude's or Cursor's. Copilot's coding agent and code review also read `AGENTS.md` directly (GA 2026).
+- **Gemini CLI** reads context files by a configurable filename list (`context.fileName`), which defaults to `GEMINI.md` but can include `AGENTS.md`; it is not an automatic "GEMINI.md missing" fallback.
 
 ## See also
 
 - ([agents.md specification](https://agents.md))
-- `/docs/context-files/claude-md` — Claude-specific overrides
-- `/docs/context-files/cursor-and-copilot` — Cursor/Copilot variants
-- `/docs/context-files/monorepos` — per-package patterns
-- `/templates/discovery/AGENTS.md` — starter template
+- `/docs/context-files/claude-md` - Claude-specific overrides
+- `/docs/context-files/cursor-and-copilot` - Cursor/Copilot variants
+- `/docs/context-files/monorepos` - per-package patterns
+- `/templates/discovery/AGENTS.md` - starter template

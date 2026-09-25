@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 1 scores OpenAPI quality and agent-readiness of HTTP APIs. Baseline is OpenAPI/Swagger presence with agent-oriented descriptions (when to use, vs. alternatives) and consistent operationIds. Production includes Arazzo workflows for multi-step operations, semantic extensions (x-action, x-agent-*), and auto-generated MCP servers. Agent-first APIs enable tool generation without reverse-engineering, reduce hallucination, and lower token spend on refinement loops.
+Dimension 1 scores OpenAPI quality and agent-readiness of HTTP APIs. Baseline is OpenAPI/Swagger presence with agent-oriented descriptions (when to use, vs. alternatives) and consistent operationIds. Production includes Arazzo workflows for multi-step operations, semantic extensions (x-action, x-agent-\*), and auto-generated MCP servers. Agent-first APIs enable tool generation without reverse-engineering, reduce hallucination, and lower token spend on refinement loops.
 
 - **0**: No OpenAPI spec (blocker)
 - **1**: OpenAPI exists but human-oriented descriptions, missing operationIds
@@ -12,16 +12,16 @@ Dimension 1 scores OpenAPI quality and agent-readiness of HTTP APIs. Baseline is
 
 ---
 
-> This dimension measures how well the HTTP API is described for machine consumption by AI agents. An agent-first API spec enables agents to discover endpoints, understand parameters and error conditions, and invoke operations without reverse-engineering code or documentation. APIs described for humans—with terse summaries and implicit context—force agents to guess intent, misuse endpoints, and fail silently. Dimension 1 directly enables agent autonomy: the better the API surface, the fewer token-expensive refinement loops agents need.
+> This dimension measures how well the HTTP API is described for machine consumption by AI agents. An agent-first API spec enables agents to discover endpoints, understand parameters and error conditions, and invoke operations without reverse-engineering code or documentation. APIs described for humans - with terse summaries and implicit context - force agents to guess intent, misuse endpoints, and fail silently. Dimension 1 directly enables agent autonomy: the better the API surface, the fewer token-expensive refinement loops agents need.
 
 ## Scoring rubric
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema. | No openapi.json/yaml, no swagger.json, no API schema files |
-| 1 | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params. | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values |
-| 2 | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties. |
-| 3 | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-*). LAPIS-style token efficiency. Auto-generated MCP from spec. | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency <200 tokens per operation. |
+| Score | Criteria                                                                                                                                                                         | Detection                                                                                                                                                                        |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema.                                                                                                  | No openapi.json/yaml, no swagger.json, no API schema files                                                                                                                       |
+| 1     | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params.                                                           | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values                                                 |
+| 2     | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties. |
+| 3     | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-\*). LAPIS-style token efficiency. Auto-generated MCP from spec.     | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency <200 tokens per operation.                             |
 
 **Key files:** openapi.json, openapi.yaml, swagger.json, api/ routes, Arazzo files
 
@@ -32,6 +32,7 @@ Dimension 1 scores OpenAPI quality and agent-readiness of HTTP APIs. Baseline is
 Use these exact patterns and file paths when auditing Dimension 1:
 
 ### File discovery
+
 - **OpenAPI/Swagger specs:** `grep -r "openapi:" . --include="*.y*ml" --include="*.json"` in project root and `docs/`, `api/specs/`, `.openapi/`
 - **Framework route files:**
   - Next.js: `app/**/route.ts`, `app/**/route.js`, `pages/api/**`
@@ -45,6 +46,7 @@ Use these exact patterns and file paths when auditing Dimension 1:
 ### Framework-specific scanning
 
 **Next.js App Router:**
+
 ```bash
 find app -name "route.ts" -o -name "route.js" | head -20
 # Each file contains: export async function GET/POST/PUT/DELETE(req, res)
@@ -52,24 +54,28 @@ find app -name "route.ts" -o -name "route.js" | head -20
 ```
 
 **Express/Fastify:**
+
 ```bash
 grep -r "router\.\(get\|post\|put\|delete\)" src/ --include="*.ts" --include="*.js"
 # Check: router.get('/users', handler) — missing operationId; check if description exists
 ```
 
 **FastAPI:**
+
 ```bash
 grep -r "@app\.\(get\|post\|put\|delete\)" src/ --include="*.py"
 # Check: @app.get("/users/") def list_users() — description from docstring
 ```
 
 **NestJS:**
+
 ```bash
 grep -r "@\(Get\|Post\|Put\|Delete\)" src/ --include="*.ts" -A 2
 # Check: @Get(':id') method name should follow verb_noun pattern
 ```
 
 **Go:**
+
 ```bash
 grep -r "HandleFunc\|GET\|POST\|PUT\|DELETE" --include="*.go"
 # Check: http.HandleFunc("/users", getUsersHandler) — operationId must be derived from handler name
@@ -106,7 +112,7 @@ paths:
       summary: List all users
       description: |
         Retrieve a paginated list of users.
-        
+
         **Use when:** you need a searchable list of user accounts.
         **Do not use for:** retrieving a single user by ID (use `get_user_by_id` instead).
         **Prerequisites:** Bearer token with `users:read` scope.
@@ -128,7 +134,7 @@ paths:
           example: 0
           description: Pagination offset in results
       responses:
-        '200':
+        "200":
           description: Successfully retrieved users
           content:
             application/json:
@@ -138,7 +144,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/User'
+                      $ref: "#/components/schemas/User"
                   total:
                     type: integer
                     example: 42
@@ -146,18 +152,18 @@ paths:
                     type: integer
                     example: 0
                 required: [data, total]
-        '400':
+        "400":
           description: Invalid query parameters
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
           description: Missing or invalid authentication
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     User:
@@ -208,12 +214,15 @@ components:
 Write descriptions as if onboarding a new engineer who will integrate your API into a system:
 
 **Good (agent-friendly):**
+
 > Retrieve a paginated list of users. Use when you need to find users matching criteria or display a directory. Do not use to get a single user by ID (use `get_user_by_id` instead). Requires `users:read` scope. Returns up to 100 results; use `offset` to fetch additional pages. Filters (not yet implemented) will be added in v2.
 
 **Bad (human-only):**
+
 > Gets the users.
 
 **Pattern:** Each description should answer in order:
+
 1. **What:** Concise action sentence.
 2. **When to use:** One specific scenario where this operation is the right choice.
 3. **When NOT to use:** One alternative operation and why you'd use that instead.
@@ -226,27 +235,30 @@ Write descriptions as if onboarding a new engineer who will integrate your API i
 Use lowercase, snake_case `verb_noun` format. This naming carries semantic meaning that agents parse:
 
 **Correct:**
-- `list_users` — read, paginated, multiple items
-- `get_user_by_id` — read, single item, keyed by ID
-- `search_users` — read, filtered/full-text, potentially expensive
-- `create_user` — write, new record
-- `update_user` — write, existing record, partial update
-- `replace_user` — write, full replacement (all fields required)
-- `delete_user` — write, destructive, idempotent if ID doesn't exist
-- `export_users_as_csv` — read, special format, potentially large
+
+- `list_users` - read, paginated, multiple items
+- `get_user_by_id` - read, single item, keyed by ID
+- `search_users` - read, filtered/full-text, potentially expensive
+- `create_user` - write, new record
+- `update_user` - write, existing record, partial update
+- `replace_user` - write, full replacement (all fields required)
+- `delete_user` - write, destructive, idempotent if ID doesn't exist
+- `export_users_as_csv` - read, special format, potentially large
 
 **Incorrect:**
-- `GetUserByID` — CamelCase not snake_case
-- `get_user_or_users` — ambiguous semantics
-- `getUser` — mixes conventions
-- `user` — no verb, unclear intent
-- `RetrieveUserAccountInformation` — verb is implicit; too verbose
+
+- `GetUserByID` - CamelCase not snake_case
+- `get_user_or_users` - ambiguous semantics
+- `getUser` - mixes conventions
+- `user` - no verb, unclear intent
+- `RetrieveUserAccountInformation` - verb is implicit; too verbose
 
 ### Flat parameter structures
 
 Agents handle flat parameter lists best. Avoid deeply nested objects in request bodies.
 
 **Preferred (flat):**
+
 ```yaml
 requestBody:
   content:
@@ -271,6 +283,7 @@ requestBody:
 ```
 
 **Avoid (nested, forces agent context switching):**
+
 ```yaml
 requestBody:
   content:
@@ -344,30 +357,30 @@ Define error response schemas per operation, not globally. Each operation should
 
 ```yaml
 responses:
-  '400':
+  "400":
     description: Invalid input
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/ValidationError'
-  '401':
+          $ref: "#/components/schemas/ValidationError"
+  "401":
     description: Missing or invalid authentication
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/AuthError'
-  '409':
+          $ref: "#/components/schemas/AuthError"
+  "409":
     description: Conflict (e.g., email already exists)
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/ConflictError'
-  '429':
+          $ref: "#/components/schemas/ConflictError"
+  "429":
     description: Rate limited
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/RateLimitError'
+          $ref: "#/components/schemas/RateLimitError"
 ```
 
 Use `$ref` to reuse error schemas. Each error schema should follow RFC 9457 (see Error Handling dimension reference).
@@ -377,12 +390,14 @@ Use `$ref` to reuse error schemas. Each error schema should follow RFC 9457 (see
 At score 3, support `Accept: text/markdown` to return operation documentation in Markdown. This enables agents to fetch human-readable docs inline:
 
 **Request:**
+
 ```
 GET /users HTTP/1.1
 Accept: text/markdown
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 200 OK
 Content-Type: text/markdown; charset=utf-8
@@ -398,14 +413,14 @@ Implement in middleware:
 // Next.js
 export async function GET(req: Request) {
   const accept = req.headers.get('Accept') || 'application/json';
-  
+
   if (accept.includes('text/markdown')) {
     const markdown = `# List Users\n\nRetrieve a paginated list...`;
     return new Response(markdown, {
       headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
     });
   }
-  
+
   return Response.json({ data: [...] });
 }
 ```
@@ -471,18 +486,21 @@ Agents consume Arazzo workflows as multi-step orchestration blueprints, reducing
 Supplement OpenAPI with agent-aware hints via vendor extensions:
 
 **`x-speakeasy-mcp`:** Indicate this operation should auto-generate an MCP tool
+
 ```yaml
 operationId: create_issue
 x-speakeasy-mcp: true
 ```
 
 **`x-openai-isConsequential`:** Mark destructive operations (used by OpenAI models to request explicit approval)
+
 ```yaml
 operationId: delete_user
 x-openai-isConsequential: true
 ```
 
 **`x-agent-hint`:** Custom agent guidance (non-standard, but useful for edge cases)
+
 ```yaml
 operationId: search_documents
 x-agent-hint: |
@@ -492,12 +510,13 @@ x-agent-hint: |
 ```
 
 **`x-rate-limit`:** Document rate limits per operation
+
 ```yaml
 operationId: list_users
 x-rate-limit:
   requests: 100
-  window: 60  # seconds
-  headers: true  # include X-RateLimit-* in response
+  window: 60 # seconds
+  headers: true # include X-RateLimit-* in response
 ```
 
 ### Auto-generating MCP from OpenAPI
@@ -509,6 +528,7 @@ Use open-source tools to generate MCP servers directly from OpenAPI specs:
 - **OpenAPI Generator** (https://openapi-generator.tech): Community-driven; filters to MCP support in progress
 
 Example with Speakeasy:
+
 ```bash
 speakeasy generate sdk \
   --lang go \
@@ -548,11 +568,11 @@ server.tool(
       idempotentHint: true,
       openWorldHint: false,
     },
-  }
+  },
 );
 ```
 
-The description field is identical to OpenAPI — agents benefit from the same onboarding tone.
+The description field is identical to OpenAPI - agents benefit from the same onboarding tone.
 
 ### OpenAI strict-mode function calling
 
@@ -588,22 +608,22 @@ Google Gemini 3 models require `thoughtSignature` on every call to preserve reas
 ```typescript
 // google-generative-ai SDK
 const tool: Tool = {
-  name: 'list_users',
-  description: 'Retrieve a paginated list of users...',
+  name: "list_users",
+  description: "Retrieve a paginated list of users...",
   inputSchema: {
-    type: 'OBJECT',
+    type: "OBJECT",
     properties: {
       limit: {
-        type: 'INTEGER',
-        description: 'Number of results per page'
+        type: "INTEGER",
+        description: "Number of results per page",
       },
       offset: {
-        type: 'INTEGER',
-        description: 'Pagination offset'
-      }
+        type: "INTEGER",
+        description: "Pagination offset",
+      },
     },
-    required: ['limit']
-  }
+    required: ["limit"],
+  },
 };
 ```
 
@@ -632,32 +652,36 @@ Export OpenAPI-derived schemas to Gemini using `zod-to-json-schema` (or equivale
 
 The surface skill includes these template files under `/templates`:
 
-- **`openapi-skeleton.yaml`** — Minimal valid OpenAPI 3.1 spec with common patterns (pagination, errors, enums)
-- **`arazzo-workflow.yaml`** — Example multi-step workflow for a common pattern (create, validate, notify)
-- **`error-types.ts`** — TypeScript types for RFC 9457 error responses (reusable in route handlers)
+- **`openapi-skeleton.yaml`** - Minimal valid OpenAPI 3.1 spec with common patterns (pagination, errors, enums)
+- **`arazzo-workflow.yaml`** - Example multi-step workflow for a common pattern (create, validate, notify)
+- **`error-types.ts`** - TypeScript types for RFC 9457 error responses (reusable in route handlers)
 
 ### Recommended tooling ecosystem
 
 **Specification and design:**
-- **Stoplight Studio** — Visual OpenAPI editor; includes linting (free community edition at https://stoplight.io)
-- **Scalar** — Beautiful OpenAPI documentation UI; embeddable (https://scalar.com)
-- **Redocly** — OpenAPI linting and bundling; enforces agent-friendly patterns (https://redocly.com)
+
+- **Stoplight Studio** - Visual OpenAPI editor; includes linting (free community edition at https://stoplight.io)
+- **Scalar** - Beautiful OpenAPI documentation UI; embeddable (https://scalar.com)
+- **Redocly** - OpenAPI linting and bundling; enforces agent-friendly patterns (https://redocly.com)
 
 **Code generation:**
-- **Speakeasy** (https://speakeasyapi.dev) — Generate SDKs + MCP servers from OpenAPI; agent-aware code
-- **Stainless** (https://www.stainless.com) — TypeScript SDK + MCP generation; focuses on DX
-- **OpenAPI Generator** (https://openapi-generator.tech) — Community-driven; broad language support
+
+- **Speakeasy** (https://speakeasyapi.dev) - Generate SDKs + MCP servers from OpenAPI; agent-aware code
+- **Stainless** (https://www.stainless.com) - TypeScript SDK + MCP generation; focuses on DX
+- **OpenAPI Generator** (https://openapi-generator.tech) - Community-driven; broad language support
 
 **Framework-specific:**
-- **NestJS** — `@nestjs/swagger` decorators auto-generate OpenAPI from controller definitions
-- **FastAPI** — Native OpenAPI generation from Pydantic models + docstrings (no separate spec needed)
-- **Express/Fastify** — `swagger-jsdoc` (inline JSDoc comments) or `fastify-swagger` (Fastify plugin)
-- **Next.js** — `openapi-types` for type safety; use `openapi-ts` CLI to generate types from spec
+
+- **NestJS** - `@nestjs/swagger` decorators auto-generate OpenAPI from controller definitions
+- **FastAPI** - Native OpenAPI generation from Pydantic models + docstrings (no separate spec needed)
+- **Express/Fastify** - `swagger-jsdoc` (inline JSDoc comments) or `fastify-swagger` (Fastify plugin)
+- **Next.js** - `openapi-types` for type safety; use `openapi-ts` CLI to generate types from spec
 
 **Validation and linting:**
-- **Redocly CLI** — `redocly lint openapi.yaml` enforces agent-friendly rules
-- **Spectacle** — Simple OpenAPI linter; catches operationId gaps
-- **IBM OpenAPI Validator** — Comprehensive spec compliance checks
+
+- **Redocly CLI** - `redocly lint openapi.yaml` enforces agent-friendly rules
+- **Spectacle** - Simple OpenAPI linter; catches operationId gaps
+- **IBM OpenAPI Validator** - Comprehensive spec compliance checks
 
 ---
 
@@ -681,10 +705,10 @@ The surface skill includes these template files under `/templates`:
 ## See also
 
 - `/docs/api-surface` in the Agent Surface Fumadocs site
-- `/templates/mcp-and-api/openapi-skeleton.yaml` — starting template for OpenAPI 3.1 specs
-- `/templates/mcp-and-api/arazzo-workflow.yaml` — workflow example for multi-step operations
-- `/references/tool-design.md` — shared concerns with tool naming and descriptions
-- `/references/error-handling.md` — per-operation error schemas and recovery hints
+- `/templates/mcp-and-api/openapi-skeleton.yaml` - starting template for OpenAPI 3.1 specs
+- `/templates/mcp-and-api/arazzo-workflow.yaml` - workflow example for multi-step operations
+- `/references/tool-design.md` - shared concerns with tool naming and descriptions
+- `/references/error-handling.md` - per-operation error schemas and recovery hints
 
 ## Retrieval and lifecycle checks
 

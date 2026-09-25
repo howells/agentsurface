@@ -1,6 +1,7 @@
 ---
 title: Clustering Findings
 description: Organizing findings into actionable work clusters
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -184,7 +185,7 @@ When organizing findings into clusters:
 
 ## Clustering Worked Example: From Audit to Plan
 
-### Raw Scorecard: acme-api
+### Raw Scorecard: acme-cli
 
 ```
 API Surface:         1/3 (OpenAPI exists, descriptions weak)
@@ -195,7 +196,6 @@ Authentication:      1/3 (API keys only)
 Error Handling:      0/3 (no structured errors)
 Tool Design:         1/3 (basic schemas, terse descriptions)
 Context Files:       1/3 (auto-generated AGENTS.md)
-Multi-Agent:         N/A
 Testing:             0/3 (no agent tests)
 ```
 
@@ -223,14 +223,13 @@ Testing:             0/3 (no agent tests)
 - API descriptions (↑API Surface 1→2)
 - MCP server (↑MCP Server 0→2)
 - llms.txt (↑Discovery 1→2)
-- Effort: 6 hours | Impact: +4 dimensions | Ratio: Excellent
+- Effort: 6.5 hours | Impact: +4 dimensions | Ratio: Excellent
 
 **Cluster 2: Machine-readable auth**
 
-- OAuth 2.1 Client Credentials (↑Authentication 1→3)
-- Scoped tokens (↑Authentication 1→3)
-- JWT validation (↑Authentication 1→3)
-- Effort: 4 hours | Impact: +1 dimension (fully) | Ratio: Good
+- OAuth 2.1 Client Credentials, scoped tokens, and JWT validation (↑Authentication 1→2)
+- Tested renewal, revocation, and wrong-user/wrong-resource rejection (↑Authentication 2→3)
+- Effort: 5 hours | Impact: +1 dimension (fully) | Ratio: Good
 
 **Cluster 3: Error recovery**
 
@@ -249,15 +248,16 @@ Testing:             0/3 (no agent tests)
 ### Transformation Plan (By Cluster)
 
 ```
-PHASE 1: Agent tool discoverability (Week 1, 6 hours)
+PHASE 1: Agent tool discoverability (Week 1, 6.5 hours)
 ├─ Task 1.1: Expand tool descriptions with context [1h]
 ├─ Task 1.2: Enhance API descriptions in OpenAPI [2h]
 ├─ Task 1.3: Create MCP server [3h]
 └─ Task 1.4: Write llms.txt [0.5h]
 
-PHASE 2: Machine-readable auth (Week 1, 4 hours)
+PHASE 2: Machine-readable auth (Week 1, 5 hours)
 ├─ Task 2.1: Implement OAuth 2.1 Client Credentials [2h]
 ├─ Task 2.2: Add token scoping and JWT validation [2h]
+├─ Task 2.3: Test renewal, revocation, wrong-resource rejection [1h]
 
 PHASE 3: Error recovery (Week 2, 3 hours)
 ├─ Task 3.1: Refactor to RFC 9457 format [1.5h]
@@ -266,8 +266,8 @@ PHASE 3: Error recovery (Week 2, 3 hours)
 PHASE 4: Context & conventions (Week 2, 2 hours)
 └─ Task 4.1: Curate AGENTS.md [2h]
 
-Total effort: 15 hours
-Expected improvement: 4/30 → 18/30 (Agent-tolerant → Agent-ready)
+Total effort: 16.5 hours
+Expected improvement: 6/30 → 20/30 (Human-only → Agent-ready)
 ```
 
 ## Tips for Effective Clustering
@@ -296,11 +296,11 @@ Depends on: "CLI enhancements" (need --json output first)
 **4. Use effort/impact ratio to prioritize.**
 
 ```
-Impact (score delta):   +4  +3  +2  +1
-Effort (hours):          6   4   3   2
+Impact (score delta):   +4   +3   +2  +1
+Effort (hours):          6    4    3   2
 
-Ratio (impact/effort):  0.7 0.75 0.67 0.5
-                        ↑ Highest priority
+Ratio (impact/effort):  0.67 0.75 0.67 0.5
+                              ↑ Highest priority
 ```
 
 **5. Show which agent specializes in each cluster.**
@@ -341,7 +341,7 @@ These should be separate clusters so you can tackle the easy win first.
 
 **Anti-pattern 3: Ignoring dependencies**
 
-Bad: Start with "Advanced multi-agent patterns" before "Basic tool descriptions"
+Bad: Start with "Arazzo multi-step workflows" before "Basic tool descriptions"
 
 This creates frustration. Dependencies prevent parallel work and waste effort.
 

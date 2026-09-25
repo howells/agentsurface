@@ -1,12 +1,12 @@
 ---
 title: Idempotency and Safety
 description: Designing tools to be safely retryable and clearly annotated as read or write
-lastVerified: 2026-07-28
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Design tools to be safely retryable given network timeouts, rate limits, and model stochasticity. Idempotent tools produce identical results when called multiple times with the same inputs (critical for reliability). Patterns: upsert instead of create+update, tag systems with idempotency keys, dry-run modes before mutations, clear read vs. write classification. Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint in MCP) enable downstream safety reasoning. Avoid hidden state changes; minimize side effects.
+Design tools to be safely retryable given network timeouts, rate limits, and model stochasticity. Idempotent tools produce identical results when called multiple times with the same inputs. Patterns: upsert instead of create+update, tag systems with idempotency keys, dry-run modes before mutations, clear read vs. write classification. Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint in MCP) enable downstream safety reasoning. Avoid hidden state changes; minimize side effects.
 
 - **Idempotency**: Same inputs → same results on retry
 - **Upsert pattern**: Single operation instead of create + update
@@ -21,7 +21,7 @@ Agents are not deterministic. Network timeouts, rate limits, and model stochasti
 
 ## Idempotency
 
-An idempotent tool produces the same result when called multiple times with identical inputs. This is critical for reliable agent automation.
+An idempotent tool produces the same result when called multiple times with identical inputs. Retries then return the same outcome instead of duplicating the side effect.
 
 ### Patterns
 
@@ -58,7 +58,7 @@ const createInvoiceSchema = z.object({
 });
 ```
 
-The handler looks the key up before executing and returns the existing result on a match, so if the agent retries with the same `idempotency_key`, it gets the same invoice back—no duplicate charge. The server-side storage, 24-hour TTL, and replay semantics behind that lookup are covered on the [Idempotency](/docs/error-handling/idempotency) page.
+The handler looks the key up before executing and returns the existing result on a match, so if the agent retries with the same `idempotency_key`, it gets the same invoice back - no duplicate charge. The server-side storage, 24-hour TTL, and replay semantics behind that lookup are covered on the [Idempotency](/docs/error-handling/idempotency) page.
 
 **For read-only tools:**
 
@@ -69,10 +69,18 @@ All read tools are idempotent by definition. Calling `search_issues` ten times w
 Use the MCP `idempotentHint` annotation:
 
 ```typescript
-server.tool("upsert_user", "Creates a user or updates if exists. Idempotent.", schema, handler, {
-  idempotentHint: true, // Safe to retry
-  destructiveHint: false, // Does not delete
-});
+server.tool(
+  "upsert_user",
+  "Creates a user or updates if exists. Idempotent.",
+  schema,
+  {
+    annotations: {
+      idempotentHint: true, // Safe to retry
+      destructiveHint: false, // Does not delete
+    },
+  },
+  handler,
+);
 ```
 
 ## Read vs Write Classification
@@ -84,12 +92,20 @@ Every tool must be clearly classified as read-only or write (mutating).
 Tools that query without side effects:
 
 ```typescript
-server.tool("search_issues", "Search for existing issues...", searchSchema, handler, {
-  readOnlyHint: true, // No mutations
-  destructiveHint: false, // Nothing deleted
-  idempotentHint: true, // Always safe to retry
-  openWorldHint: false, // All effects local to this API
-});
+server.tool(
+  "search_issues",
+  "Search for existing issues...",
+  searchSchema,
+  {
+    annotations: {
+      readOnlyHint: true, // No mutations
+      destructiveHint: false, // Nothing deleted
+      idempotentHint: true, // Always safe to retry
+      openWorldHint: false, // All effects local to this API
+    },
+  },
+  handler,
+);
 ```
 
 Read-only tools can be called in parallel without coordination. Agents may call five read tools simultaneously without risk.
@@ -99,12 +115,20 @@ Read-only tools can be called in parallel without coordination. Agents may call 
 Tools that create, update, or mutate state:
 
 ```typescript
-server.tool("create_invoice", "Creates a new invoice...", createSchema, handler, {
-  readOnlyHint: false, // Mutates database
-  destructiveHint: false, // Does not delete (can be reversed)
-  idempotentHint: true, // Supports idempotency keys
-  openWorldHint: false, // All effects local
-});
+server.tool(
+  "create_invoice",
+  "Creates a new invoice...",
+  createSchema,
+  {
+    annotations: {
+      readOnlyHint: false, // Mutates database
+      destructiveHint: false, // Does not delete (can be reversed)
+      idempotentHint: true, // Supports idempotency keys
+      openWorldHint: false, // All effects local
+    },
+  },
+  handler,
+);
 ```
 
 Write tools should typically be called sequentially or in known dependency order. If multiple write tools are called in parallel, the agent must understand and handle conflicts.
@@ -118,13 +142,15 @@ server.tool(
   "delete_invoice",
   "Permanently deletes an invoice. This cannot be undone...",
   deleteSchema,
-  handler,
   {
-    readOnlyHint: false,
-    destructiveHint: true, // Irreversible mutation
-    idempotentHint: false, // Not safe to retry (second call will fail)
-    openWorldHint: false,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true, // Irreversible mutation
+      idempotentHint: false, // Not safe to retry (second call will fail)
+      openWorldHint: false,
+    },
   },
+  handler,
 );
 ```
 
@@ -140,6 +166,7 @@ server.tool(
   "preview_migration",
   "Shows what tables and columns would change without executing...",
   migrationSchema,
+  { annotations: { readOnlyHint: true } },
   async (params) => {
     const plan = await generateMigrationPlan(params.migration_id);
     return {
@@ -151,7 +178,6 @@ server.tool(
       ],
     };
   },
-  { readOnlyHint: true },
 );
 
 // Execution tool (called only after preview approved)
@@ -159,11 +185,11 @@ server.tool(
   "execute_migration",
   "Executes the migration. Call preview_migration first to review changes...",
   migrationSchema,
+  { annotations: { destructiveHint: true, idempotentHint: false } },
   async (params) => {
     const result = await runMigration(params.migration_id);
     return { content: [{ type: "text", text: `Migration ${params.migration_id} applied.` }] };
   },
-  { destructiveHint: true, idempotentHint: false },
 );
 ```
 
@@ -211,14 +237,67 @@ update_invoice(
 
 This gives agents finer control and reversibility. Voiding an invoice is safer than deleting it.
 
+## Collapsing Hints into Presets
+
+Most tool registries don't reason about all four MCP hints independently - they collapse them into three presets (READ_ONLY, WRITE, DESTRUCTIVE) and drive system-prompt safety rules, client confirmation UI, and tool-selection filtering from whichever preset a tool carries:
+
+```typescript
+export const READ_ONLY = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+export const WRITE = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+export const DESTRUCTIVE = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false,
+};
+```
+
+A system prompt built from these groups separates tools into three lists (read-only: call freely; write: explain before calling; destructive: never call without explicit user confirmation) and a client UI shows a confirmation dialog only for tools carrying `DESTRUCTIVE`. At tool-selection time, filter destructive tools out of a candidate set by default and require them to be explicitly re-included - see [Tool Curation](/docs/tool-design/tool-curation).
+
+## Draft-Then-Confirm for Destructive Actions
+
+Never expose a direct-send or direct-delete tool to the model unprompted. Split the action into a `_draft` (or `_prepare`) tool that creates state without side effects and returns a preview, and a `_confirm` (or `_execute`) tool that performs the irreversible step:
+
+```typescript
+// Step 1: safe and idempotent: returns a preview, does not send
+server.tool(
+  "invoice_create_draft",
+  "Create a draft invoice. Does not send.",
+  draftSchema,
+  { annotations: WRITE },
+  handler,
+);
+
+// Step 2: irreversible: only called after the human has seen the preview and confirmed
+server.tool(
+  "invoice_confirm_and_send",
+  "Send a draft invoice. Irreversible.",
+  confirmSchema,
+  { annotations: DESTRUCTIVE },
+  handler,
+);
+```
+
+The system prompt instructs the model to call the draft tool, show the result to the user, wait for explicit confirmation ("yes", "send it"), and only then call the confirm tool. For bulk operations, the same shape applies: a `_prepare` tool that returns a match count and a sample of affected records, and an `_execute` tool gated behind it. This is the tool-design half of a human-approval gate; the surface contract for suspending and resuming on the human's decision - durable pending state, idempotent resume, expiry - is covered in [Human Approval](/docs/tool-design/human-approval).
+
 ## Documenting Safety Constraints
 
 In descriptions, explicitly state:
 
-1. **Whether the tool is idempotent** — "Safe to retry with same inputs"
-2. **Whether it's reversible** — "This cannot be undone" vs "Can be reverted with `archive_invoice`"
-3. **What approvals are required** — "Requires human approval before executing"
-4. **Rate limits** — "Max 10 calls per minute"
+1. **Whether the tool is idempotent** - "Safe to retry with same inputs"
+2. **Whether it's reversible** - "This cannot be undone" vs "Can be reverted with `archive_invoice`"
+3. **What approvals are required** - "Requires human approval before executing"
+4. **Rate limits** - "Max 10 calls per minute"
 
 ```typescript
 server.tool(
@@ -228,8 +307,8 @@ server.tool(
     "the hosted payment link in the email body. This can be reverted by calling " +
     "`revoke_sent_invoice` if sent in error.",
   schema,
+  { annotations: { idempotentHint: true } },
   handler,
-  { idempotentHint: true },
 );
 ```
 
@@ -279,11 +358,12 @@ async (params) => {
 
 ## MCP Annotations Reference
 
-The MCP `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` hints let downstream clients reason about tool safety — the same read/write/destructive classifications above, expressed as machine-readable metadata. MCP defaults are conservative: tools are assumed writable, potentially destructive, non-idempotent, and open-world unless you say otherwise, so set hints only when the property is accurate for the implementation. See [Tool Annotations](/docs/mcp-servers/annotations) for the full semantics of each hint and how clients act on them.
+The MCP `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` hints let downstream clients reason about tool safety - the same read/write/destructive classifications above, expressed as machine-readable metadata. MCP defaults are conservative: tools are assumed writable, potentially destructive, non-idempotent, and open-world unless you say otherwise, so set hints only when the property is accurate for the implementation. See [Tool Annotations](/docs/mcp-servers/annotations) for the full semantics of each hint and how clients act on them.
 
 ## See also
 
-- [Tool Annotations](/docs/mcp-servers/annotations) — canonical semantics of the four MCP behavioral hints
-- `/docs/error-handling/idempotency` — retry logic and recovery patterns
-- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) — current annotation semantics
+- [Tool Annotations](/docs/mcp-servers/annotations) - canonical semantics of the four MCP behavioral hints
+- [Human Approval](/docs/tool-design/human-approval) - the surface contract for suspending a call on human sign-off and resuming it
+- `/docs/error-handling/idempotency` - retry logic and recovery patterns
+- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - current annotation semantics
 - ([Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system))

@@ -1,6 +1,7 @@
 ---
 title: Webhooks and Events for Agents
 description: Designing webhook schemas and event payloads that agents can route, deduplicate, and act on reliably
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -17,7 +18,7 @@ Agents are not always the initiating party. Many workflows begin when something 
 
 ## OpenAPI 3.1 Webhooks Field
 
-OpenAPI 3.1 introduced a top-level `webhooks` field that lets you document incoming webhook payloads in the same spec as your outbound API. This is the correct place to document webhooks — not in a separate `callbacks` object under a subscription endpoint, and not in a separate documentation site.
+OpenAPI 3.1 introduced a top-level `webhooks` field that lets you document incoming webhook payloads in the same spec as your outbound API. This is the correct place to document webhooks; use `callbacks` under the triggering operation only for operation-specific completion events (see Webhooks vs Callbacks below).
 
 ```yaml
 openapi: "3.1.0"
@@ -97,9 +98,9 @@ webhooks:
 
 OpenAPI 3.x supports both `webhooks` and `callbacks`. They serve different purposes:
 
-**`webhooks`** — events that your server sends to a registered URL, initiated by server-side state changes. The consumer registers a URL in advance; the server calls it whenever the event occurs.
+**`webhooks`** - events that your server sends to a registered URL, initiated by server-side state changes. The consumer registers a URL in advance; the server calls it whenever the event occurs.
 
-**`callbacks`** — responses to long-running or asynchronous operations. Defined under a specific path operation; the server calls the consumer's URL when a previously initiated operation completes.
+**`callbacks`** - responses to long-running or asynchronous operations. Defined under a specific path operation; the server calls the consumer's URL when a previously initiated operation completes.
 
 ```yaml
 paths:
@@ -138,7 +139,7 @@ Use `webhooks` for system-wide events (order created, payment succeeded). Use `c
 
 ### Discriminator Fields
 
-Every event payload must include a field that unambiguously identifies the event type. Agents route events by this field — without it, the agent must infer event type from payload shape, which is unreliable.
+Every event payload must include a field that unambiguously identifies the event type. Agents route events by this field - without it, the agent must infer event type from payload shape, which is unreliable.
 
 ```yaml
 components:
@@ -216,7 +217,7 @@ This allows an agent framework that receives any event payload to look up the co
 
 ### Idempotency Keys
 
-Webhook delivery systems guarantee at-least-once delivery. Agents must handle duplicate events without creating duplicate side effects. Include an `idempotency_key` in every event payload:
+Webhook delivery systems guarantee at-least-once delivery. Agents must handle duplicate events without creating duplicate side effects. Extend the `BaseEvent` schema above with an `idempotency_key`, required on every event payload:
 
 ```yaml
 components:
@@ -256,9 +257,24 @@ webhooks:
         A payment is guaranteed to appear at most once per idempotency_key.
 ```
 
-### Signature Verification
+### Signature Verification: Standard Webhooks
 
-Agents receiving webhooks must verify the payload signature to prevent spoofed events. Document the verification mechanism in your spec:
+Agents receiving webhooks must verify the payload signature to prevent spoofed events. Don't invent a bespoke header scheme - use [Standard Webhooks](https://www.standardwebhooks.com/), an open specification maintained by a technical steering committee including Svix, Twilio, Zapier, Kong, Supabase, ngrok, Mux, and Lob, with compatible implementations already shipped by OpenAI, Google Gemini, Brex, and others. An agent that already knows how to verify one Standard Webhooks sender can verify yours without reading your docs.
+
+The spec defines three required headers, all prefixed `webhook-`:
+
+```http
+POST /webhooks/receive HTTP/1.1
+webhook-id: msg_2KWPBgLlAfxdpx2AI54pPJ85f4W
+webhook-timestamp: 1710460800
+webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
+```
+
+- `webhook-id` - unique identifier for this delivery
+- `webhook-timestamp` - Unix timestamp (seconds) the delivery was signed
+- `webhook-signature` - space-delimited list of signatures, so a secret can be rotated with zero downtime by including both the old and new signature during the overlap window
+
+The signed content is `{webhook-id}.{webhook-timestamp}.{raw_body}`, HMAC-SHA256'd with the webhook secret, base64-encoded, and prefixed `v1,`. Signing secrets are base64, prefixed `whsec_` so tooling can recognize the scheme at a glance.
 
 ```yaml
 webhooks:
@@ -266,34 +282,36 @@ webhooks:
     post:
       operationId: webhook_order_created
       description: >
-        Verify the X-Signature-256 header before processing. The value is
-        HMAC-SHA256 of the raw request body using your webhook secret as the key,
-        encoded as hex. Reject requests where the signature does not match.
+        Signed per the Standard Webhooks spec (standardwebhooks.com). Verify
+        webhook-signature before processing: HMAC-SHA256("{webhook-id}.{webhook-timestamp}.{body}",
+        secret), base64-encoded, compared against each v1 value in the
+        space-delimited webhook-signature header. Reject deliveries where
+        webhook-timestamp is outside your replay-tolerance window.
       parameters:
-        - name: X-Signature-256
+        - name: webhook-id
           in: header
           required: true
           schema:
             type: string
-            pattern: "^sha256=[0-9a-f]{64}$"
-          description: >
-            HMAC-SHA256 signature of the request body. Format: sha256={hex_digest}.
-            Compute: HMAC-SHA256(body_bytes, webhook_secret).
-        - name: X-Delivery-ID
-          in: header
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: Unique ID for this delivery attempt; use for support requests
-        - name: X-Timestamp
+          description: Unique ID for this delivery; use for support requests and dedup
+        - name: webhook-timestamp
           in: header
           required: true
           schema:
             type: string
           description: >
-            Unix timestamp when the delivery was initiated. Reject requests
-            where abs(now - X-Timestamp) > 300 seconds to prevent replay attacks.
+            Unix timestamp (seconds) the delivery was signed. Reject requests
+            outside your tolerance window to prevent replay attacks; the spec
+            leaves the exact window to the implementer, and five minutes each
+            way is a common choice.
+        - name: webhook-signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: >
+            Space-delimited list of "v1,{base64_hmac_sha256}" values, one per
+            active signing secret. Compare against all of them, not just the first.
 ```
 
 ## Schema Design Patterns
@@ -358,7 +376,7 @@ components:
               type: object
               required: [order, previous_status, new_status]
               properties:
-                # Full state snapshot — agent does not need to call get_order
+                # Full state snapshot - agent does not need to call get_order
                 order:
                   $ref: "#/components/schemas/Order"
                 previous_status:
@@ -437,8 +455,9 @@ paths:
                 secret:
                   type: string
                   description: >
-                    Optional secret for signature verification. If provided,
-                    all deliveries will include an X-Signature-256 header.
+                    Optional Standard Webhooks signing secret (whsec_ prefix,
+                    base64-encoded). If provided, all deliveries include a
+                    webhook-signature header computed against it.
 ```
 
 ## Checklist
@@ -447,7 +466,8 @@ paths:
 - [ ] Every event payload includes `event_type`, `event_id`, and `created_at`
 - [ ] Every event payload includes an `idempotency_key`
 - [ ] A `discriminator` is configured on the union event schema
-- [ ] Signature verification headers are documented with the algorithm and format
+- [ ] Signatures follow Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`), not a bespoke header scheme
+- [ ] Signature verification rejects deliveries outside the replay-tolerance window
 - [ ] State snapshots are included in event payloads (agents should not need follow-up calls)
 - [ ] Every emitted event type is listed in the spec
 - [ ] Event schemas are versioned with a `schema_version` field
@@ -455,6 +475,8 @@ paths:
 
 ## Related Pages
 
-- [OpenAPI for Agents](./openapi-for-agents) — spec structure that webhooks sit alongside
-- [Error Handling](/docs/error-handling) — how to return errors from webhook receivers
-- [Arazzo Workflows](./arazzo-workflows) — multi-step workflows triggered by webhook events
+- [OpenAPI for Agents](./openapi-for-agents) - spec structure that webhooks sit alongside
+- [Error Handling](/docs/error-handling) - how to return errors from webhook receivers
+- [Arazzo Workflows](./arazzo-workflows) - multi-step workflows triggered by webhook events
+- [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase) - applying this design to order and payment events specifically
+- [Standard Webhooks specification](https://www.standardwebhooks.com/) - header names, HMAC scheme, and rotation model this page follows

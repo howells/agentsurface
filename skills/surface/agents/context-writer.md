@@ -28,7 +28,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
 ## Process
 
-1. **Create AGENTS.md** (cross-tool Markdown context; authoring target ~150 lines ideal, <300 max — this is stricter than the <370-line audit tolerance used when scoring existing repos):
+1. **Create AGENTS.md** (cross-tool Markdown context; authoring target ~150 lines ideal, <300 max - this is stricter than the <370-line audit tolerance used when scoring existing repos):
    - Location: project root
    - Structure:
 

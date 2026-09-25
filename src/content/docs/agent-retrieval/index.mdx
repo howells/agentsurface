@@ -1,0 +1,29 @@
+---
+title: Agent Retrieval
+description: Condensed current best practice for vector databases, embeddings, RAG patterns, and knowledge graphs
+lastVerified: 2026-09-25
+---
+
+Agent Retrieval is how an agent finds and uses knowledge for its own work - vector search, embeddings, and retrieval-augmented generation. It is part of the Build agents half of the site: a condensed, current-best-practice reference for teams building an agent's retrieval stack. The product-facing side - making your own product's data retrievable by other agents - is covered in [Retrievability](/docs/retrievability).
+
+## Summary
+
+The durable pattern is stable even as vendors and benchmarks move fast: combine sparse keyword retrieval, dense semantic retrieval, metadata filters, reranking, and evaluation. Dense-only vector search is a fine prototype baseline and rarely enough for a production agent that needs exact identifiers, permissions, and citations.
+
+- **Hybrid beats dense-only** for mixed corpora - combine keyword and dense signals unless an eval proves one is enough.
+- **Chunking is product logic** - preserve source, section, and version metadata; do not index anonymous text blobs.
+- **Reranking improves precision** - retrieve broad, rerank narrow.
+- **Graphs are a maintenance commitment** - add one only when relationships are explicit and queried often.
+- **Evaluate retrieval, not just generation** - recall, ranking quality, faithfulness, latency, and cost all need gates.
+
+## Pages
+
+- [Vector Databases](/docs/agent-retrieval/vector-databases) - Pinecone, Qdrant, Weaviate, pgvector, and when to pick each.
+- [Embeddings](/docs/agent-retrieval/embeddings) - model selection, Matryoshka truncation, multimodal embeddings.
+- [RAG Patterns](/docs/agent-retrieval/rag-patterns) - the pipeline from chunking through reranking to agentic and graph-augmented retrieval.
+- [Knowledge Graphs](/docs/agent-retrieval/knowledge-graphs) - when graph retrieval justifies its maintenance cost compared with vectors.
+- [Retrieval Evals](/docs/agent-retrieval/retrieval-evals) - recall, ranking, and faithfulness metrics and CI gates.
+
+## Freshness
+
+This corner of the ecosystem moves fast: embedding models, vector database pricing, and framework recommendations change over months. Treat every model name, price, and benchmark figure on these pages as a snapshot verified on the date stamped at the top of each page, and re-verify before a procurement or architecture decision.

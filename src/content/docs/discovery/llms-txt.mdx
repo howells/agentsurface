@@ -1,12 +1,12 @@
 ---
 title: llms.txt
-description: The llms.txt specification for giving AI agents a curated, token-efficient index of your site
-lastVerified: 2026-07-06
+description: The llms.txt specification for giving coding agents and IDE tools a curated, token-efficient index of your site
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation, llms.txt lets you declare upfront what matters most. Primary consumers include IDE and coding-agent workflows that index documentation during project setup or on demand.
+llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation, llms.txt lets you declare upfront what matters most. The confirmed consumers are narrow: IDE and coding-agent workflows - Cursor, Claude Code, and similar tools - that index the file during project setup or on demand. General-purpose crawlers and inference-time browsing largely skip it; see [Adoption and Consumption](#adoption-and-consumption) below.
 
 - Served at /llms.txt as text/plain; charset=utf-8
 - Required: H1 with product/site name
@@ -14,14 +14,15 @@ llms.txt is a standard file served at /llms.txt that publishes a curated, token-
 - Link format: - [Title](url): description
 - Total size under 5,000 tokens for efficiency
 - Use ## Optional section for lower-priority content
+- Worth shipping for documentation and developer-tool sites; not a general-site AEO tactic
 
-The `llms.txt` specification, proposed by Jeremy Howard in September 2024 at [llmstxt.org](https://llmstxt.org), gives sites a standard location to publish a curated, token-efficient index of their content. Where a sitemap describes every URL for crawlers, `llms.txt` describes the most important content for AI agents — with enough context to navigate without crawling the full site.
+The `llms.txt` specification, proposed by Jeremy Howard in September 2024 at [llmstxt.org](https://llmstxt.org), gives sites a standard location to publish a curated, token-efficient index of their content. Where a sitemap describes every URL for crawlers, `llms.txt` describes the most important content for AI agents - with enough context to navigate without crawling the full site.
 
 ## The Problem It Solves
 
 An AI agent trying to use your API or understand your product faces a practical constraint: context windows are finite. Crawling your entire documentation site could cost hundreds of thousands of tokens before the agent answers a single question. `llms.txt` moves the curation work to the publisher, letting you declare in advance what an AI needs to know and where to find it.
 
-Adoption is broad enough that documentation platforms and agent tools now treat `llms.txt` as a normal publishing target. The primary confirmed consumers are IDE and coding-agent workflows — Cursor, Claude Code, and similar tools that index `llms.txt` during project setup or on demand.
+The confirmed value is narrow but real: IDE and coding-agent workflows - Cursor, Claude Code, and similar tools - fetch `llms.txt` on demand when indexing a documentation or developer-tool site during project setup. That is the use case this page's guidance is written for.
 
 ## Canonical Format
 
@@ -48,15 +49,15 @@ Adoption is broad enough that documentation platforms and agent tools now treat 
 
 The only required element is the H1 (`#`) with the product or site name. Everything else is recommended but optional.
 
-**H1** — Required. Site or product name. One per file.
+**H1** - Required. Site or product name. One per file.
 
-**Blockquote summary** — Recommended. One paragraph describing the product and its intended users. Appears directly below the H1.
+**Blockquote summary** - Recommended. One paragraph describing the product and its intended users. Appears directly below the H1.
 
-**H2 sections** — Group related links. Section names are free-form.
+**H2 sections** - Group related links. Section names are free-form.
 
-**Link list items** — Each item is `[Title](URL): Description`. The colon-and-description suffix is optional but strongly recommended. Descriptions help agents prioritize which links to fetch.
+**Link list items** - Each item is `[Title](URL): Description`. The colon-and-description suffix is optional but strongly recommended. Descriptions help agents prioritize which links to fetch.
 
-**`## Optional` section** — A specially named section that agents can skip when operating under context pressure. Put supplementary content — changelog entries, older tutorials, edge-case reference — in this section.
+**`## Optional` section** - A specially named section that agents can skip when operating under context pressure. Put supplementary content - changelog entries, older tutorials, edge-case reference - in this section.
 
 ## The .md URL Convention
 
@@ -73,20 +74,20 @@ If your site does not yet serve `.md` endpoints, link to the HTML pages as a fal
 
 Keep the full `llms.txt` under 5,000 tokens. This fits comfortably in a single context window turn and ensures agents can load the entire index at once without truncation.
 
-The Anthropic `llms.txt` is a useful reference point: their index file is approximately 8,364 tokens and their `llms-full.txt` is approximately 481,349 tokens. Both extremes demonstrate what is possible, but the index should be the compact version — agents fetch the full content when they need depth.
+The Anthropic `llms.txt` is a useful reference point: their index file is approximately 8,364 tokens and their `llms-full.txt` is approximately 481,349 tokens. Both extremes demonstrate what is possible, but the index should be the compact version - agents fetch the full content when they need depth.
 
 ## Real Examples
 
 **Anthropic** publishes two files:
 
-- `/llms.txt` — 8,364-token index with sections for Claude models, APIs, and product features
-- `/llms-full.txt` — 481,349-token file with all documentation content inlined
+- `/llms.txt` - 8,364-token index with sections for Claude models, APIs, and product features
+- `/llms-full.txt` - 481,349-token file with all documentation content inlined
 
 **Stripe** publishes three files across their domains:
 
-- `stripe.com/llms.txt` — product overview and marketing content
-- `docs.stripe.com/llms.txt` — full API and integration documentation
-- `support.stripe.com/llms.txt` — help center and troubleshooting content
+- `stripe.com/llms.txt` - product overview and marketing content
+- `docs.stripe.com/llms.txt` - full API and integration documentation
+- `support.stripe.com/llms.txt` - help center and troubleshooting content
 
 Stripe also uses an `## Instructions` section (see below) to give behavioral guidance to AI agents about how to handle Stripe-specific concepts.
 
@@ -104,12 +105,12 @@ Stripe's pattern of adding an `## Instructions` section is worth adopting. Unlik
 ## Instructions
 
 - When discussing pricing, always refer users to the current pricing page rather than quoting figures directly.
-- The API uses camelCase for JSON keys in requests and snake_case in webhook payloads — these are not inconsistencies.
+- The API uses camelCase for JSON keys in requests and snake_case in webhook payloads - these are not inconsistencies.
 - Authentication is always via Bearer token in the Authorization header, never via query parameters.
 - Rate limit errors use HTTP 429 with a Retry-After header. Always surface this to the user.
 ```
 
-Agents reading this section before answering questions will follow these directives. This is particularly useful for:
+Agents that read this section have the directives in context when answering; treat it as steering, not enforcement. This is particularly useful for:
 
 - Correcting common misconceptions agents develop from training data
 - Flagging which information goes stale quickly (pricing, feature availability)
@@ -138,9 +139,9 @@ Agents reading this section before answering questions will follow these directi
 
 `llms-full.txt` serves two distinct use cases:
 
-**RAG pipelines** — Teams building internal knowledge bases chunk and embed `llms-full.txt` rather than crawling and parsing HTML. A single well-structured file is easier to process than hundreds of HTML pages.
+**RAG pipelines** - Teams building internal knowledge bases chunk and embed `llms-full.txt` rather than crawling and parsing HTML. A single well-structured file is easier to process than hundreds of HTML pages.
 
-**IDE indexing** — Tools like Cursor and Claude Code download `llms-full.txt` once and index it locally. Subsequent queries against your documentation happen without network round trips.
+**IDE indexing** - Tools like Cursor and Claude Code download `llms-full.txt` once and index it locally. Subsequent queries against your documentation happen without network round trips.
 
 Maintain `llms-full.txt` as a generated artifact. Inlining content manually does not scale. See [Generation Tools](#generation-tools) below.
 
@@ -166,35 +167,23 @@ Lighthouse's `llms-txt` audit verifies the file is actually usable, not just pre
 
 These map directly onto the canonical format above: the required H1, and a link list with real entries rather than a placeholder file.
 
-You can also reference `llms.txt` from `robots.txt`:
-
-```
-# robots.txt
-User-agent: *
-Allow: /
-
-# LLM index
-Sitemap: https://example.com/sitemap.xml
-# llms.txt: https://example.com/llms.txt
-```
-
-The `# llms.txt:` comment line is an informal convention — it is not part of the robots.txt specification but some crawlers recognize it.
+See [Referencing llms.txt from robots.txt](/docs/discovery/robots-txt#referencing-llmstxt-from-robotstxt) for the comment-line convention some crawlers recognize.
 
 ## Generation Tools
 
 Most documentation platforms now generate `llms.txt` automatically:
 
-**Mintlify** — generates `llms.txt` and `llms-full.txt` from your docs config. No additional configuration required.
+**Mintlify** - generates `llms.txt` and `llms-full.txt` from your docs config. No additional configuration required.
 
-**Fern** — generates `llms.txt` alongside OpenAPI documentation. Configurable section grouping.
+**Fern** - generates `llms.txt` alongside OpenAPI documentation. Configurable section grouping.
 
-**GitBook** — generates `llms.txt` from your space's table of contents.
+**GitBook** - generates `llms.txt` from your space's table of contents.
 
-**Docusaurus** — community plugin `docusaurus-plugin-llms-txt` generates both files at build time.
+**Docusaurus** - community plugin `docusaurus-plugin-llms-txt` generates both files at build time.
 
-**WordPress** — plugins available for major documentation themes.
+**WordPress** - plugins available for major documentation themes.
 
-**Next.js** — implement as a route handler:
+**Next.js** - implement as a route handler:
 
 ```typescript
 // app/llms.txt/route.ts
@@ -228,25 +217,25 @@ export async function GET() {
 
 If you want to verify your file is discoverable:
 
-- **llmstxthub.com** — directory of submitted `llms.txt` files with category browsing
-- **llms-txt-hub** — GitHub-based registry with programmatic access
-- **llms-txt.io** — validation tool that checks format and token count
+- **llmstxthub.com** - directory of submitted `llms.txt` files with category browsing
+- **llms-txt-hub** - GitHub-based registry with programmatic access
+- **llms-txt.io** - validation tool that checks format and token count
 
 Submission to directories is optional. The primary value of `llms.txt` comes from agents discovering the file at the standard path, not from directory listings.
 
 ## Adoption and Consumption
 
-Be honest about who actually reads `llms.txt`. The evidence is that general-purpose crawlers and inference-time browsing do not use it:
+Few agents actually read `llms.txt`. General-purpose crawlers and inference-time browsing do not use it:
 
 - An Ahrefs study of ~137,000 sites found that roughly 28% publish an `llms.txt` file, but 97% of the valid files received **zero** requests during May 2026.
-- The major AI crawlers — GPTBot, ClaudeBot, PerplexityBot — skip `llms.txt` entirely.
+- The major AI crawlers - GPTBot, ClaudeBot, PerplexityBot - skip `llms.txt` entirely.
 - Google's John Mueller compared `llms.txt` to the keywords meta tag, and Google's own AI-optimization guidance states that files like this are not needed or used for its systems.
 
 So `llms.txt` is not an answer-engine-optimization (AEO) strategy for a general site. Treat any claim that it improves visibility in AI Overviews or chatbot answers with skepticism.
 
-The genuine, confirmed value is narrow: **coding agents and IDE assistants — Cursor, Claude Code, and similar tools — fetch `llms.txt` on demand when indexing a documentation or developer-tool site.** That on-demand consumption during a developer's task is real, and it is the reason this site still ships an `llms.txt`.
+The genuine, confirmed value is narrow: coding agents and IDE assistants - Cursor, Claude Code, and similar tools - fetch `llms.txt` on demand when indexing a documentation or developer-tool site. That on-demand consumption during a developer's task is real, and it is the reason this site still ships an `llms.txt`.
 
-**Recommendation:** worth shipping for documentation and developer-tool sites — it is cheap to generate and there is real coding-agent consumption. Do not ship it expecting an AEO benefit on a general marketing or content site; there is no evidence it changes how answer engines see you.
+**Recommendation:** worth shipping for documentation and developer-tool sites - it is cheap to generate and there is real coding-agent consumption. Do not ship it expecting an AEO benefit on a general marketing or content site; there is no evidence it changes how answer engines see you.
 
 ## Modular, per-section indexes
 

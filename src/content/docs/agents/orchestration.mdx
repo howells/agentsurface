@@ -1,0 +1,81 @@
+---
+title: Orchestration
+description: The primary multi-agent coordination patterns, when to use each, and the failure modes to expect.
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Multi-agent systems are a family of patterns. Choosing the wrong one is the most common source of multi-agent complexity - a sequential pipeline where concurrent fan-out was needed, or a swarm where a supervisor would have produced coherent output.
+
+| Pattern    | Control                                  | Best for                                            | Risk                                            |
+| ---------- | ---------------------------------------- | --------------------------------------------------- | ----------------------------------------------- |
+| Sequential | Forward through fixed stages             | Research → draft → edit → review                    | Context dilution, error propagation             |
+| Concurrent | Fan-out / fan-in aggregation             | Independent parallel work                           | Inconsistent schemas, partial failure           |
+| Handoff    | Transfer to a specialist                 | Distinct, non-overlapping domains                   | Ambiguous boundaries, lost context              |
+| Supervisor | Central agent delegates, retains control | Known task decomposition, single point of synthesis | Over-delegation, context leakage across workers |
+| Council    | Independent members, then synthesis      | Ambiguous or high-risk decisions                    | Duplicated cost, false consensus                |
+| Swarm      | Peer-to-peer, no central coordinator     | Long-running, open-ended multi-step tasks           | Cycles, unpredictable emergent behavior         |
+
+Production systems frequently combine patterns: a deterministic backbone handles routing, validation, and error recovery, and agents are invoked only at the decision points that genuinely need judgment.
+
+## Sequential
+
+The output of one agent becomes the input to the next. No agent needs to know about the others - only its own input and output contract. Use it when stages are predictable, each needs different context, or intermediate outputs must be inspectable. Risk: by the third stage, context contains every prior stage's output, and an error early on produces plausible-looking garbage downstream. Long pipelines degrade quality faster than they degrade speed.
+
+## Concurrent (Fan-Out / Fan-In)
+
+The same input goes to multiple agents in parallel; results are merged through majority vote, weighted merge, LLM synthesis, or best-of-N. Use it for independent sub-tasks or when multiple perspectives improve the answer. Define a shared output schema before building fan-out - an aggregator cannot merge results with different shapes - and set an explicit timeout/partial-result policy for when one of several agents fails.
+
+Isolate failures per branch: catch errors inside each parallel step and return a typed success-or-failure result rather than letting one throw discard the branches that already finished. The fan-in stage can then merge from whatever succeeded and report the rest as partial, instead of the whole fan-out failing because one branch did.
+
+## Handoff (Routing)
+
+A router evaluates input and transfers full control to exactly one specialist; the router does not see the result. Use it for clearly distinct domains (billing vs. technical support) where routing can be decided from the input alone. Cross-domain queries ("why was I charged for a broken feature") are the recurring failure - add an explicit fallback agent rather than forcing routing logic to resolve ambiguity it cannot see.
+
+OpenAI Agents SDK models this with a `handoffs` array; when the model decides to transfer, it calls `transfer_to_<agent_name>`. Python imports are `from agents import Agent, Runner` (not `openai.agents`); JS imports are `import { Agent, run } from '@openai/agents'`. LangGraph's swarm variant (below) uses `create_handoff_tool` for the same transfer-of-control primitive.
+
+## Supervisor
+
+A single agent decomposes the goal, delegates to specialists, collects results, and synthesizes output - the only agent that talks to the user or calling system. This is the most widely implemented pattern because it maps to how teams work.
+
+Two delegation shapes matter and are not interchangeable:
+
+|                   | Handoff (transfer control)              | Agent-as-tool (return control)                |
+| ----------------- | --------------------------------------- | --------------------------------------------- |
+| Who talks to user | Sub-agent, after transfer               | Supervisor only                               |
+| Result flow       | Back via a return handoff               | Returned as a tool result                     |
+| Context           | Sub-agent has full conversation history | Sub-agent has only what the supervisor passes |
+| Use case          | Deep specialist sessions                | Quick delegated lookups                       |
+
+Most production supervisors use agents-as-tools for the orchestration layer, reserving handoffs for extended specialist sessions. Give each worker a description that states what it does, what it returns, and - as important - what it does **not** do; vague descriptions ("helps with research and writing") produce routing drift. Filter delegation context per worker rather than passing the full transcript, and add a completion check outside the supervisor's ordinary reasoning - supervisors fail most often by stopping too early on output that reads as fluent prose but does not yet satisfy the goal.
+
+## Council
+
+Several agents independently answer or judge the same problem; a synthesis step merges, selects, rejects, or escalates. Use it for evaluative or high-risk decisions - code review across security/reliability/maintainability lenses, policy review, model or prompt selection against a shared rubric. Give every member the same input and a distinct lens, require structured output so synthesis can compare results, and default to **preserving disagreement**: a final answer naming a blocking minority view is usually more useful than a polished consensus that erases risk. Budget for duplicated work explicitly - councils intentionally repeat work, and cost scales with member count.
+
+## Swarm (Peer-to-Peer Handoff)
+
+There is no permanent coordinator; any agent can hand off directly to any other based on its own local decision. This removes the supervisor's context-accumulation bottleneck at the cost of predictability - emergent routing is harder to trace and debug. Use swarm when tasks are long-running enough that supervisor context growth is a real cost and handoff conditions can be stated clearly in each agent's own instructions; use supervisor when the sequence is predictable and you need a single point of accountability.
+
+Swarms cycle without protection: agent A hands to B, B hands back to A, indefinitely. Mitigate with a seen-agents set, a handoff depth limit, and at least one terminal agent (escalation, fallback) that cannot hand off further.
+
+## Reliable Default: Deterministic Backbone + AI At Decision Nodes
+
+Most steps in an agentic workflow are mechanical - schema validation, routing by a known field, checking a confidence threshold - and should not be delegated to a model. Reserve model calls for the steps that need language understanding or judgment: extracting intent, specialist synthesis, generating user-facing text. This has lower cost, faster execution, and more predictable failure modes than fully AI-driven orchestration, and it is how most production multi-agent systems are actually built regardless of which pattern above sits at the top.
+
+## Human Checkpoints
+
+Any of these patterns can pause for a human decision at a checkpoint - before a costly action, before publishing, before an irreversible write. The approval contract a tool must expose to support that (declare, persist, resume) is covered in [Human Approval](/docs/tool-design/human-approval), not repeated here.
+
+## Long-Lived, Entity-Scoped Agents
+
+Most of the patterns above assume a request has a beginning and an end. Some domains don't fit that shape: the agent's job is "know this entity" - a persona, a project, a room - rather than "answer this one prompt." Scope memory and session state to a stable entity ID instead of a single request or thread, so the agent accumulates context about that entity across every future interaction rather than starting cold each time. This changes what "the same agent" means: two requests days apart against the same entity ID are the same ongoing relationship. See [Memory](/docs/agents/memory) for the semantic-recall mechanics this scoping pattern builds on.
+
+## Related
+
+- [Frameworks](/docs/agents/frameworks)
+- [Memory](/docs/agents/memory)
+- [Human Approval](/docs/tool-design/human-approval)
+- [Evaluation Framework](/docs/testing/evaluation-framework)
+- [Durable Execution](/docs/agents/durable-execution)

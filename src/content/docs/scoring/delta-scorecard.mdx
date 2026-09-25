@@ -1,6 +1,7 @@
 ---
 title: Delta Scorecard
 description: Computing and visualizing improvements between two scorecards
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -197,9 +198,8 @@ Authentication:     1/3 (API keys only)
 Error Handling:     0/3 (generic HTTP)
 Tool Design:        0/3 (no tool definitions)
 Context Files:      1/3 (auto-generated AGENTS.md)
-Multi-Agent:        N/A
 Testing:            0/3 (no agent tests)
-Data Retrievability: N/A
+Retrievability:     N/A
 
 Total: 3/24 (scaled: 4/30)
 Rating: Human-only
@@ -219,10 +219,11 @@ Following the transformation plan, the team:
    - Structured error handling with `isError`
    - Tested with `InMemoryTransport`
 
-3. **Upgraded authentication** (2 hours)
+3. **Upgraded authentication** (3 hours)
    - Added OAuth 2.1 Client Credentials grant
    - Scoped tokens (read:api, write:config)
    - JWT validation (iss, aud, exp)
+   - Tested token renewal, revocation, and wrong-user/wrong-resource rejection
 
 4. **Enhanced error handling** (1.5 hours)
    - RFC 9457 Problem Details format
@@ -252,11 +253,10 @@ Authentication:     3/3 (OAuth 2.1 M2M, scoped tokens)
 Error Handling:     2/3 (RFC 9457, missing doc_uri)
 Tool Design:        2/3 (good descriptions, no toModelOutput)
 Context Files:      2/3 (AGENTS.md curated, no CLAUDE.md)
-Multi-Agent:        N/A
 Testing:            2/3 (tool + error recovery, no evals)
-Data Retrievability: N/A
+Retrievability:     N/A
 
-Total: 16/24 (scaled: 18/30)
+Total: 17/24 (scaled: 21/30)
 Rating: Agent-ready
 ```
 
@@ -288,12 +288,11 @@ Output:
   error-handling                 0/3    2/3   +2 ✦     ↑
   tool-design                    0/3    2/3   +2 ✦     ↑
   context-files                  1/3    2/3   +1 ✦     ↑
-  multi-agent                     N/A    N/A    —      →
   testing                        0/3    2/3   +2 ✦     ↑
-  data-retrievability             N/A    N/A    —      →
+  retrievability                  N/A    N/A    —      →
 
   ─────────────────────────────────────────────────────
-  TOTAL: 3/24 → 16/24 (scaled: 4/30 → 18/30)
+  TOTAL: 3/24 → 17/24 (scaled: 4/30 → 21/30)
   RATING: Human-only → Agent-ready ✦
 
   Clusters tackled:
@@ -308,7 +307,7 @@ Output:
 
 **Strong improvements** (✦):
 
-- **Authentication** jumped from 1 → 3: OAuth 2.1 Client Credentials + scoped tokens is complete
+- **Authentication** jumped from 1 → 3: OAuth 2.1 Client Credentials, scoped tokens, and tested renewal/revocation/wrong-resource rejection is complete
 - **API Surface** 0 → 2: OpenAPI spec exists with agent-oriented descriptions (missing Arazzo for 3)
 - **MCP Server** 0 → 2: Tools exposed via MCP with proper structure (missing pagination for 3)
 - **Error Handling** 0 → 2: RFC 9457 with is_retriable (missing doc_uri for 3)
@@ -323,7 +322,7 @@ Output:
 **Overall:**
 
 - **Rating upgraded**: Human-only → Agent-ready (crossed the 15-point threshold)
-- **Score improvement**: +14 points in 33 hours of work
+- **Score improvement**: +14 points in 13.5 hours of work
 - **Impact**: Agents can now reliably use the API with proper auth, error recovery, and tool discovery
 
 ## Next Steps
@@ -336,4 +335,4 @@ From the delta, the team can prioritize remaining gaps:
 4. **Discovery 2 → 3**: Add JSON-LD schema + content negotiation (2 hours)
 5. **Testing 2 → 3**: Set up eval suite with pass@k metrics (3 hours)
 
-Tackling these would push the score to 25–27/30 (Agent-first range).
+Tackling these five 2→3 bumps would raise the raw score to 22/24, scaling to roughly 28/30 (Agent-first range).

@@ -1,64 +1,64 @@
 ---
 title: Session Control
-description: The controller layer between the UI and the agent loop — modes, subagent surfacing, tool approvals, thread state, and mid-run steering that turn a chat box into a supervised session.
-lastVerified: 2026-07-06
+description: The controller layer between the UI and the agent loop - modes, subagent surfacing, tool approvals, thread state, and mid-run steering that turn a chat box into a supervised session.
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-A chat box is not a control surface. It takes a message and waits for a reply. Long-running agents need more: a way to run in different modes, approve individual actions, watch delegated work, steer a run that is already in flight, and recover the whole thing after a reconnect. Session control is the layer that sits between the interface and the agent loop and turns "send message, wait" into a supervised session.
+A chat box takes a message and waits for a reply. Long-running agents need more: a way to run in different modes, approve individual actions, watch delegated work, steer a run that is already in flight, and recover the whole thing after a reconnect. Session control is the layer that sits between the interface and the agent loop and turns "send message, wait" into a supervised session.
 
-This layer is where coding agents and product agents converge. Claude Code, Cursor, Codex CLI, and GitHub Copilot all expose modes, per-call tool approvals, and steering because a terminal agent that edits files needs supervision. A support agent that drafts refunds for a human to approve needs the same primitives. Product session layers such as Mastra's AgentController (beta) generalize the pattern for non-coding agents. Treat the coding-agent version as one instance of session control, not its definition.
+This layer is where coding agents and product agents converge. Claude Code, Cursor, Codex CLI, and GitHub Copilot all expose modes, per-call tool approvals, and steering because a terminal agent that edits files needs supervision. A support agent that drafts refunds for a human to approve needs the same primitives. Product session layers such as Mastra's AgentController (beta) generalize the pattern for non-coding agents. Treat the coding-agent version as one instance of session control.
 
 Decide by run duration and blast radius: a single-shot, read-only assistant needs none of this; anything that runs across turns, delegates to subagents, or takes irreversible actions needs an explicit controller.
 
 ## Modes
 
-A mode is a policy over what the agent may do without asking. Do not hardcode "plan mode" as a coding-only feature — it is one instance of a general shape.
+A mode is a policy over what the agent may do without asking. Do not hardcode "plan mode" as a coding-only feature - it is one instance of a general shape.
 
 The general progression is **draft → execute → review**:
 
-- **Draft** — the agent proposes a plan or a specific action but takes no side effects. Claude Code's plan mode is one instance; a support agent that drafts a refund for a reviewer is another; a data agent that shows the migration it would run is a third.
-- **Execute** — the agent acts. Execution may be fully autonomous (auto-accept), gated per call, or gated per class of action, depending on the mode's approval policy.
-- **Review** — completed work is presented for inspection and acceptance before it is treated as final. A diff to accept, a batch of drafted replies to send, a set of changes to merge.
+- **Draft** - the agent proposes a plan or a specific action but takes no side effects. Claude Code's plan mode is one instance; a support agent that drafts a refund for a reviewer is another; a data agent that shows the migration it would run is a third.
+- **Execute** - the agent acts. Execution may be fully autonomous (auto-accept), gated per call, or gated per class of action, depending on the mode's approval policy.
+- **Review** - completed work is presented for inspection and acceptance before it is treated as final. A diff to accept, a batch of drafted replies to send, a set of changes to merge.
 
-Modes should be explicit, visible, and switchable mid-session. The user should always be able to see which mode is active and downgrade a running agent from execute to draft. Auto-accept is a mode, not a default — surface it as a deliberate choice.
+Modes should be explicit, visible, and switchable mid-session. The user should always be able to see which mode is active and downgrade a running agent from execute to draft. Auto-accept is a deliberate choice, so surface it as a mode.
 
 ## Subagent Surfacing
 
-When an agent delegates to subagents, the thread should show that delegated work is happening without flooding the main conversation with every sub-step. Collapse a subagent's activity into a single labeled unit — "researching sources (3 agents)" — that expands on demand. Show progress and completion at the delegation boundary; keep the full sub-thread reachable but out of the primary flow.
+When an agent delegates to subagents, the thread should show that delegated work is happening without flooding the main conversation with every sub-step. Collapse a subagent's activity into a single labeled unit - "researching sources (3 agents)" - that expands on demand. Show progress and completion at the delegation boundary; keep the full sub-thread reachable but out of the primary flow.
 
-The failure to avoid is a thread that becomes unreadable because five subagents interleave their raw output into one stream. Surface delegation as structure, not as noise.
+The failure to avoid is a thread that becomes unreadable because five subagents interleave their raw output into one stream. Surface delegation as structure.
 
 ## Tool Approvals
 
-Tool approval is where session control meets safety. This page covers the UI and controller patterns; for where to place gates and how suspend/resume works underneath, see [Human-in-the-Loop](/docs/multi-agent/human-in-the-loop), which owns the approval-checkpoint semantics.
+Tool approval is where session control meets safety. This page covers the UI and controller patterns; for the tool-surface contract underneath - declaring that a call needs sign-off, persisting the pending state, and resuming it safely - see [Human Approval](/docs/tool-design/human-approval).
 
 Three UI-level policies cover most cases:
 
-- **Per-call approval** — the agent pauses before a specific tool call and shows the exact arguments. The user approves or rejects that one call.
-- **Per-session policy** — "approve this tool for the rest of the session" or "always ask for this tool." The decision is remembered for the thread's lifetime, not baked into code.
-- **Allowlists** — a standing set of tools the agent may call without prompting, with everything else gated. Coding agents expose this as command allowlists; product agents express it as approved action types.
+- **Per-call approval** - the agent pauses before a specific tool call and shows the exact arguments. The user approves or rejects that one call.
+- **Per-session policy** - "approve this tool for the rest of the session" or "always ask for this tool." The decision is remembered for the thread's lifetime; no code change is needed.
+- **Allowlists** - a standing set of tools the agent may call without prompting, with everything else gated. Coding agents expose this as command allowlists; product agents express it as approved action types.
 
 Whatever the UI, the controller must persist approval decisions as durable state. A per-session "always allow" that evaporates on reconnect forces the user to re-approve everything and trains them to click through blindly.
 
 ### Approval State
 
-Approvals are a state machine, not a modal that disappears on refresh. Persist explicit states server-side so a reload or reconnect restores exactly where the run paused:
+Approvals are a state machine, and that state must survive a refresh. Persist explicit states server-side so a reload or reconnect restores exactly where the run paused:
 
-- `drafted` — the agent prepared a proposed action
-- `needs_approval` — a user or reviewer must decide
-- `approved` — execution may proceed
-- `rejected` — execution must stop or revise
-- `expired` — approval was not granted in time
-- `executed` — the side effect happened
-- `rolled_back` — a compensating action ran
+- `drafted` - the agent prepared a proposed action
+- `needs_approval` - a user or reviewer must decide
+- `approved` - execution may proceed
+- `rejected` - execution must stop or revise
+- `expired` - approval was not granted in time
+- `executed` - the side effect happened
+- `rolled_back` - a compensating action ran
 
 Every approval record should capture who approved, what they saw at the moment of approval, what changed after approval, and which execution consumed that approval. That record is the audit trail; without it you cannot answer "who authorized this refund and on what basis" after the fact.
 
 ## Thread State
 
-Session control depends on durable thread state — the set of facts that must survive a page reload, a dropped socket, or a process restart. At minimum:
+Session control depends on durable thread state - the set of facts that must survive a page reload, a dropped socket, or a process restart. At minimum:
 
 - the active goal and mode
 - selected resources, connected account, and workspace
@@ -66,7 +66,7 @@ Session control depends on durable thread state — the set of facts that must s
 - pending approvals with their prompts and proposed actions
 - active run IDs so a suspended run can be resumed
 
-If this state lives only in a model transcript or in browser memory, the session cannot reliably resume and every reconnect is a fresh start. Persist it where the controller — not just the UI — can read it back.
+If this state lives only in a model transcript or in browser memory, the session cannot reliably resume and every reconnect is a fresh start. Persist it where the controller - not just the UI - can read it back.
 
 ## Mid-Run Steering
 
@@ -79,12 +79,12 @@ Users need to correct a running agent without starting over. Steering is the set
 - pause, cancel, or retry a failed step
 - escalate to a human
 
-Steering works best when the underlying run has checkpoints. If all state lives in a single model transcript, the controller cannot cleanly splice a new instruction into a run or resume from the right point after a correction. The runtime side of this — replay-safe activities, checkpointing partial state, injecting signals into a live workflow — belongs to [Durable Execution](/docs/runtime-boundaries/durable-execution). Session control owns the UX: how the injection is captured, shown, and acknowledged; durable execution owns how the running workflow absorbs it.
+Steering works best when the underlying run has checkpoints. If all state lives in a single model transcript, the controller cannot cleanly splice a new instruction into a run or resume from the right point after a correction. The runtime side of this - replay-safe activities, checkpointing partial state, injecting signals into a live workflow - belongs to [Durable Execution](/docs/agents/durable-execution). Session control owns the UX: how the injection is captured, shown, and acknowledged; durable execution owns how the running workflow absorbs it.
 
-CopilotKit's AG-UI is the current de facto layer for streaming agent state and steering events to a UI across vendors; see the [Emerging Standards Watchlist](/docs/protocols/emerging-standards) for its status.
+AG-UI, originated at CopilotKit, is the current de facto layer for streaming agent state and steering events to a UI across vendors, adopted via SDKs rather than a pinned spec version; see the [Emerging Standards Watchlist](/docs/protocols/emerging-standards) for its status.
 
 <Callout type="info">
-  Voice barge-in — interrupting a speaking or acting agent by talking over it — is the canonical
+  Voice barge-in - interrupting a speaking or acting agent by talking over it - is the canonical
   hard case of mid-run steering, because it collapses the pause, the new instruction, and the
   acknowledgment into a single real-time channel. It is out of scope for this guide's current
   coverage.
@@ -101,8 +101,8 @@ CopilotKit's AG-UI is the current de facto layer for streaming agent state and s
 
 ## Related
 
-- [Agentic UI](/docs/agentic-ui) — the interface shapes and event model this controller sits behind
-- [Human-in-the-Loop](/docs/multi-agent/human-in-the-loop) — approval-checkpoint semantics and framework suspend/resume
-- [MCP Apps](/docs/agentic-ui/mcp-apps) — interactive UI delivered through MCP tool results
-- [Emerging Standards Watchlist](/docs/protocols/emerging-standards) — AG-UI and other draft agent-to-UI protocols
-- [Runtime Boundaries](/docs/runtime-boundaries) — where durable execution and background work live
+- [Agentic UI](/docs/agentic-ui) - the interface shapes and event model this controller sits behind
+- [Human Approval](/docs/tool-design/human-approval) - the tool-surface approval contract and framework suspend/resume pointers
+- [MCP Apps](/docs/agentic-ui/mcp-apps) - interactive UI delivered through MCP tool results
+- [Emerging Standards Watchlist](/docs/protocols/emerging-standards) - AG-UI and other draft agent-to-UI protocols
+- [Durable Execution](/docs/agents/durable-execution) - replay-safe workflow engines for non-deterministic agent loops

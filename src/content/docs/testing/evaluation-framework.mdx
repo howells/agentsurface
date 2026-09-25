@@ -1,11 +1,12 @@
 ---
 title: Agent Evaluation Framework
 description: A three-layer framework for measuring agent reasoning, action accuracy, and task completion
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Measure multi-step system performance, not single-turn model accuracy. Three-layer framework: (1) Reasoning – plan quality and adherence (correct tools, order, deviations), (2) Action – tool selection accuracy (F1 score) and parameter correctness (all args valid), (3) Outcome – final artifact matches success criteria (code correct, summary faithful). Each layer can fail independently; binary success/fail hides which layer broke.
+Measure multi-step system performance, not single-turn model accuracy. Three-layer framework: (1) Reasoning - plan quality and adherence (correct tools, order, deviations), (2) Action - tool selection accuracy (F1 score) and parameter correctness (all args valid), (3) Execution - final artifact matches success criteria (code correct, summary faithful). Each layer can fail independently; binary success/fail hides which layer broke.
 
 ```
 Layer 1: Reasoning (Plan)
@@ -16,13 +17,13 @@ Layer 2: Action (Tool Use)
 ├── Selection F1: right tool?
 └── Parameters: correct args?
 
-Layer 3: Outcome (Result)
+Layer 3: Execution (Result)
 └── Artifact: meets criteria?
 ```
 
 ---
 
-LLM evaluations measure a model. Agent evaluations measure a system. That distinction matters because agent failures are rarely pure model failures — they are failures of tool selection, parameter construction, state management, and multi-step coordination. An LLM that scores 90% on a reasoning benchmark might produce an agent that completes only 40% of real tasks correctly, because the gap between "can reason" and "can reliably select the right tool and pass the right arguments" is substantial.
+LLM evaluations measure a model. Agent evaluations measure a system. That distinction matters because agent failures are rarely pure model failures - they are failures of tool selection, parameter construction, state management, and multi-step coordination. An LLM that scores 90% on a reasoning benchmark might produce an agent that completes only 40% of real tasks correctly, because the gap between "can reason" and "can reliably select the right tool and pass the right arguments" is substantial.
 
 Agent evaluations need different metrics, different grading approaches, and a different dataset construction philosophy.
 
@@ -30,7 +31,7 @@ Agent evaluations need different metrics, different grading approaches, and a di
 
 LLM evals typically measure a single turn: given this input, does the model produce an output that matches a reference? MMLU, HumanEval, and HellaSwag all follow this pattern. The metric is accuracy against a fixed answer.
 
-Agent evals measure multi-step execution: given this task, does the agent reach a correct end state by making correct decisions at each step? Two agents might both fail to complete a task — one because it chose the wrong tool, one because it chose the right tool but passed wrong arguments. These failures require different fixes. A single binary success/failure metric obscures which layer broke.
+Agent evals measure multi-step execution: given this task, does the agent reach a correct end state by making correct decisions at each step? Two agents might both fail to complete a task - one because it chose the wrong tool, one because it chose the right tool but passed wrong arguments. These failures require different fixes. A single binary success/failure metric obscures which layer broke.
 
 The three-layer framework separates agent evaluation into the three components that can fail independently.
 
@@ -103,7 +104,7 @@ def grade_parameters(
 ) -> dict:
     errors = []
 
-    # Schema validation — required fields and types
+    # Schema validation: required fields and types
     for field, spec in schema.get("properties", {}).items():
         if field in schema.get("required", []):
             if field not in call.arguments:
@@ -111,7 +112,7 @@ def grade_parameters(
             elif spec["type"] == "string" and not isinstance(call.arguments[field], str):
                 errors.append(f"Wrong type for {field}: expected string")
 
-    # Semantic validation — compare to reference
+    # Semantic validation: compare to reference
     semantic_score = 1.0
     if reference_args:
         matches = sum(
@@ -136,7 +137,7 @@ Execution evals measure whether the agent completed the task and how efficiently
 | Task completion | Did the agent reach the correct end state?                           |
 | Step efficiency | How many steps did the agent take, relative to the minimum required? |
 
-Task completion is graded on outcomes, not on the path taken. If the task is "send invoice inv_01," the correct outcome is that the invoice's status is `sent`. The agent might have taken a different path to reach that outcome — that is fine, as long as the end state is correct.
+Task completion is graded on outcomes, not on the path taken. If the task is "send invoice inv_01," the correct outcome is that the invoice's status is `sent`. The agent might have taken a different path to reach that outcome - that is fine, as long as the end state is correct.
 
 ```python
 async def grade_task_completion(
@@ -159,7 +160,7 @@ def step_efficiency(actual_steps: int, minimum_steps: int) -> float:
     return minimum_steps / actual_steps if actual_steps > 0 else 0.0
 ```
 
-An efficiency score of 1.0 means the agent took exactly the minimum number of steps. Scores below 0.5 indicate the agent is taking more than twice the necessary steps — a signal of confused planning or excessive redundant tool calls.
+An efficiency score of 1.0 means the agent took exactly the minimum number of steps. Scores below 0.5 indicate the agent is taking more than twice the necessary steps - a signal of confused planning or excessive redundant tool calls.
 
 ## Grader Types
 
@@ -253,7 +254,7 @@ Agent outputs are not deterministic. The same task, run ten times, may produce d
 pass@k = P(at least one of k attempts succeeds)
 ```
 
-A high pass@1 but low pass@k means the agent is consistently capable. A low pass@1 but high pass@5 means the agent can succeed but is unreliable — it gets lucky on some attempts.
+A high pass@1 with pass@k close to it means the agent is consistently capable. A low pass@1 but high pass@5 means the agent can succeed but is unreliable - it gets lucky on some attempts.
 
 **pass^k** (consistency floor) measures whether the agent succeeds on all k attempts:
 
@@ -261,10 +262,10 @@ A high pass@1 but low pass@k means the agent is consistently capable. A low pass
 pass^k = P(all k attempts succeed)
 ```
 
-For production deployments, pass^1 (a single run) and pass^k together bracket the reliability range. A production agent should aim for pass^1 close to pass@k — consistent success, not lucky success.
+For production deployments, pass@1 (a single run) and pass^k together bracket the reliability range. A production agent should aim for pass@1 close to pass@k - consistent success, not lucky success.
 
 ```python
-def passat_k(results: list[bool]) -> float:
+def passat_1(results: list[bool]) -> float:
     """Fraction of runs that pass: estimate of pass@1 / success rate."""
     return sum(results) / len(results) if results else 0.0
 
@@ -280,7 +281,7 @@ Capability evals measure what the agent can do. Regression evals detect when it 
 | Type       | Dataset composition                                           | Grading             | Run frequency                   |
 | ---------- | ------------------------------------------------------------- | ------------------- | ------------------------------- |
 | Capability | Challenging tasks at the frontier of agent ability            | Model-based + human | Weekly or on new model versions |
-| Regression | Real failures from production — the 20-50 most impactful bugs | Code-based          | On every code change            |
+| Regression | Real failures from production - the 20-50 most impactful bugs | Code-based          | On every code change            |
 
 Regression evals are the higher-priority investment for production systems. Capability evals tell you how good the system is. Regression evals tell you when you've broken something that was working.
 
@@ -321,29 +322,29 @@ EVAL_CASES = [
 The same correct outcome can be reached by different valid paths. Graders that require a specific sequence of tool calls will incorrectly fail tasks where the agent chose an equally valid path.
 
 ```python
-# Wrong — brittle path check
+# Wrong: brittle path check
 def grade_task(execution):
     expected_sequence = ["get_customer", "get_invoice", "send_invoice"]
     actual_sequence = [c.tool for c in execution.tool_calls]
     return actual_sequence == expected_sequence  # Fails on valid variations
 
-# Right — outcome check
+# Right: outcome check
 async def grade_task(execution, db):
     invoice = await db.get_invoice(execution.task_inputs["invoice_id"])
     return invoice.status == "sent"  # Pass if end state is correct
 ```
 
-There are exceptions — for tasks where the path is part of the contract (e.g., "confirm before sending"), the path must be verified. But these should be explicit requirements in the eval case, not a general assumption.
+There are exceptions - for tasks where the path is part of the contract (e.g., "confirm before sending"), the path must be verified. But these should be explicit requirements in the eval case, not a general assumption.
 
 ## Eval-Driven Development
 
 Write evals before writing the agent. When a new capability is required:
 
-1. Write the eval cases first — what does success look like?
+1. Write the eval cases first - what does success look like?
 2. Build a code-based grader for the expected outcomes
-3. Run the eval against the current system — establish the baseline (likely 0%)
+3. Run the eval against the current system - establish the baseline (likely 0%)
 4. Implement the capability
-5. Run the eval again — measure the improvement
+5. Run the eval again - measure the improvement
 6. Promote the eval to the regression suite
 
 This discipline prevents the common pattern where evals are written after the system is built to confirm it works, rather than to specify what it should do.
@@ -359,18 +360,18 @@ This discipline prevents the common pattern where evals are written after the sy
 - [ ] Graders check outcomes, not paths (unless path is a requirement)
 - [ ] Evals are written before the capability is implemented
 
-## See also
-
-- `/docs/testing/metrics` — pass@k, pass^k, tool F1, schema conformance
-- `/docs/testing/llm-as-judge` — calibrating judge models and biases
-- `/docs/testing/braintrust` — managed eval platform with dataset versioning
-- `/docs/testing/promptfoo` — YAML-driven evals with red-teaming
-- `/docs/testing/vitest-harness` — in-process evals with Vitest
-- `/docs/testing/observability` — OpenTelemetry traces for debugging
-- `/docs/testing/ci-integration` — regression testing and statistical significance
-
-## Integration sandbox evidence
+## Integration Sandbox Evidence
 
 For integrations that mutate data, send messages, or charge money, document a supported test environment: its base URL, separate credentials and data, supported operations, reset mechanism, and differences from production. Verify the environment cannot reach production effects with its test credentials. A demo page or an environment variable named sandbox is not sufficient evidence.
 
 Run the intended journey with test data, including an invalid request and an interrupted or repeated operation. Retain the final resource state, authorization outcome, and cleanup result. If no safe test environment exists, record that limitation and use the smallest authorized verification path; do not manufacture successful evidence from mocked responses. Choose the isolation needed for the operation; a public read may need no dedicated sandbox.
+
+## See also
+
+- `/docs/testing/metrics` - pass@k, pass^k, tool F1, schema conformance
+- `/docs/testing/llm-as-judge` - calibrating judge models and biases
+- `/docs/testing/braintrust` - managed eval platform with dataset versioning
+- `/docs/testing/promptfoo` - YAML-driven evals with red-teaming
+- `/docs/testing/vitest-harness` - in-process evals with Vitest
+- `/docs/testing/observability` - OpenTelemetry traces for debugging
+- `/docs/testing/ci-integration` - regression testing and statistical significance

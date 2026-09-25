@@ -1,7 +1,7 @@
 ---
 title: Rubric Calibration
 description: Maintaining consistency and preventing score drift over time
-lastVerified: 2026-07-28
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -52,11 +52,11 @@ For each dimension, ask:
 - **Are the detection signals clear?** Can two auditors independently verify them, or do they require judgment?
 - **Has the ecosystem changed?** RFC standards, new frameworks, or tool adoption may have shifted what "good" means.
 
-Example: In 2025, OAuth 2.1 was optional for Authentication 2/3. In 2026, it's standard, so move it to 1/3.
+Example: In 2025, RFC 9728 protected-resource metadata was optional for Authentication 3/3. The 2026-07-28 MCP spec makes it the discovery mechanism for protected remote servers, so 3/3 now requires it there.
 
 ### 3. Create a Calibration Set (2 hours)
 
-Pick 2 projects from your baseline scorecards—one scoring 1–2 on a dimension, one scoring 2–3. These become your reference projects for that dimension.
+Pick 2 projects from your baseline scorecards - one scoring 1–2 on a dimension, one scoring 2–3. These become your reference projects for that dimension.
 
 For API Surface, example:
 
@@ -84,12 +84,12 @@ For any disagreement >0.5 points, clarify the rubric:
 
 ### 6. Version the Rubric
 
-Tag the rubric release: `surface-rubric-v1.2` (date: 2026-09-01).
+Tag the rubric release: `surface-rubric-v1.2` (date: 2026-09-15).
 
 Include in the CHANGELOG:
 
 ```markdown
-## v1.2 (2026-09-01)
+## v1.2 (2026-09-15)
 
 **Calibration changes:**
 
@@ -133,11 +133,11 @@ IRR = (agreements on same score) / (total dimensions scored)
 | Tool Design    | 1         | 1         | 1         | 1    | ✓         |
 | Discovery      | 2         | 2         | 2         | 2    | ✓         |
 | Context Files  | 2         | 2         | 2         | 2    | ✓         |
-| CLI Design     | N/A       | N/A       | N/A       | N/A  | ✓         |
-| Multi-Agent    | N/A       | N/A       | N/A       | N/A  | ✓         |
 | Testing        | 1         | 1         | 1         | 1    | ✓         |
 
-**IRR = 7/10 = 0.70** (Fair. MCP Server and Auth criteria need clarification.)
+CLI Design is N/A for this project (no CLI ships) and is excluded from the count - N/A agreement isn't evidence of rubric clarity.
+
+**IRR = 5/8 = 0.625** (Poor. MCP Server and Auth criteria need clarification.)
 
 ### Resolving Disagreement
 
@@ -157,12 +157,12 @@ For each disagreement, ask:
 Auditor A: "Minimal MCP, basic tools, no pagination → 1/3"
 Auditor B: "MCP tools have annotations, outputSchema declared → 2/3"
 
-**Root cause:** Rubric doesn't specify whether annotations are required for 2/3 or nice-to-have.
+**Root cause:** Rubric doesn't say how many tools must carry annotations before the evidence counts.
 
 **Fix:** Update rubric:
 
 > Score 2 requires: annotations on all tools, outputSchema on tools returning structured data.
-> Score 3 requires: annotations + pagination on list operations + OAuth.
+> Score 3 requires: annotations plus pagination on list operations, RFC 9728 metadata where the HTTP server is protected, and the transport, testing, and consent criteria in the rubric.
 
 ## Pilot Testing on Recent Audits
 
@@ -170,7 +170,7 @@ Before finalizing rubric changes, test them:
 
 1. **Select 3 recent scorecards** from past 3 months
 2. **Re-audit using new rubric** (2 auditors independently)
-3. **Compare old vs new scores** — should be small deltas unless rubric was truly misaligned
+3. **Compare old vs new scores** - should be small deltas unless rubric was truly misaligned
 4. **Document changes** in CHANGELOG
 5. **Gather feedback** from auditors on clarity
 
@@ -241,7 +241,7 @@ Solution: Quarterly re-audit of all Low confidence scores. Update rubric if the 
 
 Problem: You add new dimensions without removing old ones. Rubric becomes unwieldy.
 
-Solution: Keep the rubric at 11 dimensions. If you want to add one, consider whether it overlaps with existing dimensions or if it is truly foundational.
+Solution: Keep the rubric at 10 dimensions. If you want to add one, consider whether it overlaps with existing dimensions or if it is truly foundational.
 
 ## Checklist: Annual Calibration
 
@@ -272,7 +272,7 @@ Inter-rater reliability:
     API Surface: 0.92 (Excellent)
     MCP Server: 0.61 (Poor) ← Needs work
     Discovery: 0.85 (Good)
-    Authentication: 0.75 (Fair) ← Needs clarification
+    Authentication: 0.75 (Good) ← minor ambiguities
 
 Changes recommended:
   1. MCP Server: Add explicit "tools must have annotations" to 2/3 criterion

@@ -1,6 +1,7 @@
 ---
 title: Content Structure for AI Consumption
 description: Structuring documentation so AI agents retrieve accurate answers with minimal tokens
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -13,7 +14,7 @@ Agents truncate context for efficiency and weight earlier content more heavily. 
 - Use clear headings to enable agent section targeting
 - Place code examples right after relevant text
 
-AI agents retrieve and quote your documentation. The structure of that documentation — where the answer appears in the page, how headings are organized, how code examples are placed — determines whether the agent extracts an accurate answer or paraphrases something plausible but wrong.
+AI agents retrieve and quote your documentation. The structure of that documentation - where the answer appears in the page, how headings are organized, how code examples are placed - determines whether the agent extracts an accurate answer or paraphrases something plausible but wrong.
 
 ## Answer-First Structure
 
@@ -58,7 +59,7 @@ The default limit is 1,000 requests per minute.
 
 Each H2 section should work as a standalone answer without requiring the reader (or agent) to have read the preceding sections. This is harder to write but dramatically increases retrieval accuracy.
 
-When an agent receives a question about "how to handle webhook signature verification," it may retrieve only the relevant section of your webhooks page — not the full page. If that section refers to "the keys you obtained earlier" without specifying what they are or where to find them, the agent produces an incomplete answer.
+When an agent receives a question about "how to handle webhook signature verification," it may retrieve only the relevant section of your webhooks page - not the full page. If that section refers to "the keys you obtained earlier" without specifying what they are or where to find them, the agent produces an incomplete answer.
 
 Write each H2 as if it were the first thing the reader sees:
 
@@ -87,8 +88,6 @@ function verifySignature(
 ```
 ````
 
-````
-
 This section is complete. An agent can retrieve it and answer "how do I verify webhook signatures" without needing the surrounding page.
 
 ## Canonical URL and Language
@@ -102,23 +101,25 @@ Two page-level signals sit underneath everything else on this page, and both are
 
 Never skip heading levels. `H1 → H3` without an `H2` confuses the document outline that agents use for navigation and retrieval.
 
-**H1** — Page title. One per page. Match the `` `<title>` `` tag.
+**H1** - Page title. One per page. Match the `` `<title>` `` tag.
 
-**H2** — Major topics. These are your retrieval units. Write H2 headings as questions or as direct answers to questions:
+**H2** - Major topics. These are your retrieval units. Write H2 headings as questions or as direct answers to questions:
 
 ```markdown
-## How do I rotate an API key?       ← question form (good for FAQPage schema)
-## Rotating API Keys                  ← noun form (fine, clear enough)
-## Important Information About Keys   ← vague (avoid)
-````
+## How do I rotate an API key? ← question form (good for FAQPage schema)
 
-**H3** — Subtopics within an H2. Do not use H3 for things that could be list items.
+## Rotating API Keys ← noun form (fine, clear enough)
 
-**H4+** — Rarely necessary. If you are reaching H4, consider whether you should restructure as separate pages.
+## Important Information About Keys ← vague (avoid)
+```
+
+**H3** - Subtopics within an H2. Do not use H3 for things that could be list items.
+
+**H4+** - Rarely necessary. If you are reaching H4, consider whether you should restructure as separate pages.
 
 ## Code Examples Immediately After Prose
 
-Place code examples directly after the prose that introduces them — not in a "Examples" section at the bottom of the page. Agents frequently retrieve a code example and the sentence immediately before it. If the code and its explanation are separated, the code appears without context.
+Place code examples directly after the prose that introduces them, rather than in an "Examples" section at the bottom of the page. Agents frequently retrieve a code example and the sentence immediately before it; if the code and its explanation are separated, the code appears without context.
 
 ````markdown
 ## Paginating Results
@@ -149,8 +150,6 @@ When `next_cursor` is absent or null, you have reached the last page.
 
 Always tag the fence with a language (` ```typescript `, not a bare ` ``` `). [CommonMark](https://spec.commonmark.org/0.31.2/#fenced-code-blocks) defines this as the fence's info string, whose first word is "typically used to specify the language of the code sample." An untagged fence forces an agent to guess the language before it can reason about the code correctly.
 
-````
-
 Note: closing text after the code block ("When `next_cursor` is absent...") re-anchors the code in the reader's understanding. Include it.
 
 ## Tables Over Prose for Parameters
@@ -160,20 +159,20 @@ Parameter documentation in prose form is hard for agents to parse into structure
 ```markdown
 ## Request Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `project_id` | string | Yes | ID of the project to deploy |
-| `ref` | string | Yes | Git ref (branch name, tag, or commit SHA) |
-| `environment` | string | No | Target environment. Default: `production` |
-| `strategy` | string | No | Deployment strategy: `rolling` or `replace`. Default: `rolling` |
-| `timeout` | integer | No | Maximum deployment duration in seconds. Default: `300` |
-````
+| Parameter     | Type    | Required | Description                                                     |
+| ------------- | ------- | -------- | --------------------------------------------------------------- |
+| `project_id`  | string  | Yes      | ID of the project to deploy                                     |
+| `ref`         | string  | Yes      | Git ref (branch name, tag, or commit SHA)                       |
+| `environment` | string  | No       | Target environment. Default: `production`                       |
+| `strategy`    | string  | No       | Deployment strategy: `rolling` or `replace`. Default: `rolling` |
+| `timeout`     | integer | No       | Maximum deployment duration in seconds. Default: `300`          |
+```
 
 Use the same format for response fields, environment variables, and configuration options.
 
 ## Token Budgets
 
-Keep page token counts within these limits. Agents working with full context windows of 128K–200K tokens may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded.
+Keep page token counts within these limits. Agents working with large context windows (200K to 1M+ tokens) may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded.
 
 | Page type                       | Target       | Hard limit |
 | ------------------------------- | ------------ | ---------- |
@@ -220,14 +219,14 @@ The `ref` parameter does not exist in the linked repository.
 Verify the ref exists: `` `git ls-remote origin | grep <ref>` ``.
 ```
 
-Quote the exact error message string — including punctuation and capitalization — as it appears in API responses. Agents match against exact strings.
+Quote the exact error message string - including punctuation and capitalization - as it appears in API responses. Agents match against exact strings.
 
 ## Meta Tags for Retrieval Accuracy
 
 ```html
 <head>
   <!-- Entity-first: product name before page topic -->
-  <meta property="og:title" content="Acme API — Rate Limits" />
+  <meta property="og:title" content="Acme API - Rate Limits" />
   <meta
     property="og:description"
     content="Rate limit thresholds by plan, handling 429 errors, and configuring retry logic for the Acme REST API."
@@ -244,11 +243,11 @@ Quote the exact error message string — including punctuation and capitalizatio
 </head>
 ```
 
-**`og:title` entity-first** — Put the product or service name first, then the topic. "Acme API — Rate Limits" retrieves more accurately than "Rate Limits" because the product context disambiguates the topic from other APIs' rate limit documentation.
+**`og:title` entity-first** - Put the product or service name first, then the topic. "Acme API - Rate Limits" retrieves more accurately than "Rate Limits" because the product context disambiguates the topic from other APIs' rate limit documentation.
 
-**`article:modified_time`** — Agents and search-augmented systems use modification time to assess whether documentation is current. A page with no modification time is treated as unknown age. Use W3C datetime format: `2025-03-15T09:00:00Z`.
+**`article:modified_time`** - Agents and search-augmented systems use modification time to assess whether documentation is current. A page with no modification time is treated as unknown age. Use W3C datetime format: `2025-03-15T09:00:00Z`.
 
-**`article:tag`** — Retrieval systems use tags for categorization and filtering. Keep tags specific and consistent across your documentation.
+**`article:tag`** - Retrieval systems use tags for categorization and filtering. Keep tags specific and consistent across your documentation.
 
 ## Sitemap Optimization
 
@@ -270,7 +269,7 @@ Quote the exact error message string — including punctuation and capitalizatio
 </urlset>
 ```
 
-**`lastmod` is critical.** Search engines and AI crawlers use `lastmod` to prioritize recrawling. A sitemap without `lastmod` gives crawlers no signal about what has changed — they recrawl everything with equal priority. Use W3C datetime format: `YYYY-MM-DD` or the full ISO 8601 form.
+Search engines and AI crawlers use `lastmod` to prioritize recrawling. A sitemap without `lastmod` gives crawlers no signal about what has changed - they recrawl everything with equal priority. Use W3C datetime format: `YYYY-MM-DD` or the full ISO 8601 form.
 
 **Sitemap limits:** maximum 50,000 URLs per sitemap file. For larger sites, use a sitemap index file that references multiple sitemaps.
 
@@ -295,6 +294,18 @@ Submit your sitemap in `robots.txt`:
 ```
 Sitemap: https://docs.example.com/sitemap.xml
 ```
+
+## Changelog and Feed Signals
+
+`lastmod` tells an agent that _something_ on a URL changed. A changelog tells it _what_ changed, in language it can act on without re-reading the whole page. Publish a dated changelog - either a page with one entry per date and version, or a machine-parseable feed - so an agent that already has your docs in context can detect drift with one small fetch instead of re-ingesting everything.
+
+RSS 2.0 and Atom (RFC 4287) both work as the feed format; Atom's `updated` element is unambiguous ISO 8601, which makes it the easier of the two to parse reliably. Advertise the feed the same way you'd advertise a Markdown alternate:
+
+```html
+<link rel="alternate" type="application/atom+xml" href="/changelog/feed.xml" title="Changelog" />
+```
+
+Each entry needs a real date, a stable identifier, and text that says what changed and why it matters to someone calling your API or reading your docs - "Bumped dependencies" is not a useful entry; "Rate limit raised from 100 to 1,000 requests/minute on the Pro plan" is. There's no scanner check for this - it's a practice with real primary-source backing (the RSS and Atom specs) rather than a graded signal, but it's the cheapest way to let an agent trust that it isn't working from stale facts.
 
 ## Semantic HTML
 

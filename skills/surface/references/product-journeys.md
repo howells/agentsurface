@@ -14,9 +14,9 @@ Use `templates/discovery/product-journey-audit.md` in this repository, or retain
 
 Useful guides:
 
-- /docs/discovery/catalogs-and-feeds — discover real resources and validate advertised targets.
-- /docs/discovery/commercial-and-entity-discovery — authoritative decision facts, identity, and distribution.
-- /docs/agentic-ui/browser-agent-accessibility — browser semantics and untrusted content.
-- /docs/api-surface/retrieval-and-job-contracts — pagination, jobs, bulk operations, and partial errors.
-- /docs/authentication — authority and credential boundaries.
-- /docs/error-handling — safe recovery.
+- /docs/discovery/catalogs-and-feeds - discover real resources and validate advertised targets.
+- /docs/discovery/commercial-and-entity-discovery - authoritative decision facts, identity, and distribution.
+- /docs/agentic-ui/browser-agent-accessibility - browser semantics and untrusted content.
+- /docs/api-surface/retrieval-and-job-contracts - pagination, jobs, bulk operations, and partial errors.
+- /docs/authentication - authority and credential boundaries.
+- /docs/error-handling - safe recovery.

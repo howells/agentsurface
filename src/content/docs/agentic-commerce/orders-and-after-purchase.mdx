@@ -1,0 +1,45 @@
+---
+title: Orders and After Purchase
+description: Order status, cancellations, returns, and refunds as agent-callable operations after checkout completes
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+A successful payment is not the end of the task an agent was given - it needs to check the order actually shipped, cancel or change it if the buyer's plans changed, and handle a return or refund if the product was wrong. Most of the mechanics here are not commerce-specific: they are the same webhook, idempotency, and error-handling patterns used everywhere else in Agent Surface, applied to order state. This page is the commerce-specific index into that existing guidance rather than a restatement of it.
+
+- Order status, cancellation, and returns/refunds need to be callable operations, not just an emailed confirmation
+- Order webhooks are the push side; a `get_order`-style call is the pull side - provide both
+- Idempotent order creation prevents a retried checkout request from creating two orders
+- A payment succeeding and an order fulfilling are different facts - don't conflate them in the response an agent sees
+
+## Order status and cancellation as callable operations
+
+An agent that completed a purchase, or is checking on one made earlier, needs a stable way to ask "what is the status of this order" and get back a machine-parseable answer - not a link to a human-facing order-history page. Expose this as an API operation or MCP tool (Shopify's Customer Account MCP `get_order` tool is one concrete example - see [Shopify](/docs/agentic-commerce/shopify)) that returns the order's current lifecycle state, not just whether payment succeeded.
+
+Cancellation follows the same rule: if your checkout protocol supports structured cancellation (ACP's structured cancellation reason codes are one example - see [Checkout Protocols](/docs/agentic-commerce/checkout-protocols)), extend that same machine-readable reasoning to post-purchase cancellation rather than switching to a support-ticket flow the moment payment has cleared.
+
+## Order webhooks
+
+Push order-lifecycle events - `order.created`, `order.status_changed`, `order.shipped`, `order.cancelled`, `order.refunded`, and the equivalent payment events - rather than requiring an agent to poll. [Webhooks and Events for Agents](/docs/api-surface/webhooks-events) covers the full design: document webhooks in the OpenAPI `webhooks` field, give every event a discriminating `event_type` and unique `event_id`, include a full state snapshot rather than only a diff, and sign deliveries per the Standard Webhooks spec (`webhook-id`/`webhook-timestamp`/`webhook-signature`) so a receiver can verify a delivery without inventing bespoke verification. Everything in that page applies directly to order and payment events - this page does not repeat it.
+
+## Idempotent order creation
+
+A network failure between an agent submitting a checkout and receiving a response is exactly the case idempotency keys exist for: the agent cannot tell whether the order was created before the connection dropped, and retrying without protection risks a duplicate charge and a duplicate order. Require an `Idempotency-Key` on order-creating and order-mutating requests, and return the original response - not a new order - when the same key arrives twice. [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) covers how this composes with request-replay protection at the authentication layer; the full key-generation, storage, and TTL mechanics live on [Idempotency](/docs/error-handling/idempotency). Both checkout-session creation (see the ACP flow on [Checkout Protocols](/docs/agentic-commerce/checkout-protocols)) and any order-mutation endpoint you expose directly need this.
+
+## Receipts and distinguishing payment from fulfilment
+
+A successful payment is not necessarily successful fulfilment - a charge can clear while the item is out of stock, or a receipt can generate before a warehouse confirms the order. Return distinct, explicit states for "payment authorized," "payment captured," "order confirmed," and "order fulfilled" rather than collapsing them into one "success" response, and make sure whichever checkout protocol or webhook stream you use actually carries a receipt (an identifier, the charged amount, and a timestamp) an agent can hold and reconcile against later - [Evaluating Product Journeys](/docs/scoring/product-journeys) treats a receipt as proof of the payment stage only; the end-of-test check is the fulfilled order.
+
+## Returns and refunds
+
+Treat a return or refund request the same way as a purchase: it needs a callable operation with a defined contract (what the buyer needs to supply, what state the order must be in, what the response looks like), structured errors when it's not possible (return window expired, item not eligible, already refunded - see [RFC 9457 Problem Details](/docs/error-handling/rfc-9457)), and a webhook or pollable status once initiated. Publish the return policy itself as structured data too - `hasMerchantReturnPolicy` on the product's `Offer`, covered in [Product Data](/docs/agentic-commerce/product-data) - so an agent can check eligibility before it asks, not only after a refund is rejected.
+
+## Related Pages
+
+- [Agentic Commerce](/docs/agentic-commerce) - the five-layer overview
+- [Webhooks and Events for Agents](/docs/api-surface/webhooks-events) - full webhook design this page builds on
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) - idempotency keys at the authentication layer
+- [Idempotency](/docs/error-handling/idempotency) - the full key-generation and storage mechanics
+- [Error Handling](/docs/error-handling) - structured errors for return/refund failures
+- [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) - where order creation originates

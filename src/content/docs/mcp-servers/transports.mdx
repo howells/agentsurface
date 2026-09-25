@@ -1,21 +1,21 @@
 ---
 title: Transport Selection
 description: Choosing and configuring the right transport for your MCP server deployment
-lastVerified: 2026-08-27
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-The transport layer affects latency, deployment, scalability, and state management. Stdio is simplest (subprocess, no network), best for local development. Streamable HTTP enables distributed deployment and horizontal scaling; the older standalone HTTP+SSE transport has been deprecated since the `2025-03-26` revision. Critical rule: write logs to stderr only; stdout is reserved for MCP JSON-RPC frames. Choose transport early — rearchitecting for a different one is painful.
+The transport layer affects latency, deployment, scalability, and state management. Stdio is simplest (subprocess, no network), best for local development. Streamable HTTP enables distributed deployment and horizontal scaling; the older standalone HTTP+SSE transport has been deprecated since the `2025-03-26` revision. Write logs to stderr only; stdout is reserved for MCP JSON-RPC frames. Choose transport early - rearchitecting for a different one is painful.
 
 - Stdio: simplest, no network, logs to stderr
-- HTTP (Streamable HTTP): bidirectional, most scalable, the only supported remote transport
-- Standalone HTTP+SSE: deprecated since the `2025-03-26` revision — migration path only
-- Select early in design — transport affects lifecycle and state management
+- HTTP (Streamable HTTP): bidirectional, most scalable, the default remote transport
+- Standalone HTTP+SSE: deprecated since the `2025-03-26` revision - migration path only
+- Select early in design - transport affects lifecycle and state management
 - Always write logs to stderr, never stdout
 - Prefer stateless mode: `2026-07-28` removes sessions and the `Mcp-Session-Id` header entirely
 
-The transport layer determines how messages flow between the MCP client and your server. The choice affects latency, deployment model, horizontal scalability, and how you handle authentication. Getting it wrong early is painful to unwind — a server designed for stdio cannot be trivially converted to HTTP without rethinking connection lifecycle and state management.
+The transport layer determines how messages flow between the MCP client and your server. The choice affects latency, deployment model, horizontal scalability, and how you handle authentication. Getting it wrong early is painful to unwind - a server designed for stdio cannot be trivially converted to HTTP without rethinking connection lifecycle and state management.
 
 ## Stdio Transport
 
@@ -109,7 +109,7 @@ app.post("/mcp", async (req, res) => {
   if (sessionId && transports.has(sessionId)) {
     transport = transports.get(sessionId)!;
   } else {
-    // New session — create a fresh transport and server pair
+    // New session - create a fresh transport and server pair
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
       onsessioninitialized: (id) => {
@@ -165,7 +165,7 @@ app.listen(3000);
 
 ## Stateless Mode for Horizontal Scaling
 
-The stateful session map above does not scale horizontally — sessions created on one instance are not visible to another. For serverless deployments and horizontally scaled services, use stateless mode by setting `sessionIdGenerator: undefined`:
+The stateful session map above does not scale horizontally - sessions created on one instance are not visible to another. For serverless deployments and horizontally scaled services, use stateless mode by setting `sessionIdGenerator: undefined`:
 
 ```typescript
 const transport = new StreamableHTTPServerTransport({
@@ -173,9 +173,9 @@ const transport = new StreamableHTTPServerTransport({
 });
 ```
 
-In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process — and it is the model `2026-07-28` requires.
+In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process - and it is the model `2026-07-28` requires.
 
-For operations that require state across calls — maintaining context between tool invocations in a multi-turn conversation — store state externally in Redis or another shared store, keyed on an identifier the client provides. The example below reads it from a request header; under `2026-07-28` the same state is keyed on a server-minted handle the client passes back as an ordinary tool argument, which works on both revisions and does not depend on transport-level session tracking:
+For operations that require state across calls - maintaining context between tool invocations in a multi-turn conversation - store state externally in Redis or another shared store, keyed on an identifier the client provides. The example below reads it from a request header; under `2026-07-28` the same state is keyed on a server-minted handle the client passes back as an ordinary tool argument, which works on both revisions and does not depend on transport-level session tracking:
 
 ```typescript
 app.post("/mcp", async (req, res) => {
@@ -210,8 +210,6 @@ app.post("/mcp", async (req, res) => {
 
 The older HTTP+SSE transport (`/sse` for the stream, `/message` for posting) has been deprecated since the `2025-03-26` MCP specification revision, and is formally Deprecated under the feature lifecycle policy introduced in `2026-07-28`. Do not build new servers against it. Streamable HTTP supersedes it and supports SSE as an optional response mode when the server needs to stream a long-running tool result.
 
-If you have clients that only support the legacy SSE transport, you can run both side by side during a migration period, but plan to remove the SSE-only endpoint.
-
 ## Transport Decision Guide
 
 ```
@@ -234,7 +232,7 @@ Vercel's serverless platform requires specific configuration for MCP servers due
 
 ```typescript
 // app/mcp/route.ts
-import { createMcpHandler } from "@vercel/mcp-adapter";
+import { createMcpHandler } from "mcp-handler";
 import { createServer } from "@/lib/billing-mcp/server";
 
 const handler = createMcpHandler(
@@ -247,31 +245,22 @@ const handler = createMcpHandler(
   },
 );
 
-export const maxDuration = 60; // seconds — requires Vercel Pro or higher
+export const maxDuration = 300; // seconds - the Hobby default and maximum under Fluid Compute
 
 export { handler as GET, handler as POST, handler as DELETE };
 ```
 
-**Enable Fluid Compute** on your Vercel project to allow concurrent streaming requests on the same function instance. Without Fluid Compute, a function handling an SSE stream blocks other requests. Configure it in your `vercel.json`:
-
-```json
-{
-  "functions": {
-    "app/mcp/route.ts": {
-      "maxDuration": 60,
-      "fluid": true
-    }
-  }
-}
-```
+Vercel Functions run on Fluid Compute by default, which lets one function instance serve concurrent requests instead of blocking on a single SSE stream. You do not need to opt in.
 
 <Callout type="info">
-  `maxDuration` of 60 seconds requires a Pro plan. On the Hobby plan, the limit is 10 seconds. For
-  tools with long-running operations (file processing, external API calls), either upgrade the plan
-  or use a streaming response to heartbeat the connection while work proceeds.
+  Duration defaults and maximums under Fluid Compute: Hobby gets 300 seconds (5 minutes), both
+  default and maximum. Pro and Enterprise default to 300 seconds with an 800-second maximum, and can
+  request up to 1800 seconds (30 minutes) through the extended-duration beta. For tools with
+  long-running operations (file processing, external API calls), set `maxDuration` explicitly or use
+  a streaming response to heartbeat the connection while work proceeds.
 </Callout>
 
-**The `mcp-handler` package** (`@vercel/mcp-adapter`) handles transport setup, session management, and the GET/POST/DELETE routing automatically. The `basePath` option tells the adapter which path prefix to strip when constructing client-facing URLs.
+**The `mcp-handler` package** handles transport setup, session management, and the GET/POST/DELETE routing automatically. The `basePath` option tells the adapter which path prefix to strip when constructing client-facing URLs.
 
 ## Using mcp-handler with Dynamic Transport Selection
 
@@ -295,7 +284,7 @@ if (process.env.PORT) {
 }
 ```
 
-This pattern avoids bundling HTTP server dependencies into the stdio binary and vice versa — each transport path imports its dependencies lazily.
+This pattern avoids bundling HTTP server dependencies into the stdio binary and vice versa - each transport path imports its dependencies lazily.
 
 <Callout type="warn">
   Never use the same `McpServer` instance across multiple transport connections. The server

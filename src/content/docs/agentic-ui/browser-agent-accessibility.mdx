@@ -1,12 +1,12 @@
 ---
 title: Browser Agent Accessibility
 description: Verify semantics, names, forms, and untrusted content in the browser accessibility tree
-lastVerified: 2026-09-10
+lastVerified: 2026-09-25
 ---
 
 Browser agents often locate controls through roles and accessible names. Build an interface that supports people using assistive technology and verify that the same task is legible to browser automation. An automated accessibility or readiness score is not proof of WCAG conformance or task success.
 
-## Structure and controls
+## Structure and Controls
 
 Use meaningful landmarks and heading hierarchy. Prefer native links, buttons, and form controls with visible labels. Give icon-only controls an accurate accessible name, associate labels with inputs, and expose validation and state changes. Placeholder text is not a durable label. Check the computed name in the browser because ARIA can override visible text. [W3C naming guidance](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/).
 
@@ -22,13 +22,24 @@ Verify keyboard focus, submission, empty results, and errors in the actual page.
 
 Give every informative image an accurate `alt` description of its content or purpose, and mark purely decorative images with `alt=""` so assistive technology and browser agents skip them instead of reading a filename or a redundant caption.
 
-## Lighthouse's Agent Accessibility Audit
+## Lighthouse's Agentic Browsing Category
 
 Chrome Lighthouse's Agentic Browsing category runs an `agent-accessibility-tree` audit that checks a fixed subset of axe-core rules against the page's accessibility tree, not the full axe rule set. The targeted rules, from [`TARGET_RULES` in `core/audits/agentic/agent-accessibility-tree.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/audits/agentic/agent-accessibility-tree.js):
 
 `button-name`, `input-button-name`, `input-image-alt`, `label`, `link-name`, `select-name`, `document-title`, `aria-allowed-attr`, `aria-allowed-role`, `aria-command-name`, `aria-conditional-attr`, `aria-dialog-name`, `aria-hidden-body`, `aria-hidden-focus`, `aria-input-field-name`, `aria-prohibited-attr`, `aria-required-attr`, `aria-required-children`, `aria-required-parent`, `aria-roles`, `aria-text`, `aria-toggle-field-name`, `aria-tooltip-name`, `aria-treeitem-name`, `aria-valid-attr`, `aria-valid-attr-value`, `duplicate-id-aria`, `definition-list`, `table-duplicate-name`, `tabindex`, `autocomplete-valid`, `presentation-role-conflict`, `svg-img-alt`.
 
-These are mostly naming and ARIA-validity rules: every control needs a computed accessible name, every ARIA attribute needs to be allowed on its role and valid in value, and structural roles need their required parents and children. Run Lighthouse's Agentic Browsing category and treat a failure here as a defect in the accessibility tree an agent reads, not only in the visual page.
+These are mostly naming and ARIA-validity rules: every control needs a computed accessible name, every ARIA attribute needs to be allowed on its role and valid in value, and structural roles need their required parents and children. Run Lighthouse's Agentic Browsing category and treat a failure here as a defect in the accessibility tree an agent reads as much as in the visual page.
+
+Run this category locally, against your own build, before shipping - it needs Chrome 150 or later, and the WebMCP-specific audits additionally need you to be registered for the [WebMCP origin trial](/docs/protocols/webmcp). See [Lighthouse's scoring docs](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) for the current audit set.
+
+## Local Tools for Seeing What an Agent Sees
+
+Two browser-vendor tools let you inspect a page the way a browsing agent does, from your own machine, without shipping anything:
+
+- **Safari's built-in MCP server** (Safari 27, 2026-09-17) runs entirely locally and makes no network calls of its own. It gives a coding agent the DOM, network requests, screenshots, and console output for a page, so an agent can check how markup renders, verify form and checkout state, compare computed styles against other browsers, flag accessibility issues (missing labels, bad ARIA, poor contrast), and read navigation-timing and resource-load performance. It has no access to personal data stored in Safari. See the [WebKit Safari 27 announcement](https://webkit.org/blog/18325/webkit-features-for-safari-27-0/).
+- **Chrome DevTools MCP** added an Agent Plugins 1.0 package (2026-09-22) so agents can load modular plugin extensions, a `--no-javascript-evaluation` flag that inspects a page with script execution disabled, a `query_heapsnapshot` tool for inspecting retained objects by size or property name, and dedicated tools for automating PWA install and lifecycle checks. See the [Chrome DevTools changelog](https://developer.chrome.com/blog/new-in-devtools-october-2026).
+
+A [proposed W3C Agent Conformance and Benchmarking Community Group](https://www.w3.org/community/blog/2026/08/25/proposed-group-agent-conformance-and-benchmarking-community-group/) (2026-08-25) aims to standardize how conformance to agent-facing specs like this one is measured and reported - weighted rubrics with observable evidence, runnable conformance suites, and versioned benchmark corpora. It is a proposal with no output yet; watch it rather than build against it.
 
 ## Layout Stability
 
@@ -38,19 +49,17 @@ Lighthouse includes Cumulative Layout Shift (CLS) in its agentic scoring because
 - Avoid inserting new content, banners, or promotions above content that is already on screen; append below instead.
 - Animate with `transform` (`scale`, `translate`) rather than properties that change layout, such as `width`, `height`, or `top`.
 
-A page that scores well on CLS for human visitors is also the page where an agent's click lands on the control it read, not on whatever moved into that spot.
-
 ## Content Without Client-Side JavaScript
 
-Many browser agents and AI crawlers fetch a page's raw HTML and do not execute JavaScript. Vercel's analysis of crawler traffic with MERJ found that OpenAI's crawlers (GPTBot, ChatGPT-User, OAI-SearchBot) and Anthropic's ClaudeBot fetch pages but do not render JavaScript, even when they download the JavaScript files a page links: [The rise of the AI crawler](https://vercel.com/blog/the-rise-of-the-ai-crawler). Key content, primary navigation links, and forms a task depends on should exist in the server-rendered HTML response, not only after client-side hydration. Treat this the same way you would treat search-engine crawlability: what the initial HTML response contains is what a non-rendering agent or crawler can act on.
+Many browser agents and AI crawlers fetch a page's raw HTML and do not execute JavaScript. Vercel's analysis of crawler traffic with MERJ found that OpenAI's crawlers (GPTBot, ChatGPT-User, OAI-SearchBot) and Anthropic's ClaudeBot fetch pages but do not render JavaScript, even when they download the JavaScript files a page links: [The rise of the AI crawler](https://vercel.com/blog/the-rise-of-the-ai-crawler). Key content, primary navigation links, and forms a task depends on should exist in the server-rendered HTML response rather than depending on client-side hydration. Treat this the same way you would treat search-engine crawlability: what the initial HTML response contains is what a non-rendering agent or crawler can act on.
 
-## Accessibility-tree injection
+## Accessibility-Tree Injection
 
 Treat text from reviews, product descriptions, remote widgets, tool results, alt text, and accessible descriptions as untrusted data. Do not interpolate third-party instructions into first-party control labels or system-level agent guidance. Escape markup, constrain allowed attributes, and retain source boundaries.
 
-Inspection should compare rendered content with the accessibility snapshot. Look for irrelevant instructions, impersonated system messages, and content that asks an agent to leave the user's task. Legitimate off-screen labels and screen-reader help must remain; hiding all nonvisual content would damage accessibility. Detection is an additional signal, not a guarantee that prompt injection is impossible. Authorization belongs at the action boundary even if the page looks safe.
+Inspection should compare rendered content with the accessibility snapshot. Look for irrelevant instructions, impersonated system messages, and content that asks an agent to leave the user's task. Legitimate off-screen labels and screen-reader help must remain; hiding all nonvisual content would damage accessibility. Detection is an additional signal only. Authorization belongs at the action boundary even if the page looks safe.
 
-## Evidence for a real journey
+## Evidence for a Real Journey
 
 Save the route and viewport, meaningful roles and names, keyboard sequence, action result, and any console or network failures. For a purchase or destructive action, verify the review and confirmation step without executing an unauthorized transaction. A passing DOM scan cannot establish that search, cart, or checkout works.
 

@@ -1,7 +1,7 @@
 ---
 title: Server Architecture
-description: Structuring MCP servers for testability, maintainability, and production reliability
-lastVerified: 2026-08-27
+description: Structuring MCP servers for testability, maintainability, production reliability, and public distribution
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -38,7 +38,7 @@ my-mcp/
 ├── apps/
 │   ├── billing-mcp/
 │   │   ├── src/
-│   │   │   ├── server.ts        # createServer() factory — the main export
+│   │   │   ├── server.ts        # createServer() factory - the main export
 │   │   │   ├── cli.ts           # Entry point for subprocess/stdio mode
 │   │   │   ├── tools/
 │   │   │   │   ├── create-invoice.ts
@@ -58,11 +58,11 @@ my-mcp/
     └── shared-zod/              # Common Zod schemas
 ```
 
-Each `apps/` directory is an independently deployable server. The `packages/` directory holds code that multiple servers share — authentication helpers, common Zod schemas, shared TypeScript types.
+Each `apps/` directory is an independently deployable server. The `packages/` directory holds code that multiple servers share - authentication helpers, common Zod schemas, shared TypeScript types.
 
 ## The createServer() Factory Pattern
 
-The single most important architectural decision is separating server construction from server startup. The `createServer()` factory creates and configures the server but does not connect it to any transport. The `cli.ts` entry point calls `createServer()` and then connects it to a transport.
+Separate server construction from server startup. The `createServer()` factory creates and configures the server but does not connect it to any transport. The `cli.ts` entry point calls `createServer()` and then connects it to a transport.
 
 ```typescript
 // src/server.ts
@@ -148,7 +148,7 @@ const CreateInvoiceSchema = z.object({
 export function registerCreateInvoice(server: McpServer, config: ServerConfig): void {
   server.tool(
     "billing_create_invoice",
-    "Creates a new invoice for a customer. Use when the user wants to charge a customer or bill for services. Requires a valid customer ID — call billing_list_customers first if you only have a customer name.",
+    "Creates a new invoice for a customer. Use when the user wants to charge a customer or bill for services. Requires a valid customer ID - call billing_list_customers first if you only have a customer name.",
     CreateInvoiceSchema,
     async (params) => {
       // implementation
@@ -161,7 +161,7 @@ Each registration function is pure: given a server and config, it registers exac
 
 ## Defense in Depth
 
-Production MCP servers need multiple overlapping protection layers. A single validation check at the boundary is not enough — each layer catches different failure modes.
+Production MCP servers need multiple overlapping protection layers. A single validation check at the boundary is not enough - each layer catches different failure modes.
 
 ```
 ┌─────────────────────────────────────┐
@@ -191,7 +191,7 @@ Production MCP servers need multiple overlapping protection layers. A single val
 └─────────────────────────────────────┘
 ```
 
-Each layer should fail closed. If authentication cannot be verified, the request is rejected — not allowed through with reduced permissions. If schema validation fails, the tool returns an `isError: true` response with a recovery-oriented message, rather than attempting to proceed with partial data.
+Each layer should fail closed. If authentication cannot be verified, the request is rejected - not allowed through with reduced permissions. If schema validation fails, the tool returns an `isError: true` response with a recovery-oriented message, rather than attempting to proceed with partial data.
 
 ## Build Tooling with tsdown
 
@@ -229,7 +229,7 @@ export default defineConfig({
 });
 ```
 
-Marking `@modelcontextprotocol/sdk` as external prevents it from being bundled into your output — consumers install it as a peer dependency. The `dts: true` option generates type declarations, which allows other servers to import and re-use your `ServerConfig` type.
+Marking `@modelcontextprotocol/sdk` as external prevents it from being bundled into your output - consumers install it as a peer dependency. The `dts: true` option generates type declarations, which allows other servers to import and re-use your `ServerConfig` type.
 
 ## Capability Declaration
 
@@ -272,7 +272,7 @@ Declaring `resources.subscribe: true` without implementing the `resources/subscr
 
 ## Environment Variable Conventions
 
-MCP servers launched as subprocesses inherit the parent process's environment. Servers deployed as HTTP services read from the deployment environment. In both cases, environment variables are the correct configuration mechanism — never configuration files bundled into the binary.
+MCP servers launched as subprocesses inherit the parent process's environment. Servers deployed as HTTP services read from the deployment environment. In both cases, environment variables are the correct configuration mechanism - never configuration files bundled into the binary.
 
 ```typescript
 // A robust config loader with validation
@@ -297,3 +297,21 @@ function loadConfig(): ServerConfig {
 ```
 
 Throwing on startup with a clear error message is always better than proceeding with `undefined` values and producing cryptic errors later during tool execution.
+
+## Publishing a Server Publicly
+
+A server built to power your own in-app agent can also become a distribution channel: the same tool registrations, served over Streamable HTTP on a stable public URL, let external clients (Claude, ChatGPT, an IDE) use your product's capabilities directly. The architecture does not change - you still build with the `createServer()` factory and register tools the same way - but three things become mandatory once the server is public rather than internal:
+
+1. **Streamable HTTP, not stdio.** External clients cannot launch your process as a subprocess. See [Transport Selection](./transports) for the stateless HTTP setup.
+2. **OAuth 2.1, not a shared bearer token.** A public server cannot distribute a static secret to every user. See [MCP Authentication](./authentication) for the full server-implementer flow, including the resource-indicator and protected-resource-metadata requirements RFC 8707 and RFC 9728 impose.
+3. **Discovery metadata clients can find.** Publish `/.well-known/oauth-protected-resource` (RFC 9728) so clients can locate your authorization server - this is the MUST-level discovery mechanism in the current spec. An informal `/.well-known/mcp/server-card.json` document is under active proposal (SEP-2127, Server Card Working Group) but is still Experimental and not part of the ratified spec; do not build a public launch around it yet.
+
+Register only the tools a given caller is authorized to use - Stripe's `configuration.actions` pattern in [Real-World MCP Patterns](./real-world-examples) is the reference example, and the same scope-gated registration applies whether the caller is your own frontend or an external MCP client.
+
+To be discoverable beyond your own docs, publish an entry to the official [MCP Registry](https://registry.modelcontextprotocol.io) (namespace verified via GitHub OAuth or a DNS TXT record) and document connection setup for the clients you expect - a `claude_desktop_config.json` snippet for stdio-style local config, and your server's public URL for clients that add remote MCP servers directly. The registry added Cargo (crates.io) as a package registry type in [v1.8.0](https://github.com/modelcontextprotocol/registry/releases) (2026-07-13), alongside npm, PyPI, NuGet, and OCI; v1.8.1 (2026-08-06) closed a namespace-takeover hole by rejecting `github.io` domains during DNS/HTTP token-exchange verification. The registry itself is still a preview release - expect breaking changes and possible data resets before a stable release. Track external usage (rate limits, per-caller quotas) the same way you would any public API; nothing about that is MCP-specific.
+
+## Related
+
+- [Transport Selection](./transports) - stdio vs. Streamable HTTP and stateless mode
+- [MCP Authentication](./authentication) - OAuth 2.1, PKCE, and token validation for public servers
+- [Real-World MCP Patterns](./real-world-examples) - scope-gated tool registration and hosted-server patterns from GitHub, Stripe, and Vercel

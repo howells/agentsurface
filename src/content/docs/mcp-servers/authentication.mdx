@@ -1,12 +1,12 @@
 ---
 title: MCP Authentication
 description: Securing MCP servers with bearer tokens, identity proxies, and OAuth 2.1
-lastVerified: 2026-08-27
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers, from the `2025-11-25` revision onward. Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
+MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers, a requirement in place since the `2025-03-26` revision introduced MCP's authorization framework. Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
 
 ```
 Use Case              Approach
@@ -23,7 +23,7 @@ Public servers        OAuth 2.1
 - Never expose tokens in logs or responses
 - Use HTTPS for all network transports
 
-An unauthenticated MCP server is an unauthenticated API. Any tool it exposes — including destructive ones — is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
+An unauthenticated MCP server is an unauthenticated API. Any tool it exposes - including destructive ones - is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
 
 The current `2026-07-28` MCP specification requires OAuth 2.1 for publicly accessible protected servers and hardens the predecessor model. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
 
@@ -82,6 +82,14 @@ Content-Type: application/json
 
 **When to use bearer tokens:** internal tools, developer workstations, CI pipelines, single-tenant servers where the operator controls both ends of the connection.
 
+<Callout type="info">
+  STDIO transport **SHOULD NOT** follow the OAuth authorization flow at all - the MCP `2026-07-28`
+  specification says implementations using STDIO should instead retrieve credentials from the
+  environment, which is exactly the bearer-token-via-env-var pattern above. Reach for OAuth 2.1 only
+  once a server is reachable over an HTTP-based transport. Source:
+  https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
+</Callout>
+
 ## Approach 2: Identity Proxy
 
 An identity proxy sits in front of your MCP server and handles authentication on its behalf. The proxy validates the incoming credentials (OAuth token, API key, session cookie) and forwards requests to your server with a trusted identity header:
@@ -95,7 +103,7 @@ An identity proxy sits in front of your MCP server and handles authentication on
 Your MCP server trusts the proxy and reads identity from the forwarded header. It never handles token validation itself.
 
 ```typescript
-// In your MCP server — trust the proxy's identity assertion
+// In your MCP server - trust the proxy's identity assertion
 app.post("/mcp", (req, res, next) => {
   const userId = req.headers["x-user-id"];
   const userScopes = req.headers["x-user-scopes"];
@@ -121,9 +129,9 @@ app.post("/mcp", (req, res, next) => {
 
 ## Approach 3: OAuth 2.1 with PKCE
 
-OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers as of the `2025-11-25` MCP specification. It is the only authentication method that supports delegated authorization — where an agent acts on behalf of a user without the user handing over their credentials.
+OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers, a requirement in place since the `2025-03-26` revision introduced MCP's authorization framework. It is the only authentication method that supports delegated authorization - where an agent acts on behalf of a user without the user handing over their credentials.
 
-The protocol-level model — protected-resource metadata discovery, authorization-server discovery, client registration options, and token audience binding — lives in [MCP Authorization](/docs/authentication/mcp-auth-model). This section is the server-implementer view: the endpoints you expose, PKCE, token validation, scope enforcement, and the on-behalf-of flow. Read the canonical page first if you need the full OAuth 2.1 discovery and registration flow; use this page to implement it.
+The protocol-level model - protected-resource metadata discovery, authorization-server discovery, client registration options, and token audience binding - lives in [MCP Authorization](/docs/authentication/mcp-auth-model). This section is the server-implementer view: the endpoints you expose, PKCE, token validation, scope enforcement, and the on-behalf-of flow. Read the canonical page first if you need the full OAuth 2.1 discovery and registration flow; use this page to implement it.
 
 <Callout type="info">
   Current `2026-07-28` behavior: clients must validate the authorization response's `iss` parameter
@@ -131,16 +139,26 @@ The protocol-level model — protected-resource metadata discovery, authorizatio
   authorization server that issued them and re-registering when an issuer changes (SEP-2352). RFC
   7591 dynamic client registration is Deprecated in favor of Client ID Metadata Documents, and where
   you still accept DCR the `application_type` field becomes required (SEP-837). The server-side work
-  on this page is unaffected — you validate a bearer token per request either way, which is exactly
+  on this page is unaffected - you validate a bearer token per request either way, which is exactly
   what the stateless core assumes now that sessions are gone. See [MCP
   Authorization](/docs/authentication/mcp-auth-model) for the full list.
+</Callout>
+
+<Callout type="warn">
+  MCP clients **MUST** implement Resource Indicators for OAuth 2.0 (RFC 8707): the `resource`
+  parameter identifying your server's canonical URI (for example `https://billing-mcp.example.com`)
+  is required in **both** the authorization request and the token request, not only reflected back
+  in the `aud` claim you validate below. A client that omits it is spec-non-conformant; a server
+  cannot add the parameter on the client's behalf, but audience validation on the token you receive
+  is how you catch a client that skipped it. Source:
+  https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
 </Callout>
 
 ### Required .well-known Endpoints
 
 Your server must expose two discovery endpoints so clients can discover your authorization server (the [MCP Authorization](/docs/authentication/mcp-auth-model) and [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) pages cover the discovery protocol and full field set):
 
-**`GET /.well-known/oauth-protected-resource`** — declares that this resource requires OAuth and points to the authorization server:
+**`GET /.well-known/oauth-protected-resource`** - declares that this resource requires OAuth and points to the authorization server:
 
 ```json
 {
@@ -151,7 +169,7 @@ Your server must expose two discovery endpoints so clients can discover your aut
 }
 ```
 
-**`GET /.well-known/oauth-authorization-server`** — describes the authorization server's capabilities (if you are running your own):
+**`GET /.well-known/oauth-authorization-server`** - describes the authorization server's capabilities (if you are running your own):
 
 ```json
 {
@@ -172,7 +190,7 @@ PKCE (Proof Key for Code Exchange) prevents authorization code interception. The
 **S256 only.** The `plain` method is insecure and must not be used.
 
 ```typescript
-// Client-side PKCE generation (for reference — this runs in the MCP client)
+// Client-side PKCE generation (for reference - this runs in the MCP client)
 import { createHash, randomBytes } from "node:crypto";
 
 function generatePKCE() {
@@ -193,7 +211,10 @@ authUrl.searchParams.set("scope", "billing:read billing:write");
 authUrl.searchParams.set("code_challenge", codeChallenge);
 authUrl.searchParams.set("code_challenge_method", "S256");
 authUrl.searchParams.set("state", randomBytes(16).toString("hex")); // CSRF protection
+authUrl.searchParams.set("resource", "https://billing-mcp.example.com"); // RFC 8707 - required
 ```
+
+The client repeats the same `resource` parameter in the token request that exchanges the code for an access token. Omitting it on either request is a protocol violation, not an optional hardening step.
 
 ### JWT Validation
 
@@ -297,15 +318,15 @@ async function getDownstreamToken(userToken: string, targetAudience: string): Pr
 }
 ```
 
-This preserves the audit trail — the downstream API sees that the request is `on_behalf_of` the original user, rather than only your service identity.
+This preserves the audit trail - the downstream API sees that the request is `on_behalf_of` the original user, rather than only your service identity.
 
-## Using experimental_withMcpAuth
+## Using withMcpAuth
 
-The `@vercel/mcp-adapter` package provides an `experimental_withMcpAuth` wrapper that integrates OAuth validation directly into the Vercel route handler:
+The `mcp-handler` package provides a `withMcpAuth` wrapper that integrates OAuth validation directly into the Vercel route handler:
 
 ```typescript
 // app/mcp/route.ts
-import { createMcpHandler, experimental_withMcpAuth } from "@vercel/mcp-adapter";
+import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { createServer } from "@/lib/billing-mcp/server";
 
 const mcpHandler = createMcpHandler((req) =>
@@ -323,12 +344,12 @@ async function validateAuth(token: string) {
   return result; // { userId, scopes }
 }
 
-export const { GET, POST, DELETE } = experimental_withMcpAuth(mcpHandler, validateAuth);
+export const { GET, POST, DELETE } = withMcpAuth(mcpHandler, validateAuth);
 
 export const maxDuration = 60;
 ```
 
-## 5 Critical Security Mistakes
+## Five Security Mistakes
 
 **1. Token passthrough without validation.** Forwarding the client's token directly to downstream services without validating it first. Always validate signature, issuer, audience, and expiry before trusting a token.
 
@@ -338,7 +359,7 @@ export const maxDuration = 60;
 
 **4. Missing CSRF protection on the callback.** The `state` parameter in OAuth prevents CSRF attacks on the authorization flow. Verify that the `state` returned in the callback matches the `state` you sent. If it does not match, reject the response.
 
-**5. Storing tokens in plaintext.** Access tokens and refresh tokens stored in plaintext in a database or log file are a breach waiting to happen. Encrypt tokens at rest. Never log token values, even in debug output.
+**5. Storing tokens in plaintext.** Access tokens and refresh tokens stored in plaintext in a database or log file are readable by anyone with database or log access. Encrypt tokens at rest. Never log token values, even in debug output.
 
 ```typescript
 // WRONG: logging token values
@@ -350,13 +371,13 @@ console.error(`Received token: iss=${payload.iss} sub=${payload.sub} exp=${paylo
 
 <Callout type="warn">
   HTTPS is required for all OAuth flows. The `code_challenge` mechanism of PKCE protects the
-  authorization code in transit, but the access token itself is a bearer credential — anyone who
+  authorization code in transit, but the access token itself is a bearer credential - anyone who
   intercepts it can use it. Never run an OAuth-authenticated MCP server over plain HTTP in
   production.
 </Callout>
 
 ## Related
 
-- [MCP Authorization](/docs/authentication/mcp-auth-model) — canonical protocol flow: protected-resource metadata, authorization-server discovery, client registration, and token audience binding
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — the `/.well-known/oauth-protected-resource` document your server publishes
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — the underlying grant flow
+- [MCP Authorization](/docs/authentication/mcp-auth-model) - canonical protocol flow: protected-resource metadata, authorization-server discovery, client registration, and token audience binding
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) - the `/.well-known/oauth-protected-resource` document your server publishes
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - the underlying grant flow

@@ -1,0 +1,94 @@
+---
+title: Durable Execution
+description: "Running non-deterministic agent loops inside durable workflow engines: model calls as replay-safe steps, checkpointing partial state, suspend/resume for approvals, and mid-run steering."
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+An agent loop is non-deterministic: the same input produces different model output, tool results vary, and the step count is not known in advance. A durable workflow engine assumes the opposite - that replaying recorded history reproduces the same code path exactly. Wrap an agent loop naively in a workflow and the first replay after a crash diverges from history and the run fails.
+
+Durable execution reconciles the two: model calls and tool invocations run as recorded steps whose results are memoized, so replay reads decisions from history instead of re-rolling them.
+
+- **Non-determinism lives in steps** - every model call and tool call is a recorded, memoized unit.
+- **Partial agent state is checkpointed** - conversation, tool results, and loop position survive a restart.
+- **Long pauses are first-class** - suspend for hours-long human approval without holding a process open.
+- **Runs can be steered mid-flight** - new instructions inject into a running loop through workflow events.
+- **History is the debugger** - replay reconstructs exactly what the agent saw and did.
+
+## When An Agent Needs This
+
+Reach for a durable workflow engine, not a plain background job, when the run outlives a single request, must survive restarts and deploys without losing progress, pauses for human approval measured in hours, fans out to sub-agents or tools that retry independently, or needs an exact replayable record for audit.
+
+A plain background job is enough when the run is short, idempotent, and safe to restart from the beginning - see [Background Agents](/docs/agents/background-agents). Decision rule: if losing an in-flight run means re-paying for completed model calls or re-running irreversible side effects, the loop belongs in durable execution.
+
+## Context Durability Versus Execution Durability
+
+Durable execution keeps the _run_ alive across crashes. A long run has a second, independent problem: the _context_ outgrows the model's window. Model platforms now address that server-side - OpenAI's compaction on the Responses API, Anthropic's beta compaction API - so a long loop stays coherent without the app resending or re-summarizing the transcript. See [Platforms](/docs/agents/platforms).
+
+Treat the two as complements. Platform compaction does nothing for lost processes or hours-long approvals; a recorded workflow history does nothing for a context window that no longer fits. Neither is an audit record - compaction is lossy by design, so the log of what the agent actually did belongs in your own recorded steps or checkpoints.
+
+## Implementation Shape
+
+The mechanics are the same across engines; only the primitives are named differently.
+
+```ts
+// Vendor-neutral shape: the loop is deterministic; the calls are recorded.
+async function agentRun(ctx, input) {
+  let state = ctx.restoreOrInit(input); // checkpointed partial state
+  while (!state.done && state.steps < MAX_STEPS) {
+    const decision = await ctx.step("model", () => callModel(state.messages));
+    if (decision.toolCall) {
+      const result = await ctx.step(`tool:${decision.toolCall.name}`, () =>
+        runTool(decision.toolCall),
+      );
+      state = ctx.checkpoint(applyToolResult(state, result));
+    } else {
+      state = ctx.checkpoint(applyFinal(state, decision));
+    }
+  }
+  return state.output;
+}
+```
+
+- **Bridge mismatched step schemas explicitly** - when one step's output shape doesn't match the next step's input, add a transform/map stage between them rather than letting the incompatible shapes collide at runtime with an opaque parse error.
+- **Checkpoint partial state** - conversation, accumulated tool results, and loop position, so a crash resumes mid-run.
+- **Suspend and resume for approvals** - a step needing a human decision suspends and releases its worker; an external event resumes it hours later. Approval semantics (declare, persist, resume) are covered in [Human Approval](/docs/tool-design/human-approval).
+- **Signal liveness for long calls** - a multi-minute tool call must periodically signal progress so the engine does not declare it dead and retry it (Temporal calls these activity heartbeats).
+- **Inject signals mid-run** - steering (new instructions, a cancel, a priority change) arrives as an event the loop drains between steps.
+- **Replay as time-travel debugging** - because history records every input the agent saw, a failed run can be replayed step by step against current code.
+
+## Compensation For Side-Effecting Steps
+
+A workflow with external side effects - payment, inventory, a sent notification - cannot simply retry from the top on failure; a step already committed a real-world change. Register a compensating action before each side-effecting step runs, and on failure run the compensations in reverse order (LIFO) so the workflow unwinds what it already did. Compensations must themselves be idempotent, since a crash can interrupt the compensation run too and force it to replay.
+
+## Standing Objectives
+
+Durable execution keeps a _run_ alive. A standing objective keeps a _goal_ alive, and it is a separate primitive: a durable, thread-scoped instruction the agent keeps working toward across loop iterations, evaluated after each iteration by a judge, bounded by a run budget, and re-read at the top of every turn.
+
+A workflow run completes; a task is dispatched and closed; an objective outlives any single run - the agent finishes a run, the objective is still open, and the next wake-up resumes where the judge left it. Three parts make it work: a **judge** (model or scorer) that returns satisfied/not-satisfied after each iteration, a **run budget** that pauses rather than fails the objective on exhaustion, and **completion criteria the judge can actually check** ("only mark complete when tests pass," not "make the code good"). Pair an objective with durable execution for open-ended work - monitor this repository until the release is green - rather than a single bounded run.
+
+## Engine Anchors
+
+Each engine solves the same problem with its own primitives.
+
+- **Temporal** - activities are the recorded, memoized unit; Signals inject mid-run input; Queries read live state; heartbeats keep long activities alive. Standalone Activities reached GA in v1.32.0 (2026-09-11): a single durable step records without authoring a full workflow around it, with delayed starts and operator APIs for pausing, resuming, and batch-managing them - convenient for wrapping one expensive model call.
+- **Inngest** - `step.run()` memoizes each step's result; replay skips completed steps and resumes at the first incomplete one; `step.waitForEvent()` suspends for approvals or steering.
+- **Cloudflare Workflows** - steps are durable and retried independently; an instance can sleep or wait for an event across restarts, running close to the model at the edge.
+- **AWS (LangGraph + DynamoDB)** - the framework-native pattern: LangGraph drives the graph, a DynamoDB checkpointer persists state after each node, and the run resumes from the last checkpoint.
+
+Frameworks also layer durable execution over an agent loop directly, built on step-memoization primitives like Inngest's, as one convenient default rather than the only shape.
+
+## Failure Modes
+
+- **Non-replay-safe side effects in workflow code** - a wall-clock read, a random value, or a direct network call in the deterministic loop body diverges on replay. Move every such call into a recorded step.
+- **Unbounded history growth** - hundreds of steps bloat workflow history until replay is slow or the engine rejects it. Cap steps, summarize and continue-as-new, or offload large payloads to storage and record references.
+- **Checkpoint staleness against long tool calls** - a tool running for minutes while the checkpoint reflects pre-call state loses that progress on a crash. Checkpoint before starting irreversible work and make the tool itself idempotent.
+- **An objective the judge can never pass** - unfalsifiable completion criteria burn the entire run budget every time. Write criteria a judge can verify from the conversation.
+- **Signal races** - a steer signal arriving between a model call and its tool execution can be read too late or applied to a stale decision. Define exactly where signals are drained, and make injected instructions idempotent against double-delivery.
+
+## Related
+
+- [Frameworks](/docs/agents/frameworks)
+- [Background Agents](/docs/agents/background-agents)
+- [Human Approval](/docs/tool-design/human-approval)

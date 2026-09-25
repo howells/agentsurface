@@ -1,11 +1,12 @@
 ---
 title: Metrics for Agent Evaluation
 description: Defining pass@k, tool-routing accuracy, schema conformance, and other quantitative measures
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Quantitative measures that bridge "the agent works" and "the agent reliably solves production tasks." Covers pass@k (at least one of k trials succeeds) and pass^k (all k trials succeed) for non-determinism, tool-routing accuracy (F1 score), schema conformance (does output match spec), trajectory correctness (did agent take the right steps), and latency metrics. Core insight: agent metrics capture multi-step execution and failure modes invisible to unit tests.
+Quantitative measures that bridge "the agent works" and "the agent reliably solves production tasks." Covers pass@k (at least one of k trials succeeds) and pass^k (all k trials succeed) for non-determinism, tool-routing accuracy (F1 score), schema conformance (does output match spec), trajectory correctness (did agent take the right steps), and latency metrics. Agent metrics capture multi-step execution and failure modes invisible to unit tests.
 
 - **pass@k**: At least one of k attempts succeeds (capability)
 - **pass^k**: All k attempts succeed (consistency/reliability)
@@ -17,7 +18,7 @@ Quantitative measures that bridge "the agent works" and "the agent reliably solv
 
 ---
 
-Agent metrics bridge the gap between "the agent works" and "the agent reliably solves production tasks." Unlike LLM benchmarks that measure a single forward pass, agent metrics capture multi-step execution, non-determinism, and failure modes that are invisible to unit tests.
+Agent metrics bridge the gap between "the agent works" and "the agent reliably solves production tasks," capturing multi-step execution, non-determinism, and failure modes invisible to unit tests. See [Why Agent Evals Differ from LLM Evals](/docs/testing/evaluation-framework#why-agent-evals-differ-from-llm-evals) for the fuller comparison against single-turn LLM benchmarks.
 
 ## Core metrics
 
@@ -50,7 +51,7 @@ for (let k = 1; k <= 10; k++) {
 // pass@10: 1 (at least one of all 10 succeeded)
 ```
 
-**pass^k** (pass-caret-k) is the probability that all k attempts succeed. Use this when consistency is required — every execution must work.
+**pass^k** (pass-caret-k) is the probability that all k attempts succeed. Use this when consistency is required - every execution must work.
 
 ```typescript
 function calculatePassCaretK(results: boolean[], k: number): number {
@@ -72,7 +73,7 @@ for (let k = 1; k <= 10; k++) {
 // pass^10: 0 (many later trials failed)
 ```
 
-For production agents, aim for pass@1 close to pass@k. A gap between these means the agent is "lucky" on some runs — reliable systems have consistent success rather than only possible success.
+For production agents, aim for pass@1 close to pass@k. A gap between these means the agent is "lucky" on some runs - reliable systems have consistent success rather than only possible success.
 
 ### Tool-routing accuracy
 
@@ -235,7 +236,7 @@ console.log(`Hallucination rate: ${hallucinationRate(badCalls, tools, schemas).t
 
 ## Deterministic checks
 
-The metrics above are computed from a run; a judge model is asked about one. Below both sits a third tier that is easy to overlook because it looks too simple to name: **micro-scorers** that answer a single narrow question about a run, deterministically, in microseconds, for zero tokens.
+The metrics above are computed from a run; a judge model is asked about one. A third tier sits below these: **micro-scorers** that answer a single narrow question about a run, deterministically, in microseconds, for zero tokens.
 
 | Check           | Question it answers                          |
 | --------------- | -------------------------------------------- |
@@ -245,11 +246,11 @@ The metrics above are computed from a run; a judge model is asked about one. Bel
 | Max tool calls  | Did the run stay under N tool calls?         |
 | No tool errors  | Did every tool call return without erroring? |
 
-Individually these are assertions you could write by hand in any test file. Naming them as a tier buys two things.
+Individually these are assertions you could write by hand in any test file. Two things follow from naming them a tier.
 
 The first is that they belong in the same eval run as the expensive scorers, not in a separate test suite. A single run over a dataset can carry both a string-contains check and a judge-scored helpfulness rating, and the checks act as gates: if the agent never called the tool the task required, the judge's opinion of the prose is not the interesting result.
 
-The second is cost shape. Judges are the dominant line in an eval budget, and every question you can move down to a deterministic check is a question you stop paying for on every dataset row and every CI run. Push assertions down as far as they will go — a check if the answer is exact, a computed metric if it is countable, a judge only when the question is genuinely qualitative.
+The second is cost shape. Judges are the dominant line in an eval budget, and every question you can move down to a deterministic check is a question you stop paying for on every dataset row and every CI run. Push assertions down as far as they will go - a check if the answer is exact, a computed metric if it is countable, a judge only when the question is genuinely qualitative.
 
 ```typescript
 // Cheap gates and an expensive judge in one run over the same dataset.
@@ -261,7 +262,7 @@ const scorers = [
 ];
 ```
 
-[Mastra](/docs/agents/framework-selection) ships this tier as Quick Checks — `checks.includes`, `checks.excludes`, `checks.equals`, `checks.matches`, `checks.similarity`, `checks.calledTool`, `checks.didNotCall`, `checks.toolOrder`, `checks.maxToolCalls`, `checks.usedNoTools`, and `checks.noToolErrors` — documented as zero-LLM micro-scorers that plug into the same `scorers` array as any judge and compose with them in a single `runEvals` call. Other eval frameworks expose the same idea under different names; the tier is the portable part.
+[Mastra](/docs/agents/frameworks) ships this tier as Quick Checks - `checks.includes`, `checks.excludes`, `checks.equals`, `checks.matches`, `checks.similarity`, `checks.calledTool`, `checks.didNotCall`, `checks.toolOrder`, `checks.maxToolCalls`, `checks.usedNoTools`, and `checks.noToolErrors` - documented as zero-LLM micro-scorers that plug into the same `scorers` array as any judge and compose with them in a single `runEvals` call. Other eval frameworks expose the same idea under different names; the tier is the portable part.
 
 ## Composite metrics
 
@@ -303,12 +304,12 @@ console.log(`p99: ${percentile(latencies, 99)}ms`);
 
 ## When to measure what
 
-- **Capability evals** — use pass@k, F1, schema conformance to benchmark agent ability on new features
-- **Regression evals** — use pass@1 (or pass^5 for critical systems) to detect breakage in CI, with deterministic checks as the cheap gate that runs on every commit
-- **Production monitoring** — track pass@1, MTTR, cost, hallucination rate in real time
-- **Debugging** — capture full traces with tool-routing accuracy and parameter details to understand failure modes
+- **Capability evals** - use pass@k, F1, schema conformance to benchmark agent ability on new features
+- **Regression evals** - use pass@1 (or pass^5 for critical systems) to detect breakage in CI, with deterministic checks as the cheap gate that runs on every commit
+- **Production monitoring** - track pass@1, MTTR, cost, hallucination rate in real time
+- **Debugging** - capture full traces with tool-routing accuracy and parameter details to understand failure modes
 
-See [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for how to instrument code to collect these metrics.
+See [OpenTelemetry GenAI semantic conventions](https://github.com/open-telemetry/semantic-conventions-genai) for how to instrument code to collect these metrics - see [Observability](/docs/testing/observability) for why the conventions moved to this repository and how to pin against an unversioned target.
 
 ## References
 
@@ -317,6 +318,6 @@ See [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/spe
 
 ## See also
 
-- `/docs/testing/evaluation-framework` — dataset and grader design
-- `/docs/testing/llm-as-judge` — calibrating judge models for hallucination detection
-- `/docs/testing/observability` — instrument agents to collect metrics
+- `/docs/testing/evaluation-framework` - dataset and grader design
+- `/docs/testing/llm-as-judge` - calibrating judge models for hallucination detection
+- `/docs/testing/observability` - instrument agents to collect metrics

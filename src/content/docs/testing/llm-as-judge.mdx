@@ -1,6 +1,7 @@
 ---
 title: LLM-as-Judge Patterns
 description: When and how to use LLM judges; biases, calibration, and hybrid approaches
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -14,21 +15,21 @@ Model-based grading for open-ended outputs with no deterministic ground truth (p
 
 ---
 
-LLM-as-judge (also called model-based grading) evaluates outputs that have no deterministic ground truth — plan quality, parameter semantics, summary coherence. A judge model reads the task, agent output, and reference (if available), then scores it. The trick is that LLM judges are biased and systematically prefer certain outputs even when they are not actually better. Understanding and mitigating these biases is critical.
+LLM-as-judge (also called model-based grading) evaluates outputs that have no deterministic ground truth - plan quality, parameter semantics, summary coherence. A judge model reads the task, agent output, and reference (if available), then scores it. LLM judges are biased and systematically prefer certain outputs even when they are not actually better.
 
 ## When to use LLM-as-judge
 
 Use when:
 
-- **Open-ended outputs** — agent was asked to write a summary, design a solution, or generate creative content. No single correct answer exists.
-- **Semantic correctness** — parameter value is well-formed JSON, but is it semantically valid? (e.g., is "next Tuesday" a reasonable due_date for this context?)
-- **Plan quality** — did the agent choose a reasonable sequence of tools, even if not the only correct sequence?
+- **Open-ended outputs** - agent was asked to write a summary, design a solution, or generate creative content. No single correct answer exists.
+- **Semantic correctness** - parameter value is well-formed JSON, but is it semantically valid? (e.g., is "next Tuesday" a reasonable due_date for this context?)
+- **Plan quality** - did the agent choose a reasonable sequence of tools, even if not the only correct sequence?
 
 Do NOT use when:
 
-- **Deterministic outputs** — agent was asked to retrieve a user by ID. Either it retrieved the right user or it did not. Use code-based graders.
-- **Tool routing** — "Did the agent call search or read_file?" This is binary and deterministic. Use code-based graders.
-- **End state verification** — "Is the database record now marked 'complete'?" Code-based graders are faster and more reliable.
+- **Deterministic outputs** - agent was asked to retrieve a user by ID. Either it retrieved the right user or it did not. Use code-based graders.
+- **Tool routing** - "Did the agent call search or read_file?" This is binary and deterministic. Use code-based graders.
+- **End state verification** - "Is the database record now marked 'complete'?" Code-based graders are faster and more reliable.
 
 ## Documented biases
 
@@ -36,7 +37,7 @@ Research from Zheng et al. (MT-Bench) and Anthropic's evaluation posts identifie
 
 ### Self-preference bias
 
-A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.6 to judge outputs from Claude Opus 5, the judge may systematically overrate outputs that look like GPT-style reasoning.
+A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.6 to judge outputs from Claude Opus 5.5, the judge may systematically overrate outputs that look like GPT-style reasoning.
 
 **Mitigation:** Use a judge from a different model family and calibrate it against human-labeled examples. For pairwise comparisons, run at least some cross-provider checks so style similarity does not become a hidden scoring advantage.
 
@@ -96,17 +97,17 @@ Score this output on a scale of 0-1. Return JSON: {"score": number, "reasoning":
     });
   }
 
-  // High agreement = confident
+  // Low stdDev = judges agree = confident score; high stdDev = flag for human review
   const mean = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
   const stdDev = Math.sqrt(
     scores.reduce((sum, s) => sum + Math.pow(s.score - mean, 2), 0) / scores.length,
   );
 
-  return scores;
+  return { scores, mean, stdDev };
 }
 
-// Example: if 3 judges give [0.9, 0.85, 0.88], stdDev ~0.02 — high agreement
-// If they give [0.2, 0.5, 0.9], stdDev ~0.28 — low agreement, task is ambiguous
+// Example: if 3 judges give [0.9, 0.85, 0.88], stdDev ~0.02: high agreement
+// If they give [0.2, 0.5, 0.9], stdDev ~0.28: low agreement, task is ambiguous
 ```
 
 ### Anchor datasets
@@ -150,7 +151,7 @@ async function calibratedJudge(
     .join("\n\n");
 
   const score = await callLLM({
-    model: "claude-opus-5",
+    model: "claude-opus-5-5",
     prompt: `
 You are grading agent outputs on a scale of 0-1.
 
@@ -191,7 +192,7 @@ async function hybridGrader(
     return spec?.type === typeof value || spec?.type === "number";
   });
 
-  // If heuristics pass, high confidence — no LLM needed
+  // If heuristics pass, high confidence: no LLM needed
   if (hasRequiredFields && typesCorrect) {
     return { score: 1.0, confidence: "high" };
   }
@@ -233,7 +234,7 @@ async function pairwiseRank(
       : [outputB, outputA, "B", "A"];
 
     const result = await callLLM({
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       prompt: `
 Task: ${task}
 
@@ -262,7 +263,7 @@ Which is better? Respond with only "1", "2", or "tie".
 
 LLM judges are expensive at scale. Strategies to reduce cost:
 
-- **Use cheaper judges for pre-screening.** Haiku 4.5 for initial triage, then Opus 4.8 for borderline cases.
+- **Use cheaper judges for pre-screening.** Haiku 4.5 for initial triage, then Opus 5.5 for borderline cases.
 - **Batch evaluation.** Ask a judge to score 10 outputs in a single prompt instead of 10 separate API calls.
 - **Threshold-based fallback.** If code-based heuristics give a score of 0.95 or 0.05, don't invoke LLM judge.
 - **Sample-based calibration.** Calibrate on 30 examples, then use cheaper model + heuristics for the remaining 1000.
@@ -281,6 +282,6 @@ LLM judges are expensive at scale. Strategies to reduce cost:
 
 ## See also
 
-- `/docs/testing/metrics` — measuring pass@k, hallucination rate
-- `/docs/testing/evaluation-framework` — grader design patterns
-- `/docs/testing/observability` — trace-based debugging for ambiguous grades
+- `/docs/testing/metrics` - measuring pass@k, hallucination rate
+- `/docs/testing/evaluation-framework` - grader design patterns
+- `/docs/testing/observability` - trace-based debugging for ambiguous grades

@@ -1,105 +1,48 @@
 ---
-title: Agent Scaffolding
-description: How the surface skill scaffolds and updates production agent systems.
+title: Build Agents
+description: What this part covers, how it relates to the core guide, and the design defaults that apply across every topic below.
+lastVerified: 2026-09-24
 ---
 
-The `surface` skill creates and updates agent infrastructure when used in scaffold mode. Use it when you need an agent, tool, workflow, memory layer, model router, browser tool, sandbox tool, or framework-specific agent wiring.
+## Summary
 
-It is not a generic code generator. It reads the project first, detects the existing runtime, then follows the conventions already present.
+Part 1 of this guide makes an existing product usable by agents: discovery, APIs, tools, CLIs, MCP servers, authentication, error handling, and retrieval. This part is different. It is a condensed, current-practice reference for teams **building** agents of their own - choosing a runtime, wiring memory, running multi-agent systems, and giving agents browser or sandbox access.
 
-Before scaffolding, align the boundary first:
+Each page states what good practice is right now and points at the tools and platforms that implement it, in [the tooling catalog](/docs/tooling-catalog). Framework ecosystem lists (Mastra's integrations, for example) are used as sources without being treated as the authority.
 
-- [Agent Design Principles](/docs/agents/design-principles) — narrow ownership, bounded loops, workflow-before-agent, and eval-first scaffolding
-- [Framework Selection](/docs/agents/framework-selection) — choosing between OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, and MCP-first designs
-- [Anthropic Platform](/docs/agents/anthropic-platform) — current Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, tools, model, and security guidance
-- [OpenAI Platform](/docs/agents/openai-platform) — current Responses API, Agents SDK, hosted Shell tool, Agent Skills in the API, compaction, tools, model, and security guidance
-- [Browser Access](/docs/agents/browser-access) — choosing between Browser Use, Kernel, Browserbase, Stagehand, Playwright, Browser Run, and extraction APIs
+## How This Part Is Organized
 
-## What It Creates
+| Page                                                                | Covers                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Frameworks](/docs/agents/frameworks)                               | Where agent work should run, and which runtime or framework fits                      |
+| [Platforms](/docs/agents/platforms)                                 | Anthropic and OpenAI platform surfaces: hosted tools, MCP, skills, models             |
+| [Orchestration](/docs/agents/orchestration)                         | Multi-agent patterns: sequential, concurrent, handoff, supervisor, council            |
+| [Memory](/docs/agents/memory)                                       | Message history, working memory, semantic recall, observational and procedural memory |
+| [Durable Execution](/docs/agents/durable-execution)                 | Running non-deterministic agent loops inside replay-safe workflow engines             |
+| [Browser and Sandboxes](/docs/agents/browser-and-sandboxes)         | Browser access and isolated code execution as high-risk, bounded tools                |
+| [Guardrails](/docs/agents/guardrails)                               | Runtime input/output processors that stand in front of the model                      |
+| [Prompts and Configuration](/docs/agents/prompts-and-configuration) | Treating the system prompt as versioned, testable configuration                       |
+| [Channels](/docs/agents/channels)                                   | Reaching users on Slack, WhatsApp, Telegram, and other messaging surfaces             |
+| [Background Agents](/docs/agents/background-agents)                 | Scheduled, proactive work that runs without a user waiting on it                      |
 
-| Mode                       | Output                                                   | Use When                                                          |
-| -------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------- |
-| `/surface init`            | Agent directory structure, central registry, exports     | A project has no agent infrastructure yet.                        |
-| `/surface agent <name>`    | Agent definition, instructions, registration, tool stubs | You need a new agent with clear purpose and tools.                |
-| `/surface tool <name>`     | Typed tool with Zod schemas, safety hints, exports       | An agent needs a new capability.                                  |
-| `/surface workflow <name>` | Workflow steps, state schemas, trigger function          | Work is multi-step, async, resumable, or stateful.                |
-| `/surface memory`          | Memory configuration and usage pattern                   | Agents need conversation, entity, or semantic recall.             |
-| `/surface model`           | Provider and gateway routing                             | You need model choice behind a stable app API.                    |
-| `/surface browser`         | Browser-access tool wrapper                              | Agents need web browsing, extraction, screenshots, or GUI access. |
-| `/surface sandbox`         | Isolated execution tool wrapper                          | Agents need to run generated or untrusted code.                   |
-
-## Runtime Decision Tree
-
-Start with the project shape:
-
-| Project Shape                                                                                                    | Default Choice                                                                                           | Reason                                                                                         |
-| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| OpenAI Responses API, `@openai/agents`, hosted tools, remote MCP, tracing/evals, realtime, files, or sandbox     | OpenAI Agents SDK                                                                                        | Best fit when OpenAI platform semantics should stay visible.                                   |
-| Claude Managed Agents, Agent Skills, Claude Code SDK, `@anthropic-ai/claude-code`, or Claude-native hosted tools | Claude platform patterns                                                                                 | Best fit when Claude owns the harness, sandbox, Skills, code work, or MCP connector path.      |
-| `ai` or `@ai-sdk/*` with app routes                                                                              | Vercel AI SDK patterns                                                                                   | Best fit for chat routes, streaming, structured output, provider routing, and app-local tools. |
-| Vercel app plus long-running, resumable, approval-based, or delayed work                                         | Vercel Workflow plus AI SDK                                                                              | Best fit for durable steps, hooks, retries, sleeps, and replayable AI workflows.               |
-| `@modelcontextprotocol/sdk` with no app agent runtime                                                            | MCP-first                                                                                                | The product is exposing tools or resources to external agents more than running its own agent. |
-| `wrangler.toml`, Workers bindings, Durable Objects, or `agents` package                                          | Cloudflare Agents                                                                                        | Best fit for edge-hosted, stateful, Workers-native agents.                                     |
-| `@mastra/core`, `src/mastra`, or `packages/agents`                                                               | Mastra                                                                                                   | Best fit for local TypeScript agents, tools, workflows, memory, and MCP exposure.              |
-| No agent packages and no stronger platform signal                                                                | Mastra for TypeScript, LangGraph for Python/graph-heavy systems, or MCP-first for external tool surfaces | Gives a coherent default without inventing local conventions.                                  |
-
-## Updating Existing Agents
-
-When updating an existing agent, preserve the local shape:
-
-- follow existing file layout before creating a new one
-- register new agents/tools in the same barrel files and central registry
-- keep instructions in Markdown when the project already uses prompt files
-- inject user/team/session context server-side, not through model-controlled tool arguments
-- keep tool names, schemas, and output shape consistent with neighboring tools
-- run type checks after wiring
-
-Do not switch frameworks just because a newer tool exists. Add a new framework only when it reduces complexity or matches the deployment target.
+For vendor lists and comparison tables behind any of these topics, see the [tooling catalog](/docs/tooling-catalog).
 
 ## Design Defaults
 
-When `surface` scaffolds an agent, the default shape should be:
+A handful of defaults apply regardless of which framework or platform a team picks. They come up on nearly every page below, so they are stated once here.
 
-- narrow domain ownership instead of broad "assistant" scope
-- tools as the path to external truth
-- explicit max steps and fallback behavior
-- workflows for predictable multi-step orchestration
-- prompts treated as configuration, not as a substitute for server logic
-- memory only when there is a clear cross-turn or retrieval need
-
-## Memory Choices
-
-Use the simplest memory that satisfies the product need:
-
-| Need                                    | Good Default                                                     |
-| --------------------------------------- | ---------------------------------------------------------------- |
-| Last few conversation turns             | Framework memory or database thread history                      |
-| Cross-session semantic recall           | Mastra Memory + pgvector, or existing vector store               |
-| Per-user or per-entity state in Workers | Durable Objects                                                  |
-| Workers-native long-term memory         | Agent Memory if available, otherwise Vectorize/AI Search/AutoRAG |
-| Product/docs corpus retrieval           | Existing search index, hybrid search, or RAG stack               |
-
-Memory resource IDs must come from authenticated server context. Never let the model choose the user, tenant, project, or entity key.
-
-## Browser And Sandbox Tools
-
-Browser and sandbox capabilities are high-risk. The skill should scaffold them with:
-
-- domain/runtime allowlists
-- timeouts and budgets
-- audit logs
-- output truncation
-- structured errors
-- confirmation gates for writes, purchases, and destructive actions
-- no production secrets inside sandbox sessions
-
-Use Browser Run for Workers-native browser sessions. Use Browser Use when the browser agent should plan and recover across a task. Use Kernel, Browserbase, Stagehand, browserless, or Playwright where they match the existing runtime and hosting needs. Use Cloudflare Sandbox, Vercel Sandbox, Daytona, or Modal when code must execute away from the app server.
+- **Tools over knowledge.** Business state, retrieval, and side effects belong in tools, not in the prompt. If a value could change tomorrow, it should not live only in the system prompt - see [Tool Design](/docs/tool-design).
+- **Narrow ownership.** An agent should own one decision boundary, not a department. A "billing dispute triage agent" is easier to evaluate and less likely to hallucinate tool usage than a "customer operations agent."
+- **Workflow before agent.** If the sequence is predictable, scaffold a deterministic workflow and drop an agent in only at the steps that need judgment: classifying intent, synthesizing tradeoffs, choosing among candidates.
+- **Bounded loops only.** Every production agent needs an explicit step budget, a stop condition, and a failure path for when the budget runs out. A loop that needs more than 10 steps is usually a sign the boundary is wrong, not that the budget should grow.
+- **Prompt as configuration.** See [Prompts and Configuration](/docs/agents/prompts-and-configuration) for the pattern; keep tenant selection, branching business logic, and access decisions out of prompt text entirely.
+- **Memory is earned.** Start with none. Add message history, then working memory, then semantic recall only when the product need is concrete - see [Memory](/docs/agents/memory).
+- **Eval-first.** A scaffold that creates an agent without a success case, a wrong-tool case, and a malformed-arguments case is incomplete. See [Evaluation Framework](/docs/testing/evaluation-framework) in Part 1.
 
 ## Related
 
-- [Cloudflare-Native Agent Stack](/docs/cookbook/cloudflare-agent-stack)
-- [Agentic Loop as Commodity](/docs/cookbook/agentic-loop)
-- [Browser Access](/docs/agents/browser-access)
+- [Getting Started](/docs/getting-started)
 - [Tool Design](/docs/tool-design)
-- [MCP Servers](/docs/mcp-servers)
-- [Multi-Agent Patterns](/docs/multi-agent)
+- [Testing](/docs/testing)
+- [Tooling Catalog](/docs/tooling-catalog)
+- [Agent Retrieval](/docs/agent-retrieval)

@@ -1,11 +1,12 @@
 ---
-title: Semantic Extensions for Agent APIs
+title: OpenAPI Extensions
 description: OpenAPI extensions, semantic taxonomies, and tooling for enriching your API with agent-specific behavioral hints
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-OpenAPI extensions like x-action and x-category add semantic metadata to operations, allowing agents to reason about risk, sequencing, and reversibility without reading full descriptions. The AgenticAPI ACTION taxonomy classifies operations into six categories: Acquire (read), Compute (transform), Transact (create/modify), Integrate (sync), Orchestrate (multi-step), and Notify (communicate). This enables agents to make safer routing decisions.
+OpenAPI extensions like x-action and x-category add semantic metadata to operations. The AgenticAPI ACTION taxonomy classifies operations into six categories: Acquire (read), Compute (transform), Transact (create/modify), Integrate (sync), Orchestrate (multi-step), and Notify (communicate). This enables agents to make safer routing decisions.
 
 ```
 ┌──────────┬─────────────────────────────────┐
@@ -20,7 +21,7 @@ OpenAPI extensions like x-action and x-category add semantic metadata to operati
 └──────────┴─────────────────────────────────┘
 ```
 
-Standard OpenAPI covers what your API does. Extensions tell agents how to behave when using it — which operations need confirmation before execution, which are safe to retry, which are destructive, and what category each operation belongs to. This page covers the extension ecosystem and the tooling built on top of it.
+Standard OpenAPI covers what your API does. Extensions tell agents how to behave when using it - which operations need confirmation before execution, which are safe to retry, which are destructive, and what category each operation belongs to. This page covers the extension ecosystem and the tooling built on top of it.
 
 ## The AgenticAPI ACTION Taxonomy
 
@@ -44,36 +45,36 @@ paths:
   /orders/{id}:
     get:
       operationId: get_order
-      x-action: Acquire
-      x-category: orders
+      x-action: get_order
+      x-category: Acquire
       summary: Get an order by ID
 
   /orders:
     post:
       operationId: create_order
-      x-action: Transact
-      x-category: orders
+      x-action: create_order
+      x-category: Transact
       summary: Create a new order
 
   /reports/generate:
     post:
       operationId: generate_sales_report
-      x-action: Compute
-      x-category: reporting
+      x-action: generate_sales_report
+      x-category: Compute
       summary: Generate a sales report for a date range
 
   /deployments:
     post:
       operationId: trigger_deployment
-      x-action: Orchestrate
-      x-category: infrastructure
+      x-action: trigger_deployment
+      x-category: Orchestrate
       summary: Trigger a production deployment
 
   /notifications/send:
     post:
       operationId: send_notification
-      x-action: Notify
-      x-category: communications
+      x-action: send_notification
+      x-category: Notify
       summary: Send a push notification to a user
 ```
 
@@ -83,7 +84,7 @@ Agent frameworks that understand the ACTION taxonomy can apply category-level po
 
 ### `x-agent-requires-confirmation`
 
-Marks operations that should pause for human approval before the agent executes them. This is framework-independent — any agent framework that respects this extension will surface a confirmation prompt.
+Marks operations that should pause for human approval before the agent executes them. This is framework-independent - any agent framework that respects this extension will surface a confirmation prompt.
 
 ```yaml
 paths:
@@ -117,7 +118,7 @@ paths:
       operationId: confirm_order
       x-agent-idempotent: true
       description: >
-        Confirms an order. Idempotent — calling this multiple times on the same
+        Confirms an order. Idempotent: calling this multiple times on the same
         order will not create duplicate confirmations.
 
   /webhooks/register:
@@ -152,7 +153,7 @@ paths:
 
 ## Speakeasy MCP Extension
 
-Speakeasy provides `x-speakeasy-mcp` for customizing how MCP tool generation treats individual operations. This is the most expressive extension currently available for controlling the gap between your raw OpenAPI spec and the MCP tools generated from it.
+Speakeasy provides `x-speakeasy-mcp` for customizing how MCP tool generation treats individual operations.
 
 ### Tool Name Override
 
@@ -259,9 +260,9 @@ paths:
 
 Valid values: `ENABLED` (require confirmation) and `DISABLED` (default, no confirmation required).
 
-## Discovery Endpoint: `DISCOVER /actions`
+## Discovery Endpoint: `GET /actions`
 
-Publishing a discovery endpoint lets agents find your action catalog without reading the full OpenAPI spec. The convention is a `DISCOVER` HTTP method (or `GET` with an `actions` suffix) at a well-known path:
+Publishing a discovery endpoint lets agents find your action catalog without reading the full OpenAPI spec. There's no standardized HTTP method or path for this - OpenAPI 3.2 added a new `QUERY` method, but nothing called `DISCOVER`. A plain `GET` at a well-known path works and needs no special client support:
 
 ```yaml
 paths:
@@ -312,18 +313,17 @@ paths:
 
 ## LAPIS Format
 
-LAPIS (LLM API Processing Instruction Syntax) is a compact representation format for OpenAPI specs optimized for LLM context windows. It reduces token count by approximately 85.5% compared to standard OpenAPI YAML while retaining the information agents need to select and call operations.
+[LAPIS](https://github.com/cr0hn/LAPIS) (Lightweight API Specification for Intelligent Systems) is a compact representation format for OpenAPI specs, designed for LLM context windows. Benchmarked against five production API specs (including GitHub and Twilio), it averages an 85.5% token reduction compared to standard OpenAPI YAML while retaining the information agents need to select and call operations.
 
-A full OpenAPI spec in YAML might be 50,000 tokens. The same spec in LAPIS format is typically under 8,000 tokens. This matters when you are stuffing tool definitions into a model context window.
+A full OpenAPI spec in YAML might be 50,000 tokens. The same spec in LAPIS format is typically well under 10,000 tokens. This matters when you are stuffing tool definitions into a model context window.
 
 ```
-# LAPIS representation of an operation
-POST /orders create_order "Creates a new order for the authenticated user"
-  body: {product_ids: string[], quantity: integer, shipping_address_id: uuid}
-  req: [product_ids, quantity]
-  200: {id: uuid, status: string, total: number, created_at: date-time}
-  400: "Invalid product ID or insufficient stock"
-  422: "Shipping address not found"
+create_order POST /orders
+  Creates a new order for the authenticated user.
+  > product_ids: [str]
+  > quantity: int
+  > shipping_address_id?: uuid
+  < Order
 ```
 
 LAPIS is useful for:
@@ -334,13 +334,13 @@ LAPIS is useful for:
 
 ## Auto-Generating MCP from OpenAPI
 
-The extensions above — especially `x-speakeasy-mcp` — feed directly into tools that generate MCP servers from your OpenAPI spec. Generation is only a starting point: a naive 1:1 mapping produces 50–300 tools that overwhelm agents, with descriptions written for human developers rather than agent reasoning. The correct workflow is generate → prune → rewrite → add composites, targeting 10–30 tools per domain.
+The extensions above - especially `x-speakeasy-mcp` - feed directly into tools that generate MCP servers from your OpenAPI spec. Generation is only a starting point: a naive 1:1 mapping produces 50–300 tools that overwhelm agents, with descriptions written for human developers rather than agent reasoning. The correct workflow is generate → prune → rewrite → add composites, targeting 10–20 tools per domain.
 
 For the full generator comparison (Stainless, Speakeasy, FastMCP, openapi-mcp-generator), the hybrid workflow step-by-step, and the reasoning behind not shipping generated output directly, see [Auto-Generating MCP from OpenAPI](/docs/mcp-servers/auto-generation). This page owns the extension mapping that those generators consume; that page owns the generation workflow.
 
 ## Checklist
 
-- [ ] Operations are categorized with `x-action` using the ACTION taxonomy
+- [ ] Operations are categorized with `x-category` using the ACTION taxonomy
 - [ ] Destructive operations have `x-agent-destructive: true`
 - [ ] Irreversible operations have `x-agent-requires-confirmation: true`
 - [ ] Idempotent operations are marked with `x-agent-idempotent: true`
@@ -351,6 +351,6 @@ For the full generator comparison (Stainless, Speakeasy, FastMCP, openapi-mcp-ge
 
 ## Related Pages
 
-- [OpenAPI for Agents](./openapi-for-agents) — the base spec design that extensions annotate
-- [Tool Definitions](./tool-definitions) — how extensions translate into MCP annotations
-- [Arazzo Workflows](./arazzo-workflows) — composite workflows as an alternative to composite tools
+- [OpenAPI for Agents](./openapi-for-agents) - the base spec design that extensions annotate
+- [Tool Definitions](./tool-definitions) - how extensions translate into MCP annotations
+- [Arazzo Workflows](./arazzo-workflows) - composite workflows as an alternative to composite tools

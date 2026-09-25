@@ -24,7 +24,7 @@ Start with a concrete verb and a familiar object. Extra words should distinguish
 | `add_samples_to_cart`       | `process_samples`              | The name makes the mutation explicit.                                |
 | No separate diagnostic tool | `check_catalogue_connection`   | The application handles connectivity and reports retrieval failures. |
 
-A diagnostic agent may genuinely need `check_connection`; a shopping assistant usually does not. Preserve source identity, freshness and actionable failure information in results without asking the model to manage infrastructure. These are Agent Surface design recommendations for the task boundary, not vendor prohibitions.
+A diagnostic agent may genuinely need `check_connection`; a shopping assistant usually does not. Preserve source identity, freshness and actionable failure information in results without asking the model to manage infrastructure.
 
 ### Use a consistent spelling
 
@@ -118,7 +118,7 @@ when no issues match the query. Each page takes ~200ms to fetch.
 
 ```
 Sends the invoice email to the customer. Must be called after
-`billing_create_invoice`—calling on a draft invoice returns
+`billing_create_invoice` - calling on a draft invoice returns
 { isError: true, message: "Invoice not finalized" }. Idempotent:
 calling twice on the same invoice does not send duplicate emails.
 Subject line and template are configurable in the system settings.
@@ -129,7 +129,7 @@ Subject line and template are configurable in the system settings.
 ```
 Transitions an issue to a new status. Requires a valid issue_id
 from `search_issues` or `get_issue`. Not all status transitions are
-valid—for example, cannot transition from "Done" back to "Open".
+valid - for example, cannot transition from "Done" back to "Open".
 Returns { isError: true, message, valid_transitions: [...] }
 if the transition is not allowed. Include a comment via the
 optional `comment` parameter to explain the change.
@@ -148,7 +148,7 @@ update_issue:        For modifying existing tickets. Use to change status,
                      assignee, or description of a ticket already tracked.
 ```
 
-Agents that read these descriptions understand exactly which tool to reach for based on the user's intent. Without disambiguation, agents guess—leading to wrong tool selection and failed operations.
+Agents that read these descriptions understand exactly which tool to reach for based on the user's intent. Without disambiguation, agents guess - leading to wrong tool selection and failed operations.
 
 ## Common Anti-Patterns
 
@@ -221,13 +221,13 @@ issues (use `create_issue`). Returns paginated results.
 
 ## Length Guidelines
 
-Good descriptions fall in the 60–200 word range. Shorter is fine if the purpose is obvious; never be terse.
+Good descriptions land between 30 and 200 words: say what's needed and stop; cut filler, never the when-to-use guidance.
 
 ```
-50 words:   Perfect for simple, unambiguous tools (get_user, list_repos)
+30 words:   Perfect for simple, unambiguous tools (get_user, list_repos)
 100 words:  Typical for mutation tools with edge cases
 200 words:  Complex tools with many preconditions or disambiguation needed
-300+ words: Red flag—consider splitting the tool or linking to deeper docs
+300+ words: Red flag - consider splitting the tool or linking to deeper docs
 ```
 
 ## Research Evidence
@@ -236,7 +236,7 @@ Anthropic's [writing-tools-for-agents](https://www.anthropic.com/engineering/wri
 
 ## See also
 
-- `/docs/tool-design/schemas` — companion page on schema design
-- `/docs/tool-design/anti-patterns` — common mistakes with fixes
+- `/docs/tool-design/schemas` - companion page on schema design
+- `/docs/tool-design/anti-patterns` - common mistakes with fixes
 - ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
-- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) — current tool naming and description fields
+- ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - current tool naming and description fields

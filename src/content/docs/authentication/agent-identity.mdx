@@ -1,7 +1,7 @@
 ---
 title: Agent Identity
 description: First-class agent principals, audit trails, and the actor chain
-lastVerified: 2026-07-06
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -39,42 +39,11 @@ Orchestrator Agent (own credentials)
   └── Sub-Agent B (own credentials, scoped)
 ```
 
-Every agent gets credentials encoding its name, task, and permission ceiling. A sub-agent cannot exceed its parent's scope. If the parent holds `invoices:read`, the sub-agent can receive at most `invoices:read` via Token Exchange — it cannot manufacture broader permissions.
+Every agent gets credentials encoding its name, task, and permission ceiling. A sub-agent cannot exceed its parent's scope. If the parent holds `invoices:read`, the sub-agent can receive at most `invoices:read` via Token Exchange - it cannot manufacture broader permissions.
 
 ## Token Exchange for Delegation
 
-RFC 8693 Token Exchange enables the orchestrator to derive narrow, time-limited tokens for sub-agents:
-
-```typescript
-async function exchangeTokenForSubAgent(
-  orchestratorToken: string,
-  subAgentId: string,
-  audience: string,
-  scopes: string[],
-): Promise<string> {
-  const form = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-    subject_token: orchestratorToken,
-    subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    actor_token: subAgentId, // or undefined if no actor token
-    requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    audience: audience,
-    scope: scopes.join(" "),
-  });
-
-  const res = await fetch("https://auth.example.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  });
-
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
-  const { access_token } = await res.json();
-  return access_token;
-}
-```
-
-The resulting token has:
+RFC 8693 Token Exchange enables the orchestrator to derive narrow, time-limited tokens for sub-agents. The full request/response implementation lives on [Token Exchange](/docs/authentication/token-exchange) - what matters here is the identity shape it produces:
 
 - Narrower scope (e.g., `invoices:read` only, not `*`)
 - Shorter lifetime (15 min vs 1 hour)
@@ -105,20 +74,31 @@ Trust identity claims in the JWT, not in custom headers. The token should includ
 }
 ```
 
-- `sub` — the calling agent identity
-- `act` — optional actor chain for nested delegation (agent → agent → service)
-- `agent_name` — human-readable agent identifier (for logs)
-- `task_id` — correlates all actions from this execution
-- `parent_task_id` — links to parent task in multi-agent chains
-- `org_id` — tenant isolation
+- `sub` - the calling agent identity
+- `act` - optional actor chain for nested delegation (agent → agent → service)
+- `agent_name` - human-readable agent identifier (for logs)
+- `task_id` - correlates all actions from this execution
+- `parent_task_id` - links to parent task in multi-agent chains
+- `org_id` - tenant isolation
 
-The `act` claim is essential for tracing who actually made a request. If agent A delegates to agent B, the token includes both identities.
+The `act` claim is how you trace who actually made a request. If agent A delegates to agent B, the token includes both identities.
 
 ## Audit Logging
 
 Log both `sub` (agent making the request) and `act` (if any) on every action:
 
 ```typescript
+// Walk the nested `act` chain (agent -> agent -> ... -> service) into a flat array
+function flattenActorChain(act?: { sub: string; act?: { sub: string } }): string[] {
+  const chain: string[] = [];
+  let current = act;
+  while (current) {
+    chain.push(current.sub);
+    current = (current as { act?: { sub: string } }).act;
+  }
+  return chain;
+}
+
 async function logAction(req: Request, action: string) {
   const token = await validateToken(req.headers.get("authorization"));
 
@@ -127,7 +107,7 @@ async function logAction(req: Request, action: string) {
     agent_id: token.sub,
     agent_name: token.agent_name,
     agent_version: token.agent_version,
-    actor_chain: token.act ? [token.act.sub] : [],
+    actor_chain: flattenActorChain(token.act),
     task_id: token.task_id,
     parent_task_id: token.parent_task_id,
     org_id: token.org_id,
@@ -173,13 +153,23 @@ Any client can set this header. Use it only for non-security purposes: returning
 
 ## Payment Mandates
 
-A payment mandate is a specialization of agent identity. Instead of proving _who_ the agent is, it proves the agent is _authorized to make a specific payment_ on a user's behalf. AP2-style signed intent binds an agent, a user, an amount cap, and a merchant scope into a single verifiable credential — the same scoped, delegated, auditable pattern as the actor chain above, applied to spending authority rather than API access. The token-narrowing and `act`-claim machinery on this page is what a mandate specializes: authority that a downstream merchant or payment network can verify without trusting the caller's self-description. See [Agentic Commerce Protocols](/docs/protocols/agentic-commerce) for how UCP, AP2, and x402 serialize this primitive.
+A payment mandate is a specialization of agent identity. Instead of proving _who_ the agent is, it proves the agent is _authorized to make a specific payment_ on a user's behalf. AP2-style signed intent binds an agent, a user, an amount cap, and a merchant scope into a single verifiable credential - the same scoped, delegated, auditable pattern as the actor chain above, applied to spending authority rather than API access. The token-narrowing and `act`-claim machinery on this page is what a mandate specializes: authority that a downstream merchant or payment network can verify without trusting the caller's self-description. See [Payments](/docs/agentic-commerce/payments) for how UCP, AP2, and x402 serialize this primitive.
 
 ## Web Bot Auth
 
 Web Bot Auth uses HTTP Message Signatures to associate automated requests with a verifiable sender. The sender or its identity provider publishes verification keys through a signatures directory. The receiving service validates the signed request, key ownership and validity, covered message components, and replay protections before applying its bot-access policy. A receiving website does not become a verified sender merely by publishing an empty directory.
 
+The IETF chartered a Web Bot Auth working group, which adopted [draft-ietf-webbotauth-httpsig-protocol](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/) on 2026-09-01, replacing the earlier individual submission (draft-meunier). The protocol it defines: a `Signature-Agent` header for in-band key discovery, a JWKS-format key directory served from a well-known URI, and a trust model that binds identity to an HTTPS URL rather than to individual keys - so key rotation doesn't break the trust relationship. Treat it as an active working-group draft, not yet a published RFC.
+
 Request identity does not grant a user's application permissions. Keep OAuth, resource authorization, and spending authority independent. A User-Agent string is a useful traffic hint, not proof of identity. Use signed traffic where the intended sender and receiver support a compatible profile; test rejected signatures and expired keys as well as successful requests. See [Cloudflare's signing, verification, and directory examples](https://github.com/cloudflare/web-bot-auth), [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html), and the [directory reference](/docs/discovery/well-known-endpoints).
+
+## Workload Identity for Agents
+
+Web Bot Auth answers "who sent this request." A separate, still-forming line of standards work answers "what workload is this agent running as, and how does it prove that to another service." The [MCP roadmap](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) (2026-08-22) names this directly: MCP authorization today assumes a human clicking through a browser consent screen, which doesn't fit an agent running unattended as a cloud workload. Its stated direction is to finalize DPoP and drive adoption (see [DPoP](/docs/authentication/dpop)), and to define an opinionated path for agent identity and delegation through **Workload Identity Federation**, building on the ID-JAG grant used in enterprise-managed authorization - with the explicit goal of engaging the IETF OAuth and WIMSE working groups rather than inventing an MCP-specific mechanism.
+
+WIMSE (Workload Identity in Multi-Service Environments) is the IETF working group this points to. Its [architecture draft](https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/) (-08, 2026-07-06) defines how workloads obtain and present identity credentials - X.509 certificates or JWTs - to authenticate to each other within a trust domain. A separate document, [draft-ni-wimse-ai-agent-identity](https://datatracker.ietf.org/doc/draft-ni-wimse-ai-agent-identity/), applies these ideas specifically to AI agents. It remains an individual submission with no working-group standing and has lapsed (last revision February 2026) - read it as a signal of where this is headed; don't build against it yet.
+
+None of this is ready to implement today. The concrete, shippable pieces are DPoP (independent of MCP, see [DPoP](/docs/authentication/dpop)) and Token Exchange with actor-chain claims, both covered above. Track Workload Identity Federation and WIMSE-based agent identity; don't build on them yet.
 
 ## Checklist
 
@@ -193,7 +183,10 @@ Request identity does not grant a user's application permissions. Keep OAuth, re
 
 ## See Also
 
-- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 implementation
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance
-- [auth.md](/docs/authentication/auth-md) — user-bound agent registration
-- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — delegation and narrowing
+- [Token Exchange](/docs/authentication/token-exchange) - RFC 8693 implementation
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - token issuance
+- [DPoP](/docs/authentication/dpop) - the MCP roadmap's near-term identity priority
+- [auth.md](/docs/authentication/auth-md) - user-bound agent registration
+- [RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693) - delegation and narrowing
+- [MCP roadmap](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) - DPoP and Workload Identity Federation direction
+- [WIMSE architecture](https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/) - workload identity trust domains this direction builds on

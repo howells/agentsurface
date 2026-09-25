@@ -1,7 +1,7 @@
 ---
 title: Well-Known Discovery Endpoints
 description: Standardized /.well-known/ paths that let agents and protocols discover your capabilities programmatically
-lastVerified: 2026-08-27
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -14,7 +14,7 @@ lastVerified: 2026-08-27
 - /.well-known/oauth-protected-resource: OAuth resource metadata
 - /.well-known/security.txt: RFC 9116 vulnerability disclosure contact
 - /.well-known/http-message-signatures-directory: Web Bot Auth public keys
-- All responses should be JSON with Content-Type application/json
+- All responses should be JSON with Content-Type application/json, except `security.txt` (`text/plain`)
 - Send Access-Control-Allow-Origin on these files so browser-based agents can fetch them cross-origin
 
 The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here lets compatible agents and protocols find your capabilities without out-of-band configuration.
@@ -46,7 +46,7 @@ Link: </.well-known/api-catalog>; rel="api-catalog"
 
 ## /.well-known/ai
 
-The IETF draft "AI Discovery Endpoint" defines `/.well-known/ai` as a JSON file describing a site's AI-facing capabilities. This is the broadest of the well-known files — it covers what AI systems can do with your site, what formats you support, and where to find more specific declarations.
+The IETF draft "AI Discovery Endpoint" defines `/.well-known/ai` as a JSON file describing a site's AI-facing capabilities. This is the broadest of the well-known files - it covers what AI systems can do with your site, what formats you support, and where to find more specific declarations.
 
 Maximum file size: 64 KB.
 
@@ -68,7 +68,7 @@ Maximum file size: 64 KB.
   },
   "mcp": {
     "endpoint": "https://mcp.example.com",
-    "transports": ["streamable-http", "sse"],
+    "transports": ["streamable-http"],
     "documentation": "https://docs.example.com/mcp"
   },
   "llms": {
@@ -87,11 +87,11 @@ Maximum file size: 64 KB.
 }
 ```
 
-Serve with `Content-Type: application/json`. This file is still a draft standard — field names may change before finalization.
+Serve with `Content-Type: application/json`. This file is still a draft standard - field names may change before finalization.
 
 ## /.well-known/agent-card.json
 
-The Agent-to-Agent (A2A) protocol, developed by Google and now IANA-registered, uses `agent-card.json` for agent-to-agent discovery. When one agent wants to delegate a task to another agent, it fetches the target's agent card to understand capabilities, authentication requirements, and endpoint locations.
+The Agent-to-Agent (A2A) protocol, originated by Google, uses `agent-card.json` for agent-to-agent discovery. Google transferred the protocol to the Linux Foundation in June 2025, and in August 2026 it became a hosted project of the Agentic AI Foundation (AAIF), which now governs it alongside sibling projects rather than any single vendor. When one agent wants to delegate a task to another agent, it fetches the target's agent card to understand capabilities, authentication requirements, and endpoint locations.
 
 ```json
 {
@@ -147,7 +147,7 @@ The Agent-to-Agent (A2A) protocol, developed by Google and now IANA-registered, 
 }
 ```
 
-The A2A protocol uses this card for routing — an orchestrating agent looks up the skills array to decide whether to delegate a task here. The `examples` field in each skill is particularly important: these are used for semantic matching when an agent does not know your agent's ID but is searching for a capable agent by task description.
+The A2A protocol uses this card for routing - an orchestrating agent looks up the skills array to decide whether to delegate a task here. The `examples` field in each skill is particularly important: these are used for semantic matching when an agent does not know your agent's ID but is searching for a capable agent by task description.
 
 ## /.well-known/mcp/server-card.json
 
@@ -166,6 +166,10 @@ An MCP Server Card describes a remote MCP server before an agent connects: what 
     "type": "streamable-http",
     "endpoint": "https://example.com/mcp"
   },
+  "tools": [
+    { "name": "search_docs", "description": "Full-text search across published documentation." },
+    { "name": "get_page", "description": "Fetch one page by canonical URL." }
+  ],
   "authentication": {
     "required": false
   }
@@ -209,7 +213,7 @@ Some clients and proposals use `/.well-known/mcp.json` as a compatibility pointe
 
 This format is still evolving. If you publish it, use it as a compatibility pointer or redirect to the MCP Server Card rather than the only advertised metadata.
 
-### WebMCP — Tools Exposed In-Browser
+### WebMCP - Tools Exposed In-Browser
 
 The well-known MCP files above advertise a _remote_ MCP server. [WebMCP](/docs/protocols/webmcp) is the browser-side counterpart: a W3C Community Group draft that lets a site expose page-scoped tools through `document.modelContext`. It does not prescribe the remote MCP wire protocol, and a client must visit the page to discover its tools. Chrome's origin trial begins in Chrome 149, but the API remains a draft without a cross-browser commitment. Publish remote MCP metadata for capabilities that must work without loading the UI.
 
@@ -258,7 +262,7 @@ Serve it at `/.well-known/security.txt` with `Content-Type: text/plain; charset=
 
 Browser-hosted agents and tools can only fetch a file cross-origin if the response sends `Access-Control-Allow-Origin`. This applies to every file on this page - `/.well-known/*`, `llms.txt`, `openapi.json`, MCP server cards - since none of them carry credentials that CORS would need to protect.
 
-No spec in this list mandates it. [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) (OAuth Authorization Server Metadata) and [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html) (OAuth Protected Resource Metadata) say nothing about CORS, and the ratified [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) doesn't address it either - its only CORS-adjacent text is an `Origin` header check required to prevent DNS rebinding attacks on local servers, which is unrelated to allowing cross-origin reads. An open MCP server-card discovery proposal recommends `Access-Control-Allow-Origin: *`, but it isn't part of the ratified spec. Treat CORS on these files as operational hygiene rather than compliance: public, non-sensitive metadata costs nothing to open up, and doing so unblocks any browser-based agent that would otherwise be silently blocked by the same-origin policy.
+No spec in this list mandates it. [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) (OAuth Authorization Server Metadata) and [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html) (OAuth Protected Resource Metadata) say nothing about CORS, and the ratified [MCP specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http) doesn't address it either - its only CORS-adjacent text is an `Origin` header check required to prevent DNS rebinding attacks on local servers, which is unrelated to allowing cross-origin reads. An open MCP server-card discovery proposal recommends `Access-Control-Allow-Origin: *`, but it isn't part of the ratified spec. Treat CORS on these files as operational hygiene rather than compliance: public, non-sensitive metadata costs nothing to open up, and doing so unblocks any browser-based agent that would otherwise be silently blocked by the same-origin policy.
 
 ```
 Access-Control-Allow-Origin: *
@@ -272,7 +276,7 @@ Implement this when your service sends outbound bot or agent requests and wants 
 
 ## /.well-known/acp.json
 
-The Agentic Commerce Protocol (ACP) uses `acp.json` for capability advertisement. ACP focuses on commercial agent interactions — agents that can transact, book, purchase, or negotiate on behalf of users.
+The Agentic Commerce Protocol (ACP) uses `acp.json` for capability advertisement. ACP focuses on commercial agent interactions - agents that can transact, book, purchase, or negotiate on behalf of users.
 
 ```json
 {
@@ -354,7 +358,7 @@ The format is `Key: Value`, one declaration per line. Comments begin with `#`. T
 
 ## agents.json
 
-The Wildcard AI standard uses `agents.json` to describe structured workflows — sequences of actions that agents can perform using your API:
+The Wildcard AI standard uses `agents.json` to describe structured workflows - sequences of actions that agents can perform using your API:
 
 ```json
 {
@@ -402,7 +406,7 @@ The Wildcard AI standard uses `agents.json` to describe structured workflows —
 }
 ```
 
-The `flows` array is the distinguishing feature of `agents.json`. Rather than just listing endpoints, it describes complete workflows — what to call, in what order, with what dependencies. Agents can execute a named flow without needing to reason about sequencing themselves.
+The `flows` array is the distinguishing feature of `agents.json`. Rather than just listing endpoints, it describes complete workflows - what to call, in what order, with what dependencies. Agents can execute a named flow without needing to reason about sequencing themselves.
 
 ## NLWeb /ask
 
@@ -430,7 +434,7 @@ Accept: application/json
 }
 ```
 
-The NLWeb reference implementation is available at `github.com/microsoft/NLWeb`. It connects to your existing content (via `llms.txt` or a vector database) and generates answers using a configured LLM backend.
+The NLWeb reference implementation is available at `github.com/nlweb-ai/NLWeb`. It connects to your existing content (via `llms.txt` or a vector database) and generates answers using a configured LLM backend.
 
 ## Advertising Well-Known Files
 

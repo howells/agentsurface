@@ -4,7 +4,7 @@ Install the Agent Surface skill for Claude Code, Codex CLI, or generic agent run
 
 Agent Surface ships a single local skill:
 
-- `surface` - audit, transform, scaffold, and manage AI agent systems, tools, workflows, memory, and model routing
+- `surface` - guide, audit, and scaffold agent surfaces: discovery, API, CLI, MCP, tool contracts, and retrieval
 
 ## Claude Code (Recommended)
 
@@ -16,7 +16,7 @@ In Claude Code, type:
 /plugin install surface
 ```
 
-This works if the Agent Surface plugin is listed in a marketplace your Claude Code is configured to use. Marketplace listing is not guaranteed — this repo does not publish or maintain a marketplace entry, so treat `npx skills add` (below) or the git-clone options as the reliable install paths.
+This works if the Agent Surface plugin is listed in a marketplace your Claude Code is configured to use. Marketplace listing is not guaranteed - this repo does not publish or maintain a marketplace entry, so treat `npx skills add` (below) or the git-clone options as the reliable install paths.
 
 ### Option 2: Git Clone (Personal/Team)
 
@@ -77,7 +77,7 @@ In Codex CLI, type:
 
 ```bash
 codex "Audit this project with surface. Focus on API design and error handling."
-codex "Use the surface skill to add memory to this Mastra project."
+codex "Use the surface skill to scaffold an MCP server for this project."
 ```
 
 Codex will:
@@ -105,7 +105,7 @@ npx skills add https://github.com/howells/agentsurface
 
 This installs the Agent Surface skill:
 
-- `surface` - audit, transform, scaffold, and manage AI agent systems, tools, workflows, memory, and model routing
+- `surface` - guide, audit, and scaffold agent surfaces: discovery, API, CLI, MCP, tool contracts, and retrieval
 
 See the [skills.sh CLI docs](https://skills.sh/docs/cli) for the current command reference.
 

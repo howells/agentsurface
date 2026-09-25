@@ -1,13 +1,14 @@
 ---
 title: Evidence & Grounding
 description: What counts as evidence and how to avoid optimism bias in scoring
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Every score must be grounded in concrete evidence; scores without evidence are guesses prone to optimism bias drift. Evidence takes four forms: file paths with line numbers (openapi.yaml:45 — "description is 4 words"), grep results (grep -r "is\*retriable" returns 0 matches), glob findings (find \*\*/\_.mcp.json returns 0 files), and command output (mytool --help --json returns exit code 2). Cite specific findings, avoid vague summaries. Calibration requires comparing multiple coders against same rubric.
+Every score must be grounded in concrete evidence; scores without evidence are guesses prone to optimism bias drift. Evidence takes four forms: file paths with line numbers (openapi.yaml:45 - "description is 4 words"), grep results (grep -r "is_retriable" returns 0 matches), glob findings (glob \*\*/.mcp.json returns 0 files), and command output (mytool --help --json returns exit code 2). Cite specific findings, avoid vague summaries. Calibration requires comparing multiple coders against same rubric.
 
-- **File paths**: openapi.yaml:45 — description text, line number
+- **File paths**: openapi.yaml:45 - description text, line number
 - **Grep patterns**: Command + result (matches 0, 5, 15 occurrences)
 - **Glob findings**: find pattern, count, example files
 - **Command output**: Tool invocation, exit code, output snippet
@@ -28,9 +29,9 @@ Cite specific locations where the scoring criterion is or isn't met.
 
 **Good:**
 
-> openapi.yaml:45 — description is "Returns data" (4 words, no agent context)
+> openapi.yaml:45 - description is "Returns data" (4 words, no agent context)
 >
-> src/api/users.ts:23 — operationId missing
+> src/api/users.ts:23 - operationId missing
 
 **Weak:**
 
@@ -44,9 +45,9 @@ Search for presence/absence of patterns that indicate capability.
 
 **Good:**
 
-> `grep -r "isError\|is_retriable" src/` — 0 matches. Error responses do not signal retriability to agents.
+> `grep -r "isError\|is_retriable" src/` - 0 matches. Error responses do not signal retriability to agents.
 >
-> `grep "toModelOutput" src/tools/` — matches in 2 of 8 tool files. Incomplete token optimization.
+> `grep "toModelOutput" src/tools/` - matches in 2 of 8 tool files. Incomplete token optimization.
 
 **Weak:**
 
@@ -60,9 +61,9 @@ Report how many files match a pattern, revealing scope.
 
 **Good:**
 
-> `glob("**/llms.txt")` — 0 results. No discovery file for agents.
+> `glob("**/llms.txt")` - 0 results. No discovery file for agents.
 >
-> `glob("**/.mcp.json")` — 1 result (project root). One MCP config, likely basic.
+> `glob("**/.mcp.json")` - 1 result (project root). One MCP config, likely basic.
 
 **Weak:**
 
@@ -167,7 +168,7 @@ Follow this pattern to ground every score:
    - Example: "operationId on all operations"
 
 2. **Run a specific command** to reveal the truth
-   - Example: `grep -c "operationId:" openapi.yaml | wc -l`
+   - Example: `grep -c "operationId:" openapi.yaml`
 
 3. **Record the output verbatim**
    - Example: "12 operationIds across 40 endpoints (30%)"
@@ -230,7 +231,7 @@ When documenting a dimension score, use this template:
 
 **Document low-confidence scores.** If you haven't examined >30% of relevant code, mark it `Low confidence` and suggest manual re-verification.
 
-**Update scores iteratively.** As you discover new evidence, update both the score and confidence level. Audits are not snapshots—they're living documents.
+**Update scores iteratively.** As you discover new evidence, update both the score and confidence level.
 
 ## Evidence across a product journey
 

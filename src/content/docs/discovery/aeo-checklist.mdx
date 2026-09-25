@@ -1,23 +1,26 @@
 ---
-title: AEO Implementation Checklist
-description: Complete tiered checklist for making your site and API discoverable and consumable by AI agents
+title: Agent Discovery Checklist
+description: A tiered checklist for making your site and API discoverable and consumable by AI agents
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-This tiered checklist organizes AEO implementation from essential foundation items through comprehensive support. Tier 1 includes robots.txt, llms.txt, and OpenGraph tags — low effort, high impact. Later tiers add JSON-LD, Markdown content negotiation, Content Signals, OpenAPI links, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and commerce protocols where relevant.
+This tiered checklist organizes agent-discovery work from essential foundation items through comprehensive support. Tier 1 covers robots.txt, llms.txt, and OpenGraph tags - low effort, high impact. Later tiers add JSON-LD, Markdown content negotiation, Content Signals, OpenAPI links, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and commerce protocols where relevant.
 
 - Tier 1: robots.txt, llms.txt, OpenGraph meta tags
 - Tier 2: OpenAPI discovery, JSON-LD markup
 - Tier 3: Content negotiation, content structure, AGENTS.md
 - Tier 4: Well-known endpoints, API Catalog, MCP Server Cards, Agent Skills, auth discovery
+- Tier 5: AGENTS.md depth, llms-full.txt, Copy for AI, token count disclosure, analytics, changelog, status, agent terms of use
+- Tier 6: NLWeb /ask endpoint, /mcp endpoint, agent-mode page view, Content Signals
 - Start with Tier 1 before advancing
 
-This checklist covers the full AEO implementation surface organized by tier. Tier 1 items are the minimum viable foundation — ship these first. Later tiers add depth and capability for teams investing seriously in agent discoverability.
+This checklist covers the full discovery surface organized by tier. Tier 1 items are the minimum viable foundation - ship these first. Later tiers add depth and capability for teams investing seriously in agent discoverability.
 
-Each item links to the relevant section of this documentation where applicable.
+Each item links to the relevant section of this documentation where applicable. This is a checklist, not a scoring system - completing a tier means the items are done, not that you have reached a certified level.
 
-## Tier 1 — Foundation
+## Tier 1 - Foundation
 
 These items cost little to implement and make later discovery work easier to verify. Complete these before anything else.
 
@@ -25,8 +28,9 @@ These items cost little to implement and make later discovery work easier to ver
 
 - [ ] `robots.txt` exists at `/robots.txt` and is served with `Content-Type: text/plain`
 - [ ] `User-agent: *` with `Allow: /` covers all legitimate bots
-- [ ] Training crawlers explicitly disallowed: `GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `cohere-ai`, `CCBot` (or explicitly allowed — the decision is made and documented)
-- [ ] Retrieval bots allowed: `ChatGPT-User`, `Claude-SearchBot`, `PerplexityBot`, `Googlebot` are not blocked
+- [ ] Training crawlers explicitly disallowed: `GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `cohere-ai`, `CCBot` (or explicitly allowed - the decision is made and documented)
+- [ ] Retrieval bots allowed: `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `Googlebot` are not blocked
+- [ ] Search, Agent, and Training access are decided as three separate questions, not one blanket toggle - if the host is Cloudflare, its three-way classification and Bot Preference Sync are configured; otherwise the equivalent per-bot rules are hand-maintained
 - [ ] `Sitemap:` directive points to your primary sitemap
 - [ ] `/robots.txt` is tested with [Google Search Console's robots.txt report](https://support.google.com/webmasters/answer/6062598)
 
@@ -47,7 +51,7 @@ See [llms.txt](./llms-txt).
 
 ### OpenGraph Meta Tags
 
-- [ ] `og:title` is entity-first: "Product Name — Page Topic"
+- [ ] `og:title` is entity-first: "Product Name - Page Topic"
 - [ ] `og:description` is 150–300 characters, factual, answer-dense
 - [ ] `article:modified_time` is present and accurate (W3C datetime format)
 - [ ] `article:published_time` is present
@@ -72,7 +76,7 @@ See [llms.txt](./llms-txt).
 
 ---
 
-## Tier 2 — Content Quality
+## Tier 2 - Content Quality
 
 Content structure improvements that directly affect whether agents extract accurate answers.
 
@@ -97,6 +101,7 @@ See [Content Structure for AI Consumption](./content-structure).
 - [ ] Documentation pages are available in Markdown format at `.md` URLs or via `Accept: text/markdown`
 - [ ] `<link rel="alternate" type="text/markdown" href="...">` present in HTML `<head>`
 - [ ] Markdown output strips navigation and footer, preserves content
+- [ ] For localized content: `hreflang` alternates are present, the locale is a path segment on Markdown routes (not a cookie or query parameter), and each locale has its own `llms.txt`
 
 See [Serving Markdown to Agents](./content-negotiation).
 
@@ -108,17 +113,19 @@ See [Serving Markdown to Agents](./content-negotiation).
 
 ---
 
-## Tier 3 — Structured Data
+## Tier 3 - Structured Data
 
 JSON-LD schema markup for AI Overview inclusion and retrieval system accuracy.
 
 ### FAQPage Schema
 
+Google dropped FAQ rich results from Search in May 2026, so this schema no longer earns Google search presentation. Keep it only for the agents and other parsers that still read `FAQPage` JSON-LD directly.
+
 - [ ] Pages with FAQ or Q&A content include `FAQPage` JSON-LD
 - [ ] Every `Question.name` exactly matches visible heading text
 - [ ] Every `Answer.text` exactly matches visible answer text
 - [ ] No schema content exists that is not visible on the page
-- [ ] Schema validated with [Google Rich Results Test](https://search.google.com/test/rich-results)
+- [ ] Schema validated with the [Schema.org Validator](https://validator.schema.org)
 
 See [Structured Data for Agents](./structured-data).
 
@@ -130,6 +137,8 @@ See [Structured Data for Agents](./structured-data).
 - [ ] `proficiencyLevel` is set (`Beginner` or `Expert`)
 
 ### HowTo Schema
+
+Google dropped `HowTo` rich results from Search in September 2023. Keep the schema for parsers other than Google Search; do not expect it to earn a Google rich result.
 
 - [ ] Step-by-step guides and tutorials include `HowTo` JSON-LD
 - [ ] Each step includes `position`, `name`, `text`, and `url` (anchored to heading)
@@ -150,7 +159,7 @@ See [Structured Data for Agents](./structured-data).
 
 ---
 
-## Tier 4 — Discovery Endpoints
+## Tier 4 - Discovery Endpoints
 
 Machine-readable capability declarations at standard paths.
 
@@ -190,7 +199,7 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 ### MCP Server Card
 
 - [ ] `/.well-known/mcp/server-card.json` published if you run an HTTP MCP server
-- [ ] `transport` correctly specifies `streamable-http`, `sse`, or `stdio`
+- [ ] `transport` correctly specifies `streamable-http` or `stdio`
 - [ ] `authentication` section accurate and complete
 - [ ] Card describes the server before connection: name, purpose, tools, transport, and auth
 - [ ] `/.well-known/mcp.json` redirects or points to the server card if used for compatibility
@@ -220,7 +229,7 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 
 ---
 
-## Tier 5 — Developer Experience
+## Tier 5 - Developer Experience
 
 Improvements for developers using AI coding assistants with your APIs and SDKs.
 
@@ -232,7 +241,7 @@ Improvements for developers using AI coding assistants with your APIs and SDKs.
 - [ ] `## Agent Boundaries` section with three tiers: autonomous / ask first / never
 - [ ] Testing rules stated explicitly: framework, location, required coverage
 - [ ] File is under 500 lines
-- [ ] No prose paragraphs — only lists, code blocks, tables
+- [ ] No prose paragraphs - only lists, code blocks, tables
 
 See [AGENTS.md and Context Files](./agents-md).
 
@@ -254,19 +263,29 @@ See [AGENTS.md and Context Files](./agents-md).
 
 - [ ] `x-markdown-tokens` header present on Markdown responses
 - [ ] Token counts visible to developers (in UI, in response headers, or in `llms.txt`)
-- [ ] Pages over 20K tokens are flagged for splitting
+- [ ] Pages over their type's hard limit in [Content Structure](./content-structure) are flagged for splitting
 
 ### Analytics
 
 - [ ] AI bot traffic tracked separately from human traffic (by user-agent)
+- [ ] Requests carrying a verified Web Bot Auth signature are distinguished from requests that merely claim a matching user-agent string
 - [ ] Which pages retrieval bots visit most frequently is visible
 - [ ] `Retry-After` header compliance monitored (are bots respecting rate limits?)
 
+### Changelog, Status, and Agent Terms of Use
+
+- [ ] A dated changelog exists (page or RSS/Atom feed) so an agent already holding your docs in context can detect drift with one small fetch
+- [ ] Changelog entries name what changed and why it matters, not just that a version shipped
+- [ ] A public status page exists and is linked from the API Catalog entry, so an agent can tell an outage from its own error before deciding to retry
+- [ ] Agent-facing terms of use are published as their own page - what automated or unattended use is actually permitted - and linked from `llms.txt` and API docs, not left implicit in `robots.txt` or buried in general Terms of Service
+
+See [Content Structure](./content-structure) and [Commercial and Entity Discovery](./commercial-and-entity-discovery).
+
 ---
 
-## Tier 6 — Advanced
+## Tier 6 - Advanced
 
-High-investment items for teams deeply committed to AEO.
+High-investment items for teams deeply committed to agent discoverability.
 
 ### NLWeb /ask Endpoint
 
@@ -288,11 +307,21 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 
 See the [MCP Servers](/docs/mcp-servers) section.
 
+### Agent-Mode Page View
+
+- [ ] A stripped structured view exists only where it does a job Markdown negotiation doesn't - direct action links rather than prose content
+- [ ] The view is served at a distinct, documented URL or parameter (e.g. `?mode=agent`), not guessed
+- [ ] Facts, prices, and links in the agent-mode view are checked against the canonical page - it's not a second, silently drifting source of truth
+
+See [Serving Markdown to Agents](./content-negotiation).
+
 ### Content Signals
 
 - [ ] `Content-Signal: search=yes, ai-input=yes, ai-train=no` declared in `robots.txt` or response headers
 - [ ] Policy header overridden appropriately for gated content
 - [ ] `robots.txt` and Content Signals policy are consistent with each other
+- [ ] If a price or specific licence condition (not just yes/no) matters, RSL is attached via `robots.txt`, an HTTP header, HTML, or the RSS feed - Content Signals alone can't express a price
+- [ ] IETF aipref (`draft-ietf-aipref-vocab`, `draft-ietf-aipref-attach`) is tracked, not implemented as a requirement - both are still pre-consensus drafts
 
 See [robots.txt for AI Agents](./robots-txt).
 
@@ -317,9 +346,7 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 
 ### Agentic Commerce
 
-- [ ] x402 implemented for machine-payable resources if agents must pay for access
-- [ ] Universal Commerce Protocol or Agentic Commerce Protocol manifests exist only if agent-mediated commerce is a real product surface
-- [ ] Commerce manifests link to canonical product, price, refund, and support policies
+- [ ] If agent-mediated commerce is a real product surface, see [Agentic Commerce](/docs/agentic-commerce) for product data, checkout protocols, payments, and trust and risk - not covered on this checklist
 
 ### Agentic Search Measurement
 
@@ -333,21 +360,9 @@ Ora's catalog names these checks `brand-search-accuracy`, `agentic-search-usecas
 
 ---
 
-## Scoring Your Implementation
+## Where to stop
 
-Use the tier count to assess where you stand:
-
-| Tiers completed | AEO score | Description                                          |
-| --------------- | --------- | ---------------------------------------------------- |
-| 0               | 0         | No AEO implementation                                |
-| Tier 1          | 1         | Minimum viable — AI agents can find you              |
-| Tier 1–2        | 2         | Content optimized for agent consumption              |
-| Tier 1–3        | 3         | Structured data enables AI Overview inclusion        |
-| Tier 1–4        | 4         | Fully machine-discoverable via standard protocols    |
-| Tier 1–5        | 5         | Developer-grade AEO, IDE integrations supported      |
-| Tier 1–6        | 6         | Reference implementation, advanced agent integration |
-
-Most production SaaS products targeting developer audiences should aim for Tier 4–5. Tier 6 items are appropriate for companies that want to be the primary source agents cite in their domain, or that build infrastructure other agents depend on.
+Most production SaaS products targeting developer audiences should complete Tier 1 through Tier 4-5. Tier 6 items are appropriate for companies that want to be the primary source agents cite in their domain, or that build infrastructure other agents depend on. There is no certified score for finishing a tier - treat each tier as done when its checkboxes are, and move to the next.
 
 ## Verify the path from discovery to action
 

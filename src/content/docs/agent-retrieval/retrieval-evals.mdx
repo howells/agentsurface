@@ -1,0 +1,82 @@
+---
+title: Retrieval Evals
+description: Metrics, CI gates, and common failure modes for retrieval quality - condensed current practice
+lastVerified: 2026-09-25
+---
+
+Retrieval quality fails silently - a bad chunking change or a stale embedding doesn't throw an error, it just returns worse results. Measure it explicitly rather than trusting that it still works.
+
+## Metrics
+
+| Metric         | What it measures                                               | A reasonable first gate   |
+| -------------- | -------------------------------------------------------------- | ------------------------- |
+| Recall@k       | Whether known-relevant docs appear in the top k                | `recall_at_10 >= 0.8`     |
+| nDCG@k         | Whether more relevant docs rank higher                         | `ndcg_at_10 >= 0.8`       |
+| MRR            | How quickly the first relevant result appears                  | `mrr >= 0.7`              |
+| Faithfulness   | Whether the generated answer is supported by retrieved context | Gate high-risk answers    |
+| Latency p95    | Whether retrieval fits the product's SLA                       | Set per endpoint          |
+| Cost per query | Whether agentic or multi-hop retrieval stays affordable        | Set a budget per workflow |
+
+```typescript
+function recallAtK(retrievedIds: string[], relevantIds: Set<string>, k = 10) {
+  const retrieved = retrievedIds.slice(0, k);
+  return retrieved.filter((id) => relevantIds.has(id)).length / Math.max(1, relevantIds.size);
+}
+```
+
+Use RAGAS for standardized scoring, plus a domain-specific eval set of 100–1,000 labelled queries - a 10-query test set produces noisy metrics and false confidence in changes.
+
+## CI gate
+
+```typescript
+describe("retrieval quality", () => {
+  test("keeps labelled answers retrievable", async () => {
+    const cases = loadRetrievalCases();
+    const scores = await Promise.all(
+      cases.map(async (item) => {
+        const results = await retrieveForAnswer(item.query);
+        return recallAtK(
+          results.map((r) => r.id),
+          item.relevantIds,
+        );
+      }),
+    );
+    const meanRecall = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+    expect(meanRecall).toBeGreaterThanOrEqual(0.8);
+  });
+});
+```
+
+## Drift monitoring
+
+Re-embed a stable document sample monthly or after a model change, and compare nearest-neighbor sets; raw vector similarity can look fine while ranking quietly degrades. Alert when recall drops on labelled queries. Record the embedding model, dimensions, chunker version, and index version with every evaluation run so a regression can be traced to its cause.
+
+## Common failure modes
+
+| Failure                                                 | Fix                                                                                                             |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Dense-only retrieval misses exact terms, IDs, filenames | Add hybrid (BM25 + dense + fusion)                                                                              |
+| No chunking strategy, anonymous text blobs indexed      | Chunk with source, section, and version metadata                                                                |
+| One embedding model for every domain                    | Compare specialized vs. general models with recall@k before committing                                          |
+| No reranking                                            | Retrieve broad (50–100), rerank to 5–10                                                                         |
+| No evaluation at all                                    | Add RAGAS or domain recall@k in CI                                                                              |
+| Embeddings never refreshed after a model update         | Version embeddings; re-embed on model change; monitor drift                                                     |
+| No metadata filters                                     | Enforce tenant and visibility filters before ranking                                                            |
+| Naive fixed-size pagination of results                  | Cap page size; use explicit cursors - see [Filters and Pagination](/docs/retrievability/filters-and-pagination) |
+| Unbounded agentic retrieval                             | Cap sub-queries, tool calls, tokens, and cost per request                                                       |
+| No fallback when retrieval returns nothing              | Return an explicit "no relevant documents" response rather than generating from empty context                   |
+
+## Checklist
+
+- Hybrid search covered by tests (sparse and dense independently).
+- Reranking measured against a labelled query set.
+- Recall@10 and nDCG@10 gated in CI.
+- Embedding drift detection running on a schedule.
+- Chunk and embedding model versions tracked in metadata.
+- Cost and latency budgets set per retrieval workflow.
+- Reindexing has a rollback path.
+
+## See also
+
+- [RAGAS documentation](https://docs.ragas.io/)
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)

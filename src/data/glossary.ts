@@ -120,7 +120,7 @@ export const glossaryTerms: GlossaryTerm[] = [
       "An orchestrator decides what runs next, carries state between steps, and handles retries, limits, and handoffs. It can support one agent or several. A fixed workflow suits predictable steps; an agent can make decisions where the next step depends on the result. More agents are useful only when their separate responsibilities justify the added coordination.",
     id: "orchestration",
     name: "Orchestration",
-    href: "/docs/multi-agent",
+    href: "/docs/agents",
   },
   {
     acronym: "API",
@@ -495,7 +495,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "A protocol for connecting agent platforms with merchant commerce capabilities.",
     detail:
       "UCP describes capabilities such as checkout, identity linking, and order management. It lets compatible systems exchange purchase information through defined contracts. A merchant still needs supported payment integrations and must enforce its business rules and the buyer's authority.",
-    href: "/docs/protocols/agentic-commerce",
+    href: "/docs/agentic-commerce/checkout-protocols",
   },
   {
     id: "acp",
@@ -505,7 +505,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "A protocol for agent-assisted checkout and related commerce operations.",
     detail:
       "ACP provides defined interfaces for preparing and completing purchases with a merchant. The integration must handle totals, customer approval, payment, and order results. Use the version and binding supported by the actual agent client and payment provider.",
-    href: "/docs/protocols/acp",
+    href: "/docs/agentic-commerce/checkout-protocols",
   },
   {
     id: "ap2",
@@ -515,7 +515,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "A protocol for expressing and verifying authorization in agent-led payments.",
     detail:
       "AP2 uses signed mandates to record purchase intent and authorization. Participants verify the evidence required by their payment flow. A signed mandate, a completed payment, and delivery of the purchased item are separate facts.",
-    href: "/docs/protocols/agentic-commerce",
+    href: "/docs/agentic-commerce/payments",
   },
   {
     id: "payment-mandate",
@@ -525,7 +525,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "A record of what someone has authorized an agent to buy or spend.",
     detail:
       "A mandate can bind permission to an amount, merchant, purpose, or expiry, depending on the protocol. The receiving system verifies that permission before proceeding. An agent preparing a cart does not itself establish authority to pay.",
-    href: "/docs/protocols/agentic-commerce",
+    href: "/docs/agentic-commerce/payments",
   },
   {
     id: "mpp",
@@ -535,7 +535,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "An HTTP payment protocol for paid resources such as API calls and content.",
     detail:
       "A server presents a payment challenge, the client responds with a payment credential, and the server verifies it before supplying the resource. Price, spending limits, receipts, and recovery after failed delivery all need defined behavior.",
-    href: "/docs/protocols/mpp",
+    href: "/docs/agentic-commerce/payments",
   },
   {
     id: "x402",
@@ -545,6 +545,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition: "A protocol that uses HTTP 402 responses to request payment for a resource.",
     detail:
       "The response tells a compatible client what payment is required. The client provides payment information, which is verified under the supported scheme before access is granted. Check the payment network, asset, settlement process, and retry behavior required by the integration.",
-    href: "/docs/protocols/agentic-commerce",
+    href: "/docs/agentic-commerce/payments",
   },
 ];

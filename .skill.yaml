@@ -10,9 +10,7 @@ version: 2.3.0
 license: MIT
 
 description: |
-  Make software legible to agents. One skill that routes to the right workflow:
-  audit agent readiness, scaffold agent infrastructure, generate MCP servers,
-  write context files, or fix specific gaps.
+  Make software legible to agents. Guide, audit or scaffold the surfaces agents use: discovery, context files, APIs, CLIs, tools, MCP servers, authentication, errors, retrieval and the tests that prove them.
 
 entry-point: ./skills/surface/SKILL.md
 
@@ -31,19 +29,14 @@ keywords:
   - cli-design
   - agent-dx
   - audit
-  - transformation
+  - scorecard
   - scaffolding
   - llms-txt
   - agents-md
-  - aeo
-  - data-retrievability
-  - vectors
-  - rag
-  - mastra
+  - agent-discovery
+  - retrievability
   - tools
-  - workflows
-  - ai-sdk
-  - memory
+  - webmcp
 
 compatibility:
   - claude-code >= 1.0.0
@@ -63,9 +56,7 @@ specialist-agents:
   - mcp-builder
   - test-writer
   - retrievability-engineer
-  - agentic-patterns-writer
   - tool-design-writer
-  - multi-agent-writer
 
 # Distribution URLs (for future registry lookup)
 distribution:

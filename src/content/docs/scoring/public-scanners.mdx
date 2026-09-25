@@ -1,0 +1,82 @@
+---
+title: Public Readiness Scanners
+description: Hosted and local scanners that check a deployed site's agent readiness from the outside, and how to use them alongside a Surface audit
+lastVerified: 2026-09-25
+---
+
+Public scanners answer a narrower question than a repository audit: what can an outside agent observe from the deployed site right now? Use them as smoke tests for crawl access, machine-readable content, discovery documents, public APIs, and callable surfaces. They cannot see an unpublished contract, an authenticated flow they cannot enter, or the source-level reason a check failed.
+
+Only well-respected scanners with a published methodology or check catalog are named on this page. Pair an observed report with a [Surface audit](/docs/scoring), then trace failed signals back to code and deployment configuration. See [Evaluating Product Journeys](/docs/scoring/product-journeys) to interpret external findings in terms of a real task, source ownership, applicability, and verified outcomes.
+
+## Is Agentic
+
+[Is Agentic](https://is-agentic.com/) is a Vercel service powered by Ora. Its Essential checks share an 80-point pool, Recommended checks share 20 points, and emerging signals can add up to five bonus points. Inapplicable surfaces are excluded; API, OAuth, MCP, GraphQL, and MCP Apps checks activate only when detected. The report timestamp and individual evidence matter more than the headline score because both the target and methodology can change.
+
+Its public integration surfaces are deliberately read-only:
+
+- `GET https://is-agentic.com/api/v1/report?url=...` retrieves the latest completed public report but does not start a scan.
+- `npx is-agentic <domain> --json` returns a stored report or starts a scan when none exists.
+- `https://is-agentic.com/mcp` exposes report, methodology, and developer-documentation tools over remote MCP.
+- `npx skills add vercel-labs/is-agentic` installs its agent skill.
+
+Only submit public URLs. Do not use an external scanner for private, authenticated, pre-release, or confidential environments merely to obtain a score.
+
+## Ora / orank scans
+
+[Ora](https://ora.ai/) - formerly at orank.ai, which now redirects to ora.ai - provides a public score and actionable findings across discovery, access, usability, and payments. Retrieve the cached result with `GET https://ora.ai/api/score/example.com`, or request a scan with `POST https://ora.ai/api/scan` and JSON body `{"url":"example.com"}`. See its [API reference](https://ora.ai/api/openapi.json) for caching and rate limits.
+
+Treat each finding as evidence to investigate. A public documentation API benefits from OpenAPI and recoverable JSON errors; it does not need an OAuth authorization server when no protected resources exist. Wikipedia and Wikidata presence depend on independent evidence and eligibility, not configuration. Record the scan date and deployed version before comparing scores.
+
+Ora's [checks catalog](https://ora.ai/api/checks) is at contract 1.25.0 with 125 checks. Its August 2026 audit reweighted two of them: ARD catalog discovery (`ard-catalog`) dropped from 3 to 1 point while ecosystem adoption of the ARD standard is still early, and developer-resource discoverability (`agentic-search-specific`) dropped from 6 to 3 points because search-result categorization for that check is noisy.
+
+Ora also published [AgentReady](https://agentready.org), a vendor-neutral, MIT-licensed standard for agent readiness, developed together with Vercel, Mintlify, and Auth0 and reaching v1.0 in August 2026. Requirements carry stable IDs in three categories - `AR-FIND-*`, `AR-READ-*`, `AR-ACT-*` - each rated MUST, SHOULD, or MAY from traced agent runs and a controlled experiment. The spec deliberately defines no scoring, weights, or leaderboard; those are left to independent implementations, including Ora's own scanner, [Is Agentic](https://is-agentic.com/), and Mintlify's Agent Score. See the [spec](https://github.com/agentready-org/standard/blob/main/spec/spec.md) and [announcement](https://ora.ai/blog/agentready-open-standard).
+
+## Cloudflare Agent Readiness
+
+[Cloudflare's checker](https://isitagentready.com/) covers discovery, content, bot access control, API/auth/tool metadata, and commerce. It exposes a [skill index](https://isitagentready.com/.well-known/agent-skills/index.json), a remote MCP server at `https://isitagentready.com/mcp`, and a scan API:
+
+```sh
+curl https://isitagentready.com/api/scan \
+  -H 'Content-Type: application/json' \
+  --data '{"url":"https://example.com"}'
+```
+
+First verified on 10 September 2026 and re-verified on **24 September 2026**, the comparison still found 22 available checks, unchanged; the website's default selection excludes A2A and AP2. Commerce is excluded from the displayed overall percentage, and neutral results do not count in its denominator. The API also returns a separate readiness level. Record the selected checks and scan time when comparing results.
+
+Its useful differences from [Ora's published catalog](https://ora.ai/api/checks) are:
+
+- **DNS-AID:** an additional DNS discovery check, absent from Ora contract 1.25.0's 125 checks. See [DNS Discovery](/docs/discovery/dns-discovery) for applicability and verification.
+- **Content Signals:** Cloudflare scores it as a standalone check, separate from crawler rules. Ora instead folds `ai-train=`/`search=` Content Signals directives into its single crawler-policy check (`robots-ai-policy-quality`) rather than scoring them on their own. Keep access and content use separate in your implementation even when a scanner combines their scores.
+- **Discovery routes:** the catalog probe also tries DNS TXT and SRV records. A broader set of probes does not imply a new product requirement.
+
+Is Agentic uses Ora's checks, so it provides another interpretation of that evidence rather than an independent checklist. Most Cloudflare capabilities overlap Ora, with different acceptance criteria and weights. Use each report to investigate actual client failures; a scanner's preferred path or older API name is not a substitute for the current protocol specification.
+
+## Google Lighthouse Agentic Browsing
+
+Lighthouse ships an `agentic-browsing` category in its default config, added in [Lighthouse 13.3.0](https://github.com/GoogleChrome/lighthouse/blob/main/changelog.md) (7 May 2026) and included by default since. It runs in both navigation and snapshot mode and is explicitly marked experimental: "This category is still under development and subject to change." Chrome's [scoring guide](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) says testing it needs Chrome 150 or later, and the WebMCP audits need the WebMCP origin trial. It scores as a pass fraction rather than 0-100.
+
+Seven audits make up the category, defined in [`agentic-browsing-config.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/config/agentic-browsing-config.js) and [`default-config.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/config/default-config.js):
+
+- `agent-accessibility-tree` - a subset of axe rules covering accessible names, labels, ARIA validity, and document title.
+- `webmcp-registered-tools` - lists registered WebMCP tools and warns above 40.
+- `webmcp-form-coverage` - flags forms missing WebMCP tool annotations.
+- `webmcp-schema-validity` - flags issues such as a missing form `toolname`, `tooldescription`, or parameter descriptions.
+- `cumulative-layout-shift` - the standard performance audit, reused here.
+- `llms-txt` - fetchable, Markdown, with at least one H1.
+- `ard-schema` - validates `ai-catalog.json` against the [ARD spec](https://agenticresourcediscovery.org/spec/), discovered via a `robots.txt` `Agentmap:` line, an HTML `<link rel="ai-catalog">`, an HTTP `Link` header, or the `/.well-known/ai-catalog.json` fallback.
+
+Run it locally:
+
+```sh
+npx lighthouse https://example.com --only-categories=agentic-browsing
+```
+
+Unlike the hosted scanners above, Lighthouse runs on your own machine, so the "only submit public URLs" caution above does not apply to it: point it at a pre-release, staging, or authenticated environment you can reach locally.
+
+## Shopify product-page audit
+
+[Shopify's product-page audit](https://www.shopify.com/agentic-readiness) takes a single product-page URL and checks the structured data AI shopping agents read to answer shoppers' questions, tied to Shopify Catalog and Agentic Storefronts. Shopify does not publish a detailed methodology or check list for the tool; it states plainly that results are "informational signals" and do not guarantee a product will be surfaced by AI agents. Treat it as a commerce-specific spot check on a product page's structured data, not a general-purpose agent-readiness scanner.
+
+## Other public checkers
+
+Many smaller free checkers exist beyond the ones above, mostly re-skinning variations of the same checklist. This guide tracks practices by the underlying standard - robots.txt, Content Signals, llms.txt, ARD, WebMCP, and so on - rather than by which checker currently scores them, since checker rosters turn over faster than the standards do.

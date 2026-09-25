@@ -13,7 +13,7 @@
  * **Canonical URL:** https://braintrust.dev/docs
  *
  * **Customisation checklist:**
- * - [ ] Update AGENT_MODEL to your model ID (opus-4-7, sonnet-4-6, etc.)
+ * - [ ] Update AGENT_MODEL to your model ID (claude-opus-5-5, claude-sonnet-5, etc.)
  * - [ ] Customize task() function to call your actual agent
  * - [ ] Add domain-specific graders (not just Factuality)
  * - [ ] Load real production traces or labelled dataset
@@ -34,7 +34,7 @@ import Braintrust from "@braintrust/eval";
 import { z } from "zod";
 
 // <CUSTOMISE>: Update model and dataset loading
-const AGENT_MODEL = "claude-opus-5";
+const AGENT_MODEL = "claude-opus-5-5";
 const DATASET_NAME = "agent-tasks-v1";
 const EVAL_NAME = "agent-routing-eval";
 
@@ -100,7 +100,7 @@ async function scoreToolCallOrder(
  * Custom scorer: Cost (sum of input + output tokens)
  */
 async function scoreCost(response: AgentResponse): Promise<{ score: number; cost: number }> {
-  // Example: $5 per 1M input tokens, $25 per 1M output tokens (Opus 5)
+  // Example: $5 per 1M input tokens, $25 per 1M output tokens (Opus 5.5)
   const inputCost = (response.tokens.input / 1e6) * 5;
   const outputCost = (response.tokens.output / 1e6) * 25;
   const totalCost = inputCost + outputCost;

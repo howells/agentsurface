@@ -1,20 +1,22 @@
 ---
-title: Arazzo Multi-Step Workflows
+title: Arazzo Workflows
 description: Using the OpenAPI Arazzo specification to define multi-step agent workflows with explicit sequencing, control flow, and runtime expressions
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Arazzo defines multi-step workflows as executable specifications, preventing agents from inventing their own order. A workflow document declares the sequence of operations, runtime expressions for data flow between steps, and success/failure handlers. This ensures deterministic behavior and prevents hallucinated steps or omitted operations in complex tasks like flight booking or payment processing.
+Arazzo defines multi-step workflows as executable specifications, preventing agents from inventing their own order. A workflow document declares the sequence of operations, runtime expressions for data flow between steps, and success/failure handlers. This keeps the sequence deterministic and prevents hallucinated steps or omitted operations in complex tasks like flight booking or payment processing.
 
 - Latest published specification: Arazzo 1.1.0.
-- Arazzo references one or many OpenAPI specs and maps them into workflows
+- Arazzo references one or many OpenAPI (and, since 1.1.0, AsyncAPI) specs and maps them into workflows
 - Each step binds to an operationId and passes data between steps via runtime expressions
-- Control flow primitives: continue, retry, goto recovery step, end
+- 1.1.0 adds a Selector Object for extracting a value from a JSON or XML response with JSONPath, XPath, or JSON Pointer
+- Control flow primitives: retry, goto recovery step, end
 - Prevents agent improvisation when sequencing matters
 - Explicit parameter and input component definitions reduce hallucination
 
-Agents improvise. Without explicit workflow definitions, an agent that needs to book a flight will invent its own sequence — searching for flights, selecting one, entering passenger details, processing payment — based on what seems reasonable. It will get the order wrong, skip steps, or hallucinate operations that do not exist.
+Agents improvise. Without explicit workflow definitions, an agent that needs to book a flight will invent its own sequence - searching for flights, selecting one, entering passenger details, processing payment - based on what seems reasonable. It will get the order wrong, skip steps, or hallucinate operations that do not exist.
 
 Arazzo solves this by letting you define the sequence explicitly, in a machine-readable format that agent frameworks can execute directly.
 
@@ -27,12 +29,12 @@ A workflow definition includes:
 - Which OpenAPI specs it references (one or many)
 - The ordered steps in the workflow, each mapped to an `operationId`
 - Runtime expressions for passing data between steps
-- Success and failure actions (continue, retry, goto a recovery step, end)
+- Success and failure actions (retry, goto a recovery step, end)
 - Reusable parameter and input components
 
 ## Core Structure
 
-An Arazzo document has three top-level fields: `arazzo`, `info`, and the core content split between `sourceDescriptions`, `workflows`, and `components`.
+An Arazzo document has five top-level fields: `arazzo`, `info`, `sourceDescriptions`, `workflows`, and `components`.
 
 ```yaml
 arazzo: "1.1.0"
@@ -96,6 +98,8 @@ workflows:
         onFailure:
           - name: no-flights-found
             type: end
+        outputs:
+          flights: $response.body#/flights
 
       - stepId: select-flight
         operationId: $sourceDescriptions.flights-api#hold_flight
@@ -110,6 +114,10 @@ workflows:
           - name: proceed-to-payment
             type: goto
             stepId: process-payment
+        outputs:
+          hold_id: $response.body#/hold_id
+          total_price: $response.body#/total_price
+          currency: $response.body#/currency
 
       - stepId: process-payment
         operationId: $sourceDescriptions.payments-api#charge_card
@@ -129,6 +137,8 @@ workflows:
           - name: payment-failed
             type: goto
             stepId: release-hold
+        outputs:
+          payment_id: $response.body#/payment_id
 
       - stepId: confirm-booking
         operationId: $sourceDescriptions.flights-api#confirm_flight_booking
@@ -175,6 +185,8 @@ components:
           format: date
 ```
 
+Each `sourceDescriptions` entry's `type` is `openapi`, `asyncapi`, or `arazzo` (a nested reference to another Arazzo document). The `asyncapi` type, added in 1.1.0, lets a workflow step bind to an AsyncAPI operation - orchestrating a publish/subscribe or messaging step alongside REST steps in the same workflow, using the same `$sourceDescriptions.<name>#<operationId>` reference syntax.
+
 ## Runtime Expressions
 
 Runtime expressions are how Arazzo passes data between steps. They use a `$`-prefixed path syntax that resolves at execution time.
@@ -211,14 +223,30 @@ steps:
 
 Downstream steps then reference `$steps.create-order.outputs.order_id` rather than navigating the raw response body repeatedly.
 
+### Selector Object (Arazzo 1.1.0)
+
+For extraction that a plain runtime expression can't reach - a JSONPath query, an XPath into an XML body - 1.1.0 adds a Selector Object with three required fields: `context` (the runtime expression identifying the data source, e.g. `$response.body`), `selector` (the query itself), and `type` (`jsonpath`, `xpath`, or `jsonpointer`):
+
+```yaml
+outputs:
+  first_item_id:
+    context: $response.body
+    selector: $.items[0].id
+    type: jsonpath
+```
+
+Use a Selector Object where the plain `$response.body#/path` shorthand can't express the query - array filtering, XML namespaces, or a JSON Pointer built from a runtime value.
+
+Criterion objects in `successCriteria` use the same `context` and `type` fields but carry the expression in `condition`, not `selector`.
+
 ## Control Flow
 
 ### Success Actions
 
 After a step succeeds (status code matches `successCriteria`), you can:
 
-- `end` — terminate the workflow, returning any declared outputs
-- `goto` — jump to another step by `stepId`
+- `end` - terminate the workflow, returning any declared outputs
+- `goto` - jump to another step by `stepId`
 
 ```yaml
 onSuccess:
@@ -234,9 +262,9 @@ onSuccess:
 
 After a step fails, you can:
 
-- `end` — terminate the workflow with failure
-- `goto` — jump to a recovery or cleanup step
-- `retry` — retry the current step, optionally with a delay and max attempt count
+- `end` - terminate the workflow with failure
+- `goto` - jump to a recovery or cleanup step
+- `retry` - retry the current step, optionally with a delay and max attempt count
 
 ```yaml
 onFailure:
@@ -377,17 +405,6 @@ When you generate MCP tools from an API, generate tools for both individual endp
 }
 ```
 
-## The Problem Without Arazzo
-
-Without workflow definitions, agents that need to execute multi-step processes will:
-
-1. **Improvise the sequence** — agents infer order from semantics, getting it wrong when operations have non-obvious dependencies
-2. **Hallucinate intermediate steps** — if no "hold flight" operation exists in their tool set, an agent may skip it and try to go straight to payment
-3. **Fail silently at decision points** — without defined failure actions, agents have no instructions for what to do when payment fails and a hold needs to be released
-4. **Lose context across steps** — without explicit output extraction, agents may fail to thread the right IDs from step to step
-
-Arazzo makes the sequence explicit, the data dependencies traceable, and the failure paths defined.
-
 <Callout type="warn">
   Agents improvising multi-step workflows is one of the most common failure modes in production
   agent systems. If your API requires more than one operation to complete a user-facing action,
@@ -400,17 +417,17 @@ Arazzo makes the sequence explicit, the data dependencies traceable, and the fai
 
 When you have an Arazzo spec alongside your OpenAPI spec, generate MCP tools from both:
 
-- **Individual operation tools** — one tool per `operationId` for fine-grained access
-- **Workflow tools** — one tool per Arazzo `workflowId` for composite operations
+- **Individual operation tools** - one tool per `operationId` for fine-grained access
+- **Workflow tools** - one tool per Arazzo `workflowId` for composite operations
 
 The workflow tool's description comes from the Arazzo `workflow.description` field; write it as an agent trigger condition (see [Naming and Descriptions](/docs/tool-design/naming-and-descriptions)).
 
 ### Validation
 
-Validate Arazzo documents with the `@openapi-contrib/arazzo-parser` package or the Arazzo CLI before generating tools:
+Validate Arazzo documents with the `@jentic/arazzo-validator` package before generating tools:
 
 ```bash
-npx arazzo-validator validate booking-workflows.arazzo.yaml
+npx @jentic/arazzo-validator validate booking-workflows.arazzo.yaml
 ```
 
 ### Version Alongside OpenAPI
@@ -428,6 +445,6 @@ Keep your Arazzo spec in the same repository as your OpenAPI spec and version th
 
 ## Related Pages
 
-- [OpenAPI for Agents](./openapi-for-agents) — writing the OpenAPI spec that Arazzo workflows reference
-- [Tool Definitions](./tool-definitions) — generating MCP tools from Arazzo workflow definitions
-- [Protocols & Standards](/docs/protocols) — Arazzo in the broader protocol landscape
+- [OpenAPI for Agents](./openapi-for-agents) - writing the OpenAPI spec that Arazzo workflows reference
+- [Tool Definitions](./tool-definitions) - generating MCP tools from Arazzo workflow definitions
+- [Protocols & Standards](/docs/protocols) - Arazzo in the broader protocol landscape

@@ -1,0 +1,65 @@
+---
+title: Agentic Commerce
+description: What a merchant or commerce platform needs so agents can find products, trust the listing, check out, pay, and follow up on an order
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Agentic commerce is what happens when the buyer at the other end of a request is a shopping agent instead of a browser. The product, catalog, checkout, and payment surfaces that already exist for people need to work for a caller that reads structured data instead of a page, holds a scoped mandate instead of a wallet, and needs a machine-checkable answer instead of a "thanks for your order" screen.
+
+This section is written for anyone running a store or a commerce platform, and the engineers building it. It is not written for someone building a shopping agent - for that side, [Agents](/docs/agents) and [Agent Retrieval](/docs/agent-retrieval) are the relevant sections.
+
+- Product data agents can find and trust comes first - nothing downstream works without it
+- Checkout and payment are separate problems: completing a transaction, and proving who authorized spending it
+- Card networks, Stripe, and browser-level bot verification are converging on the same shape - a signed, scoped, revocable authorization
+- Shopify has shipped most of this as platform features already; other stacks have to build the equivalent by hand
+- Commerce reuses the existing dimensions, applied to a purchase flow
+
+## The layers
+
+Treat agent-ready commerce as five layers, each depending on the one before it.
+
+1. **Products agents can find and trust** - accurate `Product`/`Offer` structured data, a merchant feed a shopping surface can ingest, and a catalog API an agent can query directly. See [Product Data](/docs/agentic-commerce/product-data).
+2. **Checkout agents can complete** - a session-based protocol (UCP, ACP) or platform SDK that turns a cart into an order without a human clicking through a web form. See [Checkout Protocols](/docs/agentic-commerce/checkout-protocols).
+3. **Payment authority** - a verifiable record of what a human authorized an agent to spend, and a settlement mechanism that honours it. See [Payments](/docs/agentic-commerce/payments).
+4. **Trust and risk** - telling a legitimate shopping agent from a scraper or a fraud bot before you let either one near checkout. See [Trust and Risk](/docs/agentic-commerce/trust-and-risk).
+5. **After the order** - status, cancellation, returns, and refunds as callable operations, not just email confirmations. See [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase).
+
+A gap in an earlier layer breaks everything above it. A perfect checkout integration is wasted if the product feed lists the wrong price, and a signed payment mandate is wasted if there is no callable way to check whether the order actually shipped.
+
+## What to do first, by role
+
+**Merchant on a commerce platform (Shopify or similar).** Most of layers 1-3 arrive as a platform feature, not something you build. Confirm it is switched on, keep your product data and return policy accurate at the source, and read [Shopify](/docs/agentic-commerce/shopify) for exactly what is automatic versus what you must configure. Your real work is layers 4 and 5: fraud thresholds and order webhooks are yours regardless of platform.
+
+**Merchant with a custom stack.** Start at layer 1 - it is cheap and every downstream surface depends on it. Then pick one checkout protocol per [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) rather than hand-building a competing flow; UCP has more live merchant integrations than ACP. Payment authority (layer 3) follows from whichever payment provider you already use - check what your processor supports before picking a mandate format yourself.
+
+**Commerce platform or marketplace operator.** You are building layers 1-4 for your merchants, which means protocol choice and trust decisions are platform policy, not per-merchant configuration. The mandate model (a signed, scoped, revocable spending authorization) is the primitive to standardize on internally regardless of which wire protocol you expose.
+
+**API or content seller (pay-per-resource, not retail).** Layers 1, 2, and 4 mostly do not apply. Go straight to the machine-payment half of [Payments](/docs/agentic-commerce/payments) - MPP and x402 - which is built for metering a single API call or a piece of content rather than a shopping cart.
+
+## How this maps onto the scorecard
+
+Agentic commerce uses the existing ten dimensions of the [Surface scorecard](/docs/scoring/rubric), evaluated against a purchase task instead of a generic one:
+
+| Dimension                              | What a commerce audit checks                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Discovery & AEO                        | Product/Offer structured data, merchant feeds, UCP/ACP well-known manifests, the platform product-page audit    |
+| API Surface / MCP Server / Tool Design | Catalog, cart, checkout, and order operations exposed as callable contracts rather than only an HTML page       |
+| Authentication                         | Spending mandates, signed-agent verification (Web Bot Auth, Trusted Agent Protocol), scoped payment credentials |
+| Error Handling                         | Idempotent order creation, payment failure recovery, webhook retry and dedup                                    |
+| Testing & Evaluation                   | A sandbox environment that exercises checkout, payment failure, and order status without touching real money    |
+| Retrievability                         | Live price and availability accuracy at the moment an agent commits to a purchase                               |
+| CLI Design, Context Files              | Usually N/A for a storefront; score when the product ships a CLI or agent-facing context files                  |
+
+[Evaluating Product Journeys](/docs/scoring/product-journeys) already covers the purchase journey (find a product, check price and availability, check out, pay, track the order, return it) end to end - use it as the audit script; use this section as the reference material behind each step.
+
+## Related Pages
+
+- [Product Data](/docs/agentic-commerce/product-data)
+- [Checkout Protocols](/docs/agentic-commerce/checkout-protocols)
+- [Payments](/docs/agentic-commerce/payments)
+- [Shopify](/docs/agentic-commerce/shopify)
+- [Trust and Risk](/docs/agentic-commerce/trust-and-risk)
+- [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase)
+- [Evaluating Product Journeys](/docs/scoring/product-journeys)

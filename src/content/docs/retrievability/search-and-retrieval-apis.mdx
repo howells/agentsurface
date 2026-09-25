@@ -1,0 +1,43 @@
+---
+title: Search and Retrieval APIs
+description: Exposing a documented query surface so agents can find your product's data instead of scraping it
+lastVerified: 2026-09-25
+---
+
+Agents need a callable way to search or retrieve your product's data - support articles, catalog items, records, documents - that returns structured, attributable results. A search box built for a browser is not that surface: it returns HTML, not a contract an agent can call directly.
+
+## What a retrieval endpoint needs
+
+- **A documented query parameter set.** Free-text query, structured filters, sort order, and result shape belong in your API spec, not only in UI behavior. See [OpenAPI for Agents](/docs/api-surface/openapi-for-agents).
+- **A stable result schema.** Every result needs an identifier, a title or summary, enough content to be useful without a follow-up call, and a canonical URL or resource reference. Returning bare IDs forces the agent into N follow-up calls to resolve what it just found.
+- **Relevance signals.** If your endpoint ranks results, expose the score or rank alongside each item so an agent can decide how much to trust the top result versus the tenth.
+- **A documented empty-result and no-match behavior.** Distinguish "zero results because nothing matched" from "the query was invalid." An agent needs to know whether to retry with a broader query or stop.
+
+## Result shape example
+
+```json
+{
+  "results": [
+    {
+      "id": "doc_9f21",
+      "title": "Rotating an API key",
+      "snippet": "Go to Settings → API Keys → Rotate. The old key remains valid for 24 hours...",
+      "score": 0.91,
+      "url": "https://docs.example.com/api-keys/rotate",
+      "updated_at": "2026-08-02T00:00:00Z"
+    }
+  ],
+  "next_cursor": "eyJvZmZzZXQiOjEwfQ",
+  "total_estimate": 47
+}
+```
+
+Every field here answers a question the agent otherwise has to guess at: what did I find, how confident should I be, where did it come from, is there more, and how much more.
+
+## Structured versus free-text retrieval
+
+Not every retrieval need is a search box. Agents often need typed queries over structured data: "orders placed after March 1 in status `shipped`." Expose this as filtered list endpoints or a query language (SQL-like, GraphQL, or structured filter parameters) rather than forcing every question through a full-text search index that was tuned for prose. See [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts) for pagination and response-schema mechanics that apply to both.
+
+## What not to duplicate here
+
+Chunking prose so an agent can retrieve a self-contained answer from it is a content-authoring concern, covered in [Content Structure](/docs/discovery/content-structure). Building a vector index or embeddings pipeline to power semantic search over your own corpus is an implementation choice; the current best-practice patterns for that live in [Agent Retrieval](/docs/agent-retrieval) as inventory, not as a requirement of this dimension. The score covers whether the capability is reachable, documented, and returns agent-usable results; which retrieval technology sits behind it is out of scope.

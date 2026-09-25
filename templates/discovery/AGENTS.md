@@ -1,5 +1,5 @@
 <!--
-AGENTS.md — Canonical agent-consumable project documentation.
+AGENTS.md - Canonical agent-consumable project documentation.
 
 What: A plain-markdown file that tells AI agents (Claude Code, Cursor, Copilot, etc.) what this
 project does, how to run it, where critical files live, and what they are and are not allowed to change.
@@ -86,7 +86,7 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 │   │   ├── AGENTS.md
 │   │   └── next.config.ts
 │   │
-│   ├── mcp-server/           # MCP 2025-11-25 server (stdio + HTTP)
+│   ├── mcp-server/           # MCP 2026-07-28 server (stdio + Streamable HTTP)
 │   │   ├── src/
 │   │   │   ├── server.ts     # MCP server setup (tools, resources)
 │   │   │   ├── tools/        # Tool implementations
@@ -257,13 +257,13 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 
 ## Key files (quick reference)
 
-- **Agent definitions:** `packages/sdk/src/agents/` — entry points for SDK users
-- **Tool schemas:** `packages/shared/src/schemas/` — Zod validators for all tool inputs
-- **MCP implementation:** `packages/mcp-server/src/server.ts` — server lifecycle + tool registration
-- **Dashboard:** `packages/dashboard/app/` — Next.js routes, JSON-LD schemas, content negotiation
-- **Tests:** `src/__tests__/`, colocated `.test.ts` files — run with `pnpm test`
+- **Agent definitions:** `packages/sdk/src/agents/` - entry points for SDK users
+- **Tool schemas:** `packages/shared/src/schemas/` - Zod validators for all tool inputs
+- **MCP implementation:** `packages/mcp-server/src/server.ts` - server lifecycle + tool registration
+- **Dashboard:** `packages/dashboard/app/` - Next.js routes, JSON-LD schemas, content negotiation
+- **Tests:** `src/__tests__/`, colocated `.test.ts` files - run with `pnpm test`
 - **CI pipeline:** `.github/workflows/test.yml`, `.github/workflows/build.yml`
-- **Architecture decisions:** `docs/ADRs/` — linked from this file, not repeated
+- **Architecture decisions:** `docs/ADRs/` - linked from this file, not repeated
 
 ---
 
@@ -279,21 +279,21 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 
 ## See also
 
-- **docs/ARCHITECTURE.md** — System design, tool flow diagrams, MCP server lifecycle
-- **docs/ADRs/** — Decision records (MCP 2025-11-25, schema validation, HTTP transport)
-- **packages/sdk/AGENTS.md** — SDK-specific commands and conventions
-- **packages/dashboard/AGENTS.md** — Next.js dashboard build and deployment
-- **packages/mcp-server/AGENTS.md** — MCP server testing and debugging
-- **CLAUDE.md** — Claude Code-specific hooks and model selection
-- **.cursor/rules/project.mdc** — Cursor IDE overrides
-- **CONTRIBUTING.md** — Pull request workflow, commit message style
+- **docs/ARCHITECTURE.md** - System design, tool flow diagrams, MCP server lifecycle
+- **docs/ADRs/** - Decision records (MCP 2026-07-28, schema validation, HTTP transport)
+- **packages/sdk/AGENTS.md** - SDK-specific commands and conventions
+- **packages/dashboard/AGENTS.md** - Next.js dashboard build and deployment
+- **packages/mcp-server/AGENTS.md** - MCP server testing and debugging
+- **CLAUDE.md** - Claude Code-specific hooks and model selection
+- **.cursor/rules/project.mdc** - Cursor IDE overrides
+- **CONTRIBUTING.md** - Pull request workflow, commit message style
 
 ---
 
 ## Links
 
 - [agents.md specification](https://agents.md)
-- [MCP 2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25)
+- [MCP 2026-07-28 spec](https://modelcontextprotocol.io/specification/2026-07-28)
 - [Next.js 15 App Router](https://nextjs.org/docs)
 - [pnpm workspaces](https://pnpm.io/workspaces)
 - [Turbo docs](https://turbo.build)

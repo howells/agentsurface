@@ -9,7 +9,7 @@ Phase 0 must complete before scoring. Read the project; do not guess.
 Detect:
 
 1. Stack, package manager, framework, runtime, deployment target.
-2. Surfaces: API, CLI, MCP, discovery, auth, errors, tools, context files, agents/workflows, tests, retrieval.
+2. Surfaces: API, CLI, MCP, discovery, auth, errors, tools, context files, tests, retrievability.
 3. Applicable dimensions.
 4. Previous `Surface audit` issues on the repo's Linear team.
 
@@ -22,19 +22,18 @@ Do not penalize an applicable dimension for an unrelated optional capability. A 
 
 Applicability:
 
-| Dimension           | Applies when                                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------------------------- |
-| API Surface         | Project exposes HTTP endpoints or API specs                                                              |
-| CLI Design          | Project is or ships a CLI                                                                                |
-| MCP Server          | Usually applicable; any useful project can expose one, but do not penalize tiny/internal scripts harshly |
-| Discovery & AEO     | Project has public docs, website, package docs, or a web API                                             |
-| Authentication      | Project has protected APIs, hosted services, or secrets                                                  |
-| Error Handling      | Always                                                                                                   |
-| Tool Design         | Project defines agent tools/functions or can expose operations as tools                                  |
-| Context Files       | Always                                                                                                   |
-| Multi-Agent         | Project orchestrates or contains agents                                                                  |
-| Testing             | Always                                                                                                   |
-| Data Retrievability | Project exposes documents, knowledge, search, datasets, or RAG                                           |
+| Dimension       | Applies when                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| API Surface     | Project exposes HTTP endpoints or API specs                                                              |
+| CLI Design      | Project is or ships a CLI                                                                                |
+| MCP Server      | Usually applicable; any useful project can expose one, but do not penalize tiny/internal scripts harshly |
+| Discovery & AEO | Project has public docs, website, package docs, or a web API                                             |
+| Authentication  | Project has protected APIs, hosted services, or secrets                                                  |
+| Error Handling  | Always                                                                                                   |
+| Tool Design     | Project defines agent tools/functions or can expose operations as tools                                  |
+| Context Files   | Always                                                                                                   |
+| Testing         | Always                                                                                                   |
+| Retrievability  | Project exposes a searchable corpus, dataset, or documents an agent might query                          |
 
 Present detected surfaces before scoring.
 
@@ -78,12 +77,11 @@ Use this exact shape for full scorecards. Keep dimensions in this order.
   6. Error Handling       [#..]  1/3   Structured errors are inconsistent
   7. Tool Design          [---]  N/A   No agent tools
   8. Context Files        [##.]  2/3   Curated AGENTS.md, no overlays
-  9. Multi-Agent          [---]  N/A   Not an agent system
-  10. Testing             [##.]  2/3   CLI contract tests, no evals
-  11. Data Retrievability [---]  N/A   No retrievable knowledge surface
+  9. Testing              [##.]  2/3   CLI contract tests, no evals
+  10. Retrievability      [---]  N/A   No searchable corpus or dataset
 
 ==============================================================================
-  TOTAL: 10/18 (scaled: 17/30)
+  TOTAL: 11/21 (scaled: 16/30)
   RATING: Agent-ready
 
   Human-only        Agent-tolerant      Agent-ready        Agent-first
@@ -189,9 +187,8 @@ Default priority:
 6. Authentication
 7. MCP server
 8. Structured data
-9. Data retrievability
+9. Retrievability
 10. Testing/evals
-11. Multi-agent patterns
 
 ## Phase 4: Execution
 
@@ -232,9 +229,9 @@ When `--format=json` is requested, include:
 {
   "project": "name",
   "date": "YYYY-MM-DD",
-  "raw_score": 10,
-  "max_applicable": 18,
-  "scaled_score": 17,
+  "raw_score": 11,
+  "max_applicable": 21,
+  "scaled_score": 16,
   "rating": "Agent-ready",
   "dimensions": [],
   "findings": [],

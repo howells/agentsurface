@@ -1,0 +1,84 @@
+---
+title: Human Approval
+description: The approval contract a tool or API surface exposes so an agent can request, wait for, and confirm human sign-off
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+Human approval lives at the tool surface: the tool exposes the declaration, the pending state, and the resume path, while the framework only runs the pause. A tool that needs approval must expose three things: a way to declare that a call needs sign-off before it executes, a durable pending state the agent can be resumed from if the process restarts, and a resume path that is safe to call twice. Agent frameworks implement the waiting differently, but the surface contract they all sit on top of is the same.
+
+- **Declare it:** a tool-level flag or hint (`requireApproval`, `needsApproval`, an MCP annotation) that a client reads before executing, not after
+- **Persist it:** the pending call, its run ID, and the proposed action survive a process restart - durable storage, not memory
+- **Resume it:** a separate call carries the human's decision back in, keyed to the same ID, and produces the same result whether called once or twice
+- **Gate placement:** approve before sends, financial commitments, production writes, publishing, and anything irreversible; skip gates for reads and user-explicitly-requested actions
+- **Framework plumbing:** Mastra, LangGraph, and the Vercel AI SDK each implement the pause differently - see pointers below
+
+Fully autonomous execution is fine for low-stakes, reversible tasks. For anything expensive, irreversible, or reaching outside the system, the tool surface needs to make approval possible before the call runs, not after. This page covers what a tool or API must expose for that to work; framework-specific suspend/resume mechanics are covered by pointers, not full listings.
+
+## Where to Put Approval Points
+
+Not every action needs approval - gates add latency and interrupt the flow. Place them at decisions that justify the cost.
+
+**Gate:**
+
+- Sending emails, messages, or notifications to external parties
+- Creating, modifying, or deleting production records
+- Financial transactions or commitments
+- Publishing content publicly
+- External paid API calls beyond a cost threshold
+- Anything irreversible (deletions, sends, deploys)
+
+**Skip:**
+
+- Read-only operations
+- Reversible writes with easy undo
+- Actions the user just explicitly requested
+
+## The Approval Contract
+
+Three surface-level requirements make an approval gate work, independent of which framework runs the agent loop.
+
+### 1. Declaring that a call needs approval
+
+The tool definition (or the client policy that wraps it) must expose whether a call requires sign-off before it executes - not as a side effect discovered after the call runs, but as metadata the orchestrator checks first. This is the same shape as the annotation-driven safety classification in [Idempotency and Safety](/docs/tool-design/idempotency-and-safety): a destructive or high-cost tool declares it, and the calling layer enforces it.
+
+The declaration can be static (always require approval for `deploy_production`) or conditional (require approval only when `recipients.length > 10` or `amount_cents > threshold`). Either way, the check happens before execution, not as a post-hoc confirmation.
+
+### 2. Persisting the pending state
+
+When a call is held for approval, the proposed action, its run ID, and the approval prompt must survive a process restart. Relying on in-memory state means a redeploy silently drops every pending approval. Persist to the same durable store the workflow engine already uses (Postgres, Redis) or to your application database - do not rely solely on the orchestration engine's internal checkpoint as the only copy.
+
+### 3. Resuming with the decision
+
+A separate event - an API call, a webhook, a UI action - carries the human's decision back in, addressed to the same run ID. Two properties matter:
+
+- **Idempotent resumption.** Calling resume twice with the same decision must produce the same outcome as calling it once. Approval UIs double-submit; the resume path must tolerate that.
+- **Expiry.** An approval that waits indefinitely accumulates risk. Set a maximum wait time; if nothing arrives within it, cancel the pending action and tell the user it expired rather than leaving it open forever.
+
+## Framework Plumbing
+
+Each framework implements the pause-and-resume mechanics differently. The contract above is what they all sit on top of.
+
+- **Mastra** - `suspend()` inside a workflow step (or `requireApproval: true` on a tool) pauses execution to durable storage; `resume()` injects the human's decision back in. See the Mastra workflows suspend/resume reference.
+- **LangGraph** - `interrupt()` pauses a node and returns a value to the human; `Command(resume=value)` sends the decision back into the graph. Requires a checkpointer (Postgres or Redis in production, not the in-memory saver).
+- **Vercel AI SDK** - AI SDK 7 sets `toolApproval` on the agent, per tool or as a function, returning `'approved'`, `'denied'`, `'user-approval'` or `'not-applicable'`; `'user-approval'` pauses the loop and emits an approval request the calling code renders and answers. Durable `WorkflowAgent` tools declare `needsApproval` on the tool instead.
+
+<Callout type="warn">
+  Whichever framework runs the loop, use a persistent checkpointer or database table for pending
+  approvals. An in-memory-only implementation loses every pending approval on restart.
+</Callout>
+
+## Building a Reliable Approval Flow
+
+1. **Make the pending state visible.** Persist the run ID, the approval prompt, and the proposed action to your application database, not only the workflow engine's internal state.
+2. **Set approval expiry.** Cancel and notify on timeout rather than waiting indefinitely.
+3. **Log every decision.** Who decided, when, the full proposed action, and any feedback - this is the audit trail.
+4. **Handle rejection gracefully.** The agent should explain what was rejected and why, then offer an alternative rather than ending the conversation.
+5. **Make resume idempotent.** A duplicate resume call must not duplicate the underlying action.
+
+## See also
+
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - the annotation-driven classification that approval declarations build on, plus the draft-then-confirm pattern for destructive tools
+- [Tool Curation](/docs/tool-design/tool-curation) - filtering high-risk tools out of a selection before approval even becomes relevant
+- `/docs/error-handling/idempotency` - retry-safe writes, the same idempotency property resume paths need

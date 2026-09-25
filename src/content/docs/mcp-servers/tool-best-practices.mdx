@@ -1,97 +1,24 @@
 ---
 title: Tool Definition Best Practices
-description: Writing tool names, descriptions, and schemas that agents can reason about reliably
-lastVerified: 2026-08-27
+description: The MCP-specific mechanics of tool definitions - schema typing, the outputSchema contract, response leanness, and the isError pattern
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Tool definitions determine agent behavior. Use snake_case verb_noun format (billing_create_invoice, not createInvoice). Descriptions function as prompts that guide agent selection and sequencing. Good descriptions answer four questions: what does this do, when to call it, what triggers it, and what it returns. Namespace tools when multiple servers are connected.
+Naming and description writing are covered in full on [Naming and Descriptions](/docs/tool-design/naming-and-descriptions); this page covers what is specific to MCP: typed schemas, the `outputSchema`/`structuredContent` contract, response leanness, and the `isError` pattern.
 
-- Naming: snake_case, verb_noun pattern, domain-prefixed when shared context
-- Descriptions: instructions, not marketing; answer four questions
-- Schema: describe every field with .describe(); list required parameters
-- Negative trigger conditions: "don't use this if..."
-- Include output shape and success conditions in descriptions
+- Schema: describe every field with `.describe()`; list required parameters
+- `outputSchema` requires returning `structuredContent` alongside or instead of `content`
+- Response leanness: return only the fields an agent acts on
+- `isError: true` for domain errors; thrown exceptions for protocol errors
+- Tool granularity: one tool, one coherent user intention
 
-Tool definitions are the primary interface between your server and the agent using it. An agent cannot ask you to clarify what a tool does — it reads the name and description, infers intent, decides whether to call it, and constructs the arguments. Every ambiguity in your definition becomes a failure mode at runtime.
+Tool definitions are the primary interface between your server and the agent using it. An agent cannot ask you to clarify what a tool does - it reads the name and description, infers intent, decides whether to call it, and constructs the arguments. Every ambiguity in your definition becomes a failure mode at runtime.
 
-## Naming Conventions
+## Naming and Descriptions
 
-Tool names must communicate two things instantly: the action being performed and the object being acted on.
-
-**Use snake_case with a verb_noun pattern:**
-
-```
-billing_create_invoice       ✓ clear domain, clear action
-billing_list_invoices        ✓ plural for list operations
-billing_get_invoice          ✓ singular for fetch by ID
-billing_void_invoice         ✓ domain verb (not billing_delete_invoice)
-billing_send_invoice_email   ✓ three-part names are fine for specificity
-```
-
-**Avoid:**
-
-```
-createInvoice        ✗ camelCase — inconsistent with MCP convention
-invoice              ✗ no verb — is this a getter? creator? list?
-do_billing_thing     ✗ vague verb
-create               ✗ no noun — create what?
-billing_crud         ✗ multiple operations in one name
-```
-
-**Namespace everything when multiple servers are in scope.** When an agent is connected to five servers simultaneously, tool names collide without a namespace prefix. The billing server uses `billing_`, the documents server uses `docs_`, the CRM server uses `crm_`. Agents resolve ambiguity by reading names alone — make that resolution trivial.
-
-## Description Writing as Prompt Engineering
-
-The tool description is executed as a prompt fragment. The model reads it to decide whether to call this tool, when to call it, and in what order relative to other tools. Write it as instructions, not marketing copy.
-
-A good description answers four questions:
-
-1. **What does this tool do?** (one sentence, the concrete action)
-2. **When should an agent use it?** (the triggering condition)
-3. **What are the prerequisites?** (what must exist before calling this)
-4. **What are the edge cases?** (what can go wrong, what to do about it)
-
-```typescript
-server.tool(
-  "billing_create_invoice",
-
-  // BAD: marketing copy — tells the agent nothing actionable
-  "Creates invoices for your customers using our powerful billing system.",
-
-  // GOOD: answers all four questions
-  "Creates a new invoice and returns the invoice ID and a hosted payment URL. " +
-    "Use when the user wants to charge a customer or bill for services rendered. " +
-    "Requires a valid customer_id — call billing_list_customers first if you only have a name or email. " +
-    "Returns isError: true if the customer has exceeded their credit limit or if a duplicate invoice " +
-    "exists for the same period; check the error message for the specific reason.",
-
-  schema,
-  handler,
-);
-```
-
-The length is appropriate — this is not documentation padding. Each sentence removes an inference the agent would otherwise have to make.
-
-**Common description patterns:**
-
-```typescript
-// For mutation tools, name the side effect explicitly
-"Permanently voids the invoice. This cannot be undone. " +
-  "The customer will not be charged. Use only when the invoice was created in error. " +
-  "To pause a legitimate invoice instead, use billing_pause_invoice.";
-
-// For list tools, document pagination
-"Returns up to 50 invoices matching the filters, ordered by created_at descending. " +
-  "Use the cursor field from the response to fetch the next page. " +
-  "Returns an empty array (not an error) when no invoices match.";
-
-// For tools with important ordering requirements
-"Sends the invoice email to the customer. " +
-  "Must be called after billing_create_invoice — calling on a draft invoice returns isError: true. " +
-  "Idempotent: calling twice on the same invoice does not send duplicate emails.";
-```
+Tool naming (snake_case verb_noun as an Agent Surface convention, not an MCP requirement - the MCP `2026-07-28` tool-names section lists `getUser` as a valid name) and description writing (the four-questions framework, mutation/pagination/ordering patterns) are covered on [Naming and Descriptions](/docs/tool-design/naming-and-descriptions). Namespacing tools when multiple servers are connected is covered there too.
 
 ## Schema Design with Zod
 
@@ -107,7 +34,7 @@ const CreateInvoiceSchema = z.object({
     .uuid()
     .describe(
       "The UUID of the customer to invoice. Get this from billing_list_customers " +
-        "or billing_get_customer — do not pass a customer name or email.",
+        "or billing_get_customer - do not pass a customer name or email.",
     ),
 
   // Integer type with domain context
@@ -154,11 +81,11 @@ const CreateInvoiceSchema = z.object({
 
 **Schema design rules:**
 
-- Use `.uuid()` for ID fields — it rejects numeric IDs that look like strings
+- Use `.uuid()` for ID fields - it rejects numeric IDs that look like strings
 - Use `.enum()` over `z.string()` for fields with a fixed valid set
 - Use `.regex()` to encode format constraints that cannot be expressed with types alone
-- Use `.int()` for counts and monetary amounts — prevents `2.5 items`
-- Use `.max()` on strings and arrays — prevents accidental giant payloads
+- Use `.int()` for counts and monetary amounts - prevents `2.5 items`
+- Use `.max()` on strings and arrays - prevents accidental giant payloads
 - Use `.optional()` with `.describe()` that states the default behavior
 
 ## The outputSchema Requirement
@@ -214,7 +141,7 @@ server.tool(
   Current `2026-07-28` behavior (SEP-2106): `inputSchema` and `outputSchema` accept any JSON Schema
   2020-12 keywords, including `$ref`, so shared definitions no longer have to be inlined, and
   `structuredContent` may be any JSON value rather than only an object. This loosens a constraint
-  rather than breaking anything — schemas written against the current subset stay valid — so keep
+  rather than breaking anything - schemas written against the current subset stay valid - so keep
   authoring conservative schemas until the clients you care about have caught up, since a client
   that cannot resolve `$ref` will simply fail to validate your tool.
 </Callout>
@@ -258,8 +185,8 @@ Each extra field in a response consumes tokens in the agent's context window. Ov
 
 MCP distinguishes between two kinds of errors:
 
-- **Protocol errors** — the tool call itself failed (invalid parameters, server crashed, timeout). These throw exceptions and result in MCP error responses. The agent typically cannot recover from these.
-- **Tool execution errors** — the tool ran successfully but the operation failed (customer not found, insufficient balance, duplicate invoice). These return normally with `isError: true` in the content.
+- **Protocol errors** - the tool call itself failed (invalid parameters, server crashed, timeout). These throw exceptions and result in MCP error responses. The agent typically cannot recover from these.
+- **Tool execution errors** - the tool ran successfully but the operation failed (customer not found, insufficient balance, duplicate invoice). These return normally with `isError: true` in the content.
 
 Use `isError: true` for all domain errors. The agent can read the error message, understand what happened, and decide to try a different approach.
 
@@ -324,7 +251,7 @@ Every `isError: true` response should tell the agent what to do next. An error m
 // COMPLETE: states the problem and provides recovery steps
 "Customer abc-123 not found. " +
   "If you have the customer's email, call billing_list_customers with filter.email to find their ID. " +
-  "If the customer was recently created, there may be a replication delay — retry in 10 seconds.";
+  "If the customer was recently created, there may be a replication delay - retry in 10 seconds.";
 
 // INCOMPLETE: vague constraint violation
 ("Invalid amount.");
@@ -344,7 +271,7 @@ The pattern is: `[what failed] + [why it failed] + [how to fix it]`. All three p
 
 ## Tool Granularity
 
-Tools that do too much are ambiguous — the agent cannot tell which variant of the operation will be performed. Tools that do too little require chaining many calls to accomplish a single user intent.
+Tools that do too much are ambiguous - the agent cannot tell which variant of the operation will be performed. Tools that do too little require chaining many calls to accomplish a single user intent.
 
 A useful heuristic: each tool should map to a single, coherent user intention.
 
@@ -363,4 +290,10 @@ billing_send_invoice(); // transitions to open, sends email
 billing_void_invoice(); // transitions to void, notifies customer
 ```
 
-When in doubt, model your tools against the operations in your domain API. One HTTP endpoint, one tool — with the exception of CRUD list/get operations that are often worth splitting.
+When in doubt, model your tools against the operations in your domain API. One HTTP endpoint, one tool - with the exception of CRUD list/get operations that are often worth splitting.
+
+## Related
+
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - verb-first naming conventions and descriptions written as onboarding prompts
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - idempotency keys, upsert patterns, and dry-run design
+- [Token Budget](/docs/tool-design/token-budget) - sizing tool definitions and responses for context cost

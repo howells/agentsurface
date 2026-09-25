@@ -1,14 +1,14 @@
 ---
 title: MCP in Next.js
-description: Integrating MCP servers with Next.js — both dev tooling and production domain servers
-lastVerified: 2026-07-06
+description: Integrating MCP servers with Next.js - both dev tooling and production domain servers
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
 Two distinct Next.js-MCP patterns: next-devtools-mcp (dev environment tooling) and mcp-handler (production domain servers). The first exposes your dev environment to Claude Desktop and Cursor via .mcp.json discovery. The second builds domain-specific MCP servers hosted inside a Next.js app. Both are useful but serve different purposes.
 
-- next-devtools-mcp: local server, exposes errors, routes, components
+- next-devtools-mcp: local server, discovers the dev server's own `/_next/mcp` endpoint for errors, routes, and logs
 - Setup: .mcp.json discovery in project root
 - mcp-handler: production servers, domain-specific capabilities
 - Use .mcp.json for local development; deploy domain servers separately
@@ -16,7 +16,7 @@ Two distinct Next.js-MCP patterns: next-devtools-mcp (dev environment tooling) a
 
 Next.js and MCP intersect in two completely different ways that are easy to conflate. The first is `next-devtools-mcp`, a tool that exposes your Next.js development environment to AI assistants. The second is building your own domain-specific MCP server hosted inside a Next.js application using `mcp-handler`. Both are useful, but they serve entirely different purposes.
 
-The patterns below target Next.js 16 (App Router, Turbopack as the default bundler, Node 20+ floor) — the version this documentation site itself runs on.
+The patterns below target Next.js 16 (App Router, Turbopack as the default bundler, Node 20+ floor) - the version this documentation site itself runs on.
 
 ## next-devtools-mcp: Dev Environment Tooling
 
@@ -29,45 +29,39 @@ The patterns below target Next.js 16 (App Router, Turbopack as the default bundl
   "mcpServers": {
     "next-devtools": {
       "command": "npx",
-      "args": ["-y", "@next/mcp", "--port", "3000"],
-      "env": {
-        "NODE_ENV": "development"
-      }
+      "args": ["-y", "next-devtools-mcp@latest"]
     }
   }
 }
 ```
 
-Clients that support `.mcp.json` discovery (Claude Desktop, Cursor) will pick this up automatically when the project is opened.
+Next.js 16+ enables its own MCP endpoint by default at `http://localhost:3000/_next/mcp`. `next-devtools-mcp` scans common ports, discovers that endpoint on your running dev server, and connects automatically - no port flag or environment variable needed. Clients that support `.mcp.json` discovery (Claude Desktop, Cursor) will pick this up automatically when the project is opened.
 
 **Tools exposed by next-devtools-mcp:**
 
-| Tool                        | Description                                                               |
-| --------------------------- | ------------------------------------------------------------------------- |
-| `get_errors`                | Returns current compilation errors and runtime errors from the dev server |
-| `get_routes`                | Lists all App Router and Pages Router routes with their file paths        |
-| `get_route_info`            | Returns the source code and metadata for a specific route                 |
-| `get_components`            | Lists React components defined in the project                             |
-| `get_environment_variables` | Returns public (non-secret) environment variable names                    |
-| `get_build_output`          | Returns the most recent build output                                      |
-| `run_build`                 | Triggers `next build` and returns the result                              |
+| Tool           | Description                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nextjs_index` | Scans common ports for running Next.js 16+ dev servers and lists each one's runtime tools                                                                               |
+| `nextjs_call`  | Invokes a runtime tool (`get_errors`, `get_logs`, `get_page_metadata`, `get_project_metadata`, `get_server_action_by_id`) on a discovered server, by port and tool name |
+| `nextjs_docs`  | Points the agent at the version-matched docs bundled in `node_modules/next/dist/docs/`                                                                                  |
+| `browser_eval` | Points the agent at the agent-browser CLI for browser automation                                                                                                        |
 
 These tools are intentionally development-only. `next-devtools-mcp` does not run in production and does not expose any of your application's business logic or data.
 
 ## Building a Domain MCP Server with mcp-handler
 
-If you want to expose your application's own capabilities through MCP — letting agents call your business logic, read your data, or trigger your workflows — you build a domain MCP server hosted inside your Next.js application.
+If you want to expose your application's own capabilities through MCP - letting agents call your business logic, read your data, or trigger your workflows - you build a domain MCP server hosted inside your Next.js application.
 
 Install the adapter:
 
 ```bash
-pnpm add @vercel/mcp-adapter
+pnpm add mcp-handler
 ```
 
-**Basic route handler** in `app/mcp/[transport]/route.ts`:
+**Basic route handler** in `app/mcp/route.ts`:
 
 ```typescript
-import { createMcpHandler } from "@vercel/mcp-adapter";
+import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 
 const handler = createMcpHandler((server) => {
@@ -109,13 +103,13 @@ export const maxDuration = 60;
 export { handler as GET, handler as POST, handler as DELETE };
 ```
 
-The dynamic `[transport]` segment in the path lets `mcp-handler` handle both `POST /mcp/http` (standard requests) and `GET /mcp/sse` (streaming) with a single route definition.
+`mcp-handler` exposes a single `/mcp` endpoint - `POST` for requests, `GET` for the server-to-client stream where the server supports one. See [Transport Selection](./transports) for how the underlying route works.
 
 **Connecting clients:** Point your MCP client at `https://your-app.vercel.app/mcp`.
 
 ## Organizing a Larger Domain Server
 
-For servers with many tools, keep the route handler thin and move tool registration into a factory function — the same pattern described in [Server Architecture](./architecture):
+For servers with many tools, keep the route handler thin and move tool registration into a factory function - the same pattern described in [Server Architecture](./architecture):
 
 ```typescript
 // lib/mcp/server.ts
@@ -138,8 +132,8 @@ export function registerTools(server: McpServer, ctx: McpContext): void {
 ```
 
 ```typescript
-// app/mcp/[transport]/route.ts
-import { createMcpHandler, experimental_withMcpAuth } from "@vercel/mcp-adapter";
+// app/mcp/route.ts
+import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { registerTools } from "@/lib/mcp/server";
 import { validateToken } from "@/lib/auth/validate-token";
 
@@ -162,19 +156,21 @@ async function authenticate(token: string) {
 
 export const maxDuration = 60;
 
-export const { GET, POST, DELETE } = experimental_withMcpAuth(mcpHandler, authenticate);
+export const { GET, POST, DELETE } = withMcpAuth(mcpHandler, authenticate);
 ```
 
-The `experimental_withMcpAuth` wrapper calls `authenticate` on every request, attaches the result to the request as `req.mcpAuth`, and rejects unauthenticated requests with a 401 before the handler runs.
+The `withMcpAuth` wrapper calls `authenticate` on every request, attaches the result to the request as `req.mcpAuth`, and rejects unauthenticated requests with a 401 before the handler runs.
 
-## Stateless Mode for Serverless
+## Stateless Mode Is Now Protocol-Level
 
-Next.js on Vercel runs as serverless functions — each invocation is a fresh process. There is no shared in-memory state between requests. The `mcp-handler` package handles this by defaulting to stateless mode when deployed on Vercel.
+Next.js on Vercel runs as serverless functions - each invocation is a fresh process, with no shared in-memory state between requests - so the `mcp-handler` package has always defaulted to stateless mode when deployed on Vercel. Under the current `2026-07-28` MCP specification, every MCP deployment target is stateless by protocol: the protocol removes the `initialize` handshake and protocol-level sessions outright (SEP-2567, SEP-2575). A long-running container behind Streamable HTTP is in exactly the same position as a Vercel function - there is no session for either one to hold.
+
+The pattern below - an identifier passed as an ordinary tool argument, with state kept in an external store - is what the spec's own "Stateful Tools" guidance describes as the correct way to carry state across calls now that MCP has no protocol-level session. Build it this way regardless of where the server runs.
 
 For tools that require session state across calls, store state externally:
 
 ```typescript
-import { createMcpHandler } from "@vercel/mcp-adapter";
+import { createMcpHandler } from "mcp-handler";
 import { kv } from "@vercel/kv";
 
 const handler = createMcpHandler((server) => {
@@ -217,21 +213,20 @@ const handler = createMcpHandler((server) => {
 
 ## maxDuration and Fluid Compute
 
-Long-running tools — those that process files, call slow external APIs, or run batch operations — need a `maxDuration` large enough for the operation to complete. The default is 10 seconds on Vercel's Hobby plan.
+Long-running tools - those that process files, call slow external APIs, or run batch operations - need a `maxDuration` large enough for the operation to complete. Vercel Functions run on Fluid Compute by default, which gives the Hobby plan a 300-second (5-minute) default and maximum.
 
 ```typescript
 // Route-level configuration
-export const maxDuration = 60; // Pro plan maximum for serverless
+export const maxDuration = 300; // Hobby default and maximum under Fluid Compute
 ```
 
-For tools that may run longer than 60 seconds, or for servers handling concurrent SSE connections, enable Fluid Compute in `vercel.json`:
+Pro and Enterprise default to 300 seconds too, but can raise `maxDuration` up to 800 seconds, or to 1800 seconds (30 minutes) through the extended-duration beta:
 
 ```json
 {
   "functions": {
-    "app/mcp/[transport]/route.ts": {
-      "maxDuration": 300,
-      "fluid": true
+    "app/mcp/route.ts": {
+      "maxDuration": 800
     }
   }
 }
@@ -240,14 +235,14 @@ For tools that may run longer than 60 seconds, or for servers handling concurren
 Fluid Compute keeps the function instance alive between requests and allows concurrent execution. This is what enables long-lived SSE connections on Vercel without the function timing out between SSE events.
 
 <Callout type="info">
-  `maxDuration` of 300 seconds requires the Vercel Pro plan or higher. For tools that may run
-  indefinitely, use a streaming response pattern to heartbeat the SSE connection while work proceeds
-  in the background, rather than blocking the function for the full duration.
+  Durations above 800 seconds need the extended-duration beta and Pro or Enterprise. For tools that
+  may run indefinitely, use a streaming response pattern to heartbeat the connection while work
+  proceeds in the background, rather than blocking the function for the full duration.
 </Callout>
 
 ## Environment Variables for MCP in Next.js
 
-MCP route handlers run as server-side code and have access to all server-side environment variables. Do not prefix MCP-related secrets with `NEXT_PUBLIC_` — that exposes them to the browser bundle.
+MCP route handlers run as server-side code and have access to all server-side environment variables. Do not prefix MCP-related secrets with `NEXT_PUBLIC_` - that exposes them to the browser bundle.
 
 ```bash
 # .env.local (development)
@@ -259,4 +254,4 @@ STRIPE_API_KEY=sk_test_...
 NEXT_PUBLIC_MCP_AUTH_SECRET=... # ← This goes into the browser bundle
 ```
 
-Access them in your route handler via `process.env.VARIABLE_NAME` — they are available without any additional configuration in Next.js server components and route handlers.
+Access them in your route handler via `process.env.VARIABLE_NAME` - they are available without any additional configuration in Next.js server components and route handlers.

@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Repositioned the site and skill around ADR 0002: Part 1 (the core guide) covers making an
+  existing product agent-ready; Part 2 (the agent-building inventory) is a secondary,
+  condensed reference for teams building their own agents. The `surface` skill's Guide,
+  Audit, and Scaffold routes are now product-side and framework-neutral
+- Dropped the Multi-Agent scoring dimension (11 → 10 dimensions) and renamed Data
+  Retrievability to Retrievability, rescoped to the product side: search/retrieval APIs,
+  retrieval contracts, and structured content, not an agent's own RAG pipeline
+- Scaffold route no longer generates agent-internal architecture (agents, orchestration,
+  memory, model routing, browser/sandbox tool access); it scaffolds agent surfaces (API, CLI,
+  MCP, tool contracts, retrieval endpoints) and their evaluation harnesses. Browser/sandbox
+  scaffolding is in scope only to build a harness that validates a surface
+- Rewrote `README.md`, `INSTALL.md`, `skills/surface/SKILL.md`, and
+  `skills/surface/references/scaffold-workflow.md` to match
+
+### Removed
+
+- Five Mastra-flavoured skill references (`conventions.md`, `patterns.md`, `gotchas.md`,
+  `house-style.md`, `workflow-composition.md`) and `model-routing.md`, plus
+  `references/multi-agent.md` and the `agentic-patterns-writer`, `multi-agent-writer`, and
+  `score-multi-agent` specialist prompts
+
+### Fixed
+
+- Corrected a claim that the MCP specification encourages DPoP (RFC 9449); DPoP is a general
+  OAuth mechanism, not part of the MCP authorization spec
+- Corrected the CLAUDE.md/AGENTS.md relationship in Claude Code: by default Claude reads one
+  or the other, not both, unless a `CLAUDE.md` imports the `AGENTS.md` or the **Project
+  instructions** setting is changed
+
 ## [2.3.0] — 2026-08-27
 
 ### Added

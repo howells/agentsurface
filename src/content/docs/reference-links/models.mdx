@@ -1,33 +1,35 @@
 ---
 title: Model Reference
-description: Canonical August 2026 model IDs for every provider — the single source of truth for the model-ID integrity check.
-lastVerified: 2026-08-27
+description: Canonical September 2026 model IDs for every provider - the single source of truth for the model-ID integrity check.
+lastVerified: 2026-09-24
 ---
 
-This is the canonical list of model IDs Agent Surface uses in examples. Every model-ID string in the docs and in the template kits must appear here. `scripts/check-docs-integrity.mjs` parses this page's code-formatted IDs into an allowlist and flags any model-ID-shaped string elsewhere in the corpus that is not on it. Update this page first, then run the sweep.
+This is the canonical list of model IDs Agent Surface uses in examples. Every model-ID string in the docs and in the template kits must appear here. `scripts/check-docs-integrity.mjs` parses this page's code-formatted IDs into an allowlist and flags any model-ID-shaped string elsewhere in the corpus that is not on it - including bare Anthropic role aliases (`opus-4-7`) and prose model names (`Opus 4.8`). Update this page first, then run the sweep.
 
-Verified against provider documentation on 2026-08-27.
+Verified against provider documentation on 2026-09-24.
 
 ## Anthropic
 
-| Model     | API ID                      | Role                | Notes                                                                                     |
-| --------- | --------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
-| Fable 5   | `claude-fable-5`            | Flagship            | Highest-capability model; deep reasoning and long tasks.                                  |
-| Opus 5    | `claude-opus-5`             | Recommended default | Released 2026-07-24. Near-Fable capability at half the price; 1M context, effort control. |
-| Sonnet 5  | `claude-sonnet-5`           | Balanced            | Fast iteration and everyday agent loops.                                                  |
-| Haiku 4.5 | `claude-haiku-4-5-20251001` | Fast / low cost     | Cheap evals, classification, high-volume calls. Dateless alias: `claude-haiku-4-5`.       |
+| Model     | API ID                      | Role                | Notes                                                                                              |
+| --------- | --------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| Fable 5.1 | `claude-fable-5-1`          | Flagship            | Supersedes Fable 5; highest-capability publicly available model for deep reasoning and long tasks. |
+| Opus 5.5  | `claude-opus-5-5`           | Recommended default | Released 2026-09-22. Supersedes Opus 5; 1M context, effort control.                                |
+| Sonnet 5  | `claude-sonnet-5`           | Balanced            | Fast iteration and everyday agent loops.                                                           |
+| Haiku 4.5 | `claude-haiku-4-5-20251001` | Fast / low cost     | Cheap evals, classification, high-volume calls. Dateless alias: `claude-haiku-4-5`.                |
 
-**Retired 2026-06-15:** Opus 4 and Sonnet 4. Older pins from that era — Opus 4.7 and Sonnet 4.6 — are no longer valid. **Superseded 2026-07-24:** Opus 4.8 remains available in the API but is no longer the recommended default; the model-ID check flags remaining Opus 4.8 pins in examples. Replace default pins with `claude-opus-5` and balanced pins with `claude-sonnet-5`.
+Anthropic also lists **Mythos**, a restricted tier above Fable 5.1 gated to an allowlist of enterprise accounts. No public API ID is published for it; do not reference it in general examples.
+
+**Retired 2026-06-15:** Opus 4 and Sonnet 4. **Retired 2026-08-05:** Opus 4.1. Older pins from these eras - Opus 4.7, Opus 4.8, and Sonnet 4.6 - are no longer valid; the model-ID check flags them, including bare aliases and prose mentions. **Superseded 2026-09-22:** Opus 5 remains available in the API but is no longer the recommended default; Fable 5 remains available but is no longer the flagship pin. Replace default pins with `claude-opus-5-5`, flagship pins with `claude-fable-5-1`, and balanced pins with `claude-sonnet-5`.
 
 ## OpenAI
 
 | Model         | API ID          | Role       | Notes                                                                          |
 | ------------- | --------------- | ---------- | ------------------------------------------------------------------------------ |
 | GPT-5.6 Sol   | `gpt-5.6-sol`   | Flagship   | GA 2026-07-09. Deepest reasoning tier; the bare alias `gpt-5.6` routes to Sol. |
-| GPT-5.6 Terra | `gpt-5.6-terra` | Balanced   | Mid tier — most capability per dollar for everyday agent work.                 |
-| GPT-5.6 Luna  | `gpt-5.6-luna`  | Value tier | Fastest and cheapest; correct wherever a cheaper OpenAI model is wanted.       |
+| GPT-5.6 Terra | `gpt-5.6-terra` | Balanced   | Mid tier - most capability per dollar for everyday agent work.                 |
+| GPT-5.6 Luna  | `gpt-5.6-luna`  | Value tier | Fastest and cheapest; the default wherever a cheaper OpenAI model is wanted.   |
 
-**Superseded 2026-07-09:** GPT-5.5 and GPT-5.4 remain available but the GPT-5.6 tiers replace them in examples — the model-ID check flags remaining GPT-5.5/5.4 pins. The o-series reasoning models (o1, o3, o4 family) were deprecated in June 2026, with removal scheduled for December 2026. Do not use them in examples.
+**Superseded 2026-07-09:** GPT-5.5 and GPT-5.4 remain available but the GPT-5.6 tiers replace them in examples - the model-ID check flags remaining GPT-5.5/5.4 pins. The o-series reasoning models (o1, o3, o4 family) were deprecated in June 2026, with removal scheduled for December 2026. Do not use them in examples.
 
 ## Google
 
@@ -36,27 +38,28 @@ Verified against provider documentation on 2026-08-27.
 | Gemini 3.7 Flash         | `gemini-3.7-flash`       | Current  | GA 2026-08. Default Google model for agent and eval examples.                          |
 | Gemini 3.6 Flash         | `gemini-3.6-flash`       | Previous | Stable previous-generation Flash model; retain only for deliberate compatibility pins. |
 | Gemini 3.5 Flash-Lite    | `gemini-3.5-flash-lite`  | Fast     | GA 2026-07-21. Fastest 3.5-series model for high-volume, low-cost calls.               |
-| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview  | Higher-capability preview; still preview as of 2026-07-28 — pin the full ID.           |
+| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | Preview  | Higher-capability preview; still preview as of 2026-09-24 - pin the full ID.           |
 
-**Superseded 2026-08:** Gemini 3.7 Flash replaces Gemini 3.6 Flash as the example default. Keep `gemini-3.6-flash` only where compatibility is deliberate. (Gemini 3.5 Pro has not reached GA.)
+**Superseded 2026-08:** Gemini 3.7 Flash replaces Gemini 3.6 Flash as the example default. Keep `gemini-3.6-flash` only where compatibility is deliberate. (Gemini 3.5 Pro is not listed because it has not reached GA.)
 
 ## Embeddings
 
-| Model                  | API ID                   | Provider | Notes                                                                          |
-| ---------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------ |
-| Text Embedding 3 Large | `text-embedding-3-large` | OpenAI   | High-dimensional; strongest OpenAI embedding.                                  |
-| Text Embedding 3 Small | `text-embedding-3-small` | OpenAI   | Cost-optimized sibling; still current, chosen for cheap/high-volume retrieval. |
-| Voyage 4 Large         | `voyage-4-large`         | Voyage   | Highest-quality Voyage retrieval embedding.                                    |
-| Voyage 4               | `voyage-4`               | Voyage   | Balanced Voyage embedding.                                                     |
-| Voyage 4 Lite          | `voyage-4-lite`          | Voyage   | Lower cost / latency.                                                          |
-| Voyage 4 Nano          | `voyage-4-nano`          | Voyage   | Smallest / cheapest Voyage embedding.                                          |
-| Voyage Context 4       | `voyage-context-4`       | Voyage   | Contextualized-chunk embedding.                                                |
-| Voyage Multimodal 3.5  | `voyage-multimodal-3-5`  | Voyage   | Current Voyage multimodal model — text-and-image embeddings in one space.      |
-| Gemini Embedding 2     | `gemini-embedding-2`     | Google   | Google's current embedding model.                                              |
+| Model                  | API ID                   | Provider | Notes                                                                                                |
+| ---------------------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
+| Text Embedding 3 Large | `text-embedding-3-large` | OpenAI   | High-dimensional; strongest OpenAI embedding.                                                        |
+| Text Embedding 3 Small | `text-embedding-3-small` | OpenAI   | Cost-optimized sibling; still current, chosen for cheap/high-volume retrieval.                       |
+| Voyage 4 Large         | `voyage-4-large`         | Voyage   | Highest-quality Voyage retrieval embedding.                                                          |
+| Voyage 4               | `voyage-4`               | Voyage   | Balanced Voyage embedding.                                                                           |
+| Voyage 4 Lite          | `voyage-4-lite`          | Voyage   | Lower cost / latency.                                                                                |
+| Voyage 4 Nano          | `voyage-4-nano`          | Voyage   | Smallest / cheapest Voyage embedding.                                                                |
+| Voyage Context 4       | `voyage-context-4`       | Voyage   | Contextualized-chunk embedding.                                                                      |
+| Voyage Multimodal 3.5  | `voyage-multimodal-3-5`  | Voyage   | Current Voyage multimodal model - text, image, and video embeddings in one space.                    |
+| Cohere Embed v4        | `embed-v4`               | Cohere   | Multimodal (text + image); Matryoshka dimensions (256-1536). Pair with `rerank-3.5` or `rerank-4.0`. |
+| Gemini Embedding 2     | `gemini-embedding-2`     | Google   | Google's current embedding model.                                                                    |
 
 ## Anti-pattern example IDs
 
-Some docs deliberately show outdated model IDs as examples of what _not_ to ship. These are exempt from the model-ID check because their staleness is the point of the example. This section is their allowlist — keep it in sync with the anti-pattern docs.
+Some docs deliberately show outdated model IDs as examples of what _not_ to ship. These are exempt from the model-ID check because their staleness is the point of the example. This section is their allowlist - keep it in sync with the anti-pattern docs.
 
 | ID                | Where                             | Why exempt                                                                                    |
 | ----------------- | --------------------------------- | --------------------------------------------------------------------------------------------- |

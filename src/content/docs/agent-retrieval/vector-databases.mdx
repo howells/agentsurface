@@ -1,0 +1,58 @@
+---
+title: Vector Databases
+description: Pinecone, Qdrant, Weaviate, pgvector, and when to pick each - condensed current practice
+lastVerified: 2026-09-25
+---
+
+Vector databases store and search high-dimensional embeddings via approximate nearest-neighbor algorithms (HNSW, DiskANN, and similar). Choose by operations burden, filtering needs, scale, and whether you already operate Postgres.
+
+## Selection matrix
+
+| Database                 | Self-host    | Native hybrid                            | Best for                                                     | Pricing model                                                |
+| ------------------------ | ------------ | ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Pinecone (serverless)    | No           | Yes (+ rerank)                           | Managed, variable workloads                                  | $16/1M read units, $4/1M write units, $0.33/GB/month storage |
+| pgvector + pgvectorscale | Yes          | No (pair with Postgres full-text search) | Cost-sensitive teams already running Postgres                | Infrastructure cost only                                     |
+| Qdrant                   | Yes or cloud | Sparse + dense                           | Fine-grained control, quantization                           | Self-host: infra cost. Cloud: usage-based                    |
+| Weaviate                 | Yes or cloud | Yes (native BM25 + dense)                | Hybrid search without a DIY fusion layer                     | Usage-based                                                  |
+| LanceDB                  | Yes          | Yes (native BM25 + dense, RRF)           | Multi-vector (ColBERT-style), TypeScript-native              | Free (OSS)                                                   |
+| Turbopuffer              | No           | Vector + BM25 in one substrate           | Very large or long-tail corpora, cost-sensitive cold storage | Serverless usage-based                                       |
+
+Verify current pricing before a procurement decision - vector database pricing changes faster than the underlying algorithms. An independent benchmark from Timescale reported pgvector + pgvectorscale beating Pinecone's s1 tier on both p95 latency and self-hosted cost at 50M vectors; treat any single benchmark as a starting point for your own load test.
+
+## Pinecone serverless
+
+Managed, auto-scaling, with native hybrid search and reranking. Namespace per tenant for multi-tenant isolation:
+
+```typescript
+const results = await pinecone
+  .index("main")
+  .namespace("tenant-1")
+  .query({ vector: embedding, topK: 10, filter: { source: { $eq: "legal" } } });
+```
+
+## pgvector + pgvectorscale
+
+The default choice for teams already operating Postgres. Combine an HNSW or DiskANN vector index with Postgres full-text search for hybrid retrieval:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgvectorscale;
+CREATE INDEX ON documents USING diskann (embedding);
+CREATE INDEX fts_idx ON documents USING GIN (to_tsvector('english', text));
+```
+
+## Turbopuffer
+
+An object-storage-backed engine best treated as a first-stage retrieval layer: narrow a large namespace to a small candidate set, then rank, rerank, and assemble context in application code. Strong fit for corpora that may grow into the billions of documents, or where not every tenant needs to stay hot. Weak fit when you need joins, transactions, or consistently low latency without cache planning.
+
+## Migration checklist
+
+- Export vectors and metadata; map schema (dims, distance metric, quantization) to the new store.
+- Batch import with retry logic; run shadow traffic before cutover.
+- Verify p95/p99 latency and cost on the new store before decommissioning the old one.
+
+## See also
+
+- [Pinecone cost guide](https://docs.pinecone.io/guides/manage-cost/understanding-cost)
+- [pgvectorscale](https://github.com/timescale/pgvectorscale)
+- [Turbopuffer docs](https://turbopuffer.com/docs)

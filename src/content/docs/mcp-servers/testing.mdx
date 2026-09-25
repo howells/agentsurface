@@ -1,11 +1,12 @@
 ---
 title: Testing MCP Servers
 description: Unit tests, in-memory integration tests, and interactive debugging with MCP Inspector
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Three testing levels catch different problems: unit tests (individual tool handlers), in-memory integration tests (full protocol stack), and MCP Inspector (interactive debugging). The createServer() factory pattern is essential — it enables testing without network I/O, ports, or process management. Tests use in-memory transport and can exercise servers synchronously.
+Three testing levels catch different problems: unit tests (individual tool handlers), in-memory integration tests (full protocol stack), and MCP Inspector (interactive debugging). The createServer() factory enables testing without network I/O, ports, or process management. Tests use in-memory transport and can exercise servers synchronously.
 
 - Level 1: Unit tests for tool registration and handlers
 - Level 2: In-memory integration tests via InMemoryTransport
@@ -14,14 +15,23 @@ Three testing levels catch different problems: unit tests (individual tool handl
 - Mock external dependencies; use in-memory databases
 - Test invalid inputs, edge cases, and error paths
 
-Testing an MCP server has three distinct levels: unit tests for individual tool handlers, in-memory integration tests that exercise the full protocol stack, and interactive inspection via the MCP Inspector. Each level catches different classes of problems — none of them is sufficient on its own.
+Testing an MCP server has three distinct levels: unit tests for individual tool handlers, in-memory integration tests that exercise the full protocol stack, and interactive inspection via the MCP Inspector. Each level catches different classes of problems - none of them is sufficient on its own.
 
 ## Why the createServer() Factory Matters for Testing
 
 The `createServer()` factory pattern described in [Server Architecture](./architecture) exists primarily to enable testing. A server that starts a network listener in its constructor cannot be tested without ports, process management, and timing concerns. A factory function that returns a configured `McpServer` can be connected to an `InMemoryTransport` in a test and exercised synchronously.
 
+<Callout type="info">
+  Current `2026-07-28` behavior: the `initialize` handshake this page's `client.connect()` calls
+  perform is removed. Capabilities move from a one-time connect-time negotiation to `_meta` on every
+  request, so a Level 2 test asserting on the connect response is asserting on a step the wire
+  protocol no longer has. The code below is the `2025-11-25` shape, which the SDK still supports;
+  see [Server Architecture](./architecture) for what changes under `2026-07-28` and update these
+  tests when your SDK version does.
+</Callout>
+
 ```typescript
-// src/server.ts — the pattern that enables testing
+// src/server.ts - the pattern that enables testing
 export function createServer(config: ServerConfig): McpServer {
   const server = new McpServer({ name: "billing-mcp", version: "1.0.0" });
   registerCreateInvoice(server, config);
@@ -31,7 +41,7 @@ export function createServer(config: ServerConfig): McpServer {
 }
 ```
 
-Every test calls `createServer()` with a test configuration — an in-memory database URL, a mock API key, reduced limits. No subprocesses, no ports, no cleanup between tests beyond what the test framework provides.
+Every test calls `createServer()` with a test configuration - an in-memory database URL, a mock API key, reduced limits. No subprocesses, no ports, no cleanup between tests beyond what the test framework provides.
 
 ## Level 1: Unit Tests
 
@@ -84,7 +94,7 @@ describe("billing_create_invoice", () => {
   });
 });
 
-// Helper — exercise the tool handler without a transport
+// Helper - exercise the tool handler without a transport
 async function callTool(server: McpServer, toolName: string, params: Record<string, unknown>) {
   const tool = (server as any)._registeredTools.get(toolName);
   if (!tool) throw new Error(`Tool not registered: ${toolName}`);
@@ -94,7 +104,7 @@ async function callTool(server: McpServer, toolName: string, params: Record<stri
 
 ## Level 2: In-Memory Integration Tests
 
-Integration tests exercise the full MCP protocol stack using `InMemoryTransport.createLinkedPair()`. The client and server communicate via the MCP JSON-RPC protocol over an in-memory channel — the same code paths that run in production, without any network.
+Integration tests exercise the full MCP protocol stack using `InMemoryTransport.createLinkedPair()`. The client and server communicate via the MCP JSON-RPC protocol over an in-memory channel - the same code paths that run in production, without any network.
 
 ```typescript
 // src/server.integration.test.ts
@@ -222,7 +232,7 @@ describe("billing-mcp integration", () => {
 });
 ```
 
-The `InMemoryTransport.createLinkedPair()` call returns two transport objects that are wired together. Anything written to one appears on the other. There are no async I/O operations — the transport is synchronous in memory. Tests run at the full speed of the JavaScript runtime.
+The `InMemoryTransport.createLinkedPair()` call returns two transport objects that are wired together. Anything written to one appears on the other. There are no async I/O operations - the transport is synchronous in memory. Tests run at the full speed of the JavaScript runtime.
 
 ## Testing Approach Matrix
 
@@ -251,7 +261,7 @@ npx @modelcontextprotocol/inspector node dist/cli.js
 **Launch against an HTTP server:**
 
 ```bash
-npx @modelcontextprotocol/inspector --url http://localhost:3000/mcp
+npx @modelcontextprotocol/inspector --server-url http://localhost:3000/mcp --transport http
 ```
 
 **With debug logging enabled:**
@@ -260,10 +270,10 @@ npx @modelcontextprotocol/inspector --url http://localhost:3000/mcp
 MCP_INSPECTOR_LOG_LEVEL=debug npx @modelcontextprotocol/inspector node dist/cli.js
 ```
 
-By default, the Inspector opens on port 5173 (UI) and 3000 (proxy). If those ports are in use:
+By default, the Inspector's web UI opens on port 6274. If that port is in use, set `CLIENT_PORT`:
 
 ```bash
-npx @modelcontextprotocol/inspector --port 5174 --proxy-port 3001 node dist/cli.js
+CLIENT_PORT=6275 npx @modelcontextprotocol/inspector node dist/cli.js
 ```
 
 **Inspector features:**
@@ -274,9 +284,9 @@ npx @modelcontextprotocol/inspector --port 5174 --proxy-port 3001 node dist/cli.
 - Browse resources and read their content
 - List and preview prompt templates
 - View the raw JSON-RPC message log for debugging protocol issues
-- Test server capabilities advertised during initialization
+- Inspect capabilities carried in `_meta` on requests and, where the server implements it, the optional `server/discover` response
 
-Use the Inspector for exploratory testing, verifying that descriptions read well, and debugging tool failures before writing regression tests. It is not a substitute for automated tests — errors you find in the Inspector should become test cases.
+Use the Inspector for exploratory testing, verifying that descriptions read well, and debugging tool failures before writing regression tests. It is not a substitute for automated tests - errors you find in the Inspector should become test cases.
 
 <Callout type="info">
   The Inspector connects using the same MCP client library used by Claude Desktop and other MCP

@@ -1,0 +1,30 @@
+---
+title: Retrievability
+description: Making your product's data and search results genuinely retrievable by AI agents
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Retrievability is whether an agent can query your product's own data - documents, records, catalog items, support content - and get back results it can trust: scoped correctly, current, attributable to a source, and easy to page through. This is the product side of retrieval. How an agent builds its own vector database or RAG pipeline is a separate concern, covered in [Agent Retrieval](/docs/agent-retrieval).
+
+- **Owns:** search and retrieval endpoints, retrieval-specific contracts (result shape, relevance signals, citations), filters and pagination scoped to retrieval, freshness and provenance metadata on retrieved records.
+- **Does not own:** general REST pagination and async job mechanics, which live in [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts); documentation structure for citation accuracy, which lives in [Content Structure](/docs/discovery/content-structure); an agent's own vector database, embeddings, or RAG pipeline, which live in [Agent Retrieval](/docs/agent-retrieval).
+- **Agent-ready means:** an agent can call a documented search or retrieval capability, receive results scoped to what it is authorized to see, tell how current each result is and where it came from, and narrow or page through a large result set without guessing.
+
+## Why this matters for agents
+
+An agent cannot browse your product the way a person scans a page. It calls an endpoint, reads what comes back, and decides what to do next from that response alone. If a search endpoint returns undated records with no source, the agent cannot tell a current answer from a stale one. If results are unbounded, the agent cannot reason over them. If there is no query surface at all, the agent falls back to scraping HTML or guessing - both unreliable.
+
+## Start Here
+
+- [Search and Retrieval APIs](/docs/retrievability/search-and-retrieval-apis) - expose a documented query surface an agent can call directly.
+- [Filters and Pagination for Retrieval](/docs/retrievability/filters-and-pagination) - scope results by tenant, category, date, and permission before an agent has to page through noise.
+- [Freshness and Provenance Signals](/docs/retrievability/freshness-and-provenance) - tell an agent how current a result is and where it came from.
+
+## Related
+
+- [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts) - general pagination, async job, and bulk-operation mechanics that retrieval endpoints build on.
+- [Content Structure](/docs/discovery/content-structure) - write and structure documentation so agents extract accurate answers from it.
+- [Catalogs and Feeds](/docs/discovery/catalogs-and-feeds) - structured product and content feeds as a retrieval surface.
+- [Agent Retrieval](/docs/agent-retrieval) - vector databases, embeddings, RAG patterns, and knowledge graphs for building an agent's own retrieval stack, as opposed to exposing your product's data to other agents.

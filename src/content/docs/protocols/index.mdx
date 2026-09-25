@@ -1,12 +1,12 @@
 ---
 title: Protocols & Standards
 description: The protocol landscape for agent-to-service and agent-to-agent communication
-lastVerified: 2026-08-27
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Three protocols dominate: MCP (agent-to-tools/data, vertical), A2A (agent-to-agent, horizontal), ACP (agent commerce). Most production systems layer them: agents use MCP to access their tools, A2A to delegate to peers, and optionally ACP for purchases. Supporting standards (OpenTelemetry, llms.txt) add observability and API discovery.
+Two protocols dominate: MCP (agent-to-tools/data, vertical) and A2A (agent-to-agent, horizontal). Most production systems layer them: agents use MCP to access their tools and A2A to delegate to peers. Commerce protocols (UCP, ACP) that ride on top of these for agent-initiated purchases now have their own section - see [Agentic Commerce](/docs/agentic-commerce). Supporting standards (OpenTelemetry, llms.txt) add observability and API discovery.
 
 ```
 Orchestrator (uses A2A)
@@ -18,11 +18,11 @@ Orchestrator (uses A2A)
        └── MCP → Specialist's tools
 ```
 
-- MCP: remote tools, resources, and prompts — `2026-07-28` is the current revision and is supported by all Tier 1 SDKs; async Tasks are an official extension
+- MCP: remote tools, resources, and prompts - `2026-07-28` is the current revision and is supported by all Tier 1 SDKs; async Tasks are an official extension
 - WebMCP: page-scoped browser tools through `document.modelContext`; a W3C Community Group draft, not remote MCP
 - A2A v1.0.1: production-grade task delegation across organizational boundaries
-- ACP: an overloaded acronym — this section covers the Agentic Commerce Protocol (OpenAI + Stripe)
-- Publish: /.well-known/agent.json, /.well-known/acp.json, /AGENTS.md, /llms.txt
+- Commerce (UCP, ACP): agent-initiated purchases - see [Agentic Commerce](/docs/agentic-commerce), not covered on this page
+- Publish: /.well-known/agent-card.json, /AGENTS.md, /llms.txt
 - Transport: stdio (local), Streamable HTTP (remote)
 
 These protocols and complementary standards define how agents discover capabilities, execute work, and integrate across organizational boundaries.
@@ -35,11 +35,11 @@ These protocols and complementary standards define how agents discover capabilit
 
 **Multiple agents delegating work?** → Add [A2A](/docs/protocols/a2a) (v1.0.1) for peer-to-peer task delegation.
 
-**Agent initiating purchases?** → Add [ACP](/docs/protocols/acp) for commerce with payment boundaries. Note that "ACP" is overloaded: the [ACP page](/docs/protocols/acp) covers the Agentic Commerce Protocol and disambiguates the two unrelated protocols that share the acronym.
+**Agent initiating purchases?** → See [Agentic Commerce](/docs/agentic-commerce) for UCP and ACP, payment authority, and trust and risk. Note that "ACP" is overloaded with two unrelated protocols; the [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) page disambiguates them.
 
-**Complex multi-step workflows?** → Use [Arazzo](/docs/protocols/comparison#arazzo--here-is-the-workflow-sequence) to choreograph API sequences.
+**Complex multi-step workflows?** → Use [Arazzo](/docs/protocols/comparison#arazzo---here-is-the-workflow-sequence) to choreograph API sequences.
 
-**Need observability?** → Instrument with [OpenTelemetry GenAI semconv](/docs/protocols/emerging-standards#opentelemetry-genai-semantic-conventions-development) — widely adopted, but still marked Development.
+**Need observability?** → Instrument with [OpenTelemetry GenAI semconv](/docs/testing/observability) - widely adopted, but still marked Development.
 
 ## The Protocols
 
@@ -48,9 +48,9 @@ These protocols and complementary standards define how agents discover capabilit
 | **MCP 2026-07-28**       | Agent-to-tool / agent-to-data (vertical) | [MCP docs](/docs/protocols/mcp)                          |
 | **WebMCP draft**         | Page-scoped browser tools                | [WebMCP docs](/docs/protocols/webmcp)                    |
 | **A2A v1.0.1**           | Agent-to-agent delegation (horizontal)   | [A2A docs](/docs/protocols/a2a)                          |
-| **ACP (commerce, beta)** | Agent-initiated commerce                 | [ACP docs](/docs/protocols/acp)                          |
+| **UCP / ACP (commerce)** | Agent-initiated commerce                 | [Agentic Commerce](/docs/agentic-commerce)               |
 | **Arazzo 1.1.0**         | Multi-step API workflow sequences        | [Comparison page](/docs/protocols/comparison)            |
-| **OpenTelemetry GenAI**  | Observability & tracing                  | [Emerging standards](/docs/protocols/emerging-standards) |
+| **OpenTelemetry GenAI**  | Observability & tracing                  | [Testing: Observability](/docs/testing/observability)    |
 | **AGENTS.md**            | Agent context documentation              | [Emerging standards](/docs/protocols/emerging-standards) |
 | **llms.txt**             | LLM-friendly API docs                    | [Emerging standards](/docs/protocols/emerging-standards) |
 
@@ -72,19 +72,19 @@ Orchestrator Agent (uses A2A)
 
 Publish these endpoints for agents to find you:
 
-- `/.well-known/agent.json` — A2A AgentCard (for multi-agent scenarios)
-- `/.well-known/acp.json` — ACP capabilities (if you accept agent-initiated payments)
-- `/AGENTS.md` — Agent context & MCP servers (always useful)
-- `/llms.txt` or `/llms-full.txt` — LLM-friendly docs
+- `/.well-known/agent-card.json` - A2A AgentCard (for multi-agent scenarios)
+- `/.well-known/ucp` or `/.well-known/acp.json` - commerce capabilities (if you accept agent-initiated payments) - see [Agentic Commerce](/docs/agentic-commerce)
+- `/AGENTS.md` - Agent context & MCP servers (always useful)
+- `/llms.txt` or `/llms-full.txt` - LLM-friendly docs
 - Structured data as JSON-LD (schema.org markup) for auto-discovery
 
 ## Full Comparison & Decision Guide
 
 See [Protocol Comparison](/docs/protocols/comparison) for maturity, transport details, auth models, and when to use each.
 
-See [Emerging Standards](/docs/protocols/emerging-standards) for Arazzo workflows, observability, semantic metadata, and draft specs to monitor.
+See [Emerging Standards](/docs/protocols/emerging-standards) for draft specs to monitor.
 
 ## Paid resources and structured discovery
 
-- [Machine Payments Protocol](/docs/protocols/mpp): HTTP payment challenges, credentials, receipts, and spending controls.
+- [Payments](/docs/agentic-commerce/payments): MPP, x402, mandates, and spending controls for paid resources and agent-initiated purchases.
 - [Agent Catalogs and Structured Feeds](/docs/discovery/catalogs-and-feeds): ARD, AI Catalog, and NLWeb feed/query boundaries.

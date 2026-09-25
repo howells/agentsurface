@@ -1,6 +1,7 @@
 ---
 title: API Keys
 description: When to use them, scoping, rotation, and the places they must never appear
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -41,14 +42,14 @@ Store keys in environment variables or secret managers, never in code:
 const apiKey = process.env.STRIPE_API_KEY;
 if (!apiKey) throw new Error("STRIPE_API_KEY is required");
 
-const res = await fetch("https://api.stripe.com/v1/charges", {
+const res = await fetch("https://api.stripe.com/v1/payment_intents", {
   method: "POST",
   headers: { Authorization: `Bearer ${apiKey}` },
   body: new URLSearchParams({ amount: "2000", currency: "usd" }),
 });
 ```
 
-Read keys once at startup. Fail fast if missing — a `KeyError` at boot is better than an auth error in production.
+Read keys once at startup. Fail fast if missing - a missing-key error at boot is better than an auth error in production.
 
 ## Scoping Keys
 
@@ -157,17 +158,40 @@ async function rotateKey(keyId: string, client: KeyManagementClient) {
 Services should handle 401 by refreshing and retrying once:
 
 ```typescript
-async function callWithRetry(url: string, options: RequestInit) {
+async function callWithRetry(
+  url: string,
+  options: RequestInit,
+  keyId: string,
+  client: KeyManagementClient,
+) {
   let res = await fetch(url, { ...options, headers: withAuth(options.headers) });
 
   if (res.status === 401) {
-    await rotateKey();
+    await rotateKey(keyId, client);
     res = await fetch(url, { ...options, headers: withAuth(options.headers) });
   }
 
   return res;
 }
 ```
+
+## Test-Mode Keys and Sandbox Environments
+
+An agent building an integration needs to be able to try it without risking production data or a real charge. Give it a separate credential space, not a "be careful" note in the docs:
+
+- **Separate test-mode keys.** Prefix so the scheme is obvious at a glance and both humans and agents can grep for it: `sk_live_...` for production, `sk_test_...` for test mode. A leaked test key can't touch production data.
+- **A sandbox environment**, not just a test key against production infrastructure. Point test keys at a separate base URL or a clearly-flagged sandbox tenant so a bug in agent-generated code can't reach real customer records.
+- **Seeded data.** A sandbox with no data forces the agent to create its own fixtures before it can test a read path. Seed the sandbox with representative records (a handful of customers, orders, invoices in different states) so an agent's first call succeeds without a setup ritual.
+- **Same schema, same errors.** The sandbox must return the same response shapes and error codes as production. A sandbox that silently diverges teaches an agent the wrong contract.
+
+```typescript
+const apiKey = process.env.API_KEY; // sk_test_... in sandbox, sk_live_... in production
+const baseUrl = apiKey.startsWith("sk_test_")
+  ? "https://sandbox.api.example.com"
+  : "https://api.example.com";
+```
+
+This is what lets an agent go from discovery to a working integration with no human in the loop - sign up, get a test key, build against seeded sandbox data, then swap to a live key. See [OpenAPI for Agents](/docs/api-surface/openapi-for-agents#publishing-sdks-and-removing-onboarding-friction) for the rest of that onboarding path.
 
 ## Where Keys Must Never Appear
 
@@ -205,8 +229,11 @@ Never in Referer headers. Never hardcoded in source code.
 - [ ] 401 responses trigger key refresh and retry
 - [ ] Keys never appear in URLs, logs, or code
 - [ ] Broad-scoped static keys are migrated to OAuth Client Credentials
+- [ ] Test-mode keys (`sk_test_...`) are distinguishable from live keys at a glance
+- [ ] A sandbox environment with seeded data exists so agents can build without touching production
 
 ## See Also
 
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — the preferred M2M flow
-- [Auth Anti-Patterns](/docs/authentication/anti-patterns) — credential mistakes to avoid
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - the preferred M2M flow
+- [Auth Anti-Patterns](/docs/authentication/anti-patterns) - credential mistakes to avoid
+- [OpenAPI for Agents](/docs/api-surface/openapi-for-agents#publishing-sdks-and-removing-onboarding-friction) - the rest of the zero-human onboarding path

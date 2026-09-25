@@ -1,6 +1,16 @@
 # Surface Scaffold Workflow
 
-Use this reference before creating or changing agent infrastructure.
+Use this reference before creating or extending an agent surface.
+
+The Scaffold route is product-side and framework-neutral: it creates or extends the contact
+points agents use to reach this software - discovery files, API/CLI/MCP surfaces, tool
+contracts, retrieval endpoints - and the evaluation harnesses that verify those surfaces
+work. It does not generate agent-internal architecture (agents, orchestration, memory, model
+routing, or an agent's own retrieval/RAG pipeline); that belongs to the agent-building
+inventory (`/docs/agents`, `/docs/agent-retrieval`), not this skill. Browser or sandbox
+scaffolding is in scope only when it builds a harness that exercises or validates a surface
+(for example, a browser-driven task test proving an agent can complete a real flow) - never
+as a general-purpose agent capability.
 
 ## Phase 0: Project Detection
 
@@ -9,275 +19,124 @@ Read the project before scaffolding.
 Detect:
 
 - Package manager and workspace layout.
-- Framework/runtime: Next.js, Node, Python, Workers, serverless, CLI, library.
-- Existing agent framework: OpenAI Agents SDK, Claude Managed Agents, Claude Code SDK, Agent Skills, Vercel AI SDK, Vercel Workflow, Mastra, LangGraph, MCP, Cloudflare Agents, custom.
-- Existing directories: `agents`, `tools`, `workflows`, `src/mastra`, `packages/agents`, `triggers`.
-- Existing model routing, retrieval/RAG, memory, browser access, sandbox execution.
+- Runtime/language and deployment target.
+- Existing surfaces: API specs/routes, CLI entry points, MCP servers, discovery files
+  (AGENTS.md, llms.txt, `.well-known`), auth flows, error shapes, tool/function-calling
+  definitions, search/retrieval endpoints, test/eval directories.
 - TypeScript module target and runtime constraints.
 - Test and typecheck commands.
 
 Present the inventory before generating code.
 
-## Framework Recommendation
-
-Choose the framework by project shape, not by preference.
-
-Prefer the existing framework when the repo already has one deliberately wired.
-
-Recommend OpenAI Agents SDK when:
-
-- The project is OpenAI-native or already uses the Responses API.
-- The user needs handoffs, tracing, evals, built-in/hosted tools, remote MCP, realtime voice, files, or sandbox execution close to OpenAI's platform.
-- The agent should preserve OpenAI response items, traces, and hosted tool behavior rather than abstracting them behind another framework.
-
-Recommend Claude Managed Agents when:
-
-- The project is Claude-native and the agent runtime should be managed by Anthropic.
-- The user needs managed sessions, secure containers/sandboxing, Agent Skills, code execution, memory, vault credentials, webhooks, multiagent sessions, outcomes, or Claude Platform on AWS.
-- The app benefits from Anthropic-owned event/session lifecycle more than embedding the loop inside the app server.
-
-Recommend Claude Code SDK when:
-
-- The project is building coding, repository, incident response, or local automation agents.
-- It needs the Claude Code harness, file/shell/code tools, explicit tool permissions, session management, and MCP extensibility.
-- The user wants programmatic control of Claude Code-like behavior from a service or CLI.
-
-Recommend Vercel AI SDK when:
-
-- The project is a Next.js or Vercel app.
-- It already uses `ai`, `@ai-sdk/*`, streaming chat UI, route handlers, provider routing, AI Gateway, or UI message persistence.
-- The primary need is app-local generation, tool calling, streaming UX, structured outputs, or active tool selection.
-
-Recommend Vercel Workflow in addition to AI SDK when:
-
-- Agent work must pause/resume, wait for human approval, retry durable steps, react to hooks/webhooks, or span minutes to months.
-- The app is already deployed on Vercel or the user wants Vercel-managed workflow state, queues, and observability.
-
-Recommend Cloudflare Agents when:
-
-- The project is Workers-native.
-- It uses or needs Durable Objects, WebSockets, Queues, Workers AI, AI Gateway, Browser Rendering/Browser Run, Vectorize, AI Search, or Sandbox near the Worker runtime.
-
-Recommend Mastra when:
-
-- The project is TypeScript.
-- It does not already have a stronger platform-native agent framework.
-- The user needs a full local agent/workflow/memory/RAG/MCP framework with explicit app-owned orchestration.
-
-Respect existing MCP, LangGraph, or custom patterns when the repo already uses them.
-
-For retrieval and integration choices, use the local tooling catalog as a shortlist, not as a dependency list. Add only the storage provider, parser, reranker, graph store, MCP hub, or observability sink that matches the project's existing platform and query shape.
-
 ## Shared Scaffolding Rules
 
-1. Prefer project-native layout over templates.
-2. Keep agents narrow: one decision boundary, small tool set.
-3. Use workflows for predictable, resumable, auditable processes.
-4. Add typed input and output schemas.
-5. Include failure paths, retry policy where appropriate, and explicit stop conditions.
-6. Add eval/test scenarios as part of the scaffold.
-7. Register and export everything that should be public.
-8. Document environment variables and runtime bindings.
-9. Avoid durable memory unless the user needs cross-turn recall, persistent entity state, or retrieval.
-10. Add explicit safety policy for browser, sandbox, auth, write, and production tools.
+1. Prefer the project's existing layout and conventions over a generic template.
+2. Add typed input and output schemas to anything agents will call.
+3. Document failure shapes: structured errors, retry guidance, and recoverable vs. terminal states.
+4. Include an evaluation or test case with every surface scaffolded, not as a follow-up.
+5. Register and export everything that should be publicly callable.
+6. Document environment variables and runtime bindings the surface needs.
+7. Treat authenticated, destructive, and production-facing capabilities as high-risk: require explicit confirmation gates and document the permission boundary.
 
 ## Mode: init
 
-Initialize agent infrastructure.
+Initialize the baseline agent-surface conventions for a project that has none yet.
 
-Create the smallest useful structure:
+Create the smallest useful set for the detected project shape:
 
-```text
-src/mastra/
-  index.ts
-  agents/index.ts
-  tools/index.ts
-  workflows/index.ts
-```
+- `AGENTS.md` at the repo root (commands, conventions, permission boundaries).
+- `public/llms.txt` (and `llms-full.txt` where useful) for a project with public docs or a website.
+- `.well-known/` metadata appropriate to the surfaces present (OAuth protected-resource metadata, MCP server card, Agent Skills index) - only for capabilities that actually exist.
+- `robots.txt`/sitemap updates so intended discovery and retrieval bots are allowed and can find the sitemap.
 
-For monorepos, prefer:
+Do not install dependencies or scaffold agent runtime code as part of `init`.
 
-```text
-packages/agents/src/
-  index.ts
-  mastra.ts
-  agents/index.ts
-  tools/index.ts
-  workflows/index.ts
-  triggers.ts
-```
+## Mode: api
 
-Do not install dependencies without permission when package installation is not already part of the user's request. Suggest exact commands and wait if needed.
+Improve the API surface for agent tool generation.
 
-## Mode: agent <name>
+- Add or upgrade an OpenAPI/GraphQL schema with agent-oriented descriptions: when/why to use an operation, disambiguation from similar operations, exhaustive enums, examples on parameters.
+- Add pagination, async-job, and bulk-operation contracts per [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts).
+- Read `references/api-surface.md` for the full rubric this mode targets.
+
+## Mode: cli
+
+Improve a CLI's machine-readable surface.
+
+- Add or standardize `--json`/`--output json` across commands, with a consistent shape.
+- Add semantic exit codes, `--dry-run` on mutating commands, and TTY detection so output degrades gracefully when piped.
+- Add a `--schema`/`--describe` command that dumps the CLI's full machine-readable command surface.
+- Read `references/cli-design.md` for the full rubric this mode targets.
+
+## Mode: mcp
+
+Scaffold or extend an MCP server that exposes this project's existing capabilities.
 
 Ask only for missing decisions:
 
-- What decision boundary does the agent own?
-- What tools does it need?
-- What is the stop condition or escalation path?
-- What latency/cost tier should its model target?
+- Which existing operations should become tools, resources, or prompts?
+- Read-only, write, or destructive behavior per tool?
+- Transport: stdio, Streamable HTTP, or both?
 
 Generate:
 
-- Agent definition file.
-- Instructions inline, builder, or markdown according to repo style.
-- Tool stubs only when needed.
-- Barrel export.
-- Registration in central runtime.
-- 3-5 eval scenarios.
+- Server registration with tool/resource/prompt definitions.
+- MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) and `outputSchema`/`structuredContent` where results are structured.
+- RFC 9728 protected-resource metadata when the server is remote and protected.
+- A test using `InMemoryTransport` covering at least one tool call and one error case.
 
-Agent must include:
+Read `references/mcp-servers.md` for the full rubric this mode targets.
 
-- Clear purpose and non-goals.
-- Small tool list.
-- Step budget or bounded workflow placement.
-- Fallback behavior for missing information and failed tools.
+## Mode: tool
 
-## Mode: tool <name>
+Create or refine one typed tool contract - a function-calling/MCP tool definition that lets an agent call an existing capability of this product. This is not an internal agent's private helper function; it is part of the product's public surface.
 
 Ask:
 
-- What does the tool do?
-- Inputs and outputs.
+- What capability does the tool expose, and what does it do?
+- Inputs and outputs, with field-level descriptions.
 - Read/write/destructive/idempotent behavior.
-- User context and permission needs.
+- Identity and permission handling (never accept user/tenant identity as a tool input parameter; resolve it server-side from the caller's authenticated context).
 
 Generate:
 
-- Tool file.
-- Zod or native schema equivalent.
-- Field descriptions.
-- Output schema.
-- MCP annotations plus `outputSchema`/`structuredContent` when MCP is present or likely.
-- Security pattern for user context.
-- Tests or fixtures when the project has a test surface.
+- Tool definition with a typed schema and field descriptions.
+- Output schema that whitelists safe fields (no internal IDs, secrets, or unrelated PII).
+- MCP annotations when the tool is also exposed over MCP.
+- A confirmation-gate note for any write/destructive tool.
+- A test or fixture when the project has a test surface.
 
-For write/destructive tools, require explicit confirmation gate in the tool contract or workflow.
+Read `references/tool-design.md` for the full rubric this mode targets.
 
-## Mode: workflow <name>
+## Mode: test-harness
 
-Ask:
+Scaffold an evaluation harness that validates one of the surfaces above, rather than a
+capability of its own.
 
-- Goal and trigger.
-- Deterministic vs agentic steps.
-- Sequential, branch, parallel, fan-out/fan-in, suspend/resume shape.
-- Shared state.
-- Retry and human-review points.
+Examples:
 
-Generate:
+- MCP conformance tests using `InMemoryTransport.createLinkedPair()` covering tool
+  selection, valid parameters, error recovery, and a multi-step sequence.
+- CLI contract tests asserting `--json` shape, exit codes, and `--dry-run` behavior.
+- Retrievability evals: a representative query through the actual search/retrieval API,
+  checking result shape, pagination across pages, and freshness fields.
+- A browser-driven task test that walks a real agent task through the deployed surface
+  (discovery -> action -> recovery -> result) to prove the surface works end to end. Use a
+  browser here only to validate an existing surface; do not scaffold general-purpose browser
+  tool access as part of this mode.
 
-- Workflow file or directory.
-- Step files for complex workflows.
-- Shared state schema.
-- Trigger function when needed.
-- Registration/export.
-- Tests/evals for happy path, recoverable error, and cancellation/escalation.
-
-## Mode: retrieval
-
-Add retrieval or RAG infrastructure only after identifying the data shape and query pattern.
-
-Ask only for missing decisions:
-
-- What corpus is being searched: docs, code, database rows, app data, tickets, emails, images, audio, or mixed media?
-- What answers require retrieval: exact lookup, semantic recall, multi-hop relationship reasoning, current web context, or structured tool/database access?
-- What freshness, tenancy, deletion, and access-control rules apply?
-- What latency and quality target should the first version meet?
-
-Default recommendations:
-
-- Use hybrid lexical + dense retrieval with reranking for most production knowledge search.
-- Use simple dense retrieval only for prototypes or small low-risk corpora.
-- Use graph or LightRAG-style retrieval when explicit relationships, entity histories, dependencies, or multi-hop questions drive quality.
-- Use multimodal retrieval when source material is visual, audio, slides, screenshots, diagrams, or scanned PDFs.
-- Use structured/tool-backed retrieval when the answer must come from live APIs, SQL, or business systems rather than chunked text.
-- Consider compiled/optimized retrieval only for stable query workloads where preprocessing, generated indexes, or query plans materially reduce cost or latency.
-
-Generate:
-
-- Ingestion/chunking or source connector code.
-- Search interface with typed query and result schemas.
-- Storage provider wiring that matches the existing platform.
-- Metadata filters for tenant, user, source, freshness, and permissions.
-- Reranking or rank-fusion stage when quality matters.
-- Eval fixtures for recall@k, context precision, grounding, and representative failure cases.
-
-Do not add durable agent memory when request-scoped retrieval, workflow state, or a searchable corpus is the actual requirement.
-
-## Mode: memory
-
-Add memory only after confirming why request-scoped state, workflow state, or retrieval is insufficient.
-
-Default TypeScript recommendation:
-
-- Mastra Memory plus Postgres/PgVector when the project already uses Mastra or Postgres.
-- Cloudflare-native memory/search/vector options in Workers-native projects.
-
-Document:
-
-- Storage provider.
-- Retention/deletion behavior.
-- Namespace isolation.
-- Privacy/security implications.
-- Environment variables or bindings.
-
-## Mode: model
-
-Read `model-routing.md`.
-
-Generate:
-
-- Model router/provider file.
-- Environment-driven defaults.
-- Tiered model selection: quick, standard, rigorous.
-- Fallback chain.
-- Provider-specific env vars/bindings.
-
-Support only providers that make sense for the project. Avoid adding many unused dependencies.
-
-## Mode: browser
-
-Browser tools are high risk.
-
-Generate:
-
-- Provider recommendation based on runtime.
-- Allowlist and denylist.
-- Timeout and page-size limits.
-- Output truncation/summarization.
-- Audit log hooks.
-- Confirmation gates for forms, purchases, deletes, auth changes, and production actions.
-
-Browser tools must be visible to the agent/user. Do not hide them as utility calls.
-
-## Mode: sandbox
-
-Sandbox/code execution tools are high risk.
-
-Generate:
-
-- Provider recommendation based on runtime.
-- Language allowlist.
-- CPU/memory/time limits.
-- Filesystem boundaries.
-- Network policy.
-- Audit logs.
-- Confirmation gates for package installs, network access, and writes outside the sandbox.
-
-Never execute untrusted code in the app server process.
+Read `references/testing.md` for the eval design this mode targets.
 
 ## Wiring
 
 After generating code:
 
-1. Register agents/workflows/tools in the central runtime.
-2. Export public modules from barrel files.
-3. Add triggers or routes where appropriate.
-4. Document env vars and bindings.
-5. Run or propose typecheck/test commands.
-6. Confirm visible failure shape: retries, stop limits, fallback.
-7. Note eval hooks and first test cases.
+1. Register the new surface (route, MCP server entry, CLI command) in the project's existing entry points.
+2. Export public modules from the project's existing barrel/index files.
+3. Document environment variables and bindings the surface needs.
+4. Run or propose the project's typecheck/test commands.
+5. Confirm the failure shape is visible: structured errors, retry guidance, and any confirmation gate.
+6. Note the eval/test case added alongside the surface.
 
 ## File Preview Format
 
@@ -285,12 +144,12 @@ Before writing substantial scaffolding, show:
 
 ```text
 Files to change:
-- src/mastra/index.ts - register runtime
-- src/mastra/agents/research-agent.ts - new bounded agent
-- src/mastra/tools/search-docs.ts - read-only retrieval tool
+- src/api/search.ts - new typed search endpoint (Retrievability mode)
+- openapi.yaml - documented query params and result schema
+- src/api/search.test.ts - pagination and empty-result test
 
 Key decisions:
-- Framework: Mastra, matching TypeScript app
-- Model: standard tier via existing router
-- Safety: read-only tool, no durable memory
+- Surface: typed search API with cursor pagination
+- Auth: reuses existing session middleware, read-only
+- Eval: one representative query test asserting result schema and freshness field
 ```

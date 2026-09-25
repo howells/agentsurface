@@ -1,26 +1,27 @@
 ---
 title: AGENTS.md for Discovery
 description: Why repository context files belong to the discovery surface, and where the full guidance lives
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Context files such as `AGENTS.md` are part of your discovery surface: a coding agent that opens your repository discovers how to build, test, and operate the project by reading them, and in a public repository they are exposed to anyone — human or agent — browsing the source. Getting them right is a discovery concern. The full authoring guidance is not discovery-specific and lives in the [Context Files](/docs/context-files) section; this page explains why the surface matters and points you there.
+Context files such as `AGENTS.md` are part of your discovery surface: a coding agent that opens your repository discovers how to build, test, and operate the project by reading them, and in a public repository they are exposed to anyone - human or agent - browsing the source. Getting them right is a discovery concern. The full authoring guidance is not discovery-specific and lives in the [Context Files](/docs/context-files) section; this page explains why the surface matters and points you there.
 
 ## Why It Belongs to Discovery
 
-Most discovery signals — `llms.txt`, structured data, `robots.txt`, well-known endpoints — help an agent find and understand your product from the outside. Context files do the same job from the inside: they are the first thing a coding agent reads when it lands in your repository, and they determine whether it can act correctly without guessing.
+Most discovery signals - `llms.txt`, structured data, `robots.txt`, well-known endpoints - help an agent find and understand your product from the outside. Context files do the same job from the inside: they are the first thing a coding agent reads when it lands in your repository, and they determine whether it can act correctly without guessing.
 
 For public repositories, these files are also crawlable web content. They advertise, to any agent that fetches the repo, exactly how the project expects to be built and what boundaries apply. Treat them as a deliberate part of what you expose, not as private scratch notes.
 
 ## What Belongs Where
 
-- `AGENTS.md` — the tool-neutral baseline every coding agent reads. Commands, tech stack, testing rules, and permission boundaries go here.
-- `CLAUDE.md` — a thin Claude Code overlay for model selection, skills, and memory hints. References `AGENTS.md`; never repeats it.
-- `.cursor/rules/*.mdc` and `.github/copilot-instructions.md` — tool-specific overrides layered on the same baseline.
+- `AGENTS.md` - the tool-neutral baseline every coding agent reads. Commands, tech stack, testing rules, and permission boundaries go here.
+- `CLAUDE.md` - a thin Claude Code overlay for skill triggers, tool boundaries, permission mode, and session hints. References `AGENTS.md`; never repeats it.
+- `.cursor/rules/*.mdc` and `.github/copilot-instructions.md` - tool-specific overrides layered on the same baseline.
 
 ## Full Guidance
 
-- [Context Files: AGENTS.md](/docs/context-files/agents-md) — the canonical spec: structure, discovery and precedence, length limits, anti-patterns, and security.
-- [Context Files: CLAUDE.md](/docs/context-files/claude-md) — Claude Code-specific overrides.
-- [Context Files: Cursor Rules and GitHub Copilot](/docs/context-files/cursor-and-copilot) — tool-specific variants and sync patterns.
+- [Context Files: AGENTS.md](/docs/context-files/agents-md) - the canonical spec: structure, discovery and precedence, length limits, anti-patterns, and security.
+- [Context Files: CLAUDE.md](/docs/context-files/claude-md) - Claude Code-specific overrides.
+- [Context Files: Cursor Rules and GitHub Copilot](/docs/context-files/cursor-and-copilot) - tool-specific variants and sync patterns.

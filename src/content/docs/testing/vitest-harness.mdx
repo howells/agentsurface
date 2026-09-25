@@ -1,11 +1,12 @@
 ---
 title: Vitest Evaluation Harness
 description: In-process evals for fast iteration; retry-on-flake, seed pinning, JUnit output
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-In-process evaluation harness for fast local iteration and deterministic routing tests (no LLM-as-judge, temperature 0). Best for TypeScript projects already using Vitest. Produce JUnit output for CI integration. Allow breakpoints, state inspection, and seed pinning for reproducibility. Fastest feedback for quick iteration; not suitable for large-scale eval (1000+cases) or open-ended grading requiring human review.
+In-process evaluation harness for fast local iteration and deterministic routing tests (no LLM-as-judge, temperature 0). Best for TypeScript projects already using Vitest. Produce JUnit output for CI integration. Allow breakpoints, state inspection, and seed pinning for reproducibility. Fastest feedback for quick iteration; not suitable for large-scale eval (1000+ cases) or open-ended grading requiring human review.
 
 - **Fast feedback**: 10-50 cases in seconds, no API latency
 - **Local debugging**: Breakpoints, state inspection, traces
@@ -20,16 +21,16 @@ Vitest evals run agents in-process within your test suite. They are faster for l
 
 ## When to use Vitest evals
 
-- **Fast feedback loop** — 10-50 test cases in seconds, no API latency to external platforms
-- **Local debugging** — set breakpoints, inspect state during agent execution
-- **Deterministic routing** — test tool selection (set temperature 0) without external eval infrastructure
-- **Regression tests** — catch regressions in CI before deploying
+- **Fast feedback loop** - 10-50 test cases in seconds, no API latency to external platforms
+- **Local debugging** - set breakpoints, inspect state during agent execution
+- **Deterministic routing** - test tool selection (set temperature 0) without external eval infrastructure
+- **Regression tests** - catch regressions in CI before deploying
 
 Do NOT use for:
 
-- **Open-ended evals** — if you need LLM-as-judge on every test case, external platforms are simpler
-- **Large-scale evaluation** — if you have 1000+ test cases, use Braintrust or LangSmith
-- **Human review** — if you need to manually review borderline cases, use a managed platform
+- **Open-ended evals** - if you need LLM-as-judge on every test case, external platforms are simpler
+- **Large-scale evaluation** - if you have 1000+ test cases, use Braintrust or LangSmith
+- **Human review** - if you need to manually review borderline cases, use a managed platform
 
 ## Basic structure
 
@@ -44,7 +45,7 @@ describe("Agent Evals", () => {
 
   beforeEach(() => {
     agent = new MyAgent({
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       temperature: 0, // Deterministic for evals
       maxRetries: 1,
     });
@@ -91,8 +92,6 @@ npm run test -- agent.eval.ts
 LLMs are stochastic. A single test failure might be noise. Retry a few times; pass if any succeeds:
 
 ```typescript
-import { retry } from "vitest";
-
 it(
   "should handle ambiguous intent",
   async () => {
@@ -113,12 +112,12 @@ This handles non-determinism while keeping tests fast. Don't use retry for deter
 
 ## Seed pinning
 
-For reproducibility, pin the LLM seed. Most providers support `seed` parameter:
+For reproducibility, pin the LLM seed where the provider supports one. OpenAI accepts a best-effort `seed` parameter; Anthropic's Messages API has no equivalent, so rely on `temperature: 0` plus the retry-on-flake pattern above for Claude models instead:
 
 ```typescript
 const agent = new MyAgent({
-  model: "claude-opus-5",
-  seed: 12345, // Fixed seed for reproducible routing
+  model: "gpt-5.6-terra",
+  seed: 12345, // Fixed seed for reproducible routing (OpenAI only)
   temperature: 0,
 });
 
@@ -254,7 +253,7 @@ First run creates a snapshot:
 ]
 ```
 
-Future runs fail if trajectory changes (e.g., tool order, new intermediate tool). Review the diff, update snapshot if intentional:
+Future runs fail if trajectory changes (e.g., tool order, new intermediate tool), so reserve this for tasks where the exact path is part of the contract, not for tasks where the agent may legitimately reach the goal a different way (see [Grade Outcomes, Not Paths](/docs/testing/evaluation-framework#grade-outcomes-not-paths)). Review the diff, update snapshot if intentional:
 
 ```bash
 npm run test -- agent.eval.ts -u
@@ -264,7 +263,7 @@ npm run test -- agent.eval.ts -u
 
 In-process evals use real API calls. To reduce cost:
 
-- **Mock tool responses** — don't call actual tools, return fixed responses:
+- **Mock tool responses** - don't call actual tools, return fixed responses:
 
 ```typescript
 const agent = new MyAgent({
@@ -277,7 +276,7 @@ const agent = new MyAgent({
 });
 ```
 
-- **Use cheaper models for routing tests** — temperature 0 with Haiku instead of Opus:
+- **Use cheaper models for routing tests** - temperature 0 with Haiku instead of Opus:
 
 ```typescript
 const agentRouting = new MyAgent({
@@ -286,7 +285,7 @@ const agentRouting = new MyAgent({
 });
 
 const agentQuality = new MyAgent({
-  model: "claude-opus-5",
+  model: "claude-opus-5-5",
 });
 
 // Routing tests: fast + cheap
@@ -295,12 +294,12 @@ const agentQuality = new MyAgent({
 
 ## Template and links
 
-- Template: `/templates/cli-and-evals/eval-vitest-harness.ts` — full working example
+- Template: `/templates/cli-and-evals/eval-vitest-harness.ts` - full working example
 - Vitest docs: https://vitest.dev/
 - Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
 
 ## See also
 
-- `/docs/testing/metrics` — pass@k calculation
-- `/docs/testing/evaluation-framework` — grader patterns
-- `/docs/testing/ci-integration` — GitHub Actions setup
+- `/docs/testing/metrics` - pass@k calculation
+- `/docs/testing/evaluation-framework` - grader patterns
+- `/docs/testing/ci-integration` - GitHub Actions setup

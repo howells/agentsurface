@@ -1,0 +1,72 @@
+---
+title: Checkout Protocols
+description: UCP and ACP - how agents complete a purchase once they have found and trusted a product, and how the two relate to MCP and A2A
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Once an agent has found a product it trusts (see [Product Data](/docs/agentic-commerce/product-data)), it needs a way to turn that into an order: negotiate what it can do, present terms for approval, and complete the purchase with a receipt. Two protocols do this today. UCP has more live merchant integrations than ACP: Google and Shopify launched it with 20+ partners, while ACP is a real, documented protocol that has narrowed since ChatGPT Instant Checkout shut down in March 2026. Neither replaces MCP or A2A - they sit above them as the commerce-specific session layer.
+
+- **UCP** - Google + Shopify; standardized catalog, cart, identity, and checkout; current release `2026-08-25`
+- **ACP** - OpenAI + Stripe; session-based checkout with explicit payment delegation; Beta, and narrowing since ChatGPT Instant Checkout shut down in March 2026
+- Both are commerce-session protocols, not tool protocols - an agent still uses MCP for the surrounding tool calls and A2A if a specialist agent handles the purchase
+- Pick one protocol per merchant relationship; don't hand-build a competing checkout surface where a platform already offers one
+
+## UCP - Universal Commerce Protocol
+
+**Status: most live merchant integrations.** UCP was announced by Google and Shopify on 2026-01-11 at NRF, with a date-versioned spec and 20+ launch partners. The UCP Tech Council expanded on 2026-04-24 to add Amazon, Meta, Microsoft, Salesforce, and Stripe.
+
+The [`2026-08-25` release](https://github.com/Universal-Commerce-Protocol/ucp/releases/tag/v2026-08-25) is the current spec version. It lays the ground for Food and Lodging verticals alongside the original Shopping vertical (polymorphic token binding, vertical-agnostic payment constructs), adds vendor-agnostic 3D Secure (3DS2) device-data-collection and challenge flows via the Actions primitive, adds response-carried request constraints so a merchant can return transaction-specific validation rules, and formalizes independent, date-based capability versioning across protocol updates. Governance has grown past the original Tech Council into vertical-specific technical councils: a [Food TC](http://ucp.dev/documentation/announcements/) (finalized 2026-07-16; Block/Square, DoorDash, Google, Toast, Uber Eats), a Lodging TC (closed 2026-08-11; Amadeus, Booking.com, Expedia, Google, Hilton, Marriott, Trip.com), and a Payments TC (closed 2026-09-02; Adyen, Ant International, Coinbase, Global Payments, Google, PayPal, Shopify, Stripe).
+
+UCP standardizes how a merchant catalog, cart, and checkout are exposed to agents, and how a purchase is authorized end to end: catalog search, cart, OAuth2 identity, checkout, and order tracking, published at a `/.well-known/ucp` profile. It is designed to be AP2-compatible, so its mandates can ride the AP2 authorization model described on [Payments](/docs/agentic-commerce/payments).
+
+If you sell through Shopify or one of the launch platforms, UCP is likely to reach you as a platform feature rather than something you implement by hand - see [Shopify](/docs/agentic-commerce/shopify) for what that looks like concretely.
+
+## ACP - Agentic Commerce Protocol
+
+**Status: Beta, and narrowing.** ACP (OpenAI + Stripe) defines how an agent completes a purchase on behalf of a user, with the current public spec under `spec/2026-04-17`. OpenAI shut down ChatGPT Instant Checkout in March 2026 after near-zero conversion; ChatGPT's shopping flow is now discovery-in-ChatGPT with checkout completed on the merchant's own site, largely through OpenAI's [Agentic Checkout Spec and Delegated Payment Spec](https://developers.openai.com/commerce/guides/key-concepts) rather than the standalone ACP session flow below. Broader commerce momentum has moved to UCP. Treat ACP as a narrowing pilot and check current merchant and client support before committing to it.
+
+<Callout type="warn">
+  **"ACP" is an overloaded acronym.** This page covers the **Agentic Commerce Protocol** (OpenAI +
+  Stripe). The unrelated **Agent Client Protocol** (Zed-originated, editor-to-agent, stable protocol
+  version 1, adopters include Zed, JetBrains, Neovim, and Emacs) and IBM's dead **Agent
+  Communication Protocol** (absorbed into [A2A](/docs/protocols/a2a) in August 2025) also use it.
+</Callout>
+
+### What a merchant needs to know
+
+Merchants publish capabilities at `/.well-known/acp.json`: supported payment methods, currencies, endpoints, and an authentication scheme. An agent fetches this before attempting any session and should not proceed if its requirements aren't in the declared capability set.
+
+The flow is a stateless, single-intent session:
+
+1. **Create session** - the agent `POST`s `/checkout_sessions` with the intent (items, currency, `budget_ceiling_cents`) and an `Idempotency-Key`. The merchant returns a session ID, the negotiated capability intersection, priced line items, and an authorization challenge.
+2. **Capability negotiation** - the agent only relies on capabilities present in `negotiated_capabilities` (`streaming_updates`, `cancellation`, `intent_tracing`, `idempotency`, `partial_fulfillment`). If something required is missing, it cancels rather than proceeding without it.
+3. **Payment delegation** - the buyer grants a one-time, amount-capped, merchant-scoped payment allowance; the agent confirms the session with the resulting payment token. This allowance does not give the agent access to the buyer's general payment credentials.
+4. **Completion** - synchronous merchants return a receipt directly; merchants with `streaming_updates` open an SSE stream and the agent calls `/complete` once it sees the `completed` event.
+
+Security: Bearer tokens scoped per agent and buyer session; optional request signing with `X-ACP-Timestamp`/`X-ACP-Signature` (5-minute replay window); mandatory `Idempotency-Key` on every mutating request. Structured cancellation carries a reason code (`user_declined`, `budget_exceeded`, `capability_mismatch`, `timeout`, `agent_error`, `merchant_unavailable`) so merchants can distinguish abandonment causes. Errors carry `severity`, `resolution` guidance, and a `retryable` flag rather than prose alone.
+
+ACP can be exposed as an MCP server: five tools (`acp_discover_merchant`, `acp_create_session`, `acp_get_session`, `acp_confirm_session`, `acp_cancel_session`) wrapping the HTTP API over standard JSON-RPC, no separate transport needed.
+
+Merchant checklist: return complete pricing (including tax and fees) at session creation, not at confirm; implement `streaming_updates` for anything over two seconds; use machine-readable error codes; honour `budget_ceiling_cents` by rejecting at creation rather than at confirm.
+
+Full spec references: [ACP specification](https://agenticcommerce.dev), [OpenAPI under `spec/2026-04-17`](https://github.com/agentic-commerce-protocol/agentic-commerce-protocol/tree/main/spec/2026-04-17/openapi).
+
+## How these relate to MCP and A2A
+
+UCP and ACP are commerce-session protocols: they define catalog, cart, checkout, and payment delegation semantics, layered on top of [MCP](/docs/protocols/mcp) (agent-to-tool/data) and [A2A](/docs/protocols/a2a) (agent-to-agent delegation) rather than replacing them. A real system layers them: MCP for the surrounding tool calls, A2A where another agent handles the purchase, and UCP or ACP for the commerce session with the merchant. ACP's MCP binding above is exactly this pattern: the commerce protocol riding MCP transport rather than competing with it.
+
+## Decision rule: which protocol by role
+
+- **Merchant / commerce platform** - UCP is the one to track and, where your platform offers it, enable. Do not hand-build a competing checkout surface; ride the platform integration. See [Shopify](/docs/agentic-commerce/shopify) if that's your platform.
+- **Selling through ChatGPT specifically** - OpenAI's product feed plus Agentic Checkout/Delegated Payment specs (see [Product Data](/docs/agentic-commerce/product-data) and [Payments](/docs/agentic-commerce/payments)) are the live path; the standalone ACP session flow above is the fallback for pilots outside that surface.
+- **Agent platform** - adopt the mandate model (see [Payments](/docs/agentic-commerce/payments)) as your internal representation of spending authority now; defer pinning to one protocol's wire format until your payment partner commits.
+
+## Related Pages
+
+- [Agentic Commerce](/docs/agentic-commerce) - the five-layer overview
+- [Payments](/docs/agentic-commerce/payments) - spending authority, mandates, and settlement once checkout completes
+- [Shopify](/docs/agentic-commerce/shopify) - UCP as a platform feature
+- [Protocol Comparison](/docs/protocols/comparison) - MCP, A2A, and the wider protocol landscape
+- [Emerging Standards](/docs/protocols/emerging-standards) - card-network payment schemes and other early-stage protocols

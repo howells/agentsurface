@@ -1,0 +1,64 @@
+---
+title: Memory
+description: The distinct types of agent memory, what each solves, and what to share versus isolate in a multi-agent system.
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+"Agent memory" covers at least five distinct mechanisms with different scope and persistence. A system that relies only on message history is capped at what fits in a context window. Start with none, and add a type only when the product need is concrete - see [Design Defaults](/docs/agents).
+
+| Type            | Scope                   | Storage                  | Retrieval               |
+| --------------- | ----------------------- | ------------------------ | ----------------------- |
+| Message history | Current thread          | In-memory / checkpointer | Sequential, by position |
+| Working memory  | Per-session, per-agent  | Structured store         | Direct key access       |
+| Semantic recall | Cross-thread, long-term | Vector database          | Embedding similarity    |
+| Observational   | Background compression  | Structured store         | Direct key access       |
+| Procedural      | Learned behavior        | Instruction store        | Loaded into context     |
+
+## Message History
+
+The conversation context the model processes every turn - the only type guaranteed to influence output. Scoped to a `thread_id`; a checkpointer (Postgres, Redis) persists it across sessions. Manage length by trimming to a token budget, summarizing and compressing older turns, or - increasingly - letting the platform do it: OpenAI's server-side compaction on the Responses API and Anthropic's beta compaction API summarize prior turns inside the provider's own runtime, so the app neither resends nor re-summarizes the transcript. Platform compaction is lossy by design and is not a memory system or an audit log; keep your own record of what the agent did.
+
+## Working Memory
+
+Persistent structured state that survives across turns within a session, and optionally across sessions - accessed directly by key rather than processed wholesale like message history. Use it for facts that should stay stable across a session: user preferences, confirmed decisions, established context. Frameworks that support it typically let you define a schema (Zod or equivalent) for what the agent tracks, inject the current values into the system prompt automatically, and persist model-driven updates alongside programmatic reads and writes.
+
+## Semantic Recall
+
+Messages and other content stored as vector embeddings; the most similar past content is retrieved and injected into the current turn. This lets an agent "remember" a fact from months ago without keeping every message in the active window. Retrieval is scoped either to a thread or to a resource/entity ID that spans threads (a user, an organization, a project) - the latter is what makes cross-thread recall work: a fact recorded in January is retrievable from a session started in April against the same entity ID.
+
+## Observational Memory
+
+Background compression of aging message history: as messages age past a recency threshold, a process summarizes and stores them in structured form, freeing context space while preserving substance. This runs asynchronously - the agent keeps operating on recent messages verbatim while older ones compress in the background. Treat any specific compression-policy API as illustrative rather than a fixed constructor shape; the pattern (recent-verbatim plus older-summarized) is the portable part, and different systems expose it as a policy, a hook, or a custom job.
+
+## Procedural Memory
+
+The first four types store what the agent _knows_; procedural memory stores what it has _learned to do_ - generalized instructions distilled from experience, not raw events. It is now an industry-converged category (Letta, Zep, Mem0, and LangMem each ship a distinct procedural or "instruction" store), and its file-based cousin is the skill library: a `SKILL.md`-style document that captures a repeatable procedure once and loads it on demand.
+
+**Write path.** Reflection, not direct capture: a background or end-of-task step reviews recent runs and promotes patterns that succeeded _repeatedly_ into standing instructions - deliberately slow and selective, since a single success should not become a rule.
+
+**Read path.** Loaded into context at session start rather than retrieved per turn, because standing instructions apply broadly. High-volume instruction sets can be scoped by task type or tool to control token cost.
+
+**Risk.** This is the one memory type that changes behavior, so a wrongly promoted instruction compounds as a bad habit across every future run. Require multiple supporting runs before promotion, expire instructions that stop being reconfirmed, and keep the store small and human-auditable.
+
+## Sharing Memory Across Agents
+
+Sharing requires explicit design; assuming a global memory store is the most common multi-agent memory mistake.
+
+| Memory type       | Share between agents?           | Rationale                                                         |
+| ----------------- | ------------------------------- | ----------------------------------------------------------------- |
+| Message history   | Only through a shared thread ID | Workers do not need the supervisor's full internal reasoning      |
+| Working memory    | Per-agent                       | Agent-specific preferences and state                              |
+| Semantic recall   | Share via a resource/entity ID  | Cross-thread recall benefits from the full history of that entity |
+| Procedural memory | Per-role, curated               | Each role learns its own procedures; sharing spreads bad habits   |
+| Shared task store | Yes, namespaced                 | Sub-task outputs must reach the supervisor or downstream agents   |
+
+Thread-level sharing (supervisor and workers on the same `thread_id`) works for tightly coupled delegation but leaks the supervisor's internal reasoning into worker context. Explicit namespaced store sharing - each agent reads and writes under `(project, task, key)` rather than a shared global object - scales better once workers should only see what they need.
+
+## Related
+
+- [Orchestration](/docs/agents/orchestration)
+- [Design Defaults](/docs/agents)
+- [Agent Retrieval](/docs/agent-retrieval) - the retrieval mechanics semantic recall builds on
+- [Durable Execution](/docs/agents/durable-execution)

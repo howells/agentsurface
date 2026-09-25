@@ -11,6 +11,7 @@
     "testing",
     "nextjs-integration",
     "auto-generation",
-    "real-world-examples"
+    "real-world-examples",
+    "code-execution"
   ]
 }

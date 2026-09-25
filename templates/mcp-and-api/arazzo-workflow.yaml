@@ -1,7 +1,7 @@
-# Arazzo 1.0.1 Workflow — Multi-step agent orchestration
+# Arazzo 1.1.0 Workflow — Multi-step agent orchestration
 #
 # Canonical spec: https://www.openapis.org/arazzo-specification
-# Aligned with: OpenAPI 3.1.x
+# Aligned with: OpenAPI 3.2.x
 # Use case: Compose multi-step agent workflows (create → validate → notify)
 #
 # When to use this:
@@ -19,7 +19,7 @@
 # ✓ Declare workflow outputs
 # ✓ Test against real API
 
-arazzo: 1.0.1
+arazzo: 1.1.0
 info:
   title: Agent Onboarding Workflow
   version: 1.0.0
@@ -52,7 +52,7 @@ workflows:
         description: Name of the new agent
         required: true
       - name: agent_model
-        description: Model to use (claude-opus-5 | claude-sonnet-5 | claude-haiku-4-5-20251001)
+        description: Model to use (claude-opus-5-5 | claude-sonnet-5 | claude-haiku-4-5-20251001)
         required: true
       - name: admin_email
         description: Email to notify of creation

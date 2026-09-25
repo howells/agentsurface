@@ -1,7 +1,7 @@
 ---
 title: WebMCP
 description: Browser-native, page-scoped tools for agents, including the current W3C Community Group API and the older webmcp.dev library.
-lastVerified: 2026-08-27
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -13,7 +13,7 @@ WebMCP is not remote MCP in a browser. The specification deliberately does not p
 - Current API: `document.modelContext.registerTool(...)`
 - Scope: tools exposed by the active page and permitted frames
 - Transport: browser-defined; the WebMCP specification does not require MCP JSON-RPC
-- Status: Draft Community Group Report, dated 2026-08-26
+- Status: Draft Community Group Report, dated 2026-09-17
 - Chrome: origin trial from Chrome 149; no cross-browser commitment yet
 
 ## Minimal Imperative Tool
@@ -115,6 +115,10 @@ Treat every tool description and result as untrusted content. The draft calls ou
 Use WebMCP when the useful capability is tied to a page the user can see: filling a product configurator, manipulating a canvas, completing a form, operating authenticated account UI, or reading page-local state that has no stable server API.
 
 Prefer an HTTP API or remote MCP server when the capability should work headlessly, across many clients, or without loading your UI. A durable agent surface often provides both: remote capabilities for automation and WebMCP tools for page-specific interaction.
+
+## Platform Adoption
+
+Shopify shipped WebMCP support for Liquid and Hydrogen storefronts on 2026-08-05, ahead of the Chrome origin trial's wider availability - a concrete data point that WebMCP is reaching production storefronts. See the [Shopify changelog](https://shopify.dev/changelog) for the current state of that support.
 
 ## `webmcp.dev` Is a Different Project
 

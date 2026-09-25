@@ -1,6 +1,7 @@
 ---
 title: Retry and Recovery Patterns
 description: Exponential backoff, circuit breakers, and idempotency for resilient agent-driven workflows
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -18,7 +19,7 @@ delay = base * 2^attempt + random(0, base)  (capped at 60s)
 - Idempotency-Key required for write operations
 - is_retriable from problem body overrides status code heuristics
 
-Agents retry. Unlike humans, who might manually retry a failed request once or twice, an agent following a retry loop will retry at whatever cadence its logic allows — which, without constraints, can become a thundering herd that makes an already-degraded service worse. Retry patterns for agent systems must fail safely without amplifying failures.
+Agents retry. Unlike humans, who might manually retry a failed request once or twice, an agent following a retry loop will retry at whatever cadence its logic allows - which, without constraints, can become a thundering herd that makes an already-degraded service worse. Retry patterns for agent systems must fail safely without amplifying failures.
 
 ## Exponential Backoff with Jitter
 
@@ -30,7 +31,7 @@ The formula:
 delay = base * 2^attempt + random(0, base)
 ```
 
-The `random(0, base)` term is jitter — a random offset added to prevent synchronized retries when multiple agents encounter the same error at the same time.
+The `random(0, base)` term is jitter - a random offset added to prevent synchronized retries when multiple agents encounter the same error at the same time.
 
 ```typescript
 function backoffDelay(attempt: number, base = 1000): number {
@@ -112,14 +113,14 @@ With a 60-second cap, delays plateau rather than growing indefinitely.
 
 When a service goes down and comes back up, every agent that accumulated retries during the outage fires simultaneously. The recovered service receives a traffic spike larger than the one that caused the outage.
 
-Jitter alone is not sufficient when the population of retrying agents is large. Full jitter — using a random value across the entire backoff range rather than adding jitter to an exponential value — spreads retries more evenly:
+Jitter alone is not sufficient when the population of retrying agents is large. Full jitter - using a random value across the entire backoff range rather than adding jitter to an exponential value - spreads retries more evenly:
 
 ```typescript
 // Exponential backoff with jitter: base * 2^n + random(0, base)
 // Good for small retry populations
 
 // Full jitter: random(0, base * 2^n)
-// Better for large retry populations — fully randomizes within the window
+// Better for large retry populations - fully randomizes within the window
 
 function fullJitterDelay(attempt: number, base = 1000): number {
   const cap = base * Math.pow(2, attempt);
@@ -154,7 +155,7 @@ class CircuitBreaker {
           `Circuit open. Retry after ${Math.ceil((this.cooldownMs - elapsed) / 1000)}s`,
         );
       }
-      // Cooldown elapsed — allow one probe request
+      // Cooldown elapsed - allow one probe request
       this.state = "half-open";
     }
 
@@ -190,7 +191,24 @@ async function getInvoice(id: string) {
 }
 ```
 
-When the circuit is open, `CircuitOpenError` carries the remaining cooldown time. Agents should treat an open circuit as a non-retriable error — they should escalate or return a partial result rather than sitting in a wait loop.
+When the circuit is open, `CircuitOpenError` carries the remaining cooldown time. Agents should treat an open circuit as a non-retriable error - they should escalate or return a partial result rather than sitting in a wait loop.
+
+## Checking Status Before Escalating
+
+No formal spec governs status pages, but a machine-readable one changes what an agent does after a retry budget is exhausted. Instead of escalating every 5xx run identically, an agent that can check status first tells the difference between "your integration broke" and "the provider is down; back off and retry later without paging anyone."
+
+Many providers already expose this. Status pages built on Atlassian Statuspage - used by OpenAI, and widely elsewhere - serve a public, unauthenticated `/api/v2/summary.json` alongside the human-readable page, with an overall `status.indicator`/`status.description` and a `components` array giving per-component status:
+
+```bash
+curl -s https://status.openai.com/api/v2/summary.json | jq '.status, .components[0]'
+```
+
+```json
+{ "description": "All Systems Operational", "indicator": "none" }
+{ "id": "...", "name": "Ads Manager", "status": "operational" }
+```
+
+This is a convention, not a standard, and it varies by status-page vendor. If you publish one, link it from your [API catalog](/docs/discovery/well-known-endpoints) so an agent doesn't have to guess the URL, and prefer a machine-readable summary endpoint over a status page that only renders as HTML - the same no-JS-content principle that applies to every other agent-facing surface.
 
 ## Rate Limit Handling
 
@@ -211,7 +229,7 @@ async function withRateLimitHandling(fn: () => Promise<Response>): Promise<Respo
       }
     }
 
-    // No Retry-After — fall back to exponential backoff
+    // No Retry-After - fall back to exponential backoff
     await sleep(backoffDelay(0));
     return fn();
   }
@@ -250,7 +268,7 @@ class RateLimitAwareClient {
 
 ## The IETF RateLimit Header Fields
 
-`X-RateLimit-*` above is a widespread but unstandardized convention - every API picks its own field names and semantics. The IETF HTTPAPI working group's [draft-ietf-httpapi-ratelimit-headers](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) standardizes two fields instead. As of this writing it is at draft -11 (May 2026) and remains an Internet-Draft, not an RFC - field names could still change before it ships, so treat it as the emerging convention rather than a settled contract.
+`X-RateLimit-*` above is a widespread but unstandardized convention - every API picks its own field names and semantics. The IETF HTTPAPI working group's [draft-ietf-httpapi-ratelimit-headers](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) standardizes two fields instead. The latest revision is draft -11 (23 May 2026); it remains an Internet-Draft, not an RFC - field names could still change before it ships, so treat it as the emerging convention rather than a settled contract.
 
 **`RateLimit`** - current quota state, as an HTTP structured field:
 
@@ -298,13 +316,13 @@ Support both while the draft is unsettled: read `RateLimit` when present, fall b
 
 ## Idempotency Keys
 
-Retries and idempotency are inseparable: an agent retrying a write operation without an idempotency guarantee risks creating duplicate resources — an invoice creation retried after a network timeout can create two invoices if the first request succeeded before the connection dropped. The rule for any retry loop is that every write it may re-issue must carry an `Idempotency-Key`, generated once per logical operation and sent unchanged on each attempt, so the server can deduplicate.
+A retried write without an idempotency guarantee can create duplicate resources; see [Idempotency](/docs/error-handling/idempotency) for the full contract. The rule for any retry loop is that every write it may re-issue must carry an `Idempotency-Key`, generated once per logical operation and sent unchanged on each attempt, so the server can deduplicate.
 
-The key-generation, server-side storage, 24-hour TTL, and replay semantics are documented in full on the [Idempotency](/docs/error-handling/idempotency) page. Idempotency keys matter most for payments, invoice creation, and any operation that consumes a limited resource or triggers an external side effect (email, SMS, webhook).
+Idempotency keys matter most for payments, invoice creation, and any operation that consumes a limited resource or triggers an external side effect (email, SMS, webhook).
 
 ## Distinguishing Retriable from Non-Retriable Errors
 
-Not all errors should be retried. Retrying a 400 Validation Error or a 403 Forbidden will never succeed — the request itself is wrong, not the timing.
+Not all errors should be retried. Retrying a 400 Validation Error or a 403 Forbidden will never succeed - the request itself is wrong, not the timing.
 
 ```typescript
 function isRetriable(err: unknown): boolean {
@@ -342,17 +360,18 @@ The `is_retriable` field in the RFC 9457 Problem Details body takes precedence o
 - [ ] Jitter is applied on every retry
 - [ ] Maximum delay is capped (60 seconds recommended)
 - [ ] Circuit breakers stop retrying after N consecutive failures
+- [ ] A machine-readable status endpoint exists and is linked from the API catalog, so agents can distinguish an outage from a broken integration
 - [ ] 429 responses use the `Retry-After` header value as the wait time
 - [ ] `RateLimit` / `RateLimit-Policy` (or `X-RateLimit-Remaining` as a fallback) are tracked to throttle proactively before hitting limits
 - [ ] All write operations that may be retried use idempotency keys
-- [ ] Idempotency key is generated once per logical operation — not per attempt
+- [ ] Idempotency key is generated once per logical operation - not per attempt
 - [ ] Non-retriable errors (4xx validation, auth failures) are not retried
 - [ ] `is_retriable` from the problem body overrides status code heuristics
 
 ## Related Pages
 
-- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) — the standard error format
-- [Agent extensions](/docs/error-handling/rfc-9457#recommended-extensions-for-agent-apis) — `is_retriable` and `retry_after_ms` fields
-- [Idempotency](/docs/error-handling/idempotency) — safe retries for write operations
-- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — structuring errors to enable this logic
-- [CLI Error Design](/docs/error-handling/cli-errors) — applying these patterns to command-line tools
+- [RFC 9457 Problem Details](/docs/error-handling/rfc-9457) - the standard error format
+- [Agent extensions](/docs/error-handling/rfc-9457#recommended-extensions-for-agent-apis) - `is_retriable` and `retry_after_ms` fields
+- [Idempotency](/docs/error-handling/idempotency) - safe retries for write operations
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) - structuring errors to enable this logic
+- [CLI Error Design](/docs/error-handling/cli-errors) - applying these patterns to command-line tools

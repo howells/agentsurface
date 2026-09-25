@@ -1,0 +1,72 @@
+---
+title: Browser and Sandboxes
+description: Choosing and scaffolding browser access and isolated code execution for agents - two of the highest-risk tool surfaces an agent can receive.
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Browser access and code execution are both useful because they let an agent do what an API cannot - interact with an unstructured page, or run generated logic - and both are high-risk for the same reason: the agent is now running something outside your control surface. A browser can read private data, click destructive controls, and follow prompt-injected page content. Generated code can loop forever, exhaust memory, or reach the network. Treat both as constrained runtimes with explicit budgets.
+
+- Prefer an API or a deterministic transform over a browser or sandbox whenever one exists.
+- Choose the least powerful surface that completes the workflow, and escalate only when needed.
+- Isolation strength trades against cold-start latency - match it to what the code or session can actually damage.
+- Neither surface is a secrets boundary: anything injected into a session is visible to code and to prompt-injected instructions that code follows.
+
+## Browser Access
+
+| Need                                               | Prefer                                                                                                                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Deterministic web automation in your own code      | Playwright or Puppeteer                                                                                                                                                                                            |
+| Python agent that should decide browser steps      | Browser Use                                                                                                                                                                                                        |
+| TypeScript automation with occasional AI decisions | Stagehand (Playwright-style code plus `act`/`extract`/`observe`)                                                                                                                                                   |
+| Hosted cloud browser infrastructure                | Browserbase, Kernel, or browserless                                                                                                                                                                                |
+| Workers-native browser access                      | Cloudflare Browser Run                                                                                                                                                                                             |
+| Search, scrape, crawl, or Markdown extraction      | Firecrawl, Tavily, Exa, Jina Reader, or Apify                                                                                                                                                                      |
+| Visual computer-use loop (model reads screenshots) | Kernel Computer Controls, Bedrock AgentCore Browser, or provider computer use (Claude's `computer_toolset_20260801` and `browser_toolset_20260801`, GA since 2026-08-19 - see [Platforms](/docs/agents/platforms)) |
+
+Prefer coarse, auditable tools over exposing raw click/type/navigate controls to the model: `extract_page_data(url, schema)`, `search_site(query, allowed_domains)`, `run_browser_task(task, allowed_domains, output_schema)` are safer shapes than `click(selector)` or `eval_js(script)`. A dedicated browser agent can use the riskier raw controls, but then needs a stricter policy envelope around it.
+
+**Guardrails checklist:** domain allowlist enforced outside the prompt; session timeouts, cost limits, and max action counts; authenticated profiles scoped to a user/tenant/task type; tool output summarized and truncated before reaching the model; downloads scanned, size-limited, and stored outside production paths; page text treated as untrusted input; writes, purchases, messages, and account changes gated behind confirmation (see [Prompts and Configuration](/docs/agents/prompts-and-configuration)); every run emits trace IDs and screenshots/recordings.
+
+Default escalation path: search/extraction API for public content → Playwright for deterministic internal or partner flows → Stagehand for brittle interaction steps → Browserbase/Kernel/Browser Run when hosting and scale become the problem → Browser Use when the browser agent itself needs to plan and recover across a multi-step task → computer-use APIs only when DOM/CDP automation is insufficient.
+
+## Sandboxes And Workspaces
+
+Two axes drive the choice. What **persists** - nothing (ephemeral), the filesystem (a coding session), or the whole workspace (an autonomous agent that learns over time) - and **isolation strength versus cold-start latency**:
+
+- **microVM** (Firecracker-style, e.g. Vercel Sandbox, E2B) - strongest isolation, for untrusted code, at the cost of a heavier cold start.
+- **Container** (Cloudflare Sandbox, AWS Bedrock AgentCore) - good isolation, lighter footprint, well-suited to first-party generated code.
+- **Process** (in-VM subprocess, seccomp/namespace jail) - lowest latency, weakest boundary; only for code you trust and can bound.
+
+Choose the weakest isolation that still contains the worst case for the code you actually run. Do not pay microVM cold-start for a trusted 200ms transform, and do not run genuinely untrusted code in a shared process.
+
+One class is worth calling out on its own: **platform-attached shells**, where the model provider bundles the container into the model API itself. OpenAI's hosted Shell tool gives the model a terminal in an OpenAI-managed container - fresh per request, or reused across turns - and Anthropic's Managed Agents environments play the same role on the Claude side (see [Platforms](/docs/agents/platforms)). The trade is the usual one: zero infrastructure to run, in exchange for vendor coupling and state living inside someone else's runtime. Prefer a platform-attached shell when the agent already lives on that platform; prefer an independent sandbox when execution must be portable across models or outlive any one provider's session model.
+
+**Independent sandbox vendors:** E2B (secure code-interpreter sandboxes, strong for data analysis); Modal (serverless VM-backed sandboxes, elastic Python/GPU); Vercel Sandbox (ephemeral microVMs with persistent-filesystem support); Cloudflare Sandbox SDK (container sandboxes driven from a Worker); AWS Bedrock AgentCore (managed Runtime and Code Interpreter for AWS-native stacks).
+
+Daytona's hosted product remains active, but core development moved to a private codebase in June 2026. The public [`daytonaio/daytona`](https://github.com/daytonaio/daytona) repository stays readable and forkable under its last licence (v0.190.0) with no further updates, fixes or releases. Treat "self-hostable" as meaning a frozen snapshot, and evaluate the hosted product on its own terms rather than assuming an open fallback.
+
+## Workspace Surfaces
+
+An ephemeral sandbox suffices for a one-shot execution. A long-running agent needs a **workspace** - durable state that outlives any single session, best understood as a set of surfaces rather than one mounted directory:
+
+- **Persistent agent filesystems** - provider-backed storage the sandbox mounts each session, so a coding agent resumes on the same working tree. Persistence needs a lifecycle: what is kept, for how long, who can read it.
+- **Sandboxed execution** - the compute surface above, attached to the same filesystem.
+- **Workspace search** - BM25, vector, or hybrid retrieval over the workspace's own contents, so the agent recalls what it learned rather than re-deriving it.
+- **Skills libraries** - reusable procedures stored in the workspace and loaded on demand, using the same packaging format covered in [Agent Skills](/docs/discovery/agent-skills).
+- **LSP inspection** - a live query interface over a semantic model of the code, distinct from the other surfaces (all recognizable as storage). The agent points at a file, line, and symbol and gets back what a hover in an editor would: inferred type, declaration site, usages, diagnostics - one tool call instead of several speculative `grep` passes and reads. Precision here changes edit quality as well as token spend, because the semantic model stays correct as the agent edits, unlike an index built once at session start. Coverage is per-language and uneven in practice.
+
+## Failure Modes
+
+- **State leaking between sessions expected to be isolated** - reusing a sandbox or filesystem across tenants or tasks leaks data and corrupts results. Isolate by tenant and task class, and prove teardown actually happens.
+- **Cold-start dominating short tasks** - a microVM boot time in front of a sub-second transform makes isolation the slowest part of the run. Pool warm sandboxes or use a lighter boundary for trusted short work.
+- **Persistence without a retention policy** - a workspace filesystem that only grows becomes an unbounded, unaudited store of scraped data and secrets. Set retention, size limits, and access scope before turning persistence on.
+- **Treating the sandbox as a secrets boundary** - a sandbox bounds what code can damage. Whatever the code can reach, it can also read. Keep production credentials out and broker privileged actions through a server-side tool the sandbox cannot bypass.
+
+## Related
+
+- [Platforms](/docs/agents/platforms) - platform-attached shells and containers
+- [Guardrails](/docs/agents/guardrails)
+- [Durable Execution](/docs/agents/durable-execution)
+- [Browser, Sandbox, and Integration catalog](/docs/tooling-catalog/browser-sandbox-and-integration) - full vendor comparison table

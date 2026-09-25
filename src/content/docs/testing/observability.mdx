@@ -1,7 +1,7 @@
 ---
 title: Observability and Instrumentation
 description: OpenTelemetry GenAI semantic conventions, trace export, Langfuse, Phoenix
-lastVerified: 2026-07-06
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -23,9 +23,9 @@ Agent observability is the ability to inspect what happened: which tools were ca
 
 ## OpenTelemetry GenAI semantic conventions
 
-The GenAI conventions define standard attributes for LLM and agent spans. Their status is Development (experimental) — nothing in the GenAI set is stable or stabilizing yet.
+The GenAI conventions define standard attributes for LLM and agent spans. Their status is Development (experimental) - nothing in the GenAI set is stable or stabilizing yet.
 
-As of semantic-conventions v1.42.0 (2026-06-12), all `gen_ai.*` and `mcp.*` conventions moved out of the mainline spec into a dedicated repository, [open-telemetry/semantic-conventions-genai](https://github.com/open-telemetry/semantic-conventions-genai). The old opentelemetry.io gen-ai pages (`https://opentelemetry.io/docs/specs/semconv/gen-ai/`) are now redirect stubs. The new repository has zero tagged releases, so the GenAI conventions are currently unversioned — you cannot pin an emitted convention version; pin to a commit or snapshot instead. Mainline semantic-conventions v1.43.0 (2026-07-03) ships with no gen-ai content.
+As of semantic-conventions v1.42.0 (2026-06-12), all `gen_ai.*` and `mcp.*` conventions moved out of the mainline spec into a dedicated repository, [open-telemetry/semantic-conventions-genai](https://github.com/open-telemetry/semantic-conventions-genai). The old opentelemetry.io gen-ai pages (`https://opentelemetry.io/docs/specs/semconv/gen-ai/`) are now redirect stubs. The new repository has zero tagged releases, so the GenAI conventions are currently unversioned - you cannot pin an emitted convention version; pin to a commit or snapshot instead. Mainline semantic-conventions v1.43.0 (2026-07-03) ships with no gen-ai content.
 
 ### Root span: LLM completion
 
@@ -38,7 +38,7 @@ async function runAgent(prompt: string) {
   const span = tracer.startSpan("llm.completion", {
     attributes: {
       "gen_ai.provider.name": "anthropic",
-      "gen_ai.request.model": "claude-opus-5",
+      "gen_ai.request.model": "claude-opus-5-5",
       "gen_ai.input.messages": JSON.stringify([{ role: "user", content: prompt }]),
       "gen_ai.usage.input_tokens": 150,
       "gen_ai.usage.output_tokens": 300,
@@ -48,7 +48,7 @@ async function runAgent(prompt: string) {
 
   try {
     const response = await callClaude({
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -70,7 +70,7 @@ async function runAgentWithTools(prompt: string) {
   const span = tracer.startSpan("agent.run", {
     attributes: {
       "gen_ai.provider.name": "anthropic",
-      "gen_ai.request.model": "claude-opus-5",
+      "gen_ai.request.model": "claude-opus-5-5",
     },
   });
 
@@ -110,28 +110,28 @@ async function runAgentWithTools(prompt: string) {
 
 **Core attributes** (on every LLM span):
 
-- `gen_ai.provider.name` — "anthropic", "openai", "google"
-- `gen_ai.request.model` — e.g., "claude-opus-5"
-- `gen_ai.input.messages` — JSON array of messages (or hash if large)
-- `gen_ai.output.messages` — model's response
-- `gen_ai.usage.input_tokens` — prompt tokens
-- `gen_ai.usage.output_tokens` — completion tokens
-- `gen_ai.system_instructions` — hash or summary (never the actual prompt if it contains secrets)
+- `gen_ai.provider.name` - "anthropic", "openai", "google"
+- `gen_ai.request.model` - e.g., "claude-opus-5-5"
+- `gen_ai.input.messages` - JSON array of messages (or hash if large)
+- `gen_ai.output.messages` - model's response
+- `gen_ai.usage.input_tokens` - prompt tokens
+- `gen_ai.usage.output_tokens` - completion tokens
+- `gen_ai.system_instructions` - hash or summary (never the actual prompt if it contains secrets)
 
 **Optional attributes**:
 
-- `gen_ai.temperature` — sampling temperature
-- `gen_ai.max_tokens` — max completion length
-- `gen_ai.data_source.id` — if RAG is used, corpus ID
-- `error.type` — if the call failed
+- `gen_ai.temperature` - sampling temperature
+- `gen_ai.max_tokens` - max completion length
+- `gen_ai.data_source.id` - if RAG is used, corpus ID
+- `error.type` - if the call failed
 
 **Tool span attributes**:
 
-- `tool.name` — name of the tool being called
-- `tool.arguments` — serialized arguments
-- `tool.input_tokens` — estimated tokens in call
-- `tool.output` — result from tool execution
-- `tool.output_tokens` — estimated tokens in result
+- `tool.name` - name of the tool being called
+- `tool.arguments` - serialized arguments
+- `tool.input_tokens` - estimated tokens in call
+- `tool.output` - result from tool execution
+- `tool.output_tokens` - estimated tokens in result
 
 ## Instrumentation libraries
 
@@ -151,7 +151,7 @@ traceloop.initialize({
 // Automatic instrumentation for Claude SDK
 const client = new Anthropic();
 const response = await client.messages.create({
-  model: "claude-opus-5",
+  model: "claude-opus-5-5",
   messages: [{ role: "user", content: "Hello" }],
 });
 // Traceloop automatically sends a span with gen_ai attributes
@@ -209,15 +209,15 @@ Traces must be exported to a backend for storage and querying. Use OTLP (OpenTel
 
 ```typescript
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const exporter = new OTLPTraceExporter({
   url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318",
   // Common endpoints:
-  // http://localhost:4318 — local Docker
-  // https://api.langfuse.com/api/v1 — Langfuse Cloud
-  // https://api.arize.com — Arize Phoenix
+  // http://localhost:4318 - local Docker
+  // https://api.langfuse.com/api/v1 - Langfuse Cloud
+  // https://api.arize.com - Arize Phoenix
 });
 
 const provider = new BasicTracerProvider();
@@ -322,7 +322,7 @@ const provider = new BasicTracerProvider({ sampler });
 
 // Or: sample based on attributes
 const span = tracer.startSpan("llm.completion");
-if (span.recordingEvents()) {
+if (span.isRecording()) {
   // Only record if sampled
   span.setAttributes({
     /* ... */
@@ -334,8 +334,8 @@ if (span.recordingEvents()) {
 
 Traces provide raw data; metrics summarize traces.
 
-- **Trace** — Full execution: agent called search_docs, got 5 results, called read_file on 2 of them, summarized output. (Detailed, expensive to store)
-- **Metric** — pass@1=1, tool_f1=0.95, latency_p99=2.3s. (Summarized, cheap to store)
+- **Trace** - Full execution: agent called search_docs, got 5 results, called read_file on 2 of them, summarized output. (Detailed, expensive to store)
+- **Metric** - pass@1=1, tool_f1=0.95, latency_p99=2.3s. (Summarized, cheap to store)
 
 For production monitoring, store metrics. For debugging, query traces. Use `gen_ai` attributes in traces to join with eval metrics:
 
@@ -348,11 +348,11 @@ GROUP BY attributes."gen_ai.request.model"
 
 ## Template
 
-Instrumentation template: `/templates/cli-and-evals/otel-genai-instrument.ts` — bootstrap code for Traceloop, manual instrumentation, and OTLP export.
+Instrumentation template: `/templates/cli-and-evals/otel-genai-instrument.ts` - bootstrap code for Traceloop, manual instrumentation, and OTLP export.
 
 ## References
 
-- OpenTelemetry GenAI conventions (dedicated repo, unversioned): https://github.com/open-telemetry/semantic-conventions-genai — the old `opentelemetry.io/docs/specs/semconv/gen-ai/` pages are redirect stubs
+- OpenTelemetry GenAI conventions (dedicated repo, unversioned): https://github.com/open-telemetry/semantic-conventions-genai - the old `opentelemetry.io/docs/specs/semconv/gen-ai/` pages are redirect stubs
 - Langfuse: https://langfuse.com/
 - Arize Phoenix: https://arize.com/phoenix
 - Traceloop: https://www.traceloop.com/
@@ -360,6 +360,6 @@ Instrumentation template: `/templates/cli-and-evals/otel-genai-instrument.ts` �
 
 ## See also
 
-- `/docs/testing/metrics` — computing pass@k from traces
-- `/docs/testing/red-teaming` — detecting attacks in trace logs
-- `/docs/testing/ci-integration` — monitoring evals in CI
+- `/docs/testing/metrics` - computing pass@k from traces
+- `/docs/testing/red-teaming` - detecting attacks in trace logs
+- `/docs/testing/ci-integration` - monitoring evals in CI

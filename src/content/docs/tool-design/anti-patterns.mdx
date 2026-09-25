@@ -1,26 +1,27 @@
 ---
 title: Anti-Patterns
 description: Ten common tool design mistakes and short fixes
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Common tool design mistakes that cause routing errors, hallucinated parameters, and failed operations. Includes: terse descriptions (no "when to use"), missing pagination (returns 1000 items instead of top-k), nullable parameters (ambiguous), opaque IDs (no semantic meaning), nested unions (OpenAI strict mode rejects), missing examples, >20 tools at once, thrown errors (should return with isError: true), tools without discrimination ("get_data" too vague), and no way for agent to discover pagination continuation. Each includes short fix pattern.
+Common tool design mistakes that cause routing errors, hallucinated parameters, and failed operations. Includes: terse descriptions (no "when to use"), >20 tools at once, opaque IDs (no semantic meaning), nested unions (OpenAI strict mode rejects), optional fields assumed to work everywhere (ambiguous under strict mode), inconsistent naming across tools, thrown errors (should return with isError: true), destructive tools without annotations, tools without discrimination ("get_data" too vague), and missing examples. Each includes a short fix pattern.
 
 - **1. Terse descriptions**: Add "Use when...", "Do not use for..."
-- **2. No pagination**: Return top-k + cursor, not all
-- **3. Nullable parameters**: Avoid `string | null`; use optional + description
-- **4. Opaque IDs**: Use semantic values or detailed examples
-- **5. Nested unions**: Break into separate tools (OpenAI strict mode constraint)
-- **6. No examples**: Provide input examples in schema
-- **7. >20 tools**: Use dynamic selection, BM25 search
-- **8. Throw errors**: Return `{ isError: true, content: [...] }`
-- **9. Vague names**: Use verb_noun pattern
-- **10. No continuation signal**: Return has_more, next_cursor, or similar
+- **2. >20 tools**: Use dynamic selection (tool search, embeddings, or keyword filtering)
+- **3. Opaque IDs**: Use semantic values or detailed examples
+- **4. Nested unions**: Break into separate tools (OpenAI strict mode constraint)
+- **5. Optional fields assumed to work everywhere**: OpenAI strict mode needs nullable + `required`, not omission
+- **6. Inconsistent naming**: Pick one noun and use it across every tool
+- **7. Throw errors**: Return `{ isError: true, content: [...] }`
+- **8. Destructive without annotations**: Mark `destructiveHint` and `idempotentHint`
+- **9. No disambiguation**: One primary tool per intent; name variants explicitly
+- **10. No examples**: Provide input examples in schema
 
 ---
 
-Well-designed tools are silent—agents use them and succeed. Poorly-designed tools scream their mistakes in the form of routing errors, hallucinated parameters, and failed operations. This page catalogs ten patterns that reliably cause failure and how to fix them.
+Poorly designed tools produce routing errors, hallucinated parameters, and failed operations. This page catalogs ten patterns that reliably cause failure and how to fix them.
 
 ## 1. Terse Descriptions
 
@@ -68,7 +69,7 @@ const agent = new Agent({
 });
 ```
 
-Agents cannot reason over large tool sets. Accuracy degrades sharply above 15–20 tools.
+Agents cannot reason over large tool sets. OpenAI calls fewer than 20 functions at the start of a turn a soft suggestion; Anthropic reports selection accuracy degrading past roughly 30-50 available tools (see [Tool Curation](/docs/tool-design/tool-curation)).
 
 **Fix:**
 
@@ -86,7 +87,7 @@ const toolsForDeveloper = [
 const agent = new Agent({ tools: toolsForDeveloper });
 ```
 
-**Pattern:** Curate task-specific subsets. Use dynamic selection (BM25) for large registries.
+**Pattern:** Curate task-specific subsets. Use dynamic selection (a provider's tool search or embedding-based ranking) for large registries - see [Tool Curation](/docs/tool-design/tool-curation).
 
 ---
 
@@ -103,7 +104,7 @@ const agent = new Agent({ tools: toolsForDeveloper });
   ];
 }
 
-// Agent cannot resolve what 'usr_123' is—no lookup tool
+// Agent cannot resolve what 'usr_123' is: no lookup tool
 ```
 
 The agent cannot do anything with the result because it cannot resolve the ID to semantic content.
@@ -166,27 +167,27 @@ server.tool('operation_execute', ...);  // Returns result
 
 ---
 
-## 5. Nullable Parameters
+## 5. Optional Fields That Assume Omission Works Everywhere
 
 **Mistake:**
 
 ```typescript
 const schema = z.object({
-  assignee: z.string().nullable().optional(), // Both null and undefined
+  assignee: z.string().optional(), // Fine for most frameworks
 });
 ```
 
-Different frameworks handle null differently. OpenAI requires explicit omission, not null.
+Most frameworks treat `.optional()` as "may be absent." OpenAI strict mode doesn't allow that - every property must be listed in `required`, so a genuinely absent field isn't expressible. A schema built only around plain `.optional()` silently fails strict-mode validation.
 
 **Fix:**
 
 ```typescript
 const schema = z.object({
-  assignee: z.string().optional(), // Omit entirely if not needed
+  assignee: z.string().nullable(), // emits { "type": ["string", "null"] }, stays in `required`
 });
 ```
 
-**Pattern:** Use optional fields without null. Omit rather than pass null.
+**Pattern:** For OpenAI strict-mode targets, keep the field in `required` and make it nullable instead of omitting it. See [Schemas](/docs/tool-design/schemas#nullable-parameters) for the full rule.
 
 ---
 
@@ -306,12 +307,23 @@ Four tools that do nearly the same thing. Agent has no signal for which to use.
 **Fix:**
 
 ```typescript
-// One search tool with clear disambig
-search_issues: ("Search for existing issues by text, assignee, or status. " +
-  "Use for finding tickets matching criteria. Returns paginated results.",
-  // If variants are needed, be explicit
-  search_issues_simple(query)); // Fast, limited filters
-search_issues_advanced(filters); // Full filter surface
+// One primary search tool with a clear description
+server.tool(
+  "search_issues",
+  "Search for existing issues by text, assignee, or status. " +
+    "Use for finding tickets matching criteria. Returns paginated results.",
+  schema,
+  handler,
+);
+
+// If variants are genuinely needed, name them explicitly
+server.tool("search_issues_simple", "Fast, limited filters for finding tickets.", schema, handler);
+server.tool(
+  "search_issues_advanced",
+  "Full filter surface: status, assignee, labels.",
+  schema,
+  handler,
+);
 ```
 
 **Pattern:** Have one primary tool per intent. Variants (simple/advanced) are acceptable if each is unambiguous.
@@ -383,7 +395,7 @@ Before shipping a tool:
 - [ ] Naming consistent across tool set (same noun, verb_noun pattern)
 - [ ] Read tools marked `readOnlyHint: true`; write tools marked clearly
 - [ ] Idempotent tools (or those supporting idempotency keys) marked `idempotentHint: true`
-- [ ] No nullable parameters; use optional instead
+- [ ] Optional fields targeting OpenAI strict mode are nullable and stay in `required`, not omitted
 
 ## See also
 

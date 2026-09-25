@@ -1,24 +1,24 @@
 ---
 title: AI Tooling Catalog
 description: High-signal router for AI and agent tooling categories
-lastVerified: 2026-07-06
+lastVerified: 2026-09-24
 ---
 
 Curated AI and agent tooling worth knowing about. Focused on tools that directly help with model access, agents, tools, memory, retrieval, evaluation, observability, browser access, document ingestion, integration, AI UI, voice, or multimodal generation.
 
 ## High-Signal Default Stack
 
-If you only need a practical shortlist, start here. These are not universal defaults; they are the tools that repeatedly show up as useful building blocks for production agent workflows.
+If you only need a practical shortlist, start here. These are the tools that repeatedly show up as useful building blocks for production agent workflows.
 
 | Job                       | Strong starting points                                                                          | Why                                                                                                |
 | ------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | Agent runtime             | Mastra, Vercel AI SDK, OpenAI Agents SDK, LangGraph                                             | Covers TypeScript apps, OpenAI-native agents, and explicit graph workflows.                        |
-| Tool interoperability     | MCP, JSON Schema, OpenAPI, Arazzo                                                               | Keeps tools inspectable, portable, and less prompt-dependent.                                      |
+| Tool interoperability     | MCP, JSON Schema, OpenAPI                                                                       | Keeps tools inspectable, portable, and less prompt-dependent.                                      |
 | Web search and extraction | Firecrawl, Tavily, Exa, Browserbase, Browser Use, Stagehand, Apify                              | Covers search, crawling, extraction, JavaScript-heavy browsing, and repeatable browser automation. |
 | RAG and retrieval         | pgvector, Qdrant, Pinecone, Weaviate, Cloudflare AI Search, Voyage AI, Cohere, Jina AI          | Covers vector storage, hybrid search, embeddings, and reranking.                                   |
 | Document ingestion        | LlamaParse, Unstructured, Docling, Reducto, Mistral OCR, Azure AI Document Intelligence         | Turns messy PDFs, docs, tables, and scanned content into retrievable structure.                    |
-| Memory                    | Honcho, Zep, Letta, Mem0, Supermemory, Graphiti                                                 | Covers explicit agent memory, temporal graphs, user memory, and recall layers.                     |
-| External app actions      | Composio, Arcade, Pipedream, Zapier, n8n, Paragon                                               | Gives agents controlled access to SaaS actions without writing every connector from scratch.       |
+| Memory                    | Honcho, Zep, Letta, Mem0, Graphiti, QMD                                                         | Covers explicit agent memory, temporal graphs, user memory, and recall layers.                     |
+| External app actions      | Pipedream, Arcade, Zapier, n8n, Paragon                                                         | Gives agents controlled access to SaaS actions without writing every connector from scratch.       |
 | Sandboxed execution       | E2B, Daytona, Vercel Sandbox, Cloudflare Sandbox, Modal                                         | Lets agents run code or generated artifacts away from production systems.                          |
 | Durable workflows         | Temporal, Trigger.dev, Inngest, Hatchet, LangGraph, Mastra workflows                            | Keeps multi-step agent work resumable, observable, and retryable.                                  |
 | Observability and evals   | Braintrust, Langfuse, Arize Phoenix, LangSmith, Promptfoo, RAGAS, DeepEval, OpenTelemetry GenAI | Gives traces, datasets, evaluations, and regression gates.                                         |
@@ -33,7 +33,7 @@ If you only need a practical shortlist, start here. These are not universal defa
 | [Model providers and gateways](/docs/tooling-catalog/model-providers-and-gateways)         | Model APIs, routing, gateway controls, realtime, voice, and multimodal generation | OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway |
 | [Retrieval and memory](/docs/tooling-catalog/retrieval-and-memory)                         | RAG, vector stores, search, reranking, agent memory, document ingestion, and OCR  | pgvector, Qdrant, Pinecone, LlamaParse, Unstructured, Honcho, Zep               |
 | [Evaluation and observability](/docs/tooling-catalog/evaluation-and-observability)         | Evals, traces, datasets, regression gates, guardrails, and policy checks          | Braintrust, Langfuse, Arize Phoenix, Promptfoo, OpenTelemetry GenAI             |
-| [Browser, sandbox, and integration](/docs/tooling-catalog/browser-sandbox-and-integration) | Browser automation, web extraction, code sandboxes, and SaaS tool hubs            | Browserbase, Stagehand, Firecrawl, E2B, Vercel Sandbox, Composio                |
+| [Browser, sandbox, and integration](/docs/tooling-catalog/browser-sandbox-and-integration) | Browser automation, web extraction, code sandboxes, and SaaS tool hubs            | Browserbase, Stagehand, Firecrawl, E2B, Vercel Sandbox, Pipedream Connect       |
 | [Capability map](/docs/tooling-catalog/capability-map)                                     | Source crawl notes, cross-category use-case mapping, and watch-only tooling       | Source tables, capability rows, watchlist                                       |
 
 ## Selection Rules

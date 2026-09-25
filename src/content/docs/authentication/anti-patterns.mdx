@@ -1,25 +1,26 @@
 ---
 title: Auth Anti-Patterns
 description: Silent failures and late-stage breakage in agent auth workflows
+lastVerified: 2026-09-24
 ---
 
 ## Recap
 
 Nine patterns that break agent auth silently: an authorization flow that does not fit the acting identity, CAPTCHA on token endpoint, session cookies, long-lived broad-scope keys, overly broad scopes, hardcoded secrets, per-request token calls, tokens without audience restriction, and tokens without DPoP. All fail silently or fail late.
 
-| Pattern                             | Fix                                                                                     |
-| ----------------------------------- | --------------------------------------------------------------------------------------- |
-| Wrong grant for the acting identity | Authorization Code + PKCE for user delegation; Client Credentials for service-owned M2M |
-| CAPTCHA on token endpoint           | Use rate limiting instead                                                               |
-| Session cookies                     | Use Bearer tokens with explicit `exp`                                                   |
-| Long-lived broad-scope keys         | Short-lived, minimum-scope                                                              |
-| Overly broad scopes                 | Request only required scopes                                                            |
-| Hardcoded secrets                   | Environment variables only                                                              |
-| Per-request token calls             | Cache for lifetime, refresh proactively                                                 |
-| No `aud` claim                      | Always set `aud`; use Token Exchange                                                    |
-| No DPoP binding                     | Add DPoP for sensitive resources                                                        |
+| Pattern                             | Why it breaks                                  | Fix                                                                                     |
+| ----------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Wrong grant for the acting identity | User consent or service access cannot complete | Authorization Code + PKCE for user delegation; Client Credentials for service-owned M2M |
+| CAPTCHA on token endpoint           | Blocks automated requests                      | Use rate limiting instead                                                               |
+| Session cookies                     | Expire without a structured signal             | Use Bearer tokens with explicit `exp`                                                   |
+| Long-lived broad-scope keys         | Maximum blast radius on leak                   | Short-lived, minimum-scope                                                              |
+| Overly broad scopes                 | Excess permissions on every token              | Request only required scopes                                                            |
+| Hardcoded secrets                   | Permanent compromise on commit                 | Environment variables only                                                              |
+| Per-request token calls             | Multiplies auth load                           | Cache for lifetime, refresh proactively                                                 |
+| No `aud` claim                      | Token valid everywhere                         | Always set `aud`; use Token Exchange                                                    |
+| No DPoP binding                     | Token can be replayed if stolen                | Add DPoP for sensitive resources                                                        |
 
-Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silent or fail late.
+Agent auth failures are rarely obvious. A CAPTCHA returns an HTML page, not an error. A cookie session expires, and the agent gets redirected instead of a structured response. A broad-scoped token succeeds silently for months, then a leaked key compromises everything at once. These patterns all fail silently or fail late.
 
 ## Using the Wrong Grant for the Acting Identity
 
@@ -33,7 +34,7 @@ See [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) and the [offic
 
 ## CAPTCHA on Token Endpoint
 
-If the token endpoint (`/oauth/token`) presents a CAPTCHA, agents fail silently. CAPTCHAs are designed to block automated requests — they succeed perfectly at blocking agents.
+If the token endpoint (`/oauth/token`) presents a CAPTCHA, agents fail silently. CAPTCHAs are designed to block automated requests - they succeed perfectly at blocking agents.
 
 This includes reCAPTCHA on login, hCaptcha on signup, or rate-limit fallback to CAPTCHA. The machine-to-machine token endpoint is an API endpoint, not a human-facing form. Use rate limiting and IP-based controls, not CAPTCHA.
 
@@ -98,7 +99,7 @@ const key = process.env.API_KEY;
 if (!key) throw new Error("API_KEY is required");
 ```
 
-If you find a hardcoded credential: rotate it immediately (before cleaning history — the secret is already compromised), remove it from code, then clean `git history`.
+If you find a hardcoded credential: rotate it immediately (before cleaning history - the secret is already compromised), remove it from code, then clean `git history`.
 
 ## Per-Request Token Calls
 
@@ -136,7 +137,7 @@ A JWT without an `aud` claim is valid against any service that trusts the issuer
   "scope": "invoices:read",
   "iss": "https://auth.example.com/",
   "exp": 1750000000
-  // No aud — valid everywhere
+  // No aud - valid everywhere
 }
 ```
 
@@ -169,27 +170,13 @@ DPoP: eyJhbGciOiJSUzI1NiIsInR5cCI6ImRwb3Arand0IiwianRpIjoiMTIzIiwiaHRtIjoiR0VUIi
 
 For high-value resources and sensitive agent-to-agent communication, require DPoP. See [DPoP](/docs/authentication/dpop).
 
-## Summary
-
-| Anti-pattern                        | Why it breaks                                  | Fix                                         |
-| ----------------------------------- | ---------------------------------------------- | ------------------------------------------- |
-| Wrong grant for the acting identity | User consent or service access cannot complete | Match the grant to the principal and client |
-| CAPTCHA on token endpoint           | Blocks automated requests                      | Remove; use rate limiting                   |
-| Session cookies                     | Expire without structured signal               | Use Bearer tokens + explicit `exp`          |
-| Long-lived broad-scope keys         | Maximum blast radius on leak                   | Short-lived, minimum-scope                  |
-| Overly broad scopes                 | Excess perms on every token                    | Request only required scopes                |
-| Hardcoded secrets                   | Permanent compromise on commit                 | Environment variables                       |
-| Per-request token calls             | Multiplies auth load                           | Cache tokens for lifetime                   |
-| No `aud` claim                      | Token valid everywhere                         | Always set `aud`; use Token Exchange        |
-| No DPoP binding                     | Token can be replayed if stolen                | Add DPoP for sensitive resources            |
-
 `auth.md` OTP claim flows are not the same anti-pattern as browser-only login. They are bounded registration ceremonies that end by issuing or upgrading a programmatic credential. They become an anti-pattern only when OTP or browser state is required on every API call.
 
 ## See Also
 
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — Client Credentials implementation
-- [API Keys](/docs/authentication/api-keys) — correct key lifecycle
-- [Agent Identity](/docs/authentication/agent-identity) — establishing verifiable principals
-- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
-- [Token Exchange](/docs/authentication/token-exchange) — narrowing scope for delegation
-- [auth.md](/docs/authentication/auth-md) — bounded registration for user-bound credentials
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - Client Credentials implementation
+- [API Keys](/docs/authentication/api-keys) - correct key lifecycle
+- [Agent Identity](/docs/authentication/agent-identity) - establishing verifiable principals
+- [DPoP](/docs/authentication/dpop) - sender-constrained tokens
+- [Token Exchange](/docs/authentication/token-exchange) - narrowing scope for delegation
+- [auth.md](/docs/authentication/auth-md) - bounded registration for user-bound credentials

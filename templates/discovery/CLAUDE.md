@@ -1,5 +1,5 @@
 <!--
-CLAUDE.md — Claude Code-specific context overrides.
+CLAUDE.md - Claude Code-specific context overrides.
 
 What: A focused markdown file that augments AGENTS.md with Claude Code-only settings:
 slash commands, subagents, MCP servers, skills, model preference, thinking budget.
@@ -8,7 +8,7 @@ When to use: When you want Claude Code to behave differently from other tools re
 If there are no Claude-specific overrides needed, omit this file.
 
 What to customize:
-1. Model selection (claude-opus-5, claude-sonnet-5, etc.)
+1. Model selection (claude-opus-5-5, claude-sonnet-5, etc.)
 2. Subagents (path to .claude/agents/*.md files)
 3. MCP servers (remote servers, local stdio servers)
 4. Skills (scoped to project)
@@ -34,16 +34,16 @@ This file documents Claude Code-specific settings only.
 
 ## Model selection
 
-**Default:** `claude-opus-5` for agent-related tasks (high reasoning, tool use, code generation).
+**Default:** `claude-opus-5-5` for agent-related tasks (high reasoning, tool use, code generation).
 
 **Override for specific tasks:**
 
 - Lightweight refactoring, docs: `claude-sonnet-5`
 - Very fast turnaround (prototypes): `claude-haiku-4-5-20251001`
 
-Use the `model:` override in the prompt when needed; otherwise, Claude Code defaults to Opus 5.
+Use the `model:` override in the prompt when needed; otherwise, Claude Code defaults to Opus 5.5.
 
-**Extended thinking:** Opus 5 allocates its thinking budget adaptively, and thinking tokens count
+**Extended thinking:** Opus 5.5 allocates its thinking budget adaptively, and thinking tokens count
 toward the context window. Drop to `claude-sonnet-5` for long, cost-sensitive sessions.
 
 ---
@@ -52,9 +52,9 @@ toward the context window. Drop to `claude-sonnet-5` for long, cost-sensitive se
 
 Ephemeral, isolated contexts for side tasks. Use them to keep the parent context lean.
 
-- **reviewer.md** — Code review only. Reads the PR, checks linting and test coverage. Read-only tools. Invoke `/review`.
-- **tester.md** — Runs `pnpm test`, analyzes failures, suggests fixes. Can modify test files only. Invoke `/test`.
-- **types.md** — Runs `pnpm type-check`, reports errors with file and line. Read-only.
+- **reviewer.md** - Code review only. Reads the PR, checks linting and test coverage. Read-only tools. Invoke `/review`.
+- **tester.md** - Runs `pnpm test`, analyzes failures, suggests fixes. Can modify test files only. Invoke `/test`.
+- **types.md** - Runs `pnpm type-check`, reports errors with file and line. Read-only.
 
 Reach for a subagent when the task is orthogonal, the parent context is already large, a cheaper
 model will do, or you need a hard permission boundary.
@@ -101,9 +101,9 @@ Exposes every tool in `packages/mcp-server/src/tools/`. Test with `pnpm --filter
 
 Project-scoped skills live in `.claude/skills/`:
 
-- `schema-validate.md` — Zod schema validator. Checks `src/schemas/*.ts` against spec.
-- `test-summary.md` — Summarize test results from the latest run.
-- `deploy-staging.md` — Deploy dashboard to staging and run smoke tests (ask-first).
+- `schema-validate.md` - Zod schema validator. Checks `src/schemas/*.ts` against spec.
+- `test-summary.md` - Summarize test results from the latest run.
+- `deploy-staging.md` - Deploy dashboard to staging and run smoke tests (ask-first).
 
 Invoke as `/schema-validate`, `/test-summary`, `/deploy-staging`. Built-in `/test`, `/lint`, and
 `/review` map onto the subagents above.
@@ -112,7 +112,7 @@ Invoke as `/schema-validate`, `/test-summary`, `/deploy-staging`. Built-in `/tes
 
 ## Permissions
 
-**Default mode:** `default` — ask-first for destructive actions, always-allow for read and test.
+**Default mode:** `default` - ask-first for destructive actions, always-allow for read and test.
 AGENTS.md owns the full three-tier boundary list; only Claude-specific overrides belong here.
 
 - Never deploy to production without explicit confirmation
@@ -141,6 +141,6 @@ IDE breakpoints only bind if you `cd packages/api/` first.
 
 - [Claude Code project memory docs](https://code.claude.com/docs/en/memory)
 - [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
-- [MCP spec 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
-- [AGENTS.md](./AGENTS.md) — Shared context (canonical reference)
-- `.claude/agents/reviewer.md`, `.claude/agents/tester.md` — subagents
+- [MCP spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
+- [AGENTS.md](./AGENTS.md) - Shared context (canonical reference)
+- `.claude/agents/reviewer.md`, `.claude/agents/tester.md` - subagents

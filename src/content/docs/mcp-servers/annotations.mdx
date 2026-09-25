@@ -1,7 +1,7 @@
 ---
 title: Tool Annotations
 description: Communicating tool behavior hints to clients through MCP annotations
-lastVerified: 2026-08-27
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -15,7 +15,7 @@ Tool annotations are metadata hints signaling tool behavior to clients. Current 
 - Default destructiveHint: true (assume worst)
 - Hints enable smarter client behavior (auto-run safe tools, warn on destructive)
 
-Tool annotations are metadata hints that tell MCP clients about the behavioral characteristics of a tool — whether it reads or writes, whether the operation can be reversed, whether it might affect systems outside the server's own domain. Clients use these hints to decide whether to show a confirmation dialog, allow automatic retry, or warn the user before proceeding.
+Tool annotations are metadata hints that tell MCP clients about the behavioral characteristics of a tool - whether it reads or writes, whether the operation can be reversed, whether it might affect systems outside the server's own domain. Clients use these hints to decide whether to show a confirmation dialog, allow automatic retry, or warn the user before proceeding.
 
 Annotations are hints, not guarantees. A tool that declares `readOnlyHint: true` might still write to a log file. Clients that come from unverified servers must treat annotations as untrusted information. For verified, trusted servers, annotations enable smarter client behavior, but they never replace server-side auth, tenant checks, scope checks, or confirmation gates.
 
@@ -25,7 +25,7 @@ Annotations are hints, not guarantees. A tool that declares `readOnlyHint: true`
 
 Signals that the tool does not modify any persistent state. It only reads, observes, or computes.
 
-- **Default:** `false` — if you do not set this, clients assume the tool may write
+- **Default:** `false` - if you do not set this, clients assume the tool may write
 - **Client effect:** Clients may allow the tool to run automatically without confirmation in agentic workflows
 
 ```typescript
@@ -49,7 +49,7 @@ server.tool(
 
 Signals that the tool may permanently delete or irreversibly modify data.
 
-- **Default:** `true` — clients assume the worst if you do not say otherwise
+- **Default:** `true` - clients assume the worst if you do not say otherwise
 - **Client effect:** Clients typically show a confirmation dialog before executing a tool with `destructiveHint: true`
 
 ```typescript
@@ -77,7 +77,7 @@ server.tool(
 
 Signals that calling the tool multiple times with the same parameters produces the same result as calling it once. No additional side effects accumulate on repeat calls.
 
-- **Default:** `false` — clients assume repeated calls may compound their effects
+- **Default:** `false` - clients assume repeated calls may compound their effects
 - **Client effect:** Clients can safely retry an idempotent tool on timeout or transient failure without risk of duplicate actions
 
 ```typescript
@@ -109,9 +109,9 @@ server.tool(
 
 ### openWorldHint
 
-Signals that the tool interacts with systems outside the MCP server — it makes external network requests, reads from external APIs, sends messages to third-party services.
+Signals that the tool interacts with systems outside the MCP server - it makes external network requests, reads from external APIs, sends messages to third-party services.
 
-- **Default:** `true` — clients assume tools may reach outside the server unless told otherwise
+- **Default:** `true` - clients assume tools may reach outside the server unless told otherwise
 - **Client effect:** Clients in sandboxed or offline environments may restrict tools with `openWorldHint: true`
 
 ```typescript
@@ -169,7 +169,7 @@ The default for every annotation is the most conservative possible value:
 | idempotentHint  | `false` | Assume repeated calls have compounding effects |
 | openWorldHint   | `true`  | Assume the tool makes external requests        |
 
-This means that an unannotated tool gets the most restrictive behavior from clients. Annotating your tools is how you opt in to smoother experiences — fewer confirmation dialogs, safer automatic retries, unrestricted use in sandboxed environments.
+This means that an unannotated tool gets the most restrictive behavior from clients. Annotating your tools is how you opt in to smoother experiences - fewer confirmation dialogs, safer automatic retries, unrestricted use in sandboxed environments.
 
 ## What Annotations Do Not Do
 
@@ -217,7 +217,7 @@ Modifies state but does not destroy data, idempotent via idempotency key:
 
 ### Create/update tool (not safe to retry)
 
-Creates a new record each time — retry may create duplicates:
+Creates a new record each time - retry may create duplicates:
 
 ```typescript
 {
@@ -262,15 +262,13 @@ Sends an email, fires a webhook, charges a credit card:
 
 ## Annotations Are Hints, Not Contracts
 
-Clients from unverified servers cannot trust annotations. A malicious or buggy server could annotate a data-deletion tool as `readOnlyHint: true` — clients that auto-approve read-only tools would execute it without confirmation.
+Clients from unverified servers cannot trust annotations. A malicious or buggy server could annotate a data-deletion tool as `readOnlyHint: true` - clients that auto-approve read-only tools would execute it without confirmation.
 
 For this reason:
 
 - Clients in high-stakes environments should require human confirmation for all tools, regardless of annotations
 - Annotations should only influence automatic behavior in contexts where the server's identity is verified (pinned hash, signed manifest, trusted registry)
 - When building a client that consumes annotations, document that unverified server annotations are treated as suggestions, not guarantees
-
-The value of annotations comes from the combination of correct implementation on the server side and appropriate trust calibration on the client side.
 
 <Callout type="info">
   Annotations are part of the tool definition and are returned in the `tools/list` response. Clients
@@ -284,6 +282,6 @@ The value of annotations comes from the combination of correct implementation on
 
 ## Related
 
-- [Tool Annotations (READ_ONLY/WRITE/DESTRUCTIVE)](/docs/cookbook/tool-annotations) — applied registry pattern: presets driving system prompts, client UI, and tool selection
-- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) — designing tools to be safely retryable and clearly classified
-- [MCP Specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/) — current tool annotation definitions
+- [Real-World MCP Patterns](./real-world-examples) - GitHub's `--read-only` flag gating registration on `readOnlyHint`, an applied use of these annotations
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - designing tools to be safely retryable and clearly classified
+- [MCP Specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/) - current tool annotation definitions

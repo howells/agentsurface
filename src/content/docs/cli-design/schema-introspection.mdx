@@ -1,19 +1,20 @@
 ---
 title: Schema Introspection
 description: Enabling agents to discover CLI commands, parameters, and types at runtime without pre-loaded documentation
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Schema introspection lets agents discover CLI capabilities at runtime without pre-loaded documentation. This solves staleness (docs may not match installed version), context cost (no need to load full docs upfront), and version mismatches (agents query the current version). Implementing --help --json or a --schema flag enables this discovery without breaking human-readable help.
+Schema introspection lets agents discover CLI capabilities at runtime without pre-loaded documentation. This solves staleness (docs may not match installed version), context cost (no need to load full docs upfront), and version mismatches (agents query the current version). Implementing --help --json or a describe command enables this discovery without breaking human-readable help.
 
 - Runtime discovery solves staleness, context cost, and version mismatches
 - --help --json returns machine-readable command metadata
 - Include parameter types, constraints, and required flags
-- Support --schema subcommands for programmatic introspection
+- Support a `describe` command for programmatic introspection
 - Machine-readable help output should list commands and their parameters
 
-An agent operating without pre-loaded documentation must be able to discover what a CLI accepts at runtime. This is schema introspection — the ability to query the CLI itself for a machine-readable description of its commands, parameters, types, and constraints.
+An agent operating without pre-loaded documentation must be able to discover what a CLI accepts at runtime. This is schema introspection - the ability to query the CLI itself for a machine-readable description of its commands, parameters, types, and constraints.
 
 Human-readable `--help` text does not satisfy this. It is written for scanning, not parsing. An agent trying to extract parameter types from `--help` text is doing brittle string matching against text that will change without warning.
 
@@ -192,7 +193,7 @@ $ mytool describe --json
 
 ## Live Runtime-Resolved Schemas
 
-Static embedded schemas have the same staleness problem as pre-loaded documentation. The highest-value implementation resolves schemas at runtime from a discovery document — typically the same OpenAPI spec the API itself uses.
+Static embedded schemas have the same staleness problem as pre-loaded documentation. The highest-value implementation resolves schemas at runtime from a discovery document - typically the same OpenAPI spec the API itself uses.
 
 ```bash
 $ mytool user create --help --json
@@ -258,11 +259,9 @@ A complete schema exposes everything an agent needs to construct a valid call:
 
 ## Skill Metadata For CLIs
 
-Agent Skills are portable folders with a `SKILL.md` entrypoint. For CLIs, you can add metadata that points agents to the live command schema and authentication checks. Treat these fields as a CLI extension to the public Agent Skills format, not as a separate incompatible format.
+The base `SKILL.md` folder shape - YAML frontmatter plus a Markdown body - is covered on [Agent Skills](/docs/discovery/agent-skills). A CLI skill extends that base format with three fields that point an agent at runtime introspection rather than a static description:
 
-A CLI skill can live in the repository root, alongside the binary, or inside a skills directory:
-
-````markdown
+```yaml
 ---
 name: mytool
 version: 2.4.1
@@ -276,53 +275,18 @@ capabilities:
   - dns records
   - billing
 ---
-
-# mytool
-
-A CLI for managing Example Platform resources.
-
-## Invariants
-
-- Always pass `--dry-run` before any destructive operation (delete, purge, archive)
-- Always pass `--fields id,name,status` unless full records are required
-- Always pass `--json` or rely on auto-detection when piping output
-
-## Authentication
-
-Set `MYTOOL_API_KEY` to your API key. Obtain from: https://app.example.com/settings/api-keys
-
-## Common Workflows
-
-### Create a user and immediately assign a role
-
-```bash
-mytool user create --name "Alice Chen" --email alice@example.com --json | \
-  jq -r '.id' | \
-  xargs -I{} mytool user role assign {} --role admin
-```
-````
-
-### Bulk-export active users as NDJSON
-
-```bash
-mytool user list --status active --all --json
 ```
 
-## Safety
-
-- `user delete` is irreversible. Always `--dry-run` first.
-- `dns record delete` propagates within 60 seconds. Verify the record before deletion.
-
-````
-
-The YAML frontmatter is machine-readable metadata. The Markdown body is prose guidance for the agent's context. The `schema_command` field tells the agent exactly how to fetch the full runtime schema for any command.
+`schema_command` tells the agent exactly how to fetch the full runtime schema for any command, rather than relying on a description that can drift from the installed version. `auth` and `capabilities` are CLI-specific extensions, not part of the public Agent Skills base fields - treat them as additive metadata a CLI skill carries on top of `name` and `description`.
 
 Auto-generate or validate CLI skill metadata from your CLI's describe output as part of your release pipeline:
 
 ```bash
 # Generate or validate SKILL.md from live schema
 mytool describe --json | generate-skill-md > SKILL.md
-````
+```
+
+For large CLIs with many command groups, a per-command `skills/` directory (one skill per subcommand group, each with its own `schema_command`) keeps any single skill file scoped and avoids one sprawling document covering the entire surface. See [Agent Knowledge Packaging](./agent-knowledge-packaging) for that pattern and for the CONTEXT.md/AGENTS.md/SKILL.md layering it sits inside.
 
 ## Scoring Rubric
 
@@ -332,7 +296,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | Only `--help` text. No machine-readable schema.                                                                                                         |
 | 1     | `--help --json` or a `describe` command for some surfaces, but incomplete.                                                                              |
-| 2     | Full schema introspection for all commands — params, types, required fields — as JSON.                                                                  |
+| 2     | Full schema introspection for all commands - params, types, required fields - as JSON.                                                                  |
 | 3     | Live, runtime-resolved schemas (e.g., from a discovery document) that always reflect the current API version. Includes scopes, enums, and nested types. |
 
 ## Checklist
@@ -350,7 +314,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
 ## Related Pages
 
-- [Raw Payload Input](./raw-payload-input) — using the schema to construct payloads directly
-- [Agent Knowledge Packaging](./agent-knowledge-packaging) — Agent Skills and context file conventions
-- [Agent Skills](/docs/discovery/agent-skills) — portable skill folder format
-- [The Agent DX CLI Scale](./cli-scale) — full scoring framework
+- [Raw Payload Input](./raw-payload-input) - using the schema to construct payloads directly
+- [Agent Knowledge Packaging](./agent-knowledge-packaging) - Agent Skills and context file conventions
+- [Agent Skills](/docs/discovery/agent-skills) - portable skill folder format
+- [The Agent DX CLI Scale](./cli-scale) - full scoring framework

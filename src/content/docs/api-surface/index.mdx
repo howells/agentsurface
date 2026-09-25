@@ -1,32 +1,33 @@
 ---
 title: API Surface
 description: HTTP, OpenAPI, and service contracts that agents can discover and call reliably
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
 API Surface is the contract layer for HTTP services: OpenAPI, operation semantics, workflow descriptions, extensions, versioning, and event delivery. Use it when agents need to discover or generate calls against a web API without guessing from prose.
 
-- **Owns:** HTTP APIs, OpenAPI 3.1, Arazzo workflows, webhooks, API versioning, and machine-readable service contracts.
+- **Owns:** HTTP APIs, OpenAPI 3.1/3.2, Arazzo workflows, webhooks, API versioning, and machine-readable service contracts.
 - **Does not own:** cross-framework tool registry design; see [Tool Design](/docs/tool-design). MCP protocol servers; see [MCP Servers](/docs/mcp-servers).
 - **Agent-ready means:** complete schemas, stable operation IDs, explicit safety/idempotency semantics, structured errors, and versioned behavior.
 
 ## Start Here
 
-- [OpenAPI for Agents](/docs/api-surface/openapi-for-agents) — make the API spec the source of truth for agent calls.
-- [Tool Definitions](/docs/api-surface/tool-definitions) — translate HTTP operations into clear generated tools.
-- [Arazzo Workflows](/docs/api-surface/arazzo-workflows) — document multi-step API sequences agents should not infer.
-- [OpenAPI Extensions](/docs/api-surface/openapi-extensions) — add agent-facing metadata without breaking the base contract.
-- [API Versioning](/docs/api-surface/api-versioning) — keep agents pinned to stable behavior.
-- [Webhooks and Events](/docs/api-surface/webhooks-events) — expose asynchronous state changes agents can react to.
+- [OpenAPI for Agents](/docs/api-surface/openapi-for-agents) - make the API spec the source of truth for agent calls.
+- [Tool Definitions](/docs/api-surface/tool-definitions) - translate HTTP operations into clear generated tools.
+- [Arazzo Workflows](/docs/api-surface/arazzo-workflows) - document multi-step API sequences agents should not infer.
+- [OpenAPI Extensions](/docs/api-surface/openapi-extensions) - add agent-facing metadata without breaking the base contract.
+- [API Versioning](/docs/api-surface/api-versioning) - keep agents pinned to stable behavior.
+- [Webhooks and Events](/docs/api-surface/webhooks-events) - expose asynchronous state changes agents can react to.
 
 ## Related
 
-- [Tool Design](/docs/tool-design) — hand-authored or framework-portable tool definitions.
-- [MCP Servers](/docs/mcp-servers) — protocol-specific exposure of tools, resources, and prompts.
-- [Error Handling](/docs/error-handling) — Problem Details and retry guidance for API failures.
-- [Authentication](/docs/authentication) — credentials, scopes, and delegated access for agent callers.
-- [Discovery](/docs/discovery) — public routes that help agents find API specs and catalogs.
+- [Tool Design](/docs/tool-design) - hand-authored or framework-portable tool definitions.
+- [MCP Servers](/docs/mcp-servers) - protocol-specific exposure of tools, resources, and prompts.
+- [Error Handling](/docs/error-handling) - Problem Details and retry guidance for API failures.
+- [Authentication](/docs/authentication) - credentials, scopes, and delegated access for agent callers.
+- [Discovery](/docs/discovery) - public routes that help agents find API specs and catalogs.
 
 ## Retrieval and lifecycle behavior
 

@@ -2,12 +2,17 @@
 
 ## Summary
 
-The complete 0–3 scoring criteria for all 11 dimensions. Each dimension has specific detection patterns (file globs, grep patterns, command output) to identify score level. Scores measure both presence and quality: 0 = not implemented, 1 = basic/weak, 2 = good/functional, 3 = excellent/production-ready. Every score must cite concrete evidence (paths, grep, command output), never guesses.
+The complete 0–3 scoring criteria for all 10 dimensions. Each dimension has specific detection patterns (file globs, grep patterns, command output) to identify score level. Scores measure both presence and quality: 0 = not implemented, 1 = basic/weak, 2 = good/functional, 3 = excellent/production-ready. Every score must cite concrete evidence (paths, grep, command output), never guesses.
 
 - **Scoring philosophy**: Evidence-based, specific file/line references, avoid optimism bias
 - **Confidence levels**: High (>80% examined), Medium (representative sample), Low (<30%, time-constrained)
 - **N/A trap**: Mark N/A only when dimension is genuinely inapplicable (not "we haven't built it yet")
-- **11 dimensions**: API Surface, CLI Design, MCP Server, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, Data Retrievability
+- **10 dimensions**: API Surface, CLI Design, MCP Server, Discovery & AEO, Authentication, Error Handling, Tool Design, Context Files, Testing, Retrievability
+
+All 10 dimensions score the product side: can agents discover, understand, call, and
+recover from this software. Agent-internal architecture (frameworks, orchestration, memory,
+model routing, and an agent's own retrieval pipeline) is not scored here; see the
+agent-building inventory (`/docs/agents`, `/docs/agent-retrieval`) for that guidance.
 
 ---
 
@@ -19,12 +24,12 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 **What it measures:** How well the project's HTTP API is described for AI agent tool generation.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema. | No openapi.json/yaml, no swagger.json, no API schema files |
-| 1 | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params. | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values |
-| 2 | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties. |
-| 3 | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-*). LAPIS-style token efficiency. Auto-generated MCP from spec. | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency <200 tokens per operation. |
+| Score | Criteria                                                                                                                                                                         | Detection                                                                                                                                                                        |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema.                                                                                                  | No openapi.json/yaml, no swagger.json, no API schema files                                                                                                                       |
+| 1     | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params.                                                           | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values                                                 |
+| 2     | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties. |
+| 3     | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-\*). LAPIS-style token efficiency. Auto-generated MCP from spec.     | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency <200 tokens per operation.                             |
 
 **Key files:** openapi.json, openapi.yaml, swagger.json, api/ routes, Arazzo files
 
@@ -34,12 +39,12 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 **What it measures:** How well the project's CLI is designed for AI agent operation, based on the Agent DX CLI Scale.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | Human-only output. Tables, color codes, prose. No structured format. Interactive prompts with no bypass. | CLI exists but: no --json flag; no --output flag; interactive prompts without --yes; no machine-readable output path |
-| 1 | JSON output exists but inconsistent. Some commands support --json, others don't. Errors may not be structured. | --json or --output json on some commands but not all. Inconsistent JSON shapes across commands. Non-zero exit code but no semantic distinction. |
-| 2 | Consistent JSON across all commands. Errors return structured JSON. Semantic exit codes (0-5). --dry-run on mutations. TTY detection. Non-interactive when flags provided. | All commands produce JSON. Exit codes differentiate success/failure/usage/notfound/permission/conflict. --dry-run on all write operations. isatty() detection suppresses spinners when piped. |
-| 3 | NDJSON streaming for paginated results. Full schema introspection (--schema dumps params/types/required as JSON). Input hardening (path traversal, control chars, encoded segments). SKILL.md shipped. Agent knowledge packaging. | --schema or --describe command returns full machine-readable schema. NDJSON streaming. Input validation rejects ../, %2e, control chars. SKILL.md or AGENTS.md ships with the CLI. |
+| Score | Criteria                                                                                                                                                                                                                          | Detection                                                                                                                                                                                     |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Human-only output. Tables, color codes, prose. No structured format. Interactive prompts with no bypass.                                                                                                                          | CLI exists but: no --json flag; no --output flag; interactive prompts without --yes; no machine-readable output path                                                                          |
+| 1     | JSON output exists but inconsistent. Some commands support --json, others don't. Errors may not be structured.                                                                                                                    | --json or --output json on some commands but not all. Inconsistent JSON shapes across commands. Non-zero exit code but no semantic distinction.                                               |
+| 2     | Consistent JSON across all commands. Errors return structured JSON. Semantic exit codes (0-5). --dry-run on mutations. TTY detection. Non-interactive when flags provided.                                                        | All commands produce JSON. Exit codes differentiate success/failure/usage/notfound/permission/conflict. --dry-run on all write operations. isatty() detection suppresses spinners when piped. |
+| 3     | NDJSON streaming for paginated results. Full schema introspection (--schema dumps params/types/required as JSON). Input hardening (path traversal, control chars, encoded segments). SKILL.md shipped. Agent knowledge packaging. | --schema or --describe command returns full machine-readable schema. NDJSON streaming. Input validation rejects ../, %2e, control chars. SKILL.md or AGENTS.md ships with the CLI.            |
 
 **Key files:** bin/, CLI entry points in package.json, commander/yargs/oclif configs
 
@@ -51,12 +56,12 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 **What it measures:** Whether and how well the project exposes an MCP server.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No MCP server. No .mcp.json. No MCP SDK imports. | No files importing @modelcontextprotocol/sdk, mcp-handler, @mastra/mcp, or similar |
-| 1 | Basic MCP server exists but minimal. Few tools with weak descriptions. No annotations. No resources. No error handling. | MCP server present but: <5 tools; descriptions are terse (<20 words); no annotations object; no resources or prompts; errors not structured with isError |
-| 2 | Well-structured MCP. Proper tool annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint). Agent-oriented descriptions. Structured error handling with isError. outputSchema declared and structuredContent returned where supported. Resources exposed for static data. | Tools have annotations. Descriptions explain when/why to use. isError pattern for recoverable tool errors. outputSchema and structuredContent on tools that return structured data. Resources for config/static data. |
-| 3 | Production MCP. RFC 9728 protected-resource metadata for protected HTTP servers. Pagination on list operations. Progress notifications for long ops. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport. Tool count optimized (<20). Consent gates for destructive/authenticated/production tools. Roots, sampling, and elicitation explicitly gated where implemented. | Auth implementation validates issuer/audience/resource/scope. Pagination on tools returning arrays. Progress notifications. Stdio and Streamable HTTP transports where relevant. Test files using InMemoryTransport. Consent policy exists for high-risk tools. |
+| Score | Criteria                                                                                                                                                                                                                                                                                                                                                                                          | Detection                                                                                                                                                                                                                                                       |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No MCP server. No .mcp.json. No MCP SDK imports.                                                                                                                                                                                                                                                                                                                                                  | No files importing @modelcontextprotocol/sdk, mcp-handler, @mastra/mcp, or similar                                                                                                                                                                              |
+| 1     | Basic MCP server exists but minimal. Few tools with weak descriptions. No annotations. No resources. No error handling.                                                                                                                                                                                                                                                                           | MCP server present but: <5 tools; descriptions are terse (<20 words); no annotations object; no resources or prompts; errors not structured with isError                                                                                                        |
+| 2     | Well-structured MCP. Proper tool annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint). Agent-oriented descriptions. Structured error handling with isError. outputSchema declared and structuredContent returned where supported. Resources exposed for static data.                                                                                                        | Tools have annotations. Descriptions explain when/why to use. isError pattern for recoverable tool errors. outputSchema and structuredContent on tools that return structured data. Resources for config/static data.                                           |
+| 3     | Production MCP. RFC 9728 protected-resource metadata for protected HTTP servers. Pagination on list operations. Progress notifications for long ops. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport. Tool count optimized (<20). Consent gates for destructive/authenticated/production tools. Roots, sampling, and elicitation explicitly gated where implemented. | Auth implementation validates issuer/audience/resource/scope. Pagination on tools returning arrays. Progress notifications. Stdio and Streamable HTTP transports where relevant. Test files using InMemoryTransport. Consent policy exists for high-risk tools. |
 
 **Key files:** .mcp.json, mcp-server files, tools/ directories
 
@@ -66,12 +71,12 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 **What it measures:** How discoverable, readable, governable, and callable the project is by AI agents. This maps to the same broad categories external agent-readiness scanners now measure: discoverability, content accessibility, bot access control, and capability discovery.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks intended retrieval bots or omits public docs from crawl. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for intended retrieval/search agents. |
-| 1 | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path. |
-| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap has accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL. |
-| 3 | Full agent-readable web surface. Core discovery is semantically valid, not just present. Applicable capability signals are published and verified; unrelated optional protocols are recorded as not applicable. | `llms-full.txt` when useful. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. Applicable API Catalog, MCP, Agent Skills, OAuth, Web Bot Auth, WebMCP, or commerce artifacts parse correctly, link to real content, and advertise working capabilities. |
+| Score | Criteria                                                                                                                                                                                                                                 | Detection                                                                                                                                                                                                                                                                                                                                                                               |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks intended retrieval bots or omits public docs from crawl.                                                                             | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for intended retrieval/search agents.                                                                                                                                                                                                                                                            |
+| 1     | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format.                                                                                        | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path.                                                                                                                                                                                                                                        |
+| 2     | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap has accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL.                                                                                                                                             |
+| 3     | Full agent-readable web surface. Core discovery is semantically valid, not just present. Applicable capability signals are published and verified; unrelated optional protocols are recorded as not applicable.                          | `llms-full.txt` when useful. Markdown response code or generated `.md` routes. Content-Signal in robots/headers, consistent with robots.txt access rules (and RSL where a price or licence condition applies). Applicable API Catalog, MCP, Agent Skills, OAuth, Web Bot Auth, WebMCP, or commerce artifacts parse correctly, link to real content, and advertise working capabilities. |
 
 **Key files:** llms.txt, llms-full.txt, AGENTS.md, robots.txt, sitemap.xml, layout files (for JSON-LD), server/middleware (for content negotiation), `.well-known/` metadata, OpenAPI/API Catalog files, MCP metadata, Agent Skills indexes
 
@@ -87,12 +92,12 @@ Score each dimension 0-3. Evidence must be specific (file paths, line numbers, c
 
 **What it measures:** Whether clients can obtain and use credentials appropriate to the acting identity. User-delegated access uses Authorization Code with PKCE; service-owned M2M access can use Client Credentials. Interactive consent at connection time is valid. Routine protected requests need scoped tokens and structured authentication failures.
 
-| Score | Criteria | Evidence |
-| --- | --- | --- |
-| 0 | No usable authorization path for the intended client and identity. | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete. |
-| 1 | Programmatic access works, but permissions, credential lifetime or validation are incomplete. | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour. |
-| 2 | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism. |
-| 3 | Level 2 plus verified discovery, isolation and credential recovery for the supported flows. | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
+| Score | Criteria                                                                                          | Evidence                                                                                                                                                                                                                    |
+| ----- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No usable authorization path for the intended client and identity.                                | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete.                                                                                           |
+| 1     | Programmatic access works, but permissions, credential lifetime or validation are incomplete.     | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour.                                                                                                                  |
+| 2     | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism.              |
+| 3     | Level 2 plus verified discovery, isolation and credential recovery for the supported flows.       | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
 
 Do not penalize a consumer integration for lacking Client Credentials. Score only flows its advertised capabilities require. [MCP authorization extensions](https://modelcontextprotocol.io/extensions/auth/overview) distinguish user consent from optional M2M support.
 
@@ -104,12 +109,12 @@ Do not penalize a consumer integration for lacking Client Credentials. Score onl
 
 **What it measures:** Whether errors give agents enough information to recover.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail. | Error responses return plain text or empty bodies. No consistent error schema. |
-| 1 | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't. | Partial error schema (some endpoints have type/message, others don't). No is_retriable field. |
-| 2 | RFC 9457 Problem Details everywhere. type, title, status, detail fields. is_retriable boolean. suggestions array. trace_id for debugging. | Consistent error schema matching RFC 9457. is_retriable on all errors. suggestions array with recovery steps. Rate limit 429 includes Retry-After. |
-| 3 | Full agent error design. doc_uri linking to documentation. Intent tracing on cancellation. Domain-specific error codes alongside HTTP. X-RateLimit-* headers on every response. CLI errors with semantic exit codes + JSON. | doc_uri in error responses. Intent trace structure on cancel/abort. Rate limit headers on all responses (not just 429). Structured CLI errors. |
+| Score | Criteria                                                                                                                                                                                                                     | Detection                                                                                                                                          |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail.                                                                                                                                  | Error responses return plain text or empty bodies. No consistent error schema.                                                                     |
+| 1     | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't.                                                                                                                                    | Partial error schema (some endpoints have type/message, others don't). No is_retriable field.                                                      |
+| 2     | RFC 9457 Problem Details everywhere. type, title, status, detail fields. is_retriable boolean. suggestions array. trace_id for debugging.                                                                                    | Consistent error schema matching RFC 9457. is_retriable on all errors. suggestions array with recovery steps. Rate limit 429 includes Retry-After. |
+| 3     | Full agent error design. doc_uri linking to documentation. Intent tracing on cancellation. Domain-specific error codes alongside HTTP. X-RateLimit-\* headers on every response. CLI errors with semantic exit codes + JSON. | doc_uri in error responses. Intent trace structure on cancel/abort. Rate limit headers on all responses (not just 429). Structured CLI errors.     |
 
 **Key files:** error handling middleware, API error responses, error types/classes
 
@@ -119,12 +124,12 @@ Do not penalize a consumer integration for lacking Client Credentials. Score onl
 
 **What it measures:** Quality of tool definitions for AI agent consumption, across any framework.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No formal tool definitions. Functions exist but no schema, no description. | No tool() calls, no @tool decorators, no createTool(), no MCP tool registrations. |
-| 1 | Basic tool schemas exist but descriptions are terse or missing. No examples. | Tool definitions present but descriptions <20 words. No .describe() on Zod fields. No inputExamples. |
-| 2 | Good tool design. verb_noun naming. Agent-oriented descriptions with "when to use" and disambiguation. Typed schemas with field descriptions. | Descriptions include "Use when..." and "Do not use for...". All schema fields have descriptions. enum values on constrained strings. <10 tools per agent/context. |
-| 3 | Excellent tool design. toModelOutput reducing token usage. Tool annotations (readOnly, destructive, idempotent). Dynamic tool selection support (activeTools, defer_loading). Cross-framework definitions (works in MCP + AI SDK + LangChain). | toModelOutput defined. annotations object present. activeTools or defer_loading patterns. Tool definitions portable across frameworks. |
+| Score | Criteria                                                                                                                                                                                                                                       | Detection                                                                                                                                                         |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No formal tool definitions. Functions exist but no schema, no description.                                                                                                                                                                     | No tool() calls, no @tool decorators, no createTool(), no MCP tool registrations.                                                                                 |
+| 1     | Basic tool schemas exist but descriptions are terse or missing. No examples.                                                                                                                                                                   | Tool definitions present but descriptions <20 words. No .describe() on Zod fields. No inputExamples.                                                              |
+| 2     | Good tool design. verb_noun naming. Agent-oriented descriptions with "when to use" and disambiguation. Typed schemas with field descriptions.                                                                                                  | Descriptions include "Use when..." and "Do not use for...". All schema fields have descriptions. enum values on constrained strings. <10 tools per agent/context. |
+| 3     | Excellent tool design. toModelOutput reducing token usage. Tool annotations (readOnly, destructive, idempotent). Dynamic tool selection support (activeTools, defer_loading). Cross-framework definitions (works in MCP + AI SDK + LangChain). | toModelOutput defined. annotations object present. activeTools or defer_loading patterns. Tool definitions portable across frameworks.                            |
 
 **Key files:** tools/ directories, agent definitions, MCP tool registrations
 
@@ -134,61 +139,50 @@ Do not penalize a consumer integration for lacking Client Credentials. Score onl
 
 **What it measures:** Quality of agent context files for AI coding assistants.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No AGENTS.md, CLAUDE.md, or equivalent. | No agent context files found. |
-| 1 | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands. | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation). |
-| 2 | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples. | Commands section at top with exact invocations. Permission boundaries defined. <370 lines. Non-obvious conventions documented with examples. |
-| 3 | Multi-tool context. AGENTS.md (universal) + CLAUDE.md (Claude-specific) + .cursor/rules (Cursor-specific). Progressive disclosure (points to detailed docs). Updated iteratively from friction. | Multiple context file formats. Progressive disclosure via file references. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
+| Score | Criteria                                                                                                                                                                                        | Detection                                                                                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No AGENTS.md, CLAUDE.md, or equivalent.                                                                                                                                                         | No agent context files found.                                                                                                                                     |
+| 1     | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands.                                                                                                    | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation).       |
+| 2     | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples.                                    | Commands section at top with exact invocations. Permission boundaries defined. <370 lines. Non-obvious conventions documented with examples.                      |
+| 3     | Multi-tool context. AGENTS.md (universal) + CLAUDE.md (Claude-specific) + .cursor/rules (Cursor-specific). Progressive disclosure (points to detailed docs). Updated iteratively from friction. | Multiple context file formats. Progressive disclosure via file references. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
 
-**Key files:** AGENTS.md, CLAUDE.md, .cursor/rules/*.mdc, .github/copilot-instructions.md, .windsurf/rules/
-
----
-
-## Dimension 9: Multi-Agent Support
-
-**What it measures:** How well the project supports multi-agent orchestration.
-
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No multi-agent patterns. Single-agent or no agent support. | No agent orchestration code. No sub-agent definitions. |
-| 1 | Basic sub-agent support. Can spawn agents but no structured delegation. | Agent definitions exist but: no state management between agents, no delegation patterns, no memory sharing. |
-| 2 | Supervisor pattern. Structured delegation with clear agent roles. State management. Human-in-the-loop at critical points. | Supervisor/orchestrator agent delegates to specialists. State passed between agents. Approval gates on destructive actions. |
-| 3 | Advanced multi-agent. A2A agent cards published. Workflow composition. Memory patterns (working, semantic, observational). Dynamic agent selection. Cross-framework interop. | /.well-known/agent-card.json published. Multiple orchestration patterns. Memory system with persistence. Agents discoverable by external systems. |
-
-**Key files:** Agent definitions, workflow files, orchestration code, .well-known/agent-card.json
-
-**N/A when:** Project is not an agent system and does not orchestrate agents.
+**Key files:** AGENTS.md, CLAUDE.md, .cursor/rules/\*.mdc, .github/copilot-instructions.md, .windsurf/rules/
 
 ---
 
-## Dimension 10: Testing & Evaluation
+## Dimension 9: Testing & Evaluation
 
 **What it measures:** Whether agent interactions are tested and evaluated.
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No agent-specific tests. Standard unit/integration tests only. | No test files targeting tool selection, agent behavior, or MCP server testing. |
-| 1 | Basic tool routing tests. Some verification that tools are called correctly. | Test files that verify tool selection or MCP tool responses. But: no error recovery testing, no multi-step flow testing. |
-| 2 | Comprehensive tool testing. Selection accuracy, parameter correctness, error recovery. Multi-step flow tests. MCP server tested with InMemoryTransport. | Tests cover: correct tool selection, valid parameters, error -> recovery, multi-step sequences. MCP tests use InMemoryTransport.createLinkedPair(). |
-| 3 | Full eval suite. pass@k and pass^k metrics. Non-determinism handling (multiple runs per test). Regression detection. CI-integrated. Eval-driven development. | Statistical metrics (multiple runs per test case). Baseline comparison for regression. Eval suite runs in CI. Test cases from real production failures. |
+| Score | Criteria                                                                                                                                                     | Detection                                                                                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No agent-specific tests. Standard unit/integration tests only.                                                                                               | No test files targeting tool selection, agent behavior, or MCP server testing.                                                                          |
+| 1     | Basic tool routing tests. Some verification that tools are called correctly.                                                                                 | Test files that verify tool selection or MCP tool responses. But: no error recovery testing, no multi-step flow testing.                                |
+| 2     | Comprehensive tool testing. Selection accuracy, parameter correctness, error recovery. Multi-step flow tests. MCP server tested with InMemoryTransport.      | Tests cover: correct tool selection, valid parameters, error -> recovery, multi-step sequences. MCP tests use InMemoryTransport.createLinkedPair().     |
+| 3     | Full eval suite. pass@k and pass^k metrics. Non-determinism handling (multiple runs per test). Regression detection. CI-integrated. Eval-driven development. | Statistical metrics (multiple runs per test case). Baseline comparison for regression. Eval suite runs in CI. Test cases from real production failures. |
 
 **Key files:** Test directories, eval suites, CI configuration
 
 ---
 
-## Dimension 11: Data Retrievability
+## Dimension 10: Retrievability
 
-**What it measures:** How effectively the codebase makes data searchable and retrievable to AI agents via search indexes, vector embeddings, hybrid retrieval, reranking, graph/structured retrieval, and fit-for-purpose RAG patterns.
+**What it measures:** Whether agents can find and pull the product's own data through a
+query-able, documented surface: search/query APIs, retrieval contracts (pagination, filters,
+freshness), and structured content. Does not measure whether the project runs a RAG pipeline
+for its own AI features - that is agent-internal architecture, scored and guided separately
+(see `references/retrievability.md`, "Not this dimension").
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No retrieval infrastructure. Documents or data are not indexed, searchable, or retrievable by agents. No search index, embeddings, vector store, or structured retrieval path. | No `.embed()` calls, no vector/search client, no BM25/full-text index, no `retriever()` or `RAG()` patterns, no queryable docs/API/database tool. Files are static or database-only without agent-facing search. |
-| 1 | Basic single-stage retrieval. Dense vector search, keyword search, or a simple file/database lookup exists, but no reranking, no hybrid strategy, no documented chunking/source strategy, and no evaluation. | Vector/search store exists but no fusion or reranking. Chunking is ad hoc or absent. Metadata filters are weak. No RAGAS, recall@k, nDCG, or domain evals. |
-| 2 | Good retrieval infrastructure. Hybrid lexical + dense retrieval or an equivalent structured retrieval design. Reranking or rank fusion present where quality matters. Chunking/source strategy documented. Metadata filters and namespace isolation exist. Basic quality metrics are tracked. | BM25/full-text + dense + RRF/weighted fusion, or structured SQL/API retrieval with typed result schemas. Reranking before generation. Chunking/source config present. Tenant/user filters on queries. Recall@k, nDCG, RAGAS, or domain eval script present. |
-| 3 | Excellent retrieval system. Retrieval architecture matches the corpus: contextual, hierarchical, graph/LightRAG, agentic, multimodal, compiled/optimized, or structured/tool-backed RAG as appropriate. Query planning/reflection appears where queries are complex. Drift/freshness and deletion are handled. Evals run in CI or release gates. | Query decomposition, dynamic retriever/tool selection, contextual embeddings, ColBERT/ColPali, graph + vector, multimodal indexes, compiled query plans, or typed live-data tools. Metadata filters on all queries. Freshness/deletion/re-embed path exists. RAGAS + custom metrics or equivalent evals in CI/CD. |
+| Score | Criteria                                                                                                                                                                                                       | Detection                                                                                                                                                                                          |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No queryable retrieval surface. Content is reachable only by reading whole pages/files; no search endpoint, no filters, no structured result schema.                                                           | No `/search` route, no OpenAPI path with query parameters, no sitemap/feed, no structured data markup.                                                                                             |
+| 1     | Basic search or lookup exists but is undocumented or unstructured: results are HTML fragments or free text, not typed records.                                                                                 | A search box or endpoint exists but returns rendered HTML, has no documented query parameters, no pagination, and no result schema.                                                                |
+| 2     | Documented search/retrieval API or content surface. Typed query and result schemas. Pagination and filters. Structured content (JSON-LD/schema.org, typed API objects, or a machine-readable feed).            | OpenAPI or equivalent documents the search endpoint's parameters and response schema. Results carry stable fields (id, title, url, updated_at). Filters/facets documented.                         |
+| 3     | Full retrieval contract. Query refinement (sort/filter/facet). Citations or source metadata on results. Freshness/versioning exposed. Stable IDs for re-fetch. Documented limits for bulk/paginated retrieval. | Response includes freshness metadata. Cursor-based pagination survives concurrent updates. Bulk export or feed endpoint documented with size/rate limits. Result objects addressable by stable ID. |
 
-**Key files:** ingestion pipelines, embedding pipelines, vector/search clients, chunking logic, reranking setup, graph or structured retrieval tools, RAG frameworks, eval scripts
+**Key files:** search route handlers, `/search` or `/query` API definitions, OpenAPI paths with query parameters, sitemap/feed generators, structured-data (JSON-LD) templates
+
+**N/A when:** Project exposes no searchable corpus or dataset (e.g. a pure single-purpose CLI utility with no content or records to look up).
 
 ---
 

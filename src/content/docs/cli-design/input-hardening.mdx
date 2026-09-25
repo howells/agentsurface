@@ -1,11 +1,12 @@
 ---
 title: Input Hardening
 description: Defending against the specific ways agents construct invalid or dangerous inputs, which differ from how humans make mistakes
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Agents hallucinate inputs differently than humans make typos. Path traversal sequences, invalid resource IDs, and plausible-looking but structurally wrong values are common agent failures. Input hardening defends against these patterns with strict validation, actionable error messages, and boundary checks. Agents are not trusted operators — validate everything.
+Agents hallucinate inputs differently than humans make typos. Path traversal sequences, invalid resource IDs, and plausible-looking but structurally wrong values are common agent failures. Input hardening defends against these patterns with strict validation, actionable error messages, and boundary checks. Agents are not trusted operators - validate everything.
 
 - Reject path traversal (../) sequences in file paths and resource IDs
 - Validate resource IDs against expected format and ownership
@@ -13,9 +14,9 @@ Agents hallucinate inputs differently than humans make typos. Path traversal seq
 - Return structured error messages listing what was wrong
 - Include valid examples in error messages for guidance
 
-Human users make typos. They transpose characters, forget required flags, and misremember option names. Agents hallucinate. They construct plausible-looking inputs that happen to be structurally invalid, semantically wrong, or — in some cases — actively dangerous.
+Human users make typos. They transpose characters, forget required flags, and misremember option names. Agents hallucinate. They construct plausible-looking inputs that happen to be structurally invalid, semantically wrong, or - in some cases - actively dangerous.
 
-The failure modes are different, so the defenses must be different. Standard input validation catches the human failure modes. Agent-specific input hardening catches the hallucination patterns that standard validation misses entirely.
+Standard input validation catches the human failure modes. Agent-specific input hardening catches the hallucination patterns that standard validation misses entirely.
 
 <Callout type="warn">
   The security posture for agent-facing CLIs must be: **the agent is not a trusted operator**. Even
@@ -26,7 +27,7 @@ The failure modes are different, so the defenses must be different. Standard inp
 
 ## Path Traversal Attacks
 
-Agents constructing file paths or resource IDs that include user-controlled segments will sometimes hallucinate `../` sequences. These are the same path traversal patterns that appear in web security vulnerabilities — and they are dangerous for exactly the same reasons when a CLI writes output files or resolves local paths.
+Agents constructing file paths or resource IDs that include user-controlled segments will sometimes hallucinate `../` sequences. These are the same path traversal patterns that appear in web security vulnerabilities - and they are dangerous for exactly the same reasons when a CLI writes output files or resolves local paths.
 
 ```bash
 # An agent asked to "save the export to the reports directory" might hallucinate:
@@ -62,7 +63,7 @@ function validateOutputPath(input: string, allowedBase: string): string {
 const safePath = validateOutputPath(flags.output, process.cwd());
 ```
 
-For resource IDs — user IDs, record IDs, slugs — that are used to construct API paths, validate that they contain no path components:
+For resource IDs - user IDs, record IDs, slugs - that are used to construct API paths, validate that they contain no path components:
 
 ```typescript
 function validateResourceId(id: string, fieldName: string): string {
@@ -101,7 +102,7 @@ function rejectControlCharacters(value: string, fieldName: string): string {
 }
 ```
 
-For resource IDs specifically, be stricter — reject all non-printable characters and limit to the expected character set:
+For resource IDs specifically, be stricter - reject all non-printable characters and limit to the expected character set:
 
 ```typescript
 const RESOURCE_ID_PATTERN = /^[a-zA-Z0-9_\-]+$/;
@@ -122,7 +123,7 @@ function validateResourceIdFormat(id: string, fieldName: string): string {
 
 ## Percent-Encoded Segments
 
-Agents reading from one API response and passing values to another will sometimes receive percent-encoded values and pass them through without decoding. `%2e%2e%2f` is `../` — a path traversal that bypasses naive string-matching checks.
+Agents reading from one API response and passing values to another will sometimes receive percent-encoded values and pass them through without decoding. `%2e%2e%2f` is `../` - a path traversal that bypasses naive string-matching checks.
 
 ```bash
 # These should be treated identically and both rejected:
@@ -144,7 +145,7 @@ function normalizeAndValidate(input: string, fieldName: string): string {
     try {
       decoded = decodeURIComponent(decoded);
     } catch {
-      // Invalid percent-encoding — reject outright
+      // Invalid percent-encoding - reject outright
       exitWithError({
         error: "invalid_encoding",
         message: `${fieldName} contains invalid percent-encoding`,
@@ -200,7 +201,7 @@ function rejectEmbeddedURLComponents(value: string, fieldName: string): string {
 
 ## HTTP-Layer Percent-Encoding
 
-When constructing API requests, the CLI must percent-encode path parameters at the HTTP layer — independently of any decoding done during input validation. This prevents double-encoding while ensuring that valid special characters in IDs (spaces, Unicode) are correctly transmitted.
+When constructing API requests, the CLI must percent-encode path parameters at the HTTP layer - independently of any decoding done during input validation. This prevents double-encoding while ensuring that valid special characters in IDs (spaces, Unicode) are correctly transmitted.
 
 ```typescript
 import { encodeURIComponent } from "url";
@@ -225,7 +226,7 @@ const path = buildAPIPath("/users/{user_id}/records/{record_id}", {
 
 ## Output Path Sandboxing
 
-When a CLI writes output files — exports, downloads, generated files — sandbox all output paths to the current working directory. An agent that constructs an absolute path or escapes via `../` should receive a clear error, not silent redirection of the file.
+When a CLI writes output files - exports, downloads, generated files - sandbox all output paths to the current working directory. An agent that constructs an absolute path or escapes via `../` should receive a clear error, not silent redirection of the file.
 
 ```typescript
 function sandboxOutputPath(input: string): string {
@@ -295,7 +296,7 @@ const outputFile = validate(flags.output, "output", outputPathRules);
 
 ## Structured Validation Errors
 
-All validation failures must return structured errors (not prose) so agents can self-correct. Include the field name, the issue, the received value, and — where possible — what was expected:
+All validation failures must return structured errors (not prose) so agents can self-correct. Include the field name, the issue, the received value, and - where possible - what was expected:
 
 ```json
 {
@@ -313,7 +314,7 @@ All validation failures must return structured errors (not prose) so agents can 
 }
 ```
 
-This gives the agent enough information to identify which field was wrong, what the issue was, and what value it passed — without requiring it to parse error prose.
+This gives the agent enough information to identify which field was wrong, what the issue was, and what value it passed - without requiring it to parse error prose.
 
 ## Scoring Rubric
 
@@ -324,7 +325,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 | 0     | No input validation beyond basic type checks.                                                                                                                                         |
 | 1     | Validates some inputs, but does not cover agent-specific hallucination patterns (path traversals, embedded query params, double encoding).                                            |
 | 2     | Rejects control characters, path traversals (`../`), percent-encoded segments (`%2e`), and embedded query params (`?`, `#`) in resource IDs.                                          |
-| 3     | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture — "The agent is not a trusted operator." |
+| 3     | Comprehensive hardening: all of the above, plus output path sandboxing to CWD, HTTP-layer percent-encoding, and an explicit security posture - "The agent is not a trusted operator." |
 
 ## Checklist
 
@@ -340,6 +341,6 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
 ## Related Pages
 
-- [Safety Rails](./safety-rails) — dry-run, confirmations, and prompt injection defense
-- [Raw Payload Input](./raw-payload-input) — validating payload content and flags
-- [The Agent DX CLI Scale](./cli-scale) — full scoring framework
+- [Safety Rails](./safety-rails) - dry-run, confirmations, and prompt injection defense
+- [Raw Payload Input](./raw-payload-input) - validating payload content and flags
+- [The Agent DX CLI Scale](./cli-scale) - full scoring framework

@@ -42,6 +42,14 @@ _Avoid_: Agent engineering, AI integration
 The canonical, evidence-backed engineering guidance for agent-surface engineering. It does not define conformance requirements.
 _Avoid_: Standard, specification
 
+**agent-building inventory**:
+The secondary part of Agent Surface: condensed current best practice and a curated inventory of tools and platforms for teams building their own agents. It sits outside the guide and the surface skill.
+_Avoid_: Core guidance, agent framework, cookbook
+
+**agent retrieval**:
+How an agent finds and uses knowledge for its own work, such as vector search, embeddings, and retrieval-augmented generation. It belongs to the agent-building inventory; retrievability, the product's side, belongs to the guide.
+_Avoid_: Retrievability, data retrievability
+
 **surface skill**:
 The intent-routed workflow that applies the guide to a software repository through Guide, Audit, or Scaffold.
 _Avoid_: CLI, agent framework

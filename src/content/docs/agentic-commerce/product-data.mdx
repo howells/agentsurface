@@ -1,0 +1,67 @@
+---
+title: Product Data for Shopping Agents
+description: Product and Offer structured data, merchant feeds, and catalog APIs that a shopping agent reads before it ever invokes a checkout protocol
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+A shopping agent reads a product page the same way a search crawler does: only the parts that are machine-parsable. Before any checkout protocol runs, the agent needs three things to already be correct - on-page structured data, a merchant feed the shopping surface ingests, and (increasingly) a catalog API it can query directly. Get this layer wrong and nothing downstream matters: a perfect checkout integration still fails if the agent priced the item from a stale feed.
+
+- Mark up every purchasable product with `schema.org/Product` and a single nested `Offer`
+- Feeds for Google Shopping and ChatGPT overlap heavily but are not the same file - check both specs, not one
+- A catalog API (UCP, platform-native, or your own) lets an agent query live state instead of trusting a cached feed
+- The Shopify product-page audit checks the same structured-data and pricing-accuracy signals described here
+
+## On-page structured data
+
+Mark up every purchasable product with `schema.org/Product` and a nested `Offer` - not `AggregateOffer`, since merchant listing eligibility requires a single `Offer` per purchasable URL.
+
+Required on the `Offer`:
+
+- `price` (a number greater than zero) and `priceCurrency` (ISO 4217), or `priceSpecification` in place of both
+- `availability` (`InStock`, `OutOfStock`, `PreOrder`, and so on)
+
+Strongly recommended:
+
+- Identifiers: `sku`, one of `gtin`/`gtin8`/`gtin12`/`gtin13`/`gtin14`, `mpn`, and `brand`
+- `shippingDetails` (`OfferShippingDetails`) for shipping cost and delivery estimate
+- `hasMerchantReturnPolicy` (`MerchantReturnPolicy`) for the return window and terms
+- `aggregateRating` and `review` where real reviews exist
+- For variants (size, colour, and so on), `ProductGroup` with `hasVariant` linking the individual `Product` entries, or `isVariantOf` / `inProductGroupWithID` on each variant
+
+This is Google's merchant-listing structured-data requirement set; see [Merchant listing structured data](https://developers.google.com/search/docs/appearance/structured-data/merchant-listing) for the full property list and validation rules. See [Structured Data for Agents](/docs/discovery/structured-data) for JSON-LD mechanics that apply beyond commerce.
+
+## Merchant feeds
+
+Structured data on the page and a feed pushed to a shopping surface are different mechanisms that need to agree. A shopping agent that only reads your feed never sees a fix you made on the page, and vice versa.
+
+### Google Merchant Center
+
+Google's [product data specification](https://support.google.com/merchants/answer/7052112) defines every attribute a Merchant Center feed can carry. At minimum every product needs `id`, `title` (max 150 characters), `description` (max 5,000 characters), `link`, `image_link`, `price` (ISO 4217), and `availability` (`in_stock`, `out_of_stock`, `preorder`, or `backorder`; `availability_date` is required when `preorder`). `brand` is required for new products except movies, books, and musical recordings; `gtin` is strongly recommended when the product has one, and `mpn` is required only when it doesn't. Apparel in several countries (Brazil, France, Germany, Japan, UK, US) additionally requires `color` and `gender`; variants need `item_group_id`. `image_link` will require a minimum 500x500px image from 31 January 2027, and AI-generated content must carry a metadata label identifying it as algorithmically created.
+
+### OpenAI / ChatGPT product feed
+
+OpenAI's [product feed specification](https://developers.openai.com/commerce/specs) defines the feed ChatGPT ingests for shopping and (where eligible) checkout. Nine fields are required: `item_id` (stable per item or variant), `title`, `description`, `url`, `brand`, `seller_name`, `image_url`, `availability` (`in_stock`, `out_of_stock`, `pre_order`, `backorder`, or `unknown`), and `price` (as `amount CURRENCY`). Accepted formats are JSONL (the reference format), CSV/TSV with headers, gzip-compressed variants, and a Google-compatible `.txt`/`.tsv`/`.csv` path that needs separate confirmation. Feeds are delivered by upload, not a pull crawl - see the [file upload guide](https://developers.openai.com/commerce/specs/file-upload/overview) for the mechanics. The feed and the on-page structured data above should describe the same product from the same source; treat a mismatch as a data defect, not two valid representations.
+
+Neither spec replaces the other. If you sell through both Google Shopping surfaces and ChatGPT, you maintain two feeds (or one superset feed) against two specs, and both need to reconcile with the live product page.
+
+## Catalog APIs
+
+A feed is a snapshot; a catalog API lets an agent query current state directly instead of trusting whatever was last uploaded. [UCP](/docs/agentic-commerce/checkout-protocols) standardizes catalog search as one of its capabilities, alongside cart and checkout - see that page for the protocol-level detail. Platform-native catalog APIs (Shopify's, for example) expose the same query surface without requiring UCP specifically; see [Shopify](/docs/agentic-commerce/shopify) for what that looks like in practice. Whichever you expose, the same rule applies as for feeds: the catalog API, the feed, and the page must return the same price and availability for the same item, checked against a real SKU, not just schema-validated.
+
+## What the Shopify product-page audit checks
+
+Shopify's agentic-readiness product-page audit scans a live product URL and checks it against the same structured-data, real-time pricing accuracy, and trust-signal criteria described above - it is a useful second check specifically for a commerce storefront, whether or not you sell through Shopify. Shopify frames the check as informational: passing signals do not guarantee a product surfaces in an AI shopping result, only that the machine-readable groundwork is in place. See [Shopify](/docs/agentic-commerce/shopify) for how this fits the platform's wider agent surface.
+
+## Revalidate before commitment
+
+Feeds and catalog responses can lag the source of truth. Recheck price, availability, and delivery eligibility immediately before an operation commits the buyer - see [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) for where that revalidation sits in a session-based checkout flow, and [Evaluating Product Journeys](/docs/scoring/product-journeys) for testing the whole path from discovery through commitment.
+
+## Related Pages
+
+- [Agentic Commerce](/docs/agentic-commerce) - the five-layer overview this page's layer sits in
+- [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) - what happens once an agent has found and trusted a product
+- [Shopify](/docs/agentic-commerce/shopify) - platform-native catalog APIs and the product-page audit in context
+- [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery) - pricing pages, organisation identity, and directory listings beyond product pages
+- [Structured Data for Agents](/docs/discovery/structured-data) - JSON-LD mechanics generally

@@ -1,10 +1,17 @@
 /**
- * RFC 8414 + MCP 2025-11-25 OAuth Protected Resource Metadata endpoint
- * Canonical spec: https://datatracker.ietf.org/doc/html/rfc8414
+ * RFC 9728 OAuth 2.0 Protected Resource Metadata endpoint
+ * Canonical spec: https://datatracker.ietf.org/doc/html/rfc9728
  * Use: Advertise auth config to remote MCP servers and agents
  *
+ * RFC 9728 defines this resource's own metadata document — not the
+ * authorization server's. The required field is `resource` (the resource's
+ * own identifier), not `resource_url`; the authorization server's issuer,
+ * token endpoint, etc. live on that server's own metadata document at its
+ * own `/.well-known/oauth-authorization-server` (RFC 8414), reachable via
+ * one of the URLs listed in `authorization_servers` below.
+ *
  * <CUSTOMISE>
- * - Update resource_url to your service domain
+ * - Update resource to your service domain
  * - Add your authorization_server URL
  * - Define scopes relevant to your API
  * - Set jwks_uri to your JWKS endpoint
@@ -15,14 +22,17 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * RFC 8414 Protected Resource Metadata
+ * RFC 9728 Protected Resource Metadata
  * Used by remote MCP servers to discover auth config
  */
 interface ProtectedResourceMetadata {
-  resource_url: string;
+  resource: string;
   authorization_servers: string[];
   scopes_supported: string[];
   jwks_uri: string;
+  bearer_methods_supported?: string[];
+  resource_name?: string;
+  resource_documentation?: string;
   response_types_supported?: string[];
   grant_types_supported?: string[];
   token_endpoint_auth_methods_supported?: string[];
@@ -37,8 +47,8 @@ interface ProtectedResourceMetadata {
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const metadata: ProtectedResourceMetadata = {
-    // <CUSTOMISE> Update to your domain
-    resource_url: process.env.API_URL || "https://api.example.com",
+    // <CUSTOMISE> Update to your domain — this resource's own identifier
+    resource: process.env.API_URL || "https://api.example.com",
 
     // <CUSTOMISE> Auth server(s) that can issue tokens for this resource
     authorization_servers: [process.env.AUTH_SERVER || "https://auth.example.com"],
@@ -57,6 +67,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     // <CUSTOMISE> URI to JWKS (public keys for token validation)
     jwks_uri: process.env.JWKS_URI || "https://auth.example.com/.well-known/jwks.json",
+
+    // How bearer tokens may be presented (RFC 9728 §2)
+    bearer_methods_supported: ["header"],
 
     // Standard OAuth response types
     response_types_supported: ["token"],
@@ -108,7 +121,7 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * MCP 2025-11-25 Remote Server Discovery:
+ * MCP 2026-07-28 Remote Server Discovery:
  *
  * When you expose your API to remote MCP servers (e.g., via OpenAI, Claude),
  * those servers fetch this metadata to:
@@ -121,7 +134,8 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
  * The MCP server will:
  * 1. GET /.well-known/oauth-protected-resource
  * 2. Cache the response for 1–24 hours
- * 3. Use authorization_servers[0] as the token endpoint
+ * 3. Use authorization_servers[0] to find the authorization server's own
+ *    metadata (RFC 8414), which carries its actual token endpoint
  * 4. Request tokens with grant_type=client_credentials
  * 5. Validate tokens using JWKS at jwks_uri
  *
@@ -131,10 +145,11 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
  * GET https://api.example.com/.well-known/oauth-protected-resource
  *
  * {
- *   "resource_url": "https://api.example.com",
+ *   "resource": "https://api.example.com",
  *   "authorization_servers": ["https://auth.example.com"],
  *   "scopes_supported": ["agent:read", "agent:write", "users:read", "posts:write"],
  *   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+ *   "bearer_methods_supported": ["header"],
  *   "grant_types_supported": ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"]
  * }
  * ```

@@ -1,7 +1,7 @@
 {
   "protocolVersion": "1.0.0",
   "name": "Example Agent API",
-  "description": "A production-grade agent that manages agents and runs workflows. Demonstrates A2A v1.0 RC with OAuth 2.1, DPoP, and structured task execution.",
+  "description": "A production-grade agent that manages agents and runs workflows. Demonstrates A2A v1.0 with OAuth 2.1, DPoP, and structured task execution.",
   "url": "https://api.example.com",
   "documentationUrl": "https://docs.example.com/agents",
   "provider": {
@@ -9,39 +9,10 @@
     "url": "https://example.com",
     "contactEmail": "support@example.com"
   },
-  "capabilities": [
-    "task-execution",
-    "multi-step-workflows",
-    "progress-tracking",
-    "error-recovery",
-    "async-execution"
-  ],
-  "protocolVersions": ["1.0.0"],
-  "authentication": {
-    "type": "OAuth2.1",
-    "flowType": "ClientCredentials",
-    "authorizationEndpoint": "https://auth.example.com/oauth/authorize",
-    "tokenEndpoint": "https://auth.example.com/oauth/token",
-    "scopes": [
-      {
-        "name": "agents:read",
-        "description": "Read agent metadata and configuration"
-      },
-      {
-        "name": "agents:write",
-        "description": "Create and modify agents"
-      },
-      {
-        "name": "agents:execute",
-        "description": "Execute agents and monitor runs"
-      },
-      {
-        "name": "agents:delete",
-        "description": "Delete agents (requires confirmation)"
-      }
-    ],
-    "dpopRequired": true,
-    "dpopSigningAlgorithms": ["RS256", "ES256"]
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "extendedAgentCard": false
   },
   "skills": [
     {
@@ -53,7 +24,7 @@
           "prompt": "Create an agent named 'Support Analyzer' using Claude Opus to analyze support tickets",
           "parameters": {
             "name": "Support Analyzer",
-            "model": "claude-opus-5",
+            "model": "claude-opus-5-5",
             "description": "Analyzes support tickets for priority and sentiment"
           }
         },
@@ -161,13 +132,13 @@
   "apiSpecification": {
     "type": "OpenAPI",
     "url": "https://api.example.com/v1/openapi.json",
-    "version": "3.1.0"
+    "version": "3.2.1"
   },
   "workflowSpecifications": [
     {
       "type": "Arazzo",
       "url": "https://api.example.com/v1/workflows/arazzo.yaml",
-      "version": "1.0.1"
+      "version": "1.1.0"
     }
   ],
   "rateLimits": {
@@ -192,9 +163,10 @@
         "clientCredentials": {
           "tokenUrl": "https://auth.example.com/oauth/token",
           "scopes": {
-            "agents:read": "Read agent metadata",
+            "agents:read": "Read agent metadata and configuration",
             "agents:write": "Create and modify agents",
-            "agents:execute": "Execute agents"
+            "agents:execute": "Execute agents and monitor runs",
+            "agents:delete": "Delete agents (requires confirmation)"
           }
         }
       }
@@ -206,10 +178,11 @@
       "required": true
     }
   },
+  "security": [{ "OAuth2": ["agents:read"], "DPoP": [] }],
   "modelSupport": [
     {
       "provider": "Anthropic",
-      "models": ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
+      "models": ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
     },
     {
       "provider": "OpenAI",
@@ -290,6 +263,6 @@
     "version": "1.0.0",
     "releaseDate": "2026-04-17",
     "tags": ["agent-management", "workflow-orchestration", "ai-powered", "production"],
-    "certifications": ["A2A-Compliant-1.0.0", "OpenAPI-3.1.0", "RFC9457-ErrorHandling"]
+    "certifications": ["A2A-Compliant-1.0.0", "OpenAPI-3.2.1", "RFC9457-ErrorHandling"]
   }
 }

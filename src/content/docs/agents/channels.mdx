@@ -1,0 +1,73 @@
+---
+title: Channels
+description: Reaching users on Slack, WhatsApp, Telegram, and other messaging surfaces - one agent core, thin platform adapters, and conversation continuity across replies and notifications.
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+Messaging platforms are an inbound surface: a place a user talks to the agent, with threads, mentions, interactive components, and their own delivery and session rules. Build one platform-agnostic agent core and connect it to each surface through a thin adapter, rather than branching agent logic on platform.
+
+- **One core, N adapters** - the agent's own logic never checks `if (platform === "whatsapp")`; the [system prompt](/docs/agents/prompts-and-configuration) does.
+- **Adapter is the seam** - normalize inbound messages to a standard shape, call the core agent, format the response back to platform constraints.
+- **Channel adapters have moved inside frameworks** - signature verification, thread identity, and streaming-into-an-editable-message are increasingly framework-mounted, not hand-built bot layers.
+- **Continuity across notification and reply** - when a user replies to a push notification, the agent needs the notification's context injected, not a disconnected message.
+
+## Platform-Agnostic Core
+
+```
+Platform Handlers (Web, WhatsApp, Telegram, Slack, Email)
+        ↓
+Message Normalizer  →  standard { platform, userId, text, attachments, replyTo }
+        ↓
+Core Agent (tools, system prompt, max steps; platform instructions injected)
+        ↓
+Platform Formatter  →  tables → lists, markdown → plaintext, links → URLs
+        ↓
+Platform Sender
+```
+
+The core agent takes a `platform` parameter that only affects which block `buildSystemPromptForPlatform()` appends (see [Prompts and Configuration](/docs/agents/prompts-and-configuration)) - it does not change tool selection, step budget, or model choice. Each adapter is thin: normalize input, call the core, format output, send. Keep normalizers and formatters separately testable from the core agent so a WhatsApp formatting bug cannot hide a core agent regression.
+
+## Channel Adapters As A Framework Capability
+
+A hand-built bot layer per platform - normalize webhook events, forward to the agent over HTTP, write the reverse path back - owned most of the bugs at the seam. That has moved inside the frameworks. The current pattern is a channel adapter configured on the agent itself, with the framework mounting the webhook route and handling platform-shaped work (signature verification, thread/message identity, streaming into an editable message, interactive components).
+
+Two shipped reference points: Mastra exposes channels as a first-class agent capability covering Slack, Microsoft Teams, Discord, Telegram, and WhatsApp directly, reaching further platforms through compatible Chat SDK adapters. Vercel's [Chat SDK](https://chat-sdk.dev/) targets Slack, Microsoft Teams, Google Chat, Discord, Telegram, WhatsApp, GitHub, and Linear through one adapter interface, usable standalone or as a layer a framework builds on.
+
+The tradeoff is real: in-framework adapters collapse the seam and stop you re-solving thread identity per platform, at the cost of coupling your conversational surface to the framework's release cadence. Two things stay yours regardless of which adapter layer you pick: platform session rules (WhatsApp's 24-hour free-form reply window is the usual one - outside it, only pre-approved template messages are allowed) and the notification continuity below.
+
+## Notification-to-Conversation Continuity
+
+When a user replies to a notification ("Order #123 needs approval" → "Approve it"), the agent needs to know what "it" refers to. Store a short-lived context record per user at the moment the notification fires, and inject it when they reply:
+
+```typescript
+interface NotificationContext {
+  eventType: string;
+  entityIds: string[];
+  summary: string; // "Order #123 from Alice needs approval"
+  action?: string; // "approve", "review", "send"
+  suggestedPrompts?: string[];
+}
+```
+
+Store it keyed by user with a short TTL (24 hours is typical), in a fast store (Redis) with a database fallback for durability across restarts. On reply, retrieve it and inject a line into the prompt or message history - `The user was just notified: {summary}. Their message below is in response to it.` - then clear it once the reply is processed so a later, unrelated reply does not reuse stale context.
+
+**Batch by urgency.** Not every event deserves an immediate notification: a receipt match a user just uploaded wants instant confirmation, but new-transaction or invoice-paid events should batch into a single summary over a 10-60 minute window to avoid notification spam. Schedule user-facing digests relative to _their_ local timezone, not server UTC.
+
+**Upstream: signal providers.** The decision to notify at all has its own shape, and it is no longer bespoke plumbing - frameworks increasingly ship an event-subscription provider interface with four operations regardless of source: `subscribe`/`unsubscribe` (bind a thread to an external resource - a PR, a mailbox, a project), `poll` (pull-based sources on an interval), `handleWebhook` (push-based sources), and `notify` (the single funnel that delivers a matched event into the subscribed thread). Adding a new event source means implementing one provider, not rewiring the notification path. A wake-up from a provider already knows which thread subscribed, so the notification context above can be written at `notify` time rather than reconstructed later from a user ID - and batch windows belong between the provider and the notification, not inside the provider itself.
+
+## Outbound: Discovering External-App Actions
+
+Channels are the inbound half of external integration. The outbound half - the agent deciding to do something in a connected app (Gmail, Slack, Notion) - is a tool-catalog scaling problem. Pre-registering every action from every connected app front-loads tokens for tools that are rarely used; the alternative is two meta-tools instead of hundreds of specific ones:
+
+- `search_tools(query, app?)` - find matching actions across connected apps for a natural-language intent ("send email," "create Notion page").
+- `execute_tool(actionId, parameters)` - run a discovered action.
+
+This trades a small discovery latency (one extra call) for a catalog that scales to any number of connected apps without a redeploy when a new one is added, and for a much smaller per-request tool list. It is worth it once the external-action catalog is large or changes independently of the app's deploy cycle; below roughly a dozen critical actions, pre-registering them directly is simpler and has no discovery latency at all.
+
+## Related
+
+- [Prompts and Configuration](/docs/agents/prompts-and-configuration) - where platform-specific rules actually live
+- [Background Agents](/docs/agents/background-agents) - the batching and scheduling this page's notifications run on
+- [Tool Design](/docs/tool-design) - schema and description design for both channel-facing and external-app tools

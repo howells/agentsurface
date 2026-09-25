@@ -1,7 +1,7 @@
 ---
 title: Structured Data for Agents
 description: JSON-LD schema markup that gives search and agent systems machine-readable facts about your content
-lastVerified: 2026-06-02
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -9,10 +9,10 @@ lastVerified: 2026-06-02
 JSON-LD markup embeds structured data so search engines and agents can extract facts without relying only on natural language inference. Use it to describe FAQs, breadcrumbs, products, articles, APIs, and other page entities in a machine-readable form. The fundamental rule: schema must exactly match visible page content, not supplement it.
 
 - JSON-LD is the easiest structured-data format for agents to parse directly
-- FAQPage schema for FAQ sections, definitions, troubleshooting guides
+- FAQPage and HowTo schema are still valid Schema.org markup for agents and other parsers, but Google no longer shows either as a Search rich result (HowTo since September 2023, FAQPage since May 2026)
 - BreadcrumbList schema for navigation and hierarchy
 - LocalBusiness, Product, and NewsArticle schemas for specific content types
-- Schema must match visible content exactly; penalized if mismatch occurs
+- Schema must match visible content exactly; mismatched schema is a trust signal search engines penalize
 
 Search-augmented AI systems retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Treat it as an extraction aid and search-quality signal, not as a guarantee that a page will appear in generated answers.
 
@@ -24,7 +24,7 @@ Set a descriptive page title, the document language (`html lang`), and a canonic
 
 JSON-LD embeds structured data in a separate `` `<script>` `` block rather than wrapping HTML elements in microdata attributes. For AI agents, this is the preferable format:
 
-- No HTML parsing required — the agent reads the JSON directly
+- No HTML parsing required - the agent reads the JSON directly
 - The data model is explicit and fully typed
 - Google recommends JSON-LD for structured data because it does not require annotating visible HTML
 - Multiple schemas can coexist in the same page without interference
@@ -33,11 +33,11 @@ The practical benefit is extraction reliability: agents can read named fields in
 
 ## The Fundamental Rule
 
-JSON-LD must exactly match the visible content on the page. If your FAQ schema contains a question-and-answer pair that does not appear in the page body, search engines will penalize the page and agents may distrust all structured data from your domain. The schema is a machine-readable version of the page — not a supplement to it.
+JSON-LD must exactly match the visible content on the page. If your FAQ schema contains a question-and-answer pair that does not appear in the page body, search engines will penalize the page and agents may distrust all structured data from your domain. The schema is a machine-readable version of the page.
 
 ## FAQPage
 
-Use `FAQPage` for any content structured as questions and answers: FAQ sections, definition pages, policy explanations, troubleshooting guides.
+Use `FAQPage` for any content structured as questions and answers: FAQ sections, definition pages, policy explanations, troubleshooting guides. Google removed FAQ rich results from Search in May 2026, so this schema no longer earns Google's rich-result presentation. Keep it anyway: it is still valid Schema.org markup, and agents and other parsers that read JSON-LD directly still benefit from question-and-answer content marked up explicitly rather than left to prose inference.
 
 ```html
 <script type="application/ld+json">
@@ -78,7 +78,7 @@ The `name` field should be the exact heading text of the question as it appears 
 
 ## HowTo
 
-Use `HowTo` for procedural content: setup guides, integration walkthroughs, step-by-step tutorials.
+Use `HowTo` for procedural content: setup guides, integration walkthroughs, step-by-step tutorials. Google removed `HowTo` rich results from Search in September 2023; do not expect a Google rich result from this schema. Keep it for agents and other parsers that read structured step data directly.
 
 ```html
 <script type="application/ld+json">
@@ -165,7 +165,7 @@ Use `TechArticle` for technical documentation pages: API reference pages, concep
 </script>
 ```
 
-`proficiencyLevel` accepts: `Beginner`, `Expert`. `dateModified` is more important than `datePublished` for agent trust — agents use modification date to assess whether documentation is current.
+`proficiencyLevel` accepts: `Beginner`, `Expert`. `dateModified` is more important than `datePublished` for agent trust - agents use modification date to assess whether documentation is current.
 
 ## SoftwareApplication
 
@@ -253,7 +253,7 @@ A single page can carry multiple schema types. A page that is both an API overvi
 </script>
 ```
 
-Use `@graph` when combining schemas. Do not use multiple `` `<script>` `` tags with competing `@context` declarations — this is valid JSON-LD but some parsers mishandle it.
+Use `@graph` when combining schemas. Do not use multiple `` `<script>` `` tags with competing `@context` declarations - this is valid JSON-LD but some parsers mishandle it.
 
 ## Implementing in Next.js
 
@@ -306,9 +306,9 @@ The `schema-dts` package provides TypeScript types for all Schema.org types, cat
 
 Test structured data before deploying:
 
-- **Google Rich Results Test** — `search.google.com/test/rich-results` — validates whether Google can process your schema and whether it qualifies for rich results
-- **Schema.org Validator** — `validator.schema.org` — validates against the full Schema.org specification, including fields outside Google's subset
-- **JSON-LD Playground** — `json-ld.org/playground` — useful for debugging `@context` and `@graph` issues
+- **Google Rich Results Test** - `search.google.com/test/rich-results` - validates whether Google can process your schema and whether it qualifies for rich results. It no longer covers `FAQPage` (Google dropped the rich result itself on 7 May 2026, with Rich Results Test support following in June 2026) or `HowTo` (removed September 2023); use it for the schema types Google still surfaces, and the Schema.org Validator for FAQPage and HowTo.
+- **Schema.org Validator** - `validator.schema.org` - validates against the full Schema.org specification, including fields outside Google's subset
+- **JSON-LD Playground** - `json-ld.org/playground` - useful for debugging `@context` and `@graph` issues
 
 ## External identity evidence
 

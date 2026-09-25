@@ -8,6 +8,7 @@
     "scorecard-format",
     "delta-scorecard",
     "clustering",
-    "calibration"
+    "calibration",
+    "public-scanners"
   ]
 }

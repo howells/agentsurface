@@ -1,6 +1,7 @@
 ---
 title: Evaluating Product Journeys
 description: Assess whether an agent can discover a product, make an informed choice, act with permission, and verify the result
+lastVerified: 2026-09-25
 ---
 
 Start an audit with a task someone actually wants completed. An agent may need to find a suitable product, compare its terms, obtain permission, perform an action, and report what happened. Agent Surface evaluates the surfaces that support that journey together, using the existing [scoring dimensions](/docs/scoring/rubric).
@@ -31,7 +32,9 @@ For API journeys, verify response schemas, collection traversal, durable job sta
 
 Identify whose resources are being accessed and who is permitted to authorize the action. Public reads may need no credentials. User-delegated access requires a supported consent and credential flow; service-owned access has its own identity boundary. Verify insufficient permissions, expired credentials, and attempts to access another user's resource. Use [authentication guidance](/docs/authentication) for the implemented flow.
 
-For a purchase, distinguish selecting an offer, preparing a cart, authorizing spend, settling payment, and confirming the order. Present the final amount, currency, merchant, and relevant terms before commitment. A successful payment is not necessarily successful fulfillment. Select [payment protocols](/docs/protocols/agentic-commerce) based on real client and provider support.
+A full purchase journey has six stages, and each is a separate check: find a product, check its price and availability, check out, pay, track the order, and return it if needed. [Agentic Commerce](/docs/agentic-commerce) covers each stage in detail - use it as the reference material behind this section rather than duplicating it here.
+
+For a purchase, distinguish selecting an offer, preparing a cart, authorizing spend, settling payment, and confirming the order. Present the final amount, currency, merchant, and relevant terms before commitment. A successful payment is not necessarily successful fulfillment - see [Orders and After Purchase](/docs/agentic-commerce/orders-and-after-purchase) for verifying fulfilment, tracking, and returns separately from the payment step. Select [checkout and payment protocols](/docs/agentic-commerce/payments) based on real client and provider support.
 
 ## Recover without guessing or repeating effects
 
@@ -50,7 +53,7 @@ Use an isolated test environment for consequential flows when available, and sta
 | Finding                                                                     | Primary Surface dimension                                                       |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | A caller cannot locate the right entry point or identify the product        | Discovery & AEO                                                                 |
-| Relevant prices, availability, or source facts cannot be retrieved reliably | Data Retrievability                                                             |
+| Relevant prices, availability, or source facts cannot be retrieved reliably | Retrievability                                                                  |
 | An operation's inputs, result, continuation, or lifecycle are unclear       | API Surface, CLI Design, MCP Server, or Tool Design, according to the interface |
 | The acting identity cannot obtain or stay within the right permissions      | Authentication                                                                  |
 | Failure or interruption leaves the caller without a safe next step          | Error Handling                                                                  |

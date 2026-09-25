@@ -1,6 +1,7 @@
 ---
 title: Tool Design
 description: Principles for defining tools that agents select correctly and execute reliably
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -13,18 +14,18 @@ Tool Design is the behavior contract for model-callable actions across framework
 
 ## Start Here
 
-- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) — write tool names and descriptions that disambiguate intent.
-- [Schemas](/docs/tool-design/schemas) — keep inputs and outputs typed, constrained, and model-legible.
-- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) — separate read, write, and destructive operations.
-- [Tool Curation](/docs/tool-design/tool-curation) — expose the smallest useful tool set per task or agent.
-- [Cross-Framework Portability](/docs/tool-design/cross-framework-portability) — define once and adapt to MCP, AI SDK, OpenAI, and other runtimes.
-- [Token Budget](/docs/tool-design/token-budget) — keep tool output useful without flooding context.
-- [Anti-Patterns](/docs/tool-design/anti-patterns) — spot vague, unsafe, or expensive tool definitions.
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - write tool names and descriptions that disambiguate intent.
+- [Schemas](/docs/tool-design/schemas) - keep inputs and outputs typed, constrained, and model-legible.
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - separate read, write, and destructive operations; annotation presets and the draft-then-confirm pattern.
+- [Human Approval](/docs/tool-design/human-approval) - the approval contract a tool exposes so an agent can request, wait for, and confirm human sign-off.
+- [Tool Curation](/docs/tool-design/tool-curation) - expose the smallest useful tool set per task or agent; sprawl prevention and dynamic selection.
+- [Cross-Framework Portability](/docs/tool-design/cross-framework-portability) - define once and adapt to MCP, AI SDK, OpenAI, and other runtimes.
+- [Token Budget](/docs/tool-design/token-budget) - keep tool output useful without flooding context.
+- [Anti-Patterns](/docs/tool-design/anti-patterns) - spot vague, unsafe, or expensive tool definitions.
 
 ## Related
 
-- [Cookbook: Tool Annotations](/docs/cookbook/tool-annotations) — shared read/write/destructive taxonomy.
-- [Cookbook: Semantic Tool Selection](/docs/cookbook/semantic-tool-selection) — dynamic selection for large registries.
-- [API Surface: Tool Definitions](/docs/api-surface/tool-definitions) — generated tools from HTTP APIs.
-- [MCP Server Tool Best Practices](/docs/mcp-servers/tool-best-practices) — MCP-specific tool implementation guidance.
-- [Error Handling: Idempotency](/docs/error-handling/idempotency) — retry-safe writes and idempotency keys.
+- [API Surface: Tool Definitions](/docs/api-surface/tool-definitions) - generated tools from HTTP APIs.
+- [MCP Server Tool Best Practices](/docs/mcp-servers/tool-best-practices) - MCP-specific tool implementation guidance.
+- [MCP Server Annotations](/docs/mcp-servers/annotations) - canonical semantics of the four MCP behavioral hints.
+- [Error Handling: Idempotency](/docs/error-handling/idempotency) - retry-safe writes and idempotency keys.

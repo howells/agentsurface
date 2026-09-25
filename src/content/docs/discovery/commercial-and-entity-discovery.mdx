@@ -1,7 +1,7 @@
 ---
 title: Commercial and Entity Discovery
 description: Publish accurate pricing, identity, and task guidance without inventing external authority
-lastVerified: 2026-09-10
+lastVerified: 2026-09-25
 ---
 
 An agent needs to establish what you sell, who operates it, when it fits a task, and what it costs. These facts should agree across visible pages, structured data, Markdown, repositories, and listings.
@@ -16,28 +16,21 @@ For `llms.txt`, split large product families into section-level indexes only whe
 
 ## Product-page structured data for shopping agents
 
-A shopping agent reads a product page the same way a search crawler does: only the parts that are machine-parsable. Mark up every purchasable product with `schema.org/Product` and a nested `Offer` (not `AggregateOffer` - merchant listing eligibility requires a single `Offer` per purchasable URL).
+Product and Offer structured data, merchant feeds, and catalog APIs for shopping agents now live in [Product Data for Shopping Agents](/docs/agentic-commerce/product-data), part of the [Agentic Commerce](/docs/agentic-commerce) section. This page covers organisation and entity identity; see that section for anything a shopping agent reads before or during checkout.
 
-Required on the `Offer`:
-
-- `price` (a number greater than zero) and `priceCurrency` (ISO 4217), or `priceSpecification` in place of both
-- `availability` (`InStock`, `OutOfStock`, `PreOrder`, and so on)
-
-Strongly recommended:
-
-- Identifiers: `sku`, one of `gtin`/`gtin8`/`gtin12`/`gtin13`/`gtin14`, `mpn`, and `brand`
-- `shippingDetails` (`OfferShippingDetails`) for shipping cost and delivery estimate
-- `hasMerchantReturnPolicy` (`MerchantReturnPolicy`) for the return window and terms
-- `aggregateRating` and `review` where real reviews exist
-- For variants (size, color, and so on), `ProductGroup` with `hasVariant` linking the individual `Product` entries, or `isVariantOf` / `inProductGroupWithID` on each variant
-
-This is Google's merchant-listing structured data requirement set; see [Merchant listing structured data](https://developers.google.com/search/docs/appearance/structured-data/merchant-listing) for the full property list and validation rules. Shopify's [agentic readiness product-page audit](https://www.shopify.com/agentic-readiness) checks a live product page against comparable structured-data, real-time pricing accuracy, and trust-signal criteria and is a useful second check specifically for a commerce storefront.
-
-Keep the purchase surface itself discoverable: a stable `/pricing` page (see above) and `Offer` data that points at the actual buy page, not a marketing page. The `payment` link relation (`rel="payment"`) is registered in the [IANA link relations registry](https://www.iana.org/assignments/link-relations/link-relations.xhtml) under RFC 8288 as "a resource where payment is accepted." It predates agentic commerce, is not required by UCP, AP2, ACP, or x402 (see [Agentic Commerce Protocols](/docs/protocols/agentic-commerce)), and sees little real-world use - treat it as an optional, documented signal rather than something to implement for agent readiness.
+Keep the purchase surface itself discoverable: a stable `/pricing` page (see above) and `Offer` data that points at the actual buy page, not a marketing page. The `payment` link relation (`rel="payment"`) is registered in the [IANA link relations registry](https://www.iana.org/assignments/link-relations/link-relations.xhtml) under RFC 8288 as "a resource where payment is accepted." It predates agentic commerce, is not required by UCP, AP2, ACP, or x402 (see [Payments](/docs/agentic-commerce/payments)), and sees little real-world use - treat it as an optional, documented signal rather than something to implement for agent readiness.
 
 ## Entity identity and independent coverage
 
 Use stable Organization identifiers and [JSON-LD](/docs/discovery/structured-data). Add `sameAs` only for pages representing the same entity; a press article mentioning a company is not necessarily an equivalent identity. Keep names, official URLs, real contact details, and ownership consistent. Publish useful About, Contact, and Privacy pages; do not add fictional addresses, ratings, or testimonials to broaden schema coverage.
+
+## Status page and agent terms of use
+
+Two more trust signals have no formal spec behind them but real practical value once an agent starts operating unattended.
+
+A public **status page** (a dedicated `/status` path or a third-party status service) tells an agent whether an API failure is your problem or theirs before it decides to retry, back off, or give up. Link it from your API Catalog entry and from error responses where practical, not just from a marketing footer.
+
+**Agent terms of use** - a published policy stating what automated or agentic use of the product is actually permitted (which endpoints may be called unattended, whether scraping the marketing site is fine but reselling scraped data isn't, what counts as abuse) - has no IETF or W3C standard behind it. It's a legal-practice recommendation, not a spec-backed check. Publish it as its own page (not buried inside general Terms of Service) and link it from `llms.txt` and your API docs so an agent - or the person operating it - can find the actual rules instead of guessing from `robots.txt` alone, which only ever states a crawl preference, not a usage licence.
 
 Wikipedia requires significant independent, reliable coverage for organizations. Wikidata has separate eligibility rules; a Wikipedia article is not its only possible qualification. Check both policies before drafting. If an eligible Wikidata entity exists, verify it is the right entity and use P856 for its official website. Do not create duplicates or promotional articles for score improvement. Sources: [Wikipedia organization notability](<https://en.wikipedia.org/wiki/Wikipedia:Notability_(organizations_and_companies)>), [Wikidata notability](https://www.wikidata.org/wiki/Wikidata:Notability), [P856](https://www.wikidata.org/wiki/Property:P856).
 

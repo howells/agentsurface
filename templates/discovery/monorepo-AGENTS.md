@@ -1,5 +1,5 @@
 <!--
-monorepo-AGENTS.md — Hierarchical context file pattern for pnpm/Turbo monorepos.
+monorepo-AGENTS.md - Hierarchical context file pattern for pnpm/Turbo monorepos.
 
 What: A template showing how to structure AGENTS.md across multiple packages while avoiding
 duplication. Root AGENTS.md provides commands + global boundaries; per-package AGENTS.md files
@@ -12,7 +12,7 @@ What to customize:
 2. Per-package: Copy the pattern to each packages/X/AGENTS.md, customize per package
 3. Update package.json entries and filter examples to match your workspace
 
-Principle: "Nearest wins" — an agent reading packages/api/AGENTS.md will prioritize
+Principle: "Nearest wins" - an agent reading packages/api/AGENTS.md will prioritize
 its commands over the root file. Avoid duplication; link from per-package back to root.
 
 Citation: https://code.claude.com/docs/en/memory
@@ -109,11 +109,11 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 
 ## See also
 
-- `packages/sdk/AGENTS.md` — SDK-specific setup, exports, testing
-- `packages/api/AGENTS.md` — API server routes, database, environment
-- `packages/dashboard/AGENTS.md` — Next.js build, TypeScript paths, export strategy
-- `docs/ARCHITECTURE.md` — Cross-package dataflow
-- `CONTRIBUTING.md` — Pull request process (includes changesets walkthrough)
+- `packages/sdk/AGENTS.md` - SDK-specific setup, exports, testing
+- `packages/api/AGENTS.md` - API server routes, database, environment
+- `packages/dashboard/AGENTS.md` - Next.js build, TypeScript paths, export strategy
+- `docs/ARCHITECTURE.md` - Cross-package dataflow
+- `CONTRIBUTING.md` - Pull request process (includes changesets walkthrough)
 
 ## Links
 
@@ -225,8 +225,8 @@ Test with: `pnpm --filter=@acme/sdk test` after shared updates.
 ## See also
 
 - Root AGENTS.md (global commands, version workflow)
-- `docs/api/sdk.md` — Public API reference
-- `src/agent.ts` — Agent class implementation
+- `docs/api/sdk.md` - Public API reference
+- `src/agent.ts` - Agent class implementation
 
 ````
 
@@ -340,8 +340,8 @@ changes require coordination with dashboard team.
 ## See also
 
 - Root AGENTS.md
-- `docs/api/routes.md` — REST endpoint reference
-- `docs/ARCHITECTURE.md` — API dataflow + agent integration points
+- `docs/api/routes.md` - REST endpoint reference
+- `docs/ARCHITECTURE.md` - API dataflow + agent integration points
 
 ````
 
@@ -453,16 +453,16 @@ See `app/layout.tsx` for implementation pattern.
 
 ## Key dependencies
 
-- `@acme/sdk` — Agent definitions + tool schemas
-- `@acme/shared` — Type exports
+- `@acme/sdk` - Agent definitions + tool schemas
+- `@acme/shared` - Type exports
 - API runs at `NEXT_PUBLIC_API_URL` (environment variable)
 
 ## See also
 
 - Root AGENTS.md
-- `docs/api/dashboard.md` — Routes + endpoints
-- `app/layout.tsx` — JSON-LD implementation
-- `app/docs/[slug]/page.tsx` — Content negotiation pattern
+- `docs/api/dashboard.md` - Routes + endpoints
+- `app/layout.tsx` - JSON-LD implementation
+- `app/docs/[slug]/page.tsx` - Content negotiation pattern
 
 ```
 

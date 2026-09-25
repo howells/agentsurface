@@ -1,6 +1,7 @@
 ---
 title: Token Exchange
 description: RFC 8693 narrowing scope and delegation for sub-agents
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -26,14 +27,14 @@ Sub-Agent (scoped token)
 
 An orchestrator agent holds a broad token: `invoices:read invoices:write customers:read`. Before calling a sub-agent or passing control to a downstream service, the orchestrator should exchange that broad token for a narrower, audience-restricted token. RFC 8693 Token Exchange enables this: a single OAuth endpoint that accepts a subject token and returns a new token with reduced scope, different audience, or delegated actor chain.
 
-Token Exchange prevents token amplification — a downstream service cannot take the token it receives and use it beyond its intended scope.
+Token Exchange prevents token amplification - a downstream service cannot take the token it receives and use it beyond its intended scope.
 
 ## The Exchange Request
 
 The orchestrator POSTs to the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`:
 
 ```bash
-curl -X POST https://auth.example.com/token \
+curl -X POST https://auth.example.com/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
   -d "subject_token=eyJhbGciOiJSUzI1NiI..." \
@@ -47,13 +48,13 @@ curl -X POST https://auth.example.com/token \
 
 Parameters:
 
-- `subject_token` — the original token (the user's authority or the orchestrator's token)
-- `subject_token_type` — type of the subject token (usually `urn:ietf:params:oauth:token-type:jwt`)
-- `actor_token` — optional; the agent acting on behalf of the subject (for delegation chains)
-- `actor_token_type` — type of the actor token
-- `requested_token_type` — type of token to return (usually `urn:ietf:params:oauth:token-type:jwt`)
-- `audience` — the service that will consume the new token
-- `scope` — the scopes to include in the new token (must be a subset of subject token's scopes)
+- `subject_token` - the original token (the user's authority or the orchestrator's token)
+- `subject_token_type` - type of the subject token (usually `urn:ietf:params:oauth:token-type:jwt`)
+- `actor_token` - optional; the agent acting on behalf of the subject (for delegation chains)
+- `actor_token_type` - type of the actor token
+- `requested_token_type` - type of token to return (usually `urn:ietf:params:oauth:token-type:jwt`)
+- `audience` - the service that will consume the new token
+- `scope` - the scopes to include in the new token (must be a subset of subject token's scopes)
 
 The server returns a new access token:
 
@@ -76,21 +77,21 @@ An orchestrator agent calls a sub-agent to summarize invoices. The orchestrator 
 ```typescript
 async function delegateToSubAgent(
   orchestratorToken: string,
-  subAgentId: string,
+  subAgentToken: string,
   downstreamServiceUri: string,
 ): Promise<string> {
   const form = new URLSearchParams({
     grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: orchestratorToken,
     subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    actor_token: subAgentId,
+    actor_token: subAgentToken,
     actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
     requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
     audience: downstreamServiceUri,
     scope: "invoices:read",
   });
 
-  const res = await fetch("https://auth.example.com/token", {
+  const res = await fetch("https://auth.example.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
@@ -106,15 +107,15 @@ async function delegateToSubAgent(
 }
 
 // Orchestrator calls sub-agent
-const subAgentToken = await delegateToSubAgent(
+const delegatedToken = await delegateToSubAgent(
   orchestratorToken,
-  "sub-agent-summarize",
+  subAgentSelfSignedToken, // a security token identifying "sub-agent-summarize", not a bare ID
   "https://invoices-service.example.com/",
 );
 
 // Sub-agent makes request with the narrowed token
 const res = await fetch("https://invoices-service.example.com/invoices", {
-  headers: { Authorization: `Bearer ${subAgentToken}` },
+  headers: { Authorization: `Bearer ${delegatedToken}` },
 });
 ```
 
@@ -134,7 +135,7 @@ Use Token Exchange when the agent already has a valid subject token or delegatio
 ```typescript
 async function exchangeForDelegatedAccess(
   userToken: string,
-  agentId: string,
+  agentToken: string,
   audience: string,
   scope: string[],
 ): Promise<string> {
@@ -142,14 +143,14 @@ async function exchangeForDelegatedAccess(
     grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: userToken,
     subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    actor_token: agentId,
+    actor_token: agentToken,
     actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
     requested_token_type: "urn:ietf:params:oauth:token-type:jwt",
     audience: audience,
     scope: scope.join(" "),
   });
 
-  const res = await fetch("https://auth.example.com/token", {
+  const res = await fetch("https://auth.example.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
@@ -163,7 +164,7 @@ async function exchangeForDelegatedAccess(
 // User authorizes agent
 const delegatedToken = await exchangeForDelegatedAccess(
   userJwt,
-  "agent-process-invoices",
+  agentSelfSignedToken, // a security token identifying "agent-process-invoices", not a bare ID
   "https://invoices-service.example.com/",
   ["invoices:read"],
 );
@@ -202,7 +203,7 @@ async function validateDelegatedToken(token: string) {
   // Verify subject (user)
   const userId = payload.sub;
 
-  // Verify actor (agent) — included via the `act` claim
+  // Verify actor (agent) - included via the `act` claim
   const actorId = (payload.act as any)?.sub || payload.azp;
 
   // Log both for audit
@@ -298,8 +299,8 @@ async function handleTokenExchange(req: Request) {
 
 ## See Also
 
-- [Agent Identity](/docs/authentication/agent-identity) — actor chains and audit logging
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) — token issuance and caching
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) — advertising token exchange support
-- [auth.md](/docs/authentication/auth-md) — registering or claiming user-bound credentials before delegation
-- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — full specification
+- [Agent Identity](/docs/authentication/agent-identity) - actor chains and audit logging
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - token issuance and caching
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) - advertising token exchange support
+- [auth.md](/docs/authentication/auth-md) - registering or claiming user-bound credentials before delegation
+- [RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693) - full specification

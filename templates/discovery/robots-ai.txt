@@ -1,4 +1,4 @@
-# robots.txt — AI crawler policy
+# robots.txt - AI crawler policy
 #
 # Spec: https://agents.md (Robots.txt for AI section)
 # Content Signals: https://contentsignals.org
@@ -11,7 +11,7 @@
 #   - Bytespider (ByteDance): https://www.bytedance.com
 #
 # DEFAULT POSTURE: allow search and retrieval bots, block model-training crawlers.
-# This is the recommended starting point — it keeps your docs discoverable and
+# This is the recommended starting point - it keeps your docs discoverable and
 # citable in AI answers without donating them to training corpora. If your project
 # wants training visibility instead, see "TRAINING-VISIBLE ALTERNATIVE" below.
 #
@@ -22,9 +22,15 @@
 # Content Signals are a machine-readable statement of intent that sits alongside
 # robots.txt rules. Declare them first so crawlers that honour the convention see
 # your policy even if they ignore individual user-agent blocks.
-#   search    — may index for search results
-#   ai-input  — may retrieve at inference time to ground an answer
-#   ai-train  — may be used as model training data
+#   search - may index for search results
+#   ai-input - may retrieve at inference time to ground an answer
+#   ai-train - may be used as model training data
+#
+# These three map directly onto how Cloudflare classifies AI bot traffic:
+# Search (indexes content to answer questions later), Agent (acts in real time
+# on a person's behalf - chat fetch bots, browser-use agents), and Training
+# (crawls to train or fine-tune a model). The three sections below - search
+# bots, user-agent bots, training bots - follow that same split.
 # ---------------------------------------------------------------------------
 User-agent: *
 Content-Signal: search=yes, ai-input=yes, ai-train=no
@@ -45,7 +51,7 @@ Allow: /AGENTS.md
 # Longest-match precedence lets this Allow win for /.well-known/ paths.
 Allow: /.well-known/
 
-# Search bots (real-time search indexing) — allowed
+# Search bots (real-time search indexing) - allowed
 User-agent: OAI-SearchBot
 Disallow: /admin
 Disallow: /private
@@ -69,7 +75,7 @@ User-agent: ChatGPT-User
 User-agent: Claude-User
 # No restrictive rules; these obey user authentication
 
-# Training bots (model training data collection) — blocked by default
+# Training bots (model training data collection) - blocked by default
 User-agent: GPTBot
 Disallow: /
 

@@ -95,7 +95,8 @@ for (const dir of docsDirs) {
 for (const metaFile of metaFiles) {
   const dir = path.dirname(metaFile);
   const meta = JSON.parse(fs.readFileSync(metaFile, "utf-8"));
-  const entries = (meta.pages ?? []).filter((page) => page !== "---");
+  // Separators ("---" or "---Label---") are navigation headings, not pages.
+  const entries = (meta.pages ?? []).filter((page) => !/^---(?:.*---)?$/.test(page));
   const siblings = fs.readdirSync(dir, { withFileTypes: true });
   const expected = new Set();
 
@@ -232,76 +233,72 @@ for (const file of modelScanFiles) {
   }
 }
 
+// Bare Anthropic role-alias and prose check.
+//
+// The claude-* regex above only catches fully-qualified IDs. Two Anthropic-
+// specific shapes still slip through: bare role aliases used in code or
+// config without the "claude-" prefix (`opus-4-7`, `sonnet-4-6`) and prose
+// mentions of a role name and version (`Opus 4.8`). Both share one shape —
+// a role name, a separator, then a dot/dash-joined version — so one regex
+// and one allowlist (derived from models.mdx's claude-prefixed IDs, prefix
+// stripped) cover both.
+//
+// False-positive guards:
+// - A bare role word with no trailing version digit never matches, so
+//   ordinary prose ("the Opus family", "a magnum opus") is untouched.
+// - A version whose leading segment is "0" is skipped: Anthropic has never
+//   shipped a 0.x release, and "0.NN" here is almost always a score or
+//   percentage sitting next to a role name in prose (e.g. "Haiku 0.72 →
+//   Opus 0.89" grading output), not a model reference.
+const ROLE_ALIAS = /\b(opus|sonnet|haiku|fable)[ -](\d+(?:[.-]\d+)*)\b/gi;
+
+const roleAllowlist = new Set();
+for (const id of modelAllowlist) {
+  if (id.startsWith("claude-")) {
+    roleAllowlist.add(id.slice("claude-".length));
+  }
+}
+
+for (const file of modelScanFiles) {
+  const content = fs.readFileSync(file, "utf-8");
+  for (const match of content.matchAll(ROLE_ALIAS)) {
+    const role = match[1].toLowerCase();
+    const rawVersion = match[2];
+    if (rawVersion.split(/[.-]/)[0] === "0") {
+      continue;
+    }
+    const normalized = `${role}-${rawVersion.replaceAll(".", "-")}`;
+    if (roleAllowlist.has(normalized)) {
+      continue;
+    }
+    const line = content.slice(0, match.index).split("\n").length;
+    modelIssues.push(
+      `${path.relative(repoRoot, file)}:${line} — superseded or unknown Anthropic model reference: ${match[0]}`,
+    );
+  }
+}
+
 // lastVerified freshness check.
 //
-// Docs carry an optional `lastVerified: YYYY-MM-DD` frontmatter stamp. Two rules:
-//   (a) STALE — any page with a stamp older than STALE_AFTER_DAYS is flagged so
-//       the content gets re-checked against upstream reality.
-//   (b) FAST_DECAY — pages whose subject matter changes quickly (models, MCP
-//       server patterns, discovery/retrieval mechanics, protocols, the tooling
-//       catalog) are REQUIRED to carry a stamp. A missing stamp is flagged.
+// Every page carries a `lastVerified: YYYY-MM-DD` frontmatter stamp, set when
+// its content was last checked against upstream reality. Two rules:
+//   (a) MISSING — a page without a stamp always fails.
+//   (b) STALE — a stamp older than STALE_AFTER_DAYS is flagged so the page
+//       gets re-checked.
 const STALE_AFTER_DAYS = 120;
 
-// --no-freshness demotes freshness findings to warnings instead of failures.
+// --no-freshness demotes staleness findings to warnings instead of failures.
 // The build gate uses it so a page aging past the staleness window can never
-// fail an unrelated deploy; the standalone `pnpm audit:docs-freshness` keeps freshness
-// fatal as the re-verification cadence signal.
+// fail an unrelated deploy; the standalone `pnpm audit:docs-freshness` keeps
+// staleness fatal as the re-verification cadence signal. A missing stamp is
+// always fatal.
 const freshnessFatal = !process.argv.includes("--no-freshness");
-
-// Directory entries ending in "/*" expand to every .mdx page in that directory.
-const FAST_DECAY = [
-  "mcp-servers/real-world-examples",
-  "mcp-servers/nextjs-integration",
-  "discovery/well-known-endpoints",
-  "discovery/agent-skills",
-  "discovery/structured-data",
-  "discovery/robots-txt",
-  "discovery/llms-txt",
-  "data-retrievability/embeddings",
-  "data-retrievability/multimodal-embeddings",
-  "data-retrievability/vector-databases",
-  "data-retrievability/index",
-  "agents/anthropic-platform",
-  "agents/runtime-guardrails",
-  "agents/sandboxes-and-workspaces",
-  "cookbook/code-execution",
-  "testing/observability",
-  "testing/promptfoo",
-  "authentication/auth-md",
-  "authentication/agent-identity",
-  "reference-links/models",
-  "runtime-boundaries/durable-execution",
-  "agentic-ui/mcp-apps",
-  "agentic-ui/session-control",
-  "protocols/*",
-  "tooling-catalog/*",
-];
 
 function docSlug(file) {
   return path
     .relative(docsRoot, file)
     .replaceAll(path.sep, "/")
     .replace(/\.mdx$/, "");
-}
-
-function expandFastDecay(patterns) {
-  const slugs = new Set();
-  for (const pattern of patterns) {
-    if (pattern.endsWith("/*")) {
-      const dir = path.join(docsRoot, pattern.slice(0, -2));
-      if (!fs.existsSync(dir)) {
-        continue;
-      }
-      for (const entry of fs.readdirSync(dir)) {
-        if (entry.endsWith(".mdx")) {
-          slugs.add(`${pattern.slice(0, -2)}/${entry.replace(/\.mdx$/, "")}`);
-        }
-      }
-    } else {
-      slugs.add(pattern);
-    }
-  }
-  return slugs;
 }
 
 function parseLastVerified(content) {
@@ -313,9 +310,8 @@ function parseLastVerified(content) {
   return lineMatch ? lineMatch[1] : null;
 }
 
-const fastDecaySlugs = expandFastDecay(FAST_DECAY);
-const stampedSlugs = new Set();
 const freshnessIssues = [];
+const stampIssues = [];
 const today = new Date();
 
 for (const file of mdxFiles) {
@@ -323,20 +319,15 @@ for (const file of mdxFiles) {
   const lastVerified = parseLastVerified(content);
   const slug = docSlug(file);
 
-  if (lastVerified) {
-    stampedSlugs.add(slug);
+  if (!lastVerified) {
+    stampIssues.push(`${path.relative(repoRoot, file)} — missing lastVerified`);
+  } else {
     const ageDays = Math.floor((today - new Date(`${lastVerified}T00:00:00Z`)) / 86_400_000);
     if (ageDays > STALE_AFTER_DAYS) {
       freshnessIssues.push(
         `${path.relative(repoRoot, file)} — stale lastVerified (${lastVerified}, ${ageDays} days)`,
       );
     }
-  }
-}
-
-for (const slug of [...fastDecaySlugs].toSorted()) {
-  if (!stampedSlugs.has(slug)) {
-    freshnessIssues.push(`${slug}.mdx — missing lastVerified (required fast-decay page)`);
   }
 }
 
@@ -486,12 +477,67 @@ if (fs.existsSync(agentSkillsIndexPath)) {
   }
 }
 
+// Retired sections check.
+//
+// These docs sections were removed outright, with no redirects. Any reference
+// to them in the docs, the skill, templates, the app or the public metadata is
+// a dead link, including absolute agentsurface.dev URLs the link check skips.
+const RETIRED_ROUTES = [
+  "agents/anthropic-platform",
+  "agents/browser-access",
+  "agents/design-principles",
+  "agents/framework-selection",
+  "agents/openai-platform",
+  "agents/runtime-guardrails",
+  "agents/sandboxes-and-workspaces",
+  "cookbook",
+  "data-retrievability",
+  "multi-agent",
+  "protocols/acp",
+  "protocols/agentic-commerce",
+  "protocols/mpp",
+  "runtime-boundaries",
+  "reference-links/docs-coverage-audit",
+];
+const retiredPattern = new RegExp(
+  `/docs/(${RETIRED_ROUTES.map((route) => route.replaceAll("/", "\\/")).join("|")})(?=[/#)"'\\s\`,]|$)`,
+  "gm",
+);
+const retiredScanRoots = [
+  "src",
+  "skills",
+  "templates",
+  "public",
+  "docs/research",
+  "README.md",
+  "INSTALL.md",
+].map((entry) => path.join(repoRoot, entry));
+const retiredIssues = [];
+for (const root of retiredScanRoots) {
+  if (!fs.existsSync(root)) {
+    continue;
+  }
+  const files = fs.statSync(root).isDirectory() ? walk(root) : [root];
+  for (const file of files) {
+    if (!/\.(mdx?|tsx?|json|ya?ml|txt)$/.test(file)) {
+      continue;
+    }
+    const content = fs.readFileSync(file, "utf-8");
+    for (const match of content.matchAll(retiredPattern)) {
+      const line = content.slice(0, match.index).split("\n").length;
+      retiredIssues.push(`${path.relative(repoRoot, file)}:${line} — ${match[0]}`);
+    }
+  }
+}
+
 if (
   linkIssues.length === 0 &&
   metaIssues.length === 0 &&
   templateIssues.length === 0 &&
   modelIssues.length === 0 &&
   (freshnessIssues.length === 0 || !freshnessFatal) &&
+  stampIssues.length === 0 &&
+  retiredIssues.length === 0 &&
   versionIssues.length === 0 &&
   agentSkillsIssues.length === 0
 ) {
@@ -536,6 +582,20 @@ if (modelIssues.length > 0) {
 if (freshnessIssues.length > 0) {
   console.error("Docs freshness (lastVerified) issues:");
   for (const issue of freshnessIssues) {
+    console.error(`- ${issue}`);
+  }
+}
+
+if (stampIssues.length > 0) {
+  console.error("Pages missing a lastVerified stamp:");
+  for (const issue of stampIssues) {
+    console.error(`- ${issue}`);
+  }
+}
+
+if (retiredIssues.length > 0) {
+  console.error("References to retired docs sections:");
+  for (const issue of retiredIssues) {
     console.error(`- ${issue}`);
   }
 }

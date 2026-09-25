@@ -1,0 +1,54 @@
+---
+title: Code Execution as a Consumption Model
+description: How an agent consumes your MCP server by writing code against it instead of chaining tool calls, and what that implies for server design.
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+A discrete tool call is a full round-trip through the model's context: every tool definition sits in the prompt on every turn, and every intermediate result - the full response, not the one field needed - flows back through the model before the next call. For a server with a broad tool surface, or a task that chains many calls, this dominates the token bill. Code execution inverts the economics: the agent writes one script against your tools, a sandbox runs it, and the model sees only the shaped result.
+
+- The MCP server is unchanged; the model now writes a script that calls the tools turn by turn.
+- Your tool definitions become an importable library. Names, schemas, and descriptions still matter; they are now function signatures, not just prompt text.
+- Generated code is untrusted and must run in a [sandbox](/docs/agents/browser-and-sandboxes) - this pattern has no safe non-sandboxed form.
+- Annotations and idempotency still matter, arguably more: a script can retry or loop over a call in ways a single model turn would not.
+
+## The Pattern
+
+Instead of exposing each MCP tool as something the model calls directly on every turn, generate a typed library from your tool definitions and let the agent write a script that imports it. The script does its own filtering, joining, and looping in ordinary code; the runtime executes it; the model sees only what the script printed or returned. Cloudflare ("Code Mode"), Anthropic (code execution with MCP), and Mastra (code mode) each arrived at this shape independently - the pattern is vendor-neutral.
+
+An MCP server already describes its tools with names, schemas, and descriptions, so this mapping is direct: MCP tools become importable functions the script calls, rather than model-visible tools the model selects between one at a time. Cloudflare reports a representative multi-call task falling from roughly 1.17 million tokens to about 1,000 when the agent wrote one script instead of chaining the equivalent tool calls - a vendor benchmark on a specific broad, loop-heavy workload, not a general result. A task that makes two calls and returns a small payload sees little benefit.
+
+## When It Wins
+
+- **Broad tool surfaces** - dozens or hundreds of tools, where loading every definition into context is itself the cost.
+- **Data-heavy intermediate results** - filtering, joining, and aggregating a large list inside the script so it never enters the model's context.
+- **Repeated loops over a collection** - a `for` loop in code instead of N identical tool-call round-trips, each paying the full definition-plus-result cost.
+
+Discrete tool calls remain the right default for narrow, low-call-count tasks - reaching for a sandbox and a code generator to save two round-trips adds more than it saves.
+
+## What This Implies for Server Design
+
+The server's tool contract is now consumed two ways: directly by a model turn, and indirectly through generated code. Design for both:
+
+- **Schemas still carry the weight.** The library generator turns your `inputSchema`/`outputSchema` into typed function signatures. Vague or untyped schemas produce a library the script author (the model) cannot use correctly - see [Tool Definition Best Practices](/docs/mcp-servers/tool-best-practices) for the schema and `outputSchema` mechanics this depends on.
+- **Granularity still matters, differently.** A script can absorb more fine-grained calls than a chat turn can, since looping is cheap in code. That does not license collapsing safety boundaries - a destructive operation should still be its own function, not folded into a "do everything" call, so a reviewed allowlist can scope what generated code is permitted to invoke.
+- **Annotations and idempotency decide whether automated retries are safe.** A script that retries a failed step on its own can re-invoke a non-idempotent mutation multiple times without a human in the loop noticing. Declare `idempotentHint` accurately (see [Tool Annotations](/docs/mcp-servers/annotations)) and design mutations with idempotency keys (see [Idempotency and Safety](/docs/tool-design/idempotency-and-safety)) before putting a tool behind a code-execution surface.
+- **Lean responses matter even more.** A shaped result contract - a summary plus structured references, not the raw payload - is what actually gets relayed back to the model; see [Token Budget](/docs/tool-design/token-budget).
+- **The sandbox constrains execution; the server remains the enforcement point.** Your server still enforces auth and scope per call the same way it does for direct tool calls (see [MCP Authentication](/docs/mcp-servers/authentication)); the sandbox constrains what the generated script can do with the access it's given, and secrets the library needs are visible to the script and to any prompt-injected instructions it follows - broker privileged calls server-side rather than handing the sandbox a credential it can read directly.
+
+## Failure Modes
+
+- **Reaching for it on narrow tasks** - a two-call task gains nothing from a sandbox, a code generator, and an opaque execution path.
+- **Treating the sandbox as a secrets boundary** - it bounds what the code can damage; only keeping credentials out of the sandbox bounds what it can read. A credential in the sandbox environment is readable by any script and any injection that steers it.
+- **Unbounded library surface** - exposing every tool to generated code lets one bad script invoke every tool. Restrict the importable surface to a reviewed allowlist scoped to the task.
+- **Discarding the generated code** - logging only the result makes a wrong answer unreconstructable. Log the script source alongside the execution.
+- **Swallowed failures** - a script that catches its own errors and returns an empty result hides breakage from the agent loop. Enforce a structured error contract (stderr plus reason) so a failed execution surfaces as a failure.
+
+## Related
+
+- [Browser and Sandboxes](/docs/agents/browser-and-sandboxes) - choosing isolation strength for the untrusted code this pattern runs.
+- [Tool Definition Best Practices](/docs/mcp-servers/tool-best-practices) - the schema and `outputSchema` mechanics the generated library depends on.
+- [Tool Annotations](/docs/mcp-servers/annotations) - `idempotentHint` and the other hints that matter more once a script can retry on its own.
+- [Token Budget](/docs/tool-design/token-budget) - shaping the result contract a script returns.
+- [Tool Curation](/docs/tool-design/tool-curation) - the complementary answer for broad tool surfaces when you keep discrete tools instead of generating a library.

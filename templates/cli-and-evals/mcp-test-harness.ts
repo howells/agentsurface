@@ -12,7 +12,7 @@
  * - Schema validation and latency profiling
  * - CI/CD gating on MCP quality
  *
- * **Canonical URL:** https://modelcontextprotocol.io/specification/2025-11-25
+ * **Canonical URL:** https://modelcontextprotocol.io/specification/2026-07-28
  *
  * **Customisation checklist:**
  * - [ ] Update MCP_SERVER_COMMAND to your server (e.g., node src/server.js)
@@ -29,17 +29,14 @@
  * - `MAX_CALLS_PER_TOOL` — Property-based calls per tool (default: 10)
  *
  * **References:**
- * - MCP spec 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25
+ * - MCP spec 2026-07-28: https://modelcontextprotocol.io/specification/2026-07-28
  * - fast-check: https://fast-check.dev/
  * - Testing & Evaluation: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { z } from "zod";
@@ -319,20 +316,26 @@ class MCPTestHarness {
  * Example MCP server (src/server.js):
  *
  * ```typescript
- * import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+ * import { McpServer } from '@modelcontextprotocol/server';
+ * import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
  *
- * const server = new Server({ name: 'test-mcp', version: '1.0.0' });
+ * const server = new McpServer({ name: 'test-mcp', version: '1.0.0' });
  *
- * server.tool('search_docs', 'Search documentation', {
- *   type: 'object',
- *   properties: {
- *     query: { type: 'string', description: 'Search query' },
+ * server.registerTool('search_docs', {
+ *   description: 'Search documentation',
+ *   inputSchema: {
+ *     type: 'object',
+ *     properties: {
+ *       query: { type: 'string', description: 'Search query' },
+ *     },
+ *     required: ['query'],
  *   },
- *   required: ['query'],
  * }, async (args) => {
  *   // Simulate search
  *   return { content: [{ type: 'text', text: `Results for ${args.query}` }] };
  * });
+ *
+ * await server.connect(new StdioServerTransport());
  * ```
  *
  * Usage:

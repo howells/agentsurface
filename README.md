@@ -1,46 +1,49 @@
 # Agent Surface
 
-Agent Surface is a practical resource for making software legible, callable, and useful to AI agents.
+Agent Surface is a field guide and implementation kit for engineering teams making software
+operable by agents: discoverable, understandable, callable, recoverable, and evaluable.
 
-It combines documentation, implementation approaches, reusable templates, and a single skill: `surface`, which routes to the right workflow — audit, scaffold, transform, or generate.
+Agents do not reach software through one interface. They read docs, inspect repositories,
+call APIs, run CLIs, use MCP tools, parse errors, and retrieve data. Agent Surface treats all
+of those contact points as one design problem: the **agent surface**.
 
-The premise is simple: agents do not consume software through one interface. They read docs, inspect repositories, call APIs, run CLIs, use MCP tools, parse errors, retrieve context, and execute workflows. Agent Surface treats all of those as one design problem.
+## Two Parts
 
-## What This Repo Contains
+The site has two labelled parts.
 
-- **Documentation** — a Fumadocs site covering API surface, CLI design, MCP servers, discovery, authentication, errors, testing, multi-agent patterns, scoring, protocols, and tool design
-- **Approaches** — opinionated patterns for making software agent-ready without turning every product into an agent framework
-- **`surface` skill** — a single skill that routes to audit, scaffold, transform, and generate workflows, scoring a codebase across 11 dimensions and scaffolding agents, tools, workflows, memory, model routing, browser access, and sandboxes
-- **Specialist agents** — focused workers for context files, discovery, errors, API shape, CLI ergonomics, auth, MCP, testing, retrievability, and agentic patterns
-- **Templates** — reusable examples for discovery, auth, MCP, errors, evals, orchestration, and agent-facing contracts
-- **Tooling catalog** — a curated list of well-regarded AI and agent tooling grouped by purpose
+**Part 1 - Make your product agent-ready (the core guide).** Product-side, framework-neutral
+guidance for making an existing product usable by agents: discovery, API surface, tool
+design, CLI design, MCP servers, authentication, error handling, context files
+(AGENTS.md/CLAUDE.md), agentic UI, retrievability (search APIs, retrieval contracts,
+structured content), protocols, testing, scoring, and reference links. This is the guide the
+`surface` skill applies.
 
-## What `surface` Does
+**Part 2 - Build agents (the agent-building inventory).** A secondary, condensed reference for
+teams building their own agents: frameworks (including Mastra), platform features,
+orchestration, memory, durable execution, browser and sandbox access, guardrails
+(`/docs/agents`), and agent retrieval - vector databases, embeddings, RAG, knowledge graphs
+(`/docs/agent-retrieval`) - plus a tooling catalog. This inventory gives one short summary of
+current practice per topic; it sits outside the core guide and outside the `surface` skill.
 
-`surface` is a single skill that routes to the right workflow based on the request. It handles:
+An earlier version of this repo kept agent-internal architecture out entirely. We keep the
+inventory because it is worth maintaining as a reference, but it stays separate so the guide
+does not turn into a general agent-building toolkit.
 
-- audit this codebase for agent readiness
-- make this repo easier for AI agents to use
-- improve API, CLI, MCP, discovery, auth, testing, or retrievability surfaces
-- produce a transformation plan
-- execute the highest-impact upgrades
-- create an agent
-- add a tool
-- build a workflow
-- add memory
-- set up model routing
-- update an existing agent correctly
+## The `surface` Skill
 
-### Audit and Transform
+`surface` is a single skill with three routes, all product-side and framework-neutral:
 
-Core outputs:
+- **Guide** - explain agent-surface concepts, standards, and implementation patterns; point to
+  the right doc or primary source.
+- **Audit** - detect a project's surfaces, score agent readiness across 10 dimensions, produce
+  findings, and write a transformation plan. `plan` and `transform` are Audit modes, not
+  separate routes; `transform` executes only after explicit confirmation.
+- **Scaffold** - create or extend agent surfaces (discovery files, API/CLI/MCP surfaces, tool
+  contracts, retrieval endpoints) and the evaluation harnesses that verify them. It does not
+  generate agent-internal architecture (agents, orchestration, memory, model routing, an
+  agent's own retrieval pipeline) - that belongs to Part 2, not this skill.
 
-- scorecard across 11 dimensions, `0-3` each, max raw score `33`, scaled to `30` for ratings
-- clustered findings with concrete fixes
-- prioritized transformation plan
-- post-change delta scorecard
-
-The 11 dimensions are:
+The 10 audit dimensions:
 
 1. API Surface
 2. CLI Design
@@ -50,35 +53,21 @@ The 11 dimensions are:
 6. Error Handling
 7. Tool Design
 8. Context Files
-9. Multi-Agent and Orchestration
-10. Testing and Evaluation
-11. Data Retrievability
+9. Testing and Evaluation
+10. Retrievability
 
-### Scaffold
-
-For agent system scaffolding, `surface` chooses the framework from the project shape. It prefers existing deliberate infrastructure, then selects OpenAI Agents SDK, Claude Managed Agents/Claude Code SDK, Vercel AI SDK, Vercel Workflow, Cloudflare Agents, Mastra, LangGraph, or MCP-first patterns based on runtime, deployment target, durability needs, and external agent interoperability.
-
-Core outputs:
-
-- agent definitions with clear instructions and tool registration
-- typed tools with Zod schemas and MCP annotations
-- workflow scaffolds with state, triggers, and safety patterns
-- memory setup for Claude Managed Agents, Mastra, Postgres/pgvector, Workers-native alternatives, or the repo's existing storage
-- model routing across providers and gateways
-- browser and sandbox tool wrappers with safety boundaries
+See [`skills/surface/SKILL.md`](./skills/surface/SKILL.md) for the operative workflow and
+[`skills/surface/references/`](./skills/surface/references/) for the per-dimension and
+per-mode detail.
 
 ## Repository Contents
 
-High-signal parts of the repo:
-
-- [`skills/surface/`](./skills/surface/) - main skill entrypoint, scoring references, specialist agents, and agent system scaffolding
-- [`src/content/docs/agents/framework-selection.mdx`](./src/content/docs/agents/framework-selection.mdx) - current framework selection guidance
-- [`src/content/docs/agents/anthropic-platform.mdx`](./src/content/docs/agents/anthropic-platform.mdx) - Claude Managed Agents, Claude Code SDK, Agent Skills, MCP connector, and Anthropic platform notes
-- [`disciplines/`](./disciplines/) - longer-form guidance on agent design topics
-- [`templates/`](./templates/) - reusable templates for discovery, auth, MCP, errors, evals, and orchestration
+- [`skills/surface/`](./skills/surface/) - skill entrypoint, audit/scaffold references, and specialist agent prompts
+- [`src/content/docs/`](./src/content/docs/) - the two-part MDX guide served by the docs site
+- [`disciplines/`](./disciplines/) - longer-form guidance on agent-surface design topics
+- [`templates/`](./templates/) - reusable starter files the implementation kit points to
 - [`src/app/`](./src/app/) - Next.js application for the docs site
-- [`src/content/docs/`](./src/content/docs/) - MDX documentation content served by the site
-- [`docs/`](./docs/) - working specs and internal supporting documents
+- [`docs/`](./docs/) - ADRs and internal supporting documents
 
 ## Quick Start
 
@@ -99,83 +88,55 @@ Other useful commands:
 ```bash
 pnpm build
 pnpm start
+pnpm test        # docs integrity check
+pnpm typecheck
+pnpm lint
 ```
 
 Notes:
 
 - `postinstall` runs `fumadocs-mdx`
-- the current `package.json` does not define a dedicated `test` script
+- `pnpm prepush` runs typecheck, lint, then `test` - the full local gate
 - linting and formatting configuration lives in [`oxlint.config.ts`](./oxlint.config.ts) and [`oxfmt.config.ts`](./oxfmt.config.ts)
 
-## Using The Skill
+## Using the Skill
 
-`surface` routes to the right workflow based on the invocation:
+`surface` routes to the matching workflow based on the request:
 
-- `/surface` - full audit with scorecard and findings
+- `/surface` - explain a concept, or run a full audit with scorecard and findings, depending on the ask
 - `/surface score` - scorecard only
 - `/surface plan` - audit plus transformation plan
-- `/surface transform` - audit, plan, and execution
+- `/surface transform` - audit, plan, and execution (after confirmation)
 - `/surface --dimension=X` - focus on a single dimension
 - `/surface --format=json` - structured output
-- `/surface init` - initialize agent infrastructure
-- `/surface agent <name>` - scaffold an agent
-- `/surface tool <name>` - scaffold a typed tool
-- `/surface workflow <name>` - scaffold a workflow
-- `/surface memory` - add memory
-- `/surface model` - configure model routing
-- `/surface browser` - add browser/web access tooling
-- `/surface sandbox` - add isolated code execution tooling
+- `/surface init` - initialize baseline agent-surface conventions (AGENTS.md, llms.txt, `.well-known`)
+- `/surface api` / `/surface cli` / `/surface mcp` - scaffold or upgrade that surface
+- `/surface tool <name>` - scaffold or refine one typed tool contract
+- `/surface test-harness` - scaffold an evaluation harness for a surface
 
-These are skill/runtime invocations, not an npm binary. This repository does not currently publish a `bin` entry in `package.json`.
-
-See [`skills/surface/SKILL.md`](./skills/surface/SKILL.md) for the operative workflow.
+These are skill/runtime invocations, not an npm binary. This repository does not publish a `bin` entry in `package.json`.
 
 ## Specialist Agents
 
-`surface` can delegate work to specialist agents in [`skills/surface/agents`](./skills/surface/agents):
+`surface` can delegate focused work to specialist prompts in [`skills/surface/agents`](./skills/surface/agents):
 
-- `context-writer`
-- `discovery-writer`
-- `error-designer`
-- `api-optimizer`
-- `cli-enhancer`
-- `auth-upgrader`
-- `mcp-builder`
-- `test-writer`
-- `retrievability-engineer`
-- `agentic-patterns-writer`
-- `tool-design-writer`
-- `multi-agent-writer`
+- `context-writer`, `discovery-writer`, `error-designer`, `api-optimizer`, `cli-enhancer`, `auth-upgrader`, `mcp-builder`, `test-writer`, `tool-design-writer` - improve an existing surface in place
+- `retrievability-engineer` - build or upgrade search/query APIs, retrieval contracts, and structured content
+- `score-*` prompts - score one audit dimension in parallel delegation
 
-These agents are used to apply focused fixes after the audit identifies the highest-impact gaps.
+These agents apply focused fixes after an audit identifies the highest-impact gaps; they are
+task resources, not required context for ordinary guide/audit/scaffold routing.
 
 ## Documentation Site
 
-The Next.js site in [`src/app`](./src/app) publishes the guidance stored in [`src/content/docs`](./src/content/docs).
-
-Current documentation areas include:
-
-- API surface design
-- CLI design
-- context files
-- discovery and AEO
-- error handling
-- MCP servers
-- multi-agent patterns
-- testing
-- tool design
-- data retrievability
-- agent system scaffolding
-- scoring and calibration
-- protocols
-- cookbook patterns
+The Next.js site in [`src/app`](./src/app) publishes the guidance in [`src/content/docs`](./src/content/docs), split into the two parts described above.
 
 ## Compatibility
 
 This repository is structured to be readable by multiple agent runtimes.
 
 - `AGENTS.md` provides repo-level guidance
-- `skills/surface/SKILL.md` provides execution instructions for audits, transformations, and agent system scaffolding
+- `skills/surface/SKILL.md` provides execution instructions for the Guide, Audit, and Scaffold routes
 - Claude Code can consume the plugin and skill layout directly
 - Codex and other generic runtimes can use `AGENTS.md` plus the linked skill file
 
@@ -194,6 +155,7 @@ Visible in the checked-in code:
 ## Key Files
 
 - [`AGENTS.md`](./AGENTS.md)
+- [`CONTEXT.md`](./CONTEXT.md)
 - [`skills/surface/SKILL.md`](./skills/surface/SKILL.md)
 - [`INSTALL.md`](./INSTALL.md)
 - [`CHANGELOG.md`](./CHANGELOG.md)

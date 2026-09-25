@@ -1,61 +1,37 @@
 ---
 title: Getting Started
-description: "Choose the right path through Agent Surface: learn concepts, build agents, expose capabilities, evaluate readiness, or track standards."
+description: "Choose a route through Agent Surface by goal: make a product usable by agents, assess it, or build agents of your own."
+lastVerified: 2026-09-25
 ---
 
-## Summary
+## Choose your path
 
-Agent Surface is organized as a dense guide, not a linear tutorial. Start by choosing the job you have: learn the concepts, build an agent system, expose an existing product to agents, evaluate readiness, or track the standards and tooling landscape.
+| Goal                                       | Start with                                 | Then read                                                                                                                                                         |
+| ------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Let agents find your product               | [Discovery](/docs/discovery)               | [Retrievability](/docs/retrievability), [Protocols](/docs/protocols)                                                                                              |
+| Let agents operate your service            | [API Surface](/docs/api-surface)           | [Tool Design](/docs/tool-design), [MCP Servers](/docs/mcp-servers), [Authentication](/docs/authentication)                                                        |
+| Make a repository easier for coding agents | [Context Files](/docs/context-files)       | [CLI Design](/docs/cli-design), [Error Handling](/docs/error-handling)                                                                                            |
+| Make a web app usable by browser agents    | [Agentic UI](/docs/agentic-ui)             | [Discovery](/docs/discovery), [Protocols](/docs/protocols)                                                                                                        |
+| Let agents buy from you                    | [Agentic Commerce](/docs/agentic-commerce) | [Product Data](/docs/agentic-commerce/product-data), [Checkout Protocols](/docs/agentic-commerce/checkout-protocols), [Payments](/docs/agentic-commerce/payments) |
+| Prove agents can complete real tasks       | [Testing](/docs/testing)                   | [Product Journeys](/docs/scoring/product-journeys)                                                                                                                |
+| Assess where you stand                     | [Scoring](/docs/scoring)                   | [Rubric](/docs/scoring/rubric), [Public Scanners](/docs/scoring/public-scanners)                                                                                  |
+| Build an agent of your own                 | [Agents](/docs/agents)                     | [Agent Retrieval](/docs/agent-retrieval), [Tooling Catalog](/docs/tooling-catalog)                                                                                |
 
-- New to the topic: start with fundamentals.
-- Building agents: start with runtime boundaries and agent scaffolding.
-- Making software usable by agents: start with surfaces.
-- Comparing maturity: use scoring after you understand the surface.
-- Tracking the ecosystem: use protocols, references, and the catalog.
+## If you are starting from zero
 
-## Choose Your Path
+For an existing product, this order gets the most value earliest:
 
-| Goal                                       | Start with                                                | Then read                                                                                                            |
-| ------------------------------------------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Understand agent systems                   | [Agent Design Principles](/docs/agents/design-principles) | [Runtime Boundaries](/docs/runtime-boundaries), [Protocols](/docs/protocols), [Tool Design](/docs/tool-design)       |
-| Build a production agent                   | [Agent Scaffolding](/docs/agents)                         | [Framework Selection](/docs/agents/framework-selection), [Agentic UI](/docs/agentic-ui), [Testing](/docs/testing)    |
-| Expose a service to agents                 | [API Surface](/docs/api-surface)                          | [Tool Design](/docs/tool-design), [MCP Servers](/docs/mcp-servers), [Authentication](/docs/authentication)           |
-| Make a repository easier for coding agents | [Context Files](/docs/context-files)                      | [Discovery](/docs/discovery), [CLI Design](/docs/cli-design), [Error Handling](/docs/error-handling)                 |
-| Improve retrieval and memory               | [Data Retrievability](/docs/data-retrievability)          | [RAG Patterns](/docs/data-retrievability/rag-patterns), [Testing](/docs/testing)                                     |
-| Evaluate readiness                         | [Scoring Framework](/docs/scoring)                        | [Rubric](/docs/scoring/rubric), [Evidence](/docs/scoring/evidence), [Delta Scorecard](/docs/scoring/delta-scorecard) |
-| Track standards and tools                  | [Protocols](/docs/protocols)                              | [Reference Links](/docs/reference-links), [Tooling Catalog](/docs/tooling-catalog)                                   |
-
-## The Core Map
-
-Agent Surface has five main subject areas:
-
-1. **Agent fundamentals:** design principles, runtime boundaries, frameworks, UI, and protocols.
-2. **Agent systems:** agents, workflows, multi-agent patterns, retrieval, memory, testing, and production patterns.
-3. **Agent-readable surfaces:** APIs, CLIs, MCP servers, discovery, context files, auth, errors, and tool definitions.
-4. **Evaluation:** scorecards, rubrics, evidence, deltas, clustering, and calibration.
-5. **Reference:** standards, source links, and tooling.
-
-## Scored Dimensions vs Reference Sections
-
-Only some of these sections are scored. Eleven of them map to the scoring framework's dimensions — API Surface, CLI Design, MCP Servers, Discovery, Authentication, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, and Data Retrievability. The rest (Agents, Agentic UI, Runtime Boundaries, Cookbook, Protocols, Reference Links, Tooling Catalog, and Scoring itself) are reference and conceptual material that inform the score without being scored. For the full dimension-to-section mapping, see [Scored Dimensions vs Reference Sections](/docs/scoring#scored-dimensions-vs-reference-sections) in the scoring framework.
-
-## If You Are Starting From Zero
-
-Use this implementation order for an existing product:
-
-1. Write accurate context files: `AGENTS.md`, tool-specific overlays, and repository boundaries.
-2. Make docs discoverable: `llms.txt`, structured data, sitemap, and stable Markdown routes.
-3. Make command output parseable: JSON, NDJSON, stable exit codes, and strict validation.
-4. Publish machine-readable contracts: OpenAPI, schema metadata, and tool definitions.
-5. Add recovery paths: RFC 9457 errors, retry guidance, idempotency, and trace IDs.
-6. Secure programmatic access: scoped credentials, OAuth metadata, DPoP where needed.
-7. Expose tools intentionally: MCP server, curated tool sets, resources, prompts, and annotations.
-8. Test real workflows: eval cases, traces, red-team suites, CI gates, and score deltas.
+1. Write accurate context files: `AGENTS.md` and any tool-specific files that import it.
+2. Make content discoverable: robots.txt policy, `llms.txt`, structured data, sitemap and Markdown routes.
+3. Make command output parseable: JSON, stable exit codes and strict input validation.
+4. Publish machine-readable contracts: OpenAPI, schema metadata and tool definitions.
+5. Add recovery paths: RFC 9457 errors, retry guidance, idempotency and trace IDs.
+6. Secure programmatic access: scoped credentials and OAuth protected resource metadata.
+7. Expose tools deliberately: an MCP server with a curated tool set, annotations and approval for risky actions.
+8. Test real tasks: eval cases, traces, CI gates and a before-and-after scorecard.
 
 ## Related
 
 - [What is Agent Surface?](/docs)
-- [Agent Scaffolding](/docs/agents)
-- [Agent-Readable API Surface](/docs/api-surface)
-- [Scoring Framework](/docs/scoring)
-- [Protocols and Standards](/docs/protocols)
+- [Scoring](/docs/scoring)
+- [Agents](/docs/agents)

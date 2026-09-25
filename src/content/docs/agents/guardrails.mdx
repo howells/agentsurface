@@ -1,0 +1,83 @@
+---
+title: Guardrails
+description: "Runtime guardrails as production defense: input and output processors around the agent loop, placement, latency budgets, and fail-open versus fail-closed choices."
+lastVerified: 2026-09-24
+---
+
+## Summary
+
+Red-teaming finds holes before launch (see [Red-Teaming Agents](/docs/testing/red-teaming) in Part 1). Guardrails are what stands in the request path in production, after the attacker you never modeled shows up. An agent system without runtime guardrails is relying on the model to refuse, and a refusal varies by prompt, drifts across model versions, and cannot be audited.
+
+Runtime guardrails are deterministic processors that wrap the agent loop: they inspect input before the model sees it and inspect output before it reaches the user or a tool.
+
+- **Enforcement in code** - model refusals drift and cannot be audited; put enforcement in code that runs every time.
+- **Two-sided pipeline** - input processors sanitize what goes in; output processors gate what comes out.
+- **Ordered and budgeted** - each check costs latency and money; sequence them and cap them.
+- **Fail-open or fail-closed is a per-processor decision** - a moderation timeout and a PII-scrub timeout are not the same risk.
+- **Not a substitute for authorization** - guardrails filter content; they do not decide who may do what.
+
+## Decision Rule
+
+Which guardrails you need is set by deployment shape and data sensitivity.
+
+| Deployment shape                                        | Primary risk                                        | Minimum guardrails                                                                                     |
+| ------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| User-facing chat (public or semi-trusted input)         | Prompt injection, abusive content, brand safety     | Input: injection detection, content moderation. Output: response moderation, system-prompt-leak scrub. |
+| Internal tool-calling agent (trusted users, real tools) | Data exfiltration, over-broad tool use, cost blowup | Input: PII redaction on logged input. Output: cost guard, PII scrub, around-tool argument checks.      |
+| Autonomous background agent (no human in the loop)      | Runaway cost, unbounded loops, silent data leaks    | Output: hard token/cost limiters, per-run budgets. Input: injection detection on all retrieved data.   |
+
+Layer data sensitivity on top: regulated or personal data (PII, PHI, payment data) makes PII detection mandatory on both sides and it should run **fail-closed** - an unavailable detector must block, not leak. Public, low-stakes content can run moderation **fail-open** - a timeout should not take down the whole product.
+
+## Implementation Shape
+
+Model guardrails as an ordered pipeline with the agent loop in the middle:
+
+```
+request
+  → [input] prompt-injection detection
+  → [input] PII detection / redaction
+  → [input] content moderation
+  → [input] language detection
+      → AGENT LOOP (model + tools)
+  → [output] cost guard / token limiter
+  → [output] response moderation
+  → [output] PII scrubbing
+  → [output] system-prompt-leak scrubbing
+response
+```
+
+**Input processors** - prompt-injection detection (classify user input _and_ retrieved tool output; treat retrieved documents as untrusted, not just the top-level message), PII detection/redaction (strip values before they enter prompts or provider request bodies), content moderation, language detection.
+
+**Output processors** - cost guards/token limiters (the control that stops a runaway autonomous loop), response moderation, PII scrubbing, system-prompt-leak scrubbing.
+
+**Three placement points:** before the model (cheapest place to reject), after the model (the final response), and around tool calls - validating tool _arguments_ before execution and tool _results_ before they re-enter context. This last point is where injection-via-tool-output and exfiltration-via-tool-call actually get stopped, and it overlaps with [Idempotency and Safety](/docs/tool-design/idempotency-and-safety).
+
+**Budget:** order processors cheapest-and-most-selective first, run independent checks concurrently where the framework allows, and prefer a fast local classifier or regex/entropy pass ahead of a network call to a hosted service.
+
+<Callout type="warn">
+  A guardrail's failure mode is a security decision, not a default. Fail-closed for PII redaction
+  and injection detection on sensitive data. Fail-open is defensible for best-effort moderation on
+  low-stakes content, where a hard dependency on a third-party service would become a single point
+  of failure for the whole product.
+</Callout>
+
+## Vendor Landscape
+
+Several systems provide guardrail primitives to compose rather than build from scratch: NVIDIA NeMo Guardrails (programmable rails for input/output/dialog flow), Guardrails AI (validator framework with a hub of composable validators), AWS Bedrock Guardrails (managed content filters, denied topics, PII redaction, contextual grounding), Azure AI Content Safety (hosted moderation and prompt-shield detection), Lakera Guard (hosted prompt-injection and data-leak detection). Frameworks also ship built-in pipelines - ordered input/output processor steps around the agent - as one concrete shape of the pattern above.
+
+## Failure Modes
+
+- **Latency stacking** - six individually-fast processors in series are not fast. Budget the pipeline, run independent checks concurrently, put cheap rejectors first.
+- **False-positive lockouts** - an over-tuned detector blocks legitimate work. Measure false-positive rate on real traffic, not just recall on attacks.
+- **Pattern-only injection detectors** - denylist matching catches yesterday's attacks and misses novel phrasings. Combine classifiers with structural defenses (untrusted-data separation, tool-argument validation).
+- **Moderation mistaken for authorization** - a content filter decides whether text is allowed, never whether this principal may perform this action. Authorization belongs in [tool design](/docs/tool-design/idempotency-and-safety), enforced server-side.
+- **Cost guards that kill legitimate long runs** - a flat token cap stopping a valid multi-hour job is an outage, not a control. Budget per run and per task class, and surface a structured "budget exceeded" error the caller can resume from.
+- **Unlogged decisions** - a guardrail that blocks without a trace ID and reason is unauditable. Log every allow/block decision.
+
+## Related
+
+- [Red-Teaming Agents](/docs/testing/red-teaming) - the offense side these guardrails defend against
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety)
+- [Human Approval](/docs/tool-design/human-approval) - approval gates for actions a guardrail should never silently allow
+- [Design Defaults](/docs/agents)
+- [Browser and Sandboxes](/docs/agents/browser-and-sandboxes) - a worked guardrails checklist for one high-risk tool surface

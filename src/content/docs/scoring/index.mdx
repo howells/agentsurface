@@ -1,11 +1,12 @@
 ---
 title: Scoring Framework
-description: Measure and track your codebase's agent-readiness across 11 dimensions
+description: Measure and track your codebase's agent-readiness across 10 dimensions
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Quantifies agent-readiness on a 0–30 scaled spectrum across 11 concrete dimensions: API, CLI, MCP, Discovery, Auth, Error Handling, Tool Design, Context Files, Multi-Agent, Testing, and Data Retrievability. Each dimension scores 0–3 (Not Implemented → Excellent), then the applicable total is scaled to 30. Provides a baseline score, identifies gaps, and tracks progress as you modernize. Scale: 0–7 (Human-only) to 23–30 (Agent-first).
+Quantifies agent-readiness on a 0–30 scaled spectrum across 10 concrete dimensions: API, CLI, MCP, Discovery, Auth, Error Handling, Tool Design, Context Files, Testing, and Retrievability. Each dimension scores 0–3 (Not Implemented → Excellent), then the applicable total is scaled to 30. Provides a baseline score, identifies gaps, and tracks progress as you modernize. Scale: 0–7 (Human-only) to 23–30 (Agent-first).
 
 - 0 = Not implemented (blocker)
 - 1 = Basic (weak, human-oriented)
@@ -13,7 +14,7 @@ Quantifies agent-readiness on a 0–30 scaled spectrum across 11 concrete dimens
 - 3 = Excellent (production, resilient, cross-framework)
 - N/A = Genuinely inapplicable (rare)
 
-Agent-readiness is not binary. A codebase's ability to be consumed by AI agents exists on a spectrum. The scoring framework quantifies that spectrum across 11 concrete dimensions, giving you a measurement today, a clear view of gaps, and a way to track progress.
+Agent-readiness is a spectrum. The scoring framework quantifies it across 10 concrete dimensions, giving you a measurement today, a clear view of gaps, and a way to track progress.
 
 ## Why Score?
 
@@ -21,7 +22,7 @@ Ambiguity that humans resolve through intuition becomes failure modes at scale w
 
 ## Repository Audit vs Public-Site Scan
 
-The Surface score is a source-backed review across code, documentation, runtime contracts, and tests. Public scanners such as [Is Agentic](https://is-agentic.com/), [Agent Readiness](https://isitagentready.com/), and [Google Lighthouse's Agentic Browsing category](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) observe the deployed website from the outside. They are complementary, but their scores are not interchangeable.
+The Surface score is a source-backed review across code, documentation, runtime contracts, and tests. Public scanners such as [Is Agentic](https://is-agentic.com/), [Agent Readiness](https://isitagentready.com/), and [Google Lighthouse's Agentic Browsing category](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) observe the deployed website from the outside. They are complementary, but their scores are not interchangeable. See [Public Scanners](/docs/scoring/public-scanners) for how to read and record their output alongside a Surface audit.
 
 Use a public scan to catch deployment reality: blocked crawlers, missing discovery files, unreadable HTML, or a capability that is not actually reachable. Use the Surface audit to find the source-level cause, assess private and authenticated surfaces, and decide whether a recommendation fits the product. Record the scanner, report URL, and scan timestamp as evidence; do not copy its headline number into the 0–30 Surface score.
 
@@ -29,54 +30,51 @@ Use a public scan to catch deployment reality: blocked crawlers, missing discove
 
 Each dimension scores from 0 to 3:
 
-- **0 (Not implemented)** — Feature missing or unsuitable for agents. This dimension is a blocker.
-- **1 (Basic)** — Feature exists but weak. Human-oriented; terse; missing critical context. Agents can use it with heavy prompting.
-- **2 (Good)** — Solid implementation. Agent-oriented descriptions, structured data, clear examples. Most agent use cases work.
-- **3 (Excellent)** — Production-ready for agents. Optimized for token efficiency, cross-framework, resilient error handling, advanced patterns (OAuth, MCP Tasks, delegation). Agents perform reliably with minimal prompt engineering.
+- **0 (Not implemented)** - Feature missing or unsuitable for agents. This dimension is a blocker.
+- **1 (Basic)** - Feature exists but weak. Human-oriented; terse; missing context agents need. Agents can use it with heavy prompting.
+- **2 (Good)** - Solid implementation. Agent-oriented descriptions, structured data, clear examples. Most agent use cases work.
+- **3 (Excellent)** - Production-ready for agents. Optimized for token efficiency, cross-framework, resilient error handling, advanced patterns (OAuth, MCP Tasks, delegation). Agents perform reliably with minimal prompt engineering.
 
-## The 11 Dimensions
+## The 10 Dimensions
 
-**1. API Surface** — How well your HTTP API is described for agent tool generation. OpenAPI quality, operationIds, agent-oriented descriptions, Arazzo workflow support.
+**1. API Surface** - How well your HTTP API is described for agent tool generation. OpenAPI quality, operationIds, agent-oriented descriptions, Arazzo workflow support.
 
-**2. CLI Design** — How well your CLI tool works with agent automation. JSON output, exit codes, schema introspection, input hardening (path traversal defense), SKILL.md packaging.
+**2. CLI Design** - How well your CLI tool works with agent automation. JSON output, exit codes, schema introspection, input hardening (path traversal defense), SKILL.md packaging.
 
-**3. MCP Server** — Whether and how well you expose an MCP server. Tool count, annotations, resources, OAuth support, pagination, testing with InMemoryTransport.
+**3. MCP Server** - Whether and how well you expose an MCP server. Tool count, annotations, resources, RFC 9728 protected-resource metadata, pagination, testing with InMemoryTransport.
 
-**4. Discovery & AEO** — How discoverable, readable, governable, and callable your project is by agents. llms.txt, AGENTS.md, JSON-LD schema, Markdown content negotiation, robots.txt, Content Signals, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and optional commerce protocols.
+**4. Discovery & AEO** - How discoverable, readable, governable, and callable your project is by agents. llms.txt, AGENTS.md, JSON-LD schema, Markdown content negotiation, robots.txt, Content Signals, API Catalog, MCP Server Cards, Agent Skills indexes, OAuth metadata, Web Bot Auth, and optional commerce protocols.
 
-**5. Authentication** — Whether agents can authenticate without human browser interaction. API keys, OAuth 2.1 Client Credentials, Token Exchange (RFC 8693), agent identity as first-class principal.
+**5. Authentication** - Whether clients can obtain and use credentials appropriate to the acting identity. Authorization Code with PKCE for user delegation, Client Credentials for service-owned M2M, scoped and time-bounded tokens, verified discovery and revocation.
 
-**6. Error Handling** — Whether errors give agents enough information to recover. RFC 9457 Problem Details, is_retriable, suggestions array, trace_id, doc_uri, semantic exit codes.
+**6. Error Handling** - Whether errors give agents enough information to recover. RFC 9457 Problem Details, is_retriable, suggestions array, trace_id, doc_uri, semantic exit codes.
 
-**7. Tool Design** — Quality of tool definitions across any framework (MCP, AI SDK, LangChain). Descriptions as prompts ("when to use" and "do not use for"), typed schemas, toModelOutput, cross-framework portability.
+**7. Tool Design** - Quality of tool definitions across any framework (MCP, AI SDK, LangChain). Descriptions as prompts ("when to use" and "do not use for"), typed schemas, toModelOutput, cross-framework portability.
 
-**8. Context Files** — Quality of agent context files for AI coding assistants. AGENTS.md + multi-tool overrides (CLAUDE.md, .cursor/rules). Hand-curated, commands first, permission boundaries, progressive disclosure.
+**8. Context Files** - Quality of agent context files for AI coding assistants. AGENTS.md + multi-tool overrides (CLAUDE.md, .cursor/rules). Hand-curated, commands first, permission boundaries, progressive disclosure.
 
-**9. Multi-Agent Support** — How well your project supports multi-agent orchestration. Sub-agent delegation, state management, A2A agent cards, memory patterns, dynamic agent selection.
+**9. Testing & Evaluation** - Whether agent interactions are tested and evaluated. Tool routing accuracy, error recovery testing, multi-step flow tests, pass@k metrics, eval-driven development.
 
-**10. Testing & Evaluation** — Whether agent interactions are tested and evaluated. Tool routing accuracy, error recovery testing, multi-step flow tests, pass@k metrics, eval-driven development.
-
-**11. Data Retrievability** — Whether project knowledge, documents, and user data are searchable and retrievable by agents. Semantic search, hybrid retrieval, reranking, metadata filters, RAG evals, and knowledge graphs.
+**10. Retrievability** - Whether an agent can query your product's own data through a documented search or retrieval capability and trust what comes back. Search and retrieval endpoints, filters and pagination scoped to retrieval, freshness and provenance metadata on results.
 
 ## Scored Dimensions vs Reference Sections
 
-Not every section of Agent Surface is a scored dimension. The eleven dimensions map onto the agent-readable-surface sections a codebase can be measured against; the remaining sections are reference and conceptual material that inform the score without being scored themselves.
+Not every section of Agent Surface is a scored dimension. The ten dimensions map onto the agent-readable-surface sections a codebase can be measured against; the remaining sections are reference and conceptual material that inform the score without being scored themselves.
 
-| Scored dimension    | Docs section                                     |
-| ------------------- | ------------------------------------------------ |
-| API Surface         | [API Surface](/docs/api-surface)                 |
-| CLI Design          | [CLI Design](/docs/cli-design)                   |
-| MCP Server          | [MCP Servers](/docs/mcp-servers)                 |
-| Discovery & AEO     | [Discovery](/docs/discovery)                     |
-| Authentication      | [Authentication](/docs/authentication)           |
-| Error Handling      | [Error Handling](/docs/error-handling)           |
-| Tool Design         | [Tool Design](/docs/tool-design)                 |
-| Context Files       | [Context Files](/docs/context-files)             |
-| Multi-Agent         | [Multi-Agent](/docs/multi-agent)                 |
-| Testing             | [Testing](/docs/testing)                         |
-| Data Retrievability | [Data Retrievability](/docs/data-retrievability) |
+| Scored dimension | Docs section                           |
+| ---------------- | -------------------------------------- |
+| API Surface      | [API Surface](/docs/api-surface)       |
+| CLI Design       | [CLI Design](/docs/cli-design)         |
+| MCP Server       | [MCP Servers](/docs/mcp-servers)       |
+| Discovery & AEO  | [Discovery](/docs/discovery)           |
+| Authentication   | [Authentication](/docs/authentication) |
+| Error Handling   | [Error Handling](/docs/error-handling) |
+| Tool Design      | [Tool Design](/docs/tool-design)       |
+| Context Files    | [Context Files](/docs/context-files)   |
+| Testing          | [Testing](/docs/testing)               |
+| Retrievability   | [Retrievability](/docs/retrievability) |
 
-The following sections are reference and conceptual — they shape how you design and audit agent systems but are **not** scored dimensions: [Agents](/docs/agents), [Agentic UI](/docs/agentic-ui), [Runtime Boundaries](/docs/runtime-boundaries), [Cookbook](/docs/cookbook), [Protocols](/docs/protocols), [Reference Links](/docs/reference-links), [Tooling Catalog](/docs/tooling-catalog), and this Scoring section itself. If you are looking for a section in the score and cannot find it, it is almost certainly one of these.
+The scorecard is product-side: it measures a product's own agent-facing surfaces, not how a team builds its own agents. The following sections are reference, conceptual, or part of the secondary agent-building inventory - they inform how you design and audit agent systems but are **not** scored dimensions: [Agents](/docs/agents), [Agentic UI](/docs/agentic-ui), [Agent Retrieval](/docs/agent-retrieval), [Protocols](/docs/protocols), [Reference Links](/docs/reference-links), [Tooling Catalog](/docs/tooling-catalog), and this Scoring section itself. If you are looking for a section in the score and cannot find it, it is almost certainly one of these.
 
 ## Confidence Levels
 
@@ -95,16 +93,16 @@ Low-confidence scores should be flagged for manual re-verification.
 Not all dimensions apply to every project. Mark a dimension N/A **only** when it is genuinely inapplicable:
 
 - **CLI Design = N/A** when your project is a web app with no CLI tool (but if you have any CLI at all, score it)
-- **Multi-Agent = N/A** when your project does not orchestrate or coordinate agents
 - **Discovery & AEO = N/A** when your project is a pure library with no web presence
+- **Retrievability = N/A** when your project exposes no searchable knowledge, documents, or user data to agents
 
-"We haven't built an MCP server yet" is a **0**, not N/A. "This project has no reason to expose an MCP server" might be N/A—but only if you are certain agents will never consume it.
+"We haven't built an MCP server yet" is a **0**, not N/A. "This project has no reason to expose an MCP server" might be N/A - but only if you are certain agents will never consume it.
 
 ## Evidence Requirements
 
 Every score must cite specific evidence:
 
-- **File paths with line numbers**: `openapi.yaml:45 — description is 4 words`
+- **File paths with line numbers**: `openapi.yaml:45 - description is 4 words`
 - **Grep findings**: `No files match /isError|is_retriable/`
 - **Glob results**: `0 files found matching **/*.mcp.json`
 - **Command output**: `mytool --help --json` returns exit code 2 with no structured output
@@ -124,12 +122,13 @@ Once all applicable dimensions are scored, the total is scaled to 0–30 and map
 
 ## What's Next
 
-- **[Rubric](/docs/scoring/rubric)** — Full 0/1/2/3 criteria for each dimension
-- **[Evidence](/docs/scoring/evidence)** — What counts as evidence and how to avoid optimism bias
-- **[Scorecard Format](/docs/scoring/scorecard-format)** — JSON schema the skill emits
-- **[Delta Scoring](/docs/scoring/delta-scorecard)** — Computing improvements before/after transformation
-- **[Clustering](/docs/scoring/clustering)** — Organizing findings into actionable clusters
-- **[Calibration](/docs/scoring/calibration)** — Maintaining rubric consistency across raters and time
+- **[Rubric](/docs/scoring/rubric)** - Full 0/1/2/3 criteria for each dimension
+- **[Evidence](/docs/scoring/evidence)** - What counts as evidence and how to avoid optimism bias
+- **[Scorecard Format](/docs/scoring/scorecard-format)** - JSON schema the skill emits
+- **[Delta Scoring](/docs/scoring/delta-scorecard)** - Computing improvements before/after transformation
+- **[Clustering](/docs/scoring/clustering)** - Organizing findings into actionable clusters
+- **[Calibration](/docs/scoring/calibration)** - Maintaining rubric consistency across raters and time
+- **[Public Scanners](/docs/scoring/public-scanners)** - Reading external agent-readiness scanners alongside a Surface audit
 
 ## Evaluate the whole product journey
 

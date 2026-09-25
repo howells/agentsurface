@@ -1,11 +1,12 @@
 ---
 title: CI Integration and Regression Testing
 description: PR-gated evals, shadow evaluation, statistical significance, budget guardrails
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-Detect regressions before production via PR-gated evals. Use layered strategy: Stage 1 (`` `<1` `` min, deterministic routing tests, temp 0, mocked tools, Vitest); Stage 2 (1-3 min, real calls, real LLM, baseline comparison vs. main); Stage 3 (optional, 5-10 min nightly, red-team suite). Track statistical significance (pass@k improvements matter, not single run), token budget guardrails (cost per eval case), and baseline regression detection (compare to main-branch results). Fail fast strategy: fail on Stage 1, run Stage 2 in parallel, skip Stage 3 on PRs.
+Detect regressions before production via PR-gated evals. Use layered strategy: Stage 1 (`<1` min, deterministic routing tests, temp 0, mocked tools, Vitest); Stage 2 (1-3 min, real calls, real LLM, baseline comparison vs. main); Stage 3 (optional, 5-10 min nightly, red-team suite). Track statistical significance (gate on pass@k improvements across runs rather than any single run), token budget guardrails (cost per eval case), and baseline regression detection (compare to main-branch results). Fail fast strategy: fail on Stage 1, run Stage 2 only if Stage 1 passes, skip Stage 3 on PRs.
 
 ```
 Stage 1: Fast routing (`<1` min)
@@ -23,11 +24,11 @@ Agent evals in CI detect regressions before they reach production. The challenge
 
 Run evals in stages, failing fast:
 
-**Stage 1 (Fast, `<1` min)** — Deterministic routing tests. Temperature 0, mock tool responses, Vitest harness.
+**Stage 1 (Fast, `<1` min)** - Deterministic routing tests. Temperature 0, mock tool responses, Vitest harness.
 
-**Stage 2 (Medium, 1-3 min)** — Regression suite. Real tool calls, real LLM, against baseline from main branch.
+**Stage 2 (Medium, 1-3 min)** - Regression suite. Real tool calls, real LLM, against baseline from main branch.
 
-**Stage 3 (Optional, 5-10 min)** — Red-team suite. Runs nightly or on explicit trigger. Too slow for every PR.
+**Stage 3 (Optional, 5-10 min)** - Red-team suite. Runs nightly or on explicit trigger. Too slow for every PR.
 
 ```yaml
 # .github/workflows/evals.yml
@@ -36,16 +37,19 @@ name: Agent Evals
 on:
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 3 * * *" # nightly, drives the redteam job below
 
 jobs:
   routing:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 18
+          node-version: 22
       - run: npm ci
       - run: npm run test:routing
         # Vitest harness, temperature 0, mock tools
@@ -55,12 +59,13 @@ jobs:
         run: exit 1
 
   regression:
+    if: github.event_name == 'pull_request'
     needs: routing
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
       - run: npm ci
 
       - name: Download baseline
@@ -88,7 +93,7 @@ jobs:
           fi
 
       - name: Comment results on PR
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         if: always()
         with:
           script: |
@@ -96,8 +101,8 @@ jobs:
             const baseline = JSON.parse(fs.readFileSync('baseline.json'));
             const current = JSON.parse(fs.readFileSync('current.json'));
 
-            const baselinePass = baseline.summary.pass_rate.toFixed(2);
-            const currentPass = current.summary.pass_rate.toFixed(2);
+            const baselinePass = (baseline.summary.pass_rate * 100).toFixed(1);
+            const currentPass = (current.summary.pass_rate * 100).toFixed(1);
             const delta = ((current.summary.pass_rate - baseline.summary.pass_rate) * 100).toFixed(1);
 
             github.rest.issues.createComment({
@@ -112,14 +117,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - run: npm ci
       - run: npx promptfoo eval -c red-team-suite.yaml --output redteam.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       - name: Check red-team results
         run: |
-          FAILED=$(jq '.results[] | select(.pass == false) | length' redteam.json)
+          FAILED=$(jq '[.results[] | select(.pass == false)] | length' redteam.json)
           if [ "$FAILED" -gt 0 ]; then
             echo "Red-team attacks succeeded! Fix before merging."
             exit 1
@@ -128,7 +133,7 @@ jobs:
 
 ## Pin the dataset version
 
-A baseline-vs-current comparison is only valid if both runs evaluated the same dataset version. If the dataset changed between the baseline run and the PR run, the delta conflates two causes — the code change and the dataset change — and the gate becomes noise. Pin the version per run, record it in the results, and fail fast when a run is unpinned or the two versions disagree.
+A baseline-vs-current comparison is only valid if both runs evaluated the same dataset version. If the dataset changed between the baseline run and the PR run, the delta conflates two causes - the code change and the dataset change - and the gate becomes noise. Pin the version per run, record it in the results, and fail fast when a run is unpinned or the two versions disagree.
 
 ```bash
 # Fail the job before interpreting any delta if versions do not match
@@ -147,7 +152,7 @@ if [ "$BASELINE_VERSION" != "$CURRENT_VERSION" ]; then
 fi
 ```
 
-Deciding _what_ goes into that versioned dataset — sourcing, labeling, leakage checks, and re-sampling as production drifts — is covered in [Datasets and experiments](/docs/testing/datasets-and-experiments).
+Deciding _what_ goes into that versioned dataset - sourcing, labeling, leakage checks, and re-sampling as production drifts - is covered in [Datasets and experiments](/docs/testing/datasets-and-experiments).
 
 ## Statistical significance
 
@@ -303,7 +308,7 @@ token_budget: 150k
 Separate evals for different scenarios to catch category-specific regressions:
 
 ```yaml
-testCases:
+tests:
   - category: "happy_path"
     description: "Well-formed intent, standard tools"
     skip_in_ci: false
@@ -372,7 +377,7 @@ if (costDelta > 20) {
 
 ## See also
 
-- `/docs/testing/datasets-and-experiments` — curating and versioning the dataset these gates compare against
-- `/docs/testing/metrics` — pass@k, F1, cost metrics
-- `/docs/testing/promptfoo` — CI-friendly YAML configs
-- `/docs/testing/vitest-harness` — fast deterministic tests
+- `/docs/testing/datasets-and-experiments` - curating and versioning the dataset these gates compare against
+- `/docs/testing/metrics` - pass@k, F1, cost metrics
+- `/docs/testing/promptfoo` - CI-friendly YAML configs
+- `/docs/testing/vitest-harness` - fast deterministic tests

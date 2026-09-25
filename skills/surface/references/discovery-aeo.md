@@ -20,13 +20,13 @@ Treat AEO as practical discoverability engineering, not a promise that any speci
 
 When auditing a public website, evaluate the same categories that current agent-readiness scanners measure:
 
-| Category | Signals |
-|---|---|
-| Discoverability | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs |
-| Content accessibility | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints |
-| Bot access control | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots |
-| Capability discovery | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata |
-| Commerce, when applicable | x402, Universal Commerce Protocol, Agentic Commerce Protocol |
+| Category                  | Signals                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| Discoverability           | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs              |
+| Content accessibility     | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints |
+| Bot access control        | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots                     |
+| Capability discovery      | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata         |
+| Commerce, when applicable | x402, MPP, UCP, ACP, product feeds - see `references/agentic-commerce.md`                         |
 
 Use scanner results as timestamped outside-in evidence for Dimension 4. [Is Agentic](https://is-agentic.com/) is a Vercel public-site scanner powered by Ora; its completed reports are also available through a read-only API, CLI, and remote MCP server. Inspect the individual checks and observed journey rather than copying its headline score into the Surface score. Do not overfit to one vendor's methodology, and never submit private, authenticated, confidential, or pre-release URLs merely to get a score.
 
@@ -46,17 +46,17 @@ Canonical explanation: `src/content/docs/discovery/dns-discovery.mdx`. Primary r
 
 Discovery & AEO can apply while many of its optional signals do not. Detect the product surface first, then activate only the matching checks:
 
-| Detected surface | Activate these checks |
-|---|---|
-| Public website or docs | Crawl policy, sitemap, stable canonical URLs, structured data, human-readable and machine-readable content |
-| Substantial public documentation | `llms.txt`, `llms-full.txt` when useful, Markdown negotiation or `.md` fallbacks, documentation links |
-| Public HTTP API | OpenAPI, API Catalog, API documentation and status links |
-| OAuth-protected API or resource | Protected Resource Metadata and authorization-server metadata |
-| Remote HTTP MCP server | MCP endpoint and discovery metadata; advertised tools, resources, prompts, transport, and auth |
-| Published task-specific skills | Agent Skills discovery index, linked `SKILL.md` artifacts, and digest verification |
-| Page-scoped agent interactions | WebMCP registration and live browser behavior |
-| Agent-mediated commerce | The commerce protocol actually implemented by the product |
-| Outbound or high-trust bot identity | HTTP Message Signatures directory and key lifecycle |
+| Detected surface                    | Activate these checks                                                                                      |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Public website or docs              | Crawl policy, sitemap, stable canonical URLs, structured data, human-readable and machine-readable content |
+| Substantial public documentation    | `llms.txt`, `llms-full.txt` when useful, Markdown negotiation or `.md` fallbacks, documentation links      |
+| Public HTTP API                     | OpenAPI, API Catalog, API documentation and status links                                                   |
+| OAuth-protected API or resource     | Protected Resource Metadata and authorization-server metadata                                              |
+| Remote HTTP MCP server              | MCP endpoint and discovery metadata; advertised tools, resources, prompts, transport, and auth             |
+| Published task-specific skills      | Agent Skills discovery index, linked `SKILL.md` artifacts, and digest verification                         |
+| Page-scoped agent interactions      | WebMCP registration and live browser behavior                                                              |
+| Agent-mediated commerce             | The commerce protocol actually implemented by the product - see `references/agentic-commerce.md`           |
+| Outbound or high-trust bot identity | HTTP Message Signatures directory and key lifecycle                                                        |
 
 When no activating surface exists, record the signal as **not applicable**. Do not award credit for an absent optional capability, and do not deduct points for it. A capability mentioned only in a roadmap, placeholder manifest, or stale documentation is not detected implementation.
 
@@ -82,12 +82,12 @@ If production access, authentication, or mutation risk prevents capability testi
 
 ## Scoring rubric
 
-| Score | Criteria | Detection |
-|-------|----------|-----------|
-| 0 | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or hides public docs from retrieval. | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot/search agents. |
-| 1 | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format. | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path. |
-| 2 | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap with accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL. |
-| 3 | Full agent-readable web surface. Core discovery is semantically valid, not just present. Applicable capability signals are published and verified; unrelated optional protocols are recorded as not applicable. | `llms-full.txt` when useful. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. Applicable API Catalog, MCP, Agent Skills, OAuth, Web Bot Auth, WebMCP, or commerce artifacts parse correctly, link to real content, and advertise working capabilities. |
+| Score | Criteria                                                                                                                                                                                                                                  | Detection                                                                                                                                                                                                                                                                                 |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No agent-specific discovery files. No llms.txt, no AGENTS.md, no structured data. robots.txt blocks AI bots or hides public docs from retrieval.                                                                                          | No llms.txt at web root. No AGENTS.md in repo. No JSON-LD in HTML. robots.txt Disallow for GPTBot/ClaudeBot/search agents.                                                                                                                                                                |
+| 1     | Basic discovery. AGENTS.md, llms.txt, robots.txt, or sitemap exists but is minimal. No capability discovery and no agent-specific content format.                                                                                         | AGENTS.md present but <50 lines or auto-generated. OR llms.txt present but <10 links. Basic sitemap only. No JSON-LD. No Markdown response path.                                                                                                                                          |
+| 2     | Good discovery. llms.txt with categorized links + AGENTS.md with commands and conventions. JSON-LD on key pages. robots.txt allows intended AI retrieval/search bots. Sitemap with accurate lastmod. OpenAPI is linked from docs or root. | llms.txt with H2 sections and descriptions. AGENTS.md with commands, conventions, boundaries. FAQPage/TechArticle/WebAPI JSON-LD. robots.txt explicitly allows retrieval bots and references sitemap. OpenAPI discoverable at a stable URL.                                               |
+| 3     | Full agent-readable web surface. Core discovery is semantically valid, not just present. Applicable capability signals are published and verified; unrelated optional protocols are recorded as not applicable.                           | `llms-full.txt` when useful. Markdown response code or generated `.md` routes. Content-Signal in robots/headers. Applicable API Catalog, MCP, Agent Skills, OAuth, Web Bot Auth, WebMCP, or commerce artifacts parse correctly, link to real content, and advertise working capabilities. |
 
 **N/A when:** Project has no web presence (pure library, CLI-only tool).
 
@@ -107,7 +107,7 @@ If production access, authentication, or mutation risk prevents capability testi
 - `x-markdown-tokens` header on markdown responses (token budget hints)
 - NLWeb `/ask` REST endpoint or `/mcp` server mode
 - "Copy for AI" button or `.md` URL suffix on docs pages (e.g. `/docs/api.md`)
-- Commerce manifests or headers when applicable: x402, Universal Commerce Protocol, Agentic Commerce Protocol
+- Commerce manifests or headers when applicable: x402, MPP, UCP, ACP - see `references/agentic-commerce.md` for the full detection and scoring guidance
 - WebMCP registration (`document.modelContext.registerTool`) in browser code when page-local tools apply
 - Public readiness report URL, scanner name, and scan timestamp when an outside-in scan is available
 
@@ -124,6 +124,7 @@ If production access, authentication, or mutation risk prevents capability testi
 **Format:** Plain text. H1 title, optional `> ` blockquote summary (one paragraph), H2 sections with markdown link + description pairs.
 
 Example structure:
+
 ```
 # Your Project Name
 
@@ -157,7 +158,7 @@ Example structure:
 
 ### AGENTS.md
 
-**Specification:** https://agents.md — contributed to the Agentic AI Foundation under the Linux Foundation.
+**Specification:** https://agents.md - contributed to the Agentic AI Foundation under the Linux Foundation.
 
 **Adoption:** Treat AGENTS.md as the cross-tool baseline for coding-agent context. Tool-specific files such as `CLAUDE.md`, Cursor rules, Copilot instructions, and Codex instructions should layer on top rather than duplicate it.
 
@@ -167,14 +168,18 @@ Example structure:
 # Project Name
 
 ## Overview
+
 High-level description of what this project does and why agents should use it.
 
 ## Commands
+
 Exact, copy-pasteable commands for common tasks. No placeholders.
 ```
+
 $ npm run test
 $ npm run build
 $ npm run dev -- --port 3000
+
 ```
 
 ## Conventions
@@ -199,13 +204,14 @@ Three-tier permission model: always (read docs), ask-first (run tests), never (d
 **Purpose:** Embed semantic information in HTML so agents can understand content without parsing prose.
 
 **Schema.org types for agent discovery:**
-- `SoftwareApplication` — project identity
-- `WebAPI` — REST API description
-- `APIReference` — API docs structure
-- `FAQPage` — common questions
-- `HowTo` — step-by-step guides
-- `TechArticle` — blog posts / technical docs
-- `Dataset` — downloadable datasets or data sources
+
+- `SoftwareApplication` - project identity
+- `WebAPI` - REST API description
+- `APIReference` - API docs structure
+- `FAQPage` - common questions
+- `HowTo` - step-by-step guides
+- `TechArticle` - blog posts / technical docs
+- `Dataset` - downloadable datasets or data sources
 
 **Implementation:** Embed as `<script type="application/ld+json">` in root layout or page templates.
 
@@ -267,6 +273,7 @@ export default function RootLayout({ children }) {
 **Pattern:** When a client sends `Accept: text/markdown`, return a markdown-formatted representation of the page instead of HTML. Also expose `.md` or `index.md` URL fallbacks for clients that cannot set custom headers.
 
 **HTTP headers:**
+
 - Request: `Accept: text/markdown`
 - Response: `Content-Type: text/markdown; charset=utf-8`
 - Always include: `Vary: Accept` (tells caches this response varies by Accept header)
@@ -279,31 +286,31 @@ export default function RootLayout({ children }) {
 
 ```typescript
 // middleware.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const accept = request.headers.get('accept') || '';
-  
-  if (accept.includes('text/markdown')) {
+  const accept = request.headers.get("accept") || "";
+
+  if (accept.includes("text/markdown")) {
     // Only for docs pages
-    if (request.nextUrl.pathname.startsWith('/docs/')) {
+    if (request.nextUrl.pathname.startsWith("/docs/")) {
       return NextResponse.rewrite(new URL(`${request.nextUrl.pathname}.md`, request.url), {
         headers: {
-          'Content-Type': 'text/markdown; charset=utf-8',
-          'Vary': 'Accept',
+          "Content-Type": "text/markdown; charset=utf-8",
+          Vary: "Accept",
         },
       });
     }
   }
-  
+
   // Default HTML response
   const response = NextResponse.next();
-  response.headers.set('Vary', 'Accept');
+  response.headers.set("Vary", "Accept");
   return response;
 }
 
 export const config = {
-  matcher: ['/docs/:path*'],
+  matcher: ["/docs/:path*"],
 };
 ```
 
@@ -313,22 +320,30 @@ export const config = {
 > **For AI agents:** This page is optimized for machine reading. Use `/ask` for natural language queries or clone the repo for full browsing context.
 ```
 
+**Agent-mode page view:** a distinct stripped view (e.g. `?mode=agent`) is a separate pattern from Markdown negotiation - build it only when the value is direct action links rather than prose, and keep its facts in sync with the canonical page. Ora's `agent-mode-view` check looks for this by name; there's no formal spec.
+
+**Locale negotiation:** `Accept-Language` (RFC 7231 §5.3.5) picks a language the same way `Accept` picks a format. Keep `hreflang` alternates, the locale segment in Markdown route paths, and per-locale `llms.txt` files in agreement.
+
 ---
 
 ### Robots.txt for AI crawlers
 
 **Standard training bots:**
+
 - `GPTBot` (OpenAI training)
 - `ClaudeBot` (Anthropic training)
-- `Google-Extended` (Google training, invisible in logs via Search Console)
+- `Google-Extended` (Google training - a normal robots.txt user-agent token, not a Search Console setting; Google states disallowing it does not affect Search ranking or inclusion)
+- `Applebot-Extended` (Apple training - same pattern: disallowing it does not affect Search ranking)
 - `Meta-ExternalAgent` (Meta training)
 
 **Standard search bots:**
+
 - `OAI-SearchBot` (OpenAI search)
 - `Claude-SearchBot` (Anthropic search)
 - `PerplexityBot` (Perplexity search)
 
 **User-agent bots:**
+
 - `ChatGPT-User` (ChatGPT browsing)
 - `Claude-User` (Claude browsing)
 
@@ -367,6 +382,7 @@ Sitemap: https://example.com/sitemap.xml
 ```
 
 **Opt-out pattern:** To block all AI bots:
+
 ```
 User-agent: GPTBot
 Disallow: /
@@ -375,7 +391,11 @@ User-agent: ClaudeBot
 Disallow: /
 ```
 
-**Google-Extended control:** Managed via Google Search Console, not robots.txt. Other bots respect Disallow rules in real time.
+**Google-Extended control:** A `Disallow` rule in robots.txt, same as any other bot. Google and Apple both confirm disallowing their `-Extended` training bot does not affect Search ranking or inclusion; Microsoft's training bots currently support only the `NOARCHIVE` meta tag, with robots.txt support targeted for early 2027.
+
+**Cloudflare's three-way classification (Search/Agent/Training):** Live for all Cloudflare customers since 2026-07-01. Bot Preference Sync (from 2026-08-21) writes those dashboard settings into robots.txt automatically. New domains on Cloudflare default Training to Disallow on ad-monetized pages from 2026-09-15. Decide Search, Agent, and Training as three separate questions - not one toggle.
+
+**Web Bot Auth:** signed HTTP requests (RFC 9421) let a site verify bot identity instead of trusting a spoofable user-agent string. The IETF webbotauth working group adopted `draft-ietf-webbotauth-httpsig-protocol` on 2026-09-01, replacing the earlier individual draft it was based on.
 
 ---
 
@@ -387,9 +407,9 @@ Content Signals let a site declare what automated systems may do with content af
 
 Supported purposes:
 
-- `search` — building a search index and returning linked search results
-- `ai-input` — using content as query-time context, grounding, or RAG input
-- `ai-train` — training or fine-tuning models
+- `search` - building a search index and returning linked search results
+- `ai-input` - using content as query-time context, grounding, or RAG input
+- `ai-train` - training or fine-tuning models
 
 Recommended default for public developer docs:
 
@@ -399,37 +419,39 @@ Content-Signal: search=yes, ai-input=yes, ai-train=no
 
 Audit for consistency. A common bad state is `robots.txt` allowing retrieval bots while response headers or managed bot settings imply `ai-input=no`.
 
+**RSL vs IETF aipref:** RSL 1.0 (rslstandard.org) is a ratified standard for attaching a price or licence condition (pay-per-crawl, subscription, pay-per-inference, attribution, free) via robots.txt, HTTP headers, HTML, RSS, or media files - use it when Content Signals' yes/no isn't enough. IETF aipref (`draft-ietf-aipref-vocab` -08, `draft-ietf-aipref-attach` -05) is still two pre-consensus Internet-Drafts defining a similar `Content-Usage` robots.txt rule and HTTP header - track it, don't require it yet.
+
 ---
 
 ### .well-known/ endpoints
 
 **API discovery:**
 
-- `/.well-known/api-catalog` — RFC 9727 API Catalog listing API specs, docs, and related endpoints
+- `/.well-known/api-catalog` - RFC 9727 API Catalog listing API specs, docs, and related endpoints
 
 **OAuth endpoints (standard):**
 
-- `/.well-known/oauth-authorization-server` — describes OAuth server capabilities (RFC 8414)
-- `/.well-known/oauth-protected-resource` — describes a protected resource expecting OAuth tokens (RFC 9728)
+- `/.well-known/oauth-authorization-server` - describes OAuth server capabilities (RFC 8414)
+- `/.well-known/oauth-protected-resource` - describes a protected resource expecting OAuth tokens (RFC 9728)
 
 **MCP discovery:**
 
-- `/.well-known/mcp/server-card.json` — MCP Server Card describing tools, transport, auth, and connection metadata
-- `/.well-known/mcp.json` — older/emerging MCP metadata path; treat as compatibility, not the only discovery path
+- `/.well-known/mcp/server-card.json` - MCP Server Card describing tools, transport, auth, and connection metadata
+- `/.well-known/mcp.json` - older/emerging MCP metadata path; treat as compatibility, not the only discovery path
 
 **Agent discovery endpoints:**
 
-- `/.well-known/agent-skills/index.json` — index of reusable Agent Skills available for this site or service
-- `/.well-known/agent.json` — A2A v1.0 RC agent card (canonical endpoint)
-- `/.well-known/agent-card.json` — alternative name (accepted by most tools)
+- `/.well-known/agent-skills/index.json` - index of reusable Agent Skills available for this site or service
+- `/.well-known/agent.json` - A2A v1.0 RC agent card (canonical endpoint)
+- `/.well-known/agent-card.json` - alternative name (accepted by most tools)
 
 **Bot identity:**
 
-- `/.well-known/http-message-signatures-directory` — public keys for Web Bot Auth signed requests
+- `/.well-known/http-message-signatures-directory` - public keys for Web Bot Auth signed requests
 
 **Deprecated (do not use):**
 
-- `/.well-known/ai-plugin.json` — ChatGPT plugin manifest. **REMOVED Jan 2025.** Do not implement.
+- `/.well-known/ai-plugin.json` - ChatGPT plugin manifest. **REMOVED Jan 2025.** Do not implement.
 
 **A2A agent card example** (`/.well-known/agent.json`):
 
@@ -606,15 +628,18 @@ Response 200:
 ### "Copy for AI" UX patterns
 
 **Pattern 1: Button on each docs page**
+
 - Place a "Copy as Markdown" button next to or in the page header
 - Copies markdown-formatted version of current page + parent context to clipboard
 - Often combined with keyboard shortcut (e.g. `Cmd+Shift+M`)
 
 **Pattern 2: Markdown URL suffix**
+
 - `/docs/api` (HTML) vs `/docs/api.md` (markdown)
 - Served via content negotiation or explicit routes
 
 **Detection in code:**
+
 ```typescript
 // docs/[slug].tsx — Next.js example
 export default function DocsPage({ slug, content }) {
@@ -634,11 +659,22 @@ export default function DocsPage({ slug, content }) {
 
 ---
 
+### Changelog feeds, status pages, agent terms of use
+
+No scanner checks these; all three have real primary-source or practical backing.
+
+- **Changelog / RSS or Atom feed** - a dated changelog (RSS 2.0 or Atom, RFC 4287) lets an agent already holding your docs detect drift with one small fetch instead of re-ingesting everything. Advertise it with `<link rel="alternate" type="application/atom+xml" href="/changelog/feed.xml">`. Entries need a real date and a specific description of what changed, not "bumped dependencies."
+- **Status page** - a public `/status` page or third-party status service lets an agent tell an outage from its own error before retrying or backing off. Link it from the API Catalog entry.
+- **Agent terms of use** - a published, standalone policy stating what automated/unattended use is actually permitted. No IETF/W3C standard backs this; it's a legal-practice recommendation. Link it from `llms.txt` and API docs, not just general Terms of Service.
+
+---
+
 ## OpenAI Apps SDK / ChatGPT Directory
 
 **Submission:** https://developers.openai.com/apps-sdk
 
 Built on MCP. Apps use MCP servers as transport layer for agent interaction. Complement your MCP server with:
+
 1. `/.well-known/mcp/server-card.json` and `/.well-known/mcp.json` only as a compatibility pointer when needed
 2. Clear AGENTS.md with OpenAI-specific notes
 3. OAuth 2.1 client credentials for agent authentication
@@ -666,55 +702,57 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 ## Templates and tooling
 
 **Templates:**
-- `/templates/discovery/llms.txt` — starter structure with sections
-- `/templates/discovery/llms-full.txt` — full docs template with token comment
-- `/templates/discovery/robots-ai.txt` — pre-filled robots.txt allowing major AI bots
-- `/templates/discovery/AGENTS.md` — hand-curated baseline structure
-- `/templates/discovery/json-ld-softwareapp.ts` — SoftwareApplication schema helper (Next.js)
-- `/templates/discovery/content-negotiation.ts` — markdown negotiation middleware (Next.js)
-- `/templates/mcp-and-api/agent-card.json` — A2A v1.0 RC card scaffold
-- `/templates/discovery/api-catalog.json` — RFC 9727 API catalog scaffold
-- `/templates/mcp-and-api/mcp-server-card.json` — MCP Server Card scaffold
-- `/templates/discovery/agent-skills-index.json` — Agent Skills discovery index
+
+- `/templates/discovery/llms.txt` - starter structure with sections
+- `/templates/discovery/llms-full.txt` - full docs template with token comment
+- `/templates/discovery/robots-ai.txt` - pre-filled robots.txt allowing major AI bots
+- `/templates/discovery/AGENTS.md` - hand-curated baseline structure
+- `/templates/discovery/json-ld-softwareapp.ts` - SoftwareApplication schema helper (Next.js)
+- `/templates/discovery/content-negotiation.ts` - markdown negotiation middleware (Next.js)
+- `/templates/mcp-and-api/agent-card.json` - A2A v1.0 RC card scaffold
+- `/templates/discovery/api-catalog.json` - RFC 9727 API catalog scaffold
+- `/templates/mcp-and-api/mcp-server-card.json` - MCP Server Card scaffold
+- `/templates/discovery/agent-skills-index.json` - Agent Skills discovery index
 
 **Tooling (verify currency):**
-- `llmstxt-generator` — CLI to build llms.txt from docs structure
-- `@vercel/llms` — Vercel SDK helper (if exists; check npm)
-- `next-llmstxt` — Next.js plugin for auto-serving llms.txt
-- `a2a-agent-card-builder` — A2A schema validator
+
+- `llmstxt-generator` - CLI to build llms.txt from docs structure
+- `@vercel/llms` - Vercel SDK helper (if exists; check npm)
+- `next-llmstxt` - Next.js plugin for auto-serving llms.txt
+- `a2a-agent-card-builder` - A2A schema validator
 
 ---
 
 ## Citations
 
-- https://llmstxt.org — llms.txt specification (Jeremy Howard, Answer.AI)
-- https://agents.md — AGENTS.md specification (Agentic AI Foundation, Linux Foundation)
-- https://schema.org/SoftwareApplication — schema.org type definitions
-- https://a2a-protocol.org/latest/specification/ — A2A v1.0.1 agent card protocol
-- https://github.com/microsoft/NLWeb — NLWeb project
-- https://modelcontextprotocol.io/specification/2026-07-28 — current MCP specification revision
-- https://webmachinelearning.github.io/webmcp/ — current WebMCP Community Group draft
-- https://is-agentic.com/methodology — Is Agentic scoring model and limitations
-- https://is-agentic.com/docs — Is Agentic report API, CLI, MCP, and skill surfaces
-- https://www.rfc-editor.org/rfc/rfc8414.html — OAuth 2.0 Authorization Server Metadata
-- https://www.rfc-editor.org/rfc/rfc9457.html — Problem Details for HTTP APIs
-- https://developers.openai.com/apps-sdk — OpenAI Apps SDK (MCP-based)
-- https://docs.cloud.google.com/agent-builder/agent-engine/overview — Google Vertex AI Agent Engine discovery
-- https://blog.cloudflare.com/agent-readiness/ — Agent Readiness scoring model and measured standards
-- https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/ — Markdown for Agents and token hints
-- https://developers.cloudflare.com/ai-crawl-control/ — AI crawler visibility and access controls
-- https://contentsignals.org — Content Signals
-- https://www.rfc-editor.org/rfc/rfc9727.html — API Catalog
-- https://www.rfc-editor.org/rfc/rfc9728.html — OAuth 2.0 Protected Resource Metadata
+- https://llmstxt.org - llms.txt specification (Jeremy Howard, Answer.AI)
+- https://agents.md - AGENTS.md specification (Agentic AI Foundation, Linux Foundation)
+- https://schema.org/SoftwareApplication - schema.org type definitions
+- https://a2a-protocol.org/latest/specification/ - A2A v1.0.1 agent card protocol
+- https://github.com/microsoft/NLWeb - NLWeb project
+- https://modelcontextprotocol.io/specification/2026-07-28 - current MCP specification revision
+- https://webmachinelearning.github.io/webmcp/ - current WebMCP Community Group draft
+- https://is-agentic.com/methodology - Is Agentic scoring model and limitations
+- https://is-agentic.com/docs - Is Agentic report API, CLI, MCP, and skill surfaces
+- https://www.rfc-editor.org/rfc/rfc8414.html - OAuth 2.0 Authorization Server Metadata
+- https://www.rfc-editor.org/rfc/rfc9457.html - Problem Details for HTTP APIs
+- https://developers.openai.com/apps-sdk - OpenAI Apps SDK (MCP-based)
+- https://docs.cloud.google.com/agent-builder/agent-engine/overview - Google Vertex AI Agent Engine discovery
+- https://blog.cloudflare.com/agent-readiness/ - Agent Readiness scoring model and measured standards
+- https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/ - Markdown for Agents and token hints
+- https://developers.cloudflare.com/ai-crawl-control/ - AI crawler visibility and access controls
+- https://contentsignals.org - Content Signals
+- https://www.rfc-editor.org/rfc/rfc9727.html - API Catalog
+- https://www.rfc-editor.org/rfc/rfc9728.html - OAuth 2.0 Protected Resource Metadata
 
 ---
 
 ## See also
 
-- `docs/discovery` — Agent discovery workflows (in Fumadocs site)
-- `templates/discovery/llms.txt`, `templates/discovery/AGENTS.md`, `templates/discovery/json-ld-softwareapp.ts` — AEO templates
-- `references/context-files.md` — Detailed AGENTS.md curation guide
-- `references/authentication.md` — OAuth 2.1 and .well-known/oauth-protected-resource
+- `docs/discovery` - Agent discovery workflows (in Fumadocs site)
+- `templates/discovery/llms.txt`, `templates/discovery/AGENTS.md`, `templates/discovery/json-ld-softwareapp.ts` - AEO templates
+- `references/context-files.md` - Detailed AGENTS.md curation guide
+- `references/authentication.md` - OAuth 2.1 and .well-known/oauth-protected-resource
 
 ## Discovery through to use
 

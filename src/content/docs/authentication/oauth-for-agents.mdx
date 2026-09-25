@@ -1,6 +1,7 @@
 ---
 title: OAuth 2.1 for Agents
 description: Client Credentials grant, PKCE, token caching, and JWT validation for M2M auth
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -171,7 +172,7 @@ Validation checks, in order:
 3. **Audience (`aud`):** Must include your service's identifier.
 4. **Expiry (`exp`):** Must be a Unix timestamp in the future (with small clock skew allowance).
 
-If your tokens include `org_id` or `tenant_id`, validate those as part of authorization — not authentication:
+If your tokens include `org_id` or `tenant_id`, validate those as part of authorization - not authentication:
 
 ```typescript
 async function authorize(token: string, resourceOrgId: string): Promise<void> {
@@ -225,10 +226,10 @@ PKCE ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)) is mandatory in
 
 ## See Also
 
-- [Token Exchange](/docs/authentication/token-exchange) — narrowing scope for sub-agents
-- [API Keys](/docs/authentication/api-keys) — simpler alternative for single-service credentials
-- [Agent Identity](/docs/authentication/agent-identity) — first-class agent principals and audit trails
-- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
-- [auth.md](/docs/authentication/auth-md) — registering or claiming user-bound credentials
-- ([OAuth 2.1 draft](https://oauth.net/2.1/)) — current OAuth 2.1 work
-- ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) — Client Credentials and token endpoints
+- [Token Exchange](/docs/authentication/token-exchange) - narrowing scope for sub-agents
+- [API Keys](/docs/authentication/api-keys) - simpler alternative for single-service credentials
+- [Agent Identity](/docs/authentication/agent-identity) - first-class agent principals and audit trails
+- [DPoP](/docs/authentication/dpop) - sender-constrained tokens
+- [auth.md](/docs/authentication/auth-md) - registering or claiming user-bound credentials
+- [OAuth 2.1 draft](https://oauth.net/2.1/) - current OAuth 2.1 work
+- [RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749) - Client Credentials and token endpoints

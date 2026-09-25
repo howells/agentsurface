@@ -1,10 +1,16 @@
 /**
  * MCP Server (stdio) — Minimal canonical implementation
  *
- * Canonical spec: https://modelcontextprotocol.io/specification/2025-11-25
- * SDK: @modelcontextprotocol/sdk (1.x)
+ * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
+ * SDK: @modelcontextprotocol/server (v2, implements the 2026-07-28 spec)
  * Transport: stdio (local, single connection, trusted)
  * Authentication: OS-level (trust delegated to host process)
+ *
+ * 2026-07-28 dropped the initialize/notifications/initialized handshake and
+ * the Mcp-Session-Id concept everywhere, including stdio — every request now
+ * carries its own protocol version in `_meta`, and servers MUST implement
+ * `server/discover` so a client can probe supported versions up front or as
+ * a compatibility check.
  *
  * When to use:
  * - Local development and testing
@@ -27,34 +33,20 @@
  * ✓ Test with InMemoryTransport.createLinkedPair()
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type {
-  Tool,
-  Resource,
-  Prompt,
-  TextContent,
-  ErrorContent,
-  TaskState,
-} from "@modelcontextprotocol/sdk/types.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import type { TextContent } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 // ===== Server Initialization =====
 
-const server = new McpServer(
-  {
-    name: "example-agent-api",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      prompts: {},
-      resources: {},
-      tasks: {}, // Enable only when the io.modelcontextprotocol/tasks extension is negotiated.
-      tools: {},
-    },
-  },
-);
+// Tasks moved out of core into the io.modelcontextprotocol/tasks extension;
+// declare it under `extensions` rather than a core `tasks` capability, and
+// only when you actually implement tasks/get + tasks/update polling.
+const server = new McpServer({
+  name: "example-agent-api",
+  version: "1.0.0",
+});
 
 // ===== Structured Logging =====
 
@@ -180,7 +172,7 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
  * - RFC 9457-style error payload
  */
 async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Promise<{
-  content: TextContent[] | ErrorContent[];
+  content: TextContent[];
   isError?: boolean;
 }> {
   logger.info("create_issue called", {
@@ -226,15 +218,18 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
 }
 
 /**
- * wait_for_build: Long-running tool demonstrating Tasks async primitive
+ * wait_for_build: Long-running tool, hand-rolled polling loop
  *
- * Demonstrates (MCP 2025-11-25):
- * - Task state machine: working → input_required | completed | failed | cancelled
- * - Progress notifications via progressToken
- * - Polling with exponential backoff
+ * This tool blocks inside the handler and polls with exponential backoff.
+ * As of 2026-07-28, the spec-native way to model a long-running operation is
+ * the io.modelcontextprotocol/tasks extension: a tool call returns a task
+ * handle, the client polls it with tasks/get, and can push input with
+ * tasks/update. Reach for that extension when a client needs to observe
+ * progress or cancel independently; this in-handler loop is the simpler
+ * option when the client is content to just wait for the final result.
  */
 async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Promise<{
-  content: TextContent[] | ErrorContent[];
+  content: TextContent[];
   isError?: boolean;
 }> {
   logger.info("wait_for_build called", {
@@ -306,48 +301,45 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
 
 // ===== Tool Registration =====
 
-server.tool(
+server.registerTool(
   "search_docs",
-  "Search project documentation by keyword. Use when you need to find relevant docs or API references. Accepts any search term. Returns up to 50 results ranked by relevance.",
   {
-    schema: searchDocsSchema,
-  },
-  handleSearchDocs,
-  {
+    description:
+      "Search project documentation by keyword. Use when you need to find relevant docs or API references. Accepts any search term. Returns up to 50 results ranked by relevance.",
+    inputSchema: searchDocsSchema,
     annotations: {
       openWorldHint: true,
       readOnlyHint: true,
     },
   },
+  handleSearchDocs,
 );
 
-server.tool(
+server.registerTool(
   "create_issue",
-  "Create a new issue in the project tracker. Use when you need to report a bug, request a feature, or log a task. Do not use for general communication. All issues are immutable once created; use update_issue for modifications.",
   {
-    schema: createIssueSchema,
-  },
-  handleCreateIssue,
-  {
+    description:
+      "Create a new issue in the project tracker. Use when you need to report a bug, request a feature, or log a task. Do not use for general communication. All issues are immutable once created; use update_issue for modifications.",
+    inputSchema: createIssueSchema,
     annotations: {
       destructiveHint: true,
       idempotentHint: true,
     },
   },
+  handleCreateIssue,
 );
 
-server.tool(
+server.registerTool(
   "wait_for_build",
-  "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout. Demonstrates MCP 2025-11-25 Tasks async primitive.",
   {
-    schema: waitForBuildSchema,
-  },
-  handleWaitForBuild,
-  {
+    description:
+      "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout. This tool polls internally rather than using the io.modelcontextprotocol/tasks extension — reach for that extension instead when a client should be able to check progress independently.",
+    inputSchema: waitForBuildSchema,
     annotations: {
       openWorldHint: true,
     },
   },
+  handleWaitForBuild,
 );
 
 // ===== Resource Handlers =====
@@ -379,7 +371,7 @@ Monitor CI/CD builds.
 
 - analyze_thread — analyze a discussion thread
 
-See https://modelcontextprotocol.io/specification/2025-11-25 for spec details.
+See https://modelcontextprotocol.io/specification/2026-07-28 for spec details.
 `;
 
   return {

@@ -2,7 +2,7 @@
  * OpenTelemetry GenAI Instrumentation — Emit semantic conventions for agent tracing
  *
  * **What it is:** Setup that emits OpenTelemetry GenAI semantic conventions:
- * `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
+ * `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
  * `gen_ai.usage.output_tokens`, `gen_ai.operation.name`, tool spans with
  * `gen_ai.tool.name`, `gen_ai.tool.call.id`. Includes decorator for chat operations
  * and Langfuse + OTLP exporters side-by-side.
@@ -48,7 +48,7 @@ import { context, trace, Span, SpanStatusCode } from "@opentelemetry/api";
 import { z } from "zod";
 
 // <CUSTOMISE>: Update model, provider, system prompt
-const MODEL_NAME = "claude-opus-5";
+const MODEL_NAME = "claude-opus-5-5";
 const PROVIDER = "anthropic";
 const SYSTEM_PROMPT = "You are a helpful AI agent...";
 
@@ -92,7 +92,7 @@ const tracer = trace.getTracer("agent-tracer", "1.0.0");
  * Chat operation span
  *
  * Sets GenAI semantic convention attributes:
- * - gen_ai.system = "anthropic" | "openai" | "google"
+ * - gen_ai.provider.name = "anthropic" | "openai" | "google"
  * - gen_ai.request.model = model ID
  * - gen_ai.operation.name = "chat"
  * - gen_ai.input.messages = system + user message
@@ -136,7 +136,7 @@ export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
           ]),
           "gen_ai.operation.name": operationName,
           "gen_ai.request.model": input.model || MODEL_NAME,
-          "gen_ai.system": PROVIDER,
+          "gen_ai.provider.name": PROVIDER,
         });
 
         // Optional: user context
@@ -158,7 +158,7 @@ export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
         });
 
         if (result.stopReason) {
-          span.setAttribute("gen_ai.stop_reason", result.stopReason);
+          span.setAttribute("gen_ai.response.finish_reasons", [result.stopReason]);
         }
 
         span.setStatus({ code: SpanStatusCode.OK });
@@ -300,11 +300,14 @@ export function logSpanContext(): void {
  */
 
 /**
- * GenAI semantic convention reference (April 2026):
+ * GenAI semantic convention reference (September 2026):
+ *
+ * `gen_ai.system` was replaced by `gen_ai.provider.name`; update any older
+ * instrumentation still emitting the former.
  *
  * Root span (chat operation):
- * - gen_ai.system: "anthropic" | "openai" | "google"
- * - gen_ai.request.model: e.g., "claude-opus-5"
+ * - gen_ai.provider.name: "anthropic" | "openai" | "google"
+ * - gen_ai.request.model: e.g., "claude-opus-5-5"
  * - gen_ai.request.max_tokens: integer
  * - gen_ai.request.temperature: 0-2
  * - gen_ai.input.messages: JSON array of messages
@@ -314,7 +317,7 @@ export function logSpanContext(): void {
  * - gen_ai.system_instructions: hash or summary of system prompt
  * - gen_ai.data_source.id: RAG corpus ID if applicable
  * - gen_ai.operation.name: e.g., "chat", "completion", "embedding"
- * - gen_ai.stop_reason: e.g., "end_turn", "max_tokens"
+ * - gen_ai.response.finish_reasons: array, e.g., ["end_turn"] or ["max_tokens"]
  *
  * Tool span (child of root):
  * - Span name: tool.{tool_name}

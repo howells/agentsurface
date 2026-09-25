@@ -1,12 +1,12 @@
 ---
 title: Protected Resource Metadata
 description: RFC 9728 resource server discovery for OAuth-protected APIs and MCP servers
-lastVerified: 2026-08-27
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to validate tokens against the correct JWKS, determine if DPoP is required, and learn which scopes you support.
+Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to validate tokens against the correct JWKS and learn which scopes you support. RFC 9728 does not standardize a DPoP-requirement field; if you require DPoP, advertise it separately (see the note below).
 
 - `resource`: your API or MCP server's resource URI
 - `authorization_servers`: list of trusted identity providers
@@ -15,7 +15,7 @@ Publish your resource server's metadata at `/.well-known/oauth-protected-resourc
 - `bearer_methods_supported`: accepted bearer token transport methods
 - Cache with `Cache-Control: max-age=3600`
 
-When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, where to validate JWTs, and whether bearer tokens require extra constraints such as DPoP. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the authorization server metadata endpoint. RFC 9728 Protected Resource Metadata defines the metadata that a resource server exposes about itself.
+When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, and where to validate JWTs. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the authorization server metadata endpoint. RFC 9728 Protected Resource Metadata defines the metadata that a resource server exposes about itself.
 
 Publish this metadata at `/.well-known/oauth-protected-resource` to allow clients (including MCP) to discover your auth requirements and validate tokens correctly.
 
@@ -42,13 +42,13 @@ Publish this metadata at `/.well-known/oauth-protected-resource` to allow client
 
 Key fields:
 
-- `resource` — your API's base URI or MCP endpoint resource identifier
-- `authorization_servers` — list of auth servers that can issue tokens you accept
-- `scopes_supported` — all scopes your API recognizes
-- `jwks_uri` — where to fetch public keys for JWT validation
-- `bearer_methods_supported` — accepted bearer token locations, usually `["header"]`
-- `resource_signing_alg_values_supported` — algorithms used when the resource signs responses or metadata
-- `resource_name` — human-readable resource name for client UI
+- `resource` - your API's base URI or MCP endpoint resource identifier
+- `authorization_servers` - list of auth servers that can issue tokens you accept
+- `scopes_supported` - all scopes your API recognizes
+- `jwks_uri` - where to fetch public keys for JWT validation
+- `bearer_methods_supported` - accepted bearer token locations, usually `["header"]`
+- `resource_signing_alg_values_supported` - algorithms used when the resource signs responses or metadata
+- `resource_name` - human-readable resource name for client UI
 
 Authorization-server capabilities such as `grant_types_supported`, `response_types_supported`, token endpoints, and token endpoint auth methods belong in the authorization server metadata document, not the protected resource metadata document.
 
@@ -67,37 +67,15 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
 ```
 
-Then the authorization server metadata can advertise supported agent registration flows:
-
-```json
-{
-  "issuer": "https://auth.example.com/",
-  "token_endpoint": "https://auth.example.com/oauth/token",
-  "agent_auth": {
-    "skill": "https://example.com/auth.md",
-    "identity_endpoint": "https://auth.example.com/agent/identity",
-    "claim_endpoint": "https://auth.example.com/agent/identity/claim",
-    "identity_types_supported": ["identity_assertion", "anonymous"],
-    "identity_assertion": {
-      "assertion_types_supported": ["urn:ietf:params:oauth:token-type:id-jag"]
-    }
-  }
-}
-```
-
-Use [auth.md](/docs/authentication/auth-md) for the full registration model. Treat this metadata as discovery only; authorization still depends on validating the issued bearer token on every request.
+The authorization server metadata then advertises supported agent registration flows through its optional `agent_auth` block - see [auth.md](/docs/authentication/auth-md) for the full field-by-field example and the current registration model. Treat this metadata as discovery only; authorization still depends on validating the issued bearer token on every request.
 
 ## Next.js Implementation
 
 ```typescript
-// pages/api/.well-known/oauth-protected-resource.ts
-import { NextApiRequest, NextApiResponse } from "next";
+// app/.well-known/oauth-protected-resource/route.ts
+import { NextResponse } from "next/server";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+export async function GET() {
   const metadata = {
     resource: "https://api.example.com",
     authorization_servers: ["https://auth.example.com/"],
@@ -115,9 +93,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     resource_name: "Example API",
   };
 
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Cache-Control", "public, max-age=3600");
-  return res.status(200).json(metadata);
+  return NextResponse.json(metadata, {
+    headers: { "Cache-Control": "public, max-age=3600" },
+  });
 }
 ```
 
@@ -125,13 +103,14 @@ Serve it at `https://api.example.com/.well-known/oauth-protected-resource` (stan
 
 ## How MCP Uses This
 
-MCP clients from the `2025-11-25` revision onward fetch this metadata to:
+MCP clients (this metadata discovery has been part of the spec since the `2025-11-25` revision) fetch this metadata to:
 
 1. Discover which authorization servers can issue tokens
 2. Validate tokens against the correct JWKS endpoint
-3. Determine if DPoP is required
-4. Learn which scopes the API supports
-5. Use the correct token endpoint for token exchange
+3. Learn which scopes the API supports
+4. Use the correct token endpoint for token exchange
+
+DPoP is not part of this discovery flow in the ratified MCP spec - see [DPoP](/docs/authentication/dpop) for why. If your resource server independently requires DPoP (an OAuth-layer decision, not an MCP one), advertise it through a field you define and document in your own metadata, since RFC 9728 does not standardize one.
 
 When an MCP server calls your resource server, it:
 
@@ -139,7 +118,7 @@ When an MCP server calls your resource server, it:
 2. Validates the resource identifier matches
 3. Fetches the JWKS from the declared `jwks_uri`
 4. On every request, validates the JWT signature against JWKS and verifies `iss` and `aud` claims
-5. Includes a DPoP proof when the selected authorization flow or resource policy requires sender-constrained tokens
+5. Includes a DPoP proof only if your resource server independently requires sender-constrained tokens
 
 ```typescript
 // MCP client example (simplified)
@@ -178,9 +157,9 @@ async function callResourceServer(token: string, endpoint: string) {
   obligations around it tighten. Clients must validate the `iss` parameter on the authorization
   response against the issuer they discovered through this document, per RFC 9207 (SEP-2468), and
   must store client credentials keyed by that issuer rather than by resource, re-registering when a
-  resource's `authorization_servers` entry changes (SEP-2352). Publishing a stable, correct `issuer`
-  in your authorization server metadata is therefore load-bearing in a way it was not before —
-  changing it invalidates every client credential registered against it.
+  resource's `authorization_servers` entry changes (SEP-2352). A stable, correct `issuer` in your
+  authorization server metadata matters more than before: changing it invalidates every client
+  credential registered against it.
 </Callout>
 
 ## Minimal Metadata for Simple APIs
@@ -257,9 +236,9 @@ Clients typically cache metadata for 1 hour (specify `Cache-Control: max-age=360
 
 ## See Also
 
-- [DPoP](/docs/authentication/dpop) — sender-constrained tokens
-- [Token Exchange](/docs/authentication/token-exchange) — RFC 8693 delegation
-- [MCP Authorization](/docs/authentication/mcp-auth-model) — MCP's use of metadata
-- [auth.md](/docs/authentication/auth-md) — agentic registration discovery
-- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — base specification
-- ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — resource server extension
+- [DPoP](/docs/authentication/dpop) - sender-constrained tokens
+- [Token Exchange](/docs/authentication/token-exchange) - RFC 8693 delegation
+- [MCP Authorization](/docs/authentication/mcp-auth-model) - MCP's use of metadata
+- [auth.md](/docs/authentication/auth-md) - agentic registration discovery
+- [RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414) - base specification
+- [RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html) - resource server extension

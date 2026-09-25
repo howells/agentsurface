@@ -1,0 +1,78 @@
+---
+title: Payments
+description: Spending authority, mandates, AP2, x402, MPP, card-network agent schemes, and Stripe's agent payment primitives
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+An agent that buys things needs explicit, verifiable, revocable spending authority, and the merchant on the other side needs to know the agent is authorized to spend on a specific user's behalf. Ad-hoc "card on file with the agent vendor" breaks both halves: the user cannot see or cap what the agent may spend, and the merchant cannot tell an authorized agent from a scripted bot replaying stored credentials. Every serious payment protocol in this space converges on the same fix: a signed, scoped, revocable authorization - a **mandate** - as a first-class object instead of an implicit trust relationship.
+
+- A mandate is not a payment: it authorizes one, and is a different fact from a completed payment or a delivered order
+- **AP2** - the general mandate primitive, now under the FIDO Alliance, thin production deployment
+- **x402** and **MPP** - HTTP-native machine-to-machine payment for a single request, not a cart
+- Card networks (Visa, Mastercard) are shipping their own agent-payment schemes; Stripe is shipping agent-specific payment primitives on top of card and stablecoin rails
+- Distinguish **human-present** (the user is watching and approves in the moment) from **human-not-present** (delegated, unattended) - protocols increasingly support both, but they need different controls
+
+## Mandates: the common primitive
+
+A **mandate** is a signed payment authorization that binds an agent, a user, an amount cap, and a scope into a single verifiable credential a merchant or payment network can check. Distinguish that authorization from a payment challenge, settlement proof, or receipt - they answer different questions, and validating one does not validate the others.
+
+Agentic commerce is an agent-authorization problem as much as a payments problem. A mandate is a specialization of the general pattern in [Agent Identity](/docs/authentication/agent-identity): scoped, delegated, auditable authority that a downstream service can verify without trusting the caller's self-description. Design your spending authority as verifiable signed intent, and the specific protocol becomes a serialization detail.
+
+## AP2 - Agent Payments Protocol
+
+**Status: strong governance, thin deployment.** AP2 is Google-originated with 60+ collaborators and was donated to the FIDO Alliance on 2026-04-28, together with Mastercard's Verifiable Intent work (below). The spec is at v0.2.0 and includes "Human Not Present" flows for delegated purchases the user is not actively watching.
+
+AP2's core object is the mandate described above: Intent, Cart, and Payment mandates, each Open or Closed, proving a human authorized a purchase. [UCP](/docs/agentic-commerce/checkout-protocols) is designed to be AP2-compatible, which is why AP2 matters even where it is not yet directly deployed as a standalone integration. Adopt the mandate concept now; pin a hard dependency on AP2 endpoints only once your payment partner ships concrete support.
+
+## x402 - HTTP 402 payments
+
+**Status: infrastructure-real.** x402 revives the long-dormant HTTP `402 Payment Required` status code as an actual payment-negotiation mechanism. It originated at Coinbase and moved under the Linux Foundation as the x402 Foundation in April 2026, with members including AWS, Cloudflare, Anthropic, and Circle.
+
+Unlike UCP and AP2, x402 already runs in production infrastructure: Cloudflare and AWS both operate x402 stablecoin micropayments at the edge, letting a server answer a request with `402` plus payment terms and accept an on-chain settlement inline. Coinbase self-reports roughly 169M payments to date - attribute that figure to Coinbase rather than treating it as independently verified.
+
+x402 fits a different shape than the cart-and-checkout protocols: it is for per-request, machine-to-machine settlement (paying for an API call, a piece of content, a compute unit) rather than consumer retail checkout. If your surface is a metered API or agent-callable resource, x402 is the relevant protocol, not UCP or ACP.
+
+The clearest productization so far is Cloudflare's [Monetization Gateway](https://blog.cloudflare.com/monetization-gateway/) (waitlist opened 2026-07-01): usage-based pricing for any protected resource - pages, datasets, API routes, MCP tools - settled over x402. The flow is the raw protocol: the server answers a gated request with `402 Payment Required` carrying price, accepted asset, and payment destination; the client pays and retries with proof; a facilitator verifies; the resource is returned. Settlement is peer-to-peer to the seller's wallet in stablecoins (USDC, Open USD, redeemable for fiat), with sub-second settlement as the design target. Two details matter for agent-surface design: pricing rules can be conditional (per-request, compute-scaled up to a cap, or charged only to unauthenticated callers), and the gateway can require [Web Bot Auth](/docs/agentic-commerce/trust-and-risk) before pricing rules apply - identity verification and payment negotiation composing into one edge flow. This generalizes the earlier Pay Per Crawl experiment from "charge crawlers for content" to "charge any caller for any resource," making a priced agent surface a configuration decision rather than a billing-infrastructure project.
+
+## MPP - Machine Payments Protocol
+
+MPP supports the same shape of problem as x402 through a vendor-neutral spec: HTTP payment-gated resources. It is relevant when a client needs to pay for an API request, content, or tool call - not for a free documentation service, and not for retail checkout, which needs product, cart, shipping, and order semantics beyond paying for one HTTP resource. [MPP overview](https://mpp.dev/overview).
+
+The server returns an HTTP 402 payment challenge; the client evaluates the terms and, within its spending authority, obtains and returns a payment credential; the server verifies payment before releasing the resource and supplies receipt information. Use the maintained implementation for challenge construction, credential validation, and receipts rather than assembling a plausible-looking header by hand. [Server integration](https://mpp.dev/quickstart/server).
+
+Set resource, merchant, currency, amount, and aggregate spending limits before allowing an agent to pay, and require user approval for commitments outside that authority. Keep server secrets out of client bundles and logs. Separate payment authorization from access to private data - paying for a resource does not grant another person's permissions. [Managing agent spend](https://mpp.dev/guides/managing-agent-spend). Document expired challenges, unsupported payment methods, insufficient funds, duplicate credentials, interrupted delivery, refund policy, and whether retrying a request can charge again; distinguish transport retries from a new purchase.
+
+Choosing between MPP and x402 comes down to the payment methods, clients, and provider integrations you actually need to support - both solve the same HTTP-402 shape with different settlement rails.
+
+## Card-network agent schemes
+
+The card networks are publishing their own agent-payment frameworks, layered on top of card rails rather than replacing them.
+
+**Visa** - [Visa Intelligent Commerce](https://www.visa.com/en-us/solutions/intelligent-commerce) is Visa's strategic portfolio for agent-driven transactions, covering agents, issuers, merchants, and developers. Within it, the [Trusted Agent Protocol](https://developer.visa.com/capabilities/trusted-agent-protocol/overview), developed with Cloudflare, lets a merchant distinguish a legitimate commerce agent from a scraper or fraud bot: the agent signs its requests with a merchant- and purpose-specific, time-bound signature that cannot be replayed or relayed, and the merchant verifies it against a published key. See [Trust and Risk](/docs/agentic-commerce/trust-and-risk) for the verification mechanics, which are the same shape as Web Bot Auth.
+
+**Mastercard** - [Agent Pay](https://www.mastercard.com/us/en/business/artificial-intelligence/mastercard-agent-pay.html) is Mastercard's agent-payment framework, including an "Agent Pay for Machines" track for machine-to-machine payments announced June 2026. Its trust layer is [Verifiable Intent](https://verifiableintent.dev) (Draft v0.1, 2026), an open specification co-developed with Google that creates a tamper-evident delegation chain binding an agent's actions to a human-approved scope: layered SD-JWT credentials bind issuer, user, and agent; eight constraint types express amount bounds, merchant allowlists, budget caps, and recurrence terms; and the mapping is explicitly protocol-agnostic, with bindings to AP2, ACP, and UCP rather than a Mastercard-only format. Verifiable Intent was donated to the FIDO Alliance alongside AP2 on 2026-04-28.
+
+Treat both as watchlist-adjacent rather than production-default: real backing (Visa + Cloudflare; Mastercard + Google, with Adyen, Checkout.com, Fiserv, Worldpay, IBM, and Basis Theory expressing support for Verifiable Intent), but single-network origin and no cross-vendor governance the way UCP or AP2 have. Evaluate them when your payment processor or acquirer actually supports them, not ahead of that.
+
+## Stripe's agent payment primitives
+
+Stripe's [agentic commerce](https://docs.stripe.com/agentic-commerce) surface splits by role. For **sellers**, Stripe supports selling through agents (share your catalog, accept agent-initiated checkout via UCP or ACP) and accepting machine payments (MPP or x402) for API calls and services. For **agent builders** (private preview), Stripe provides [Shared Payment Tokens](https://docs.stripe.com/agentic-commerce/concepts/shared-payment-tokens) (SPTs) - a scoped grant to use a customer's payment method, with its own usage and expiry limits, issued from the Link Agent Wallet and usable across all Stripe-supported currencies. An SPT is functionally a mandate: the buyer authorizes it once, the agent presents it to complete a purchase, and it cannot be reused outside its scope. Stripe's [Delegated Payment Spec](https://developers.openai.com/commerce/guides/key-concepts) is the mechanism OpenAI uses to share payment credentials with merchants in Agentic Checkout flows - Stripe's Shared Payment Token is the first implementation of it.
+
+## Human-present vs human-not-present
+
+Distinguish two authorization shapes before choosing a control:
+
+- **Human-present** - the user is in the loop at the moment of purchase: reviewing a cart, approving a total, confirming a payment prompt. This is the default shape for ACP checkout sessions and most retail UCP flows today.
+- **Human-not-present** - the user has delegated authority ahead of time (a budget, a recurring purchase, an agent monitoring price and buying when a condition is met) and is not watching the specific transaction. AP2's "Human Not Present" flows and Mastercard's "Agent Pay for Machines" both target this case explicitly.
+
+Human-not-present needs tighter mandate scoping (amount cap, merchant allowlist, expiry, revocation path) precisely because there is no in-the-moment review to catch a mistake. Match your approval thresholds and mandate constraints to which shape a given flow actually is - see [Trust and Risk](/docs/agentic-commerce/trust-and-risk) for setting those thresholds.
+
+## Related Pages
+
+- [Agentic Commerce](/docs/agentic-commerce) - the five-layer overview
+- [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) - UCP and ACP, which these payment mechanisms settle
+- [Trust and Risk](/docs/agentic-commerce/trust-and-risk) - verifying the agent presenting a mandate is who it claims to be
+- [Agent Identity](/docs/authentication/agent-identity) - the general scoped-delegation pattern a mandate specializes
+- [Emerging Standards](/docs/protocols/emerging-standards) - protocols still too early-stage for this page

@@ -1,6 +1,7 @@
 ---
 title: Scorecard Format
 description: JSON schema and TypeScript Zod schema for scorecards
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -43,9 +44,8 @@ const DimensionName = z.enum([
   "error-handling",
   "tool-design",
   "context-files",
-  "multi-agent",
   "testing",
-  "data-retrievability",
+  "retrievability",
 ]);
 
 const ConfidenceLevel = z.enum(["high", "medium", "low"]);
@@ -58,6 +58,7 @@ const EvidenceItem = z.object({
 });
 
 const Finding = z.object({
+  id: z.string().describe('Stable ID other Finding arrays reference, e.g. "mcp-not-implemented"'),
   what: z.string().describe("Specific issue with file:line reference"),
   why: z.string().describe("Why this matters for agent consumption"),
   fix: z.string().describe("Concrete steps to resolve"),
@@ -95,11 +96,11 @@ const Scorecard = z.object({
   }),
   date: z.string().datetime().describe("ISO 8601, e.g., 2026-04-17T15:30:00Z"),
   auditor: z.string().optional(),
-  dimensions: z.array(Dimension).length(11),
+  dimensions: z.array(Dimension).length(10),
   findingClusters: z.array(FindingCluster),
   overall: z.object({
-    rawScore: z.number().int().min(0).max(33),
-    maxApplicable: z.number().int().min(1).max(33),
+    rawScore: z.number().int().min(0).max(30),
+    maxApplicable: z.number().int().min(1).max(30),
     scaledScore: z
       .number()
       .int()
@@ -128,11 +129,11 @@ export type Scorecard = z.infer<typeof Scorecard>;
 {
   "version": "1.0",
   "project": {
-    "name": "acme-api",
-    "repository": "https://github.com/acme/api",
+    "name": "acme-widgets",
+    "repository": "https://github.com/acme/widgets-api",
     "description": "Customer-facing REST API for SaaS platform"
   },
-  "date": "2026-04-17T15:30:00Z",
+  "date": "2026-06-10T15:30:00Z",
   "auditor": "surface@1.2.0",
   "dimensions": [
     {
@@ -144,7 +145,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "type": "file",
           "description": "OpenAPI spec exists",
           "location": "docs/api/openapi.yaml",
-          "result": "40 endpoints, operationId on 38 (95%), descriptions 30-50 words"
+          "result": "40 endpoints, operationId on 40 (100%), descriptions 30-50 words"
         },
         {
           "type": "grep",
@@ -159,7 +160,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "0 matches. No workflow definitions."
         }
       ],
-      "findings": ["api-missing-arazzo"],
+      "findings": [],
       "notes": "OpenAPI is well-documented with agent-oriented descriptions. Missing Arazzo workflows prevent multi-step operation definition."
     },
     {
@@ -215,7 +216,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "0 matches"
         }
       ],
-      "findings": ["discovery-llms-txt-missing", "discovery-json-ld-missing"],
+      "findings": ["discovery-llms-txt-missing"],
       "notes": "AGENTS.md present but minimal. No llms.txt or structured data for agent discovery."
     },
     {
@@ -242,8 +243,8 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "0 matches"
         }
       ],
-      "findings": ["auth-missing-token-exchange"],
-      "notes": "OAuth 2.1 M2M with scoped tokens. Missing RFC 8693 Token Exchange for narrowly-scoped ephemeral tokens."
+      "findings": [],
+      "notes": "OAuth 2.1 M2M with scoped tokens. Token exchange (RFC 8693) not applicable to the advertised flows."
     },
     {
       "name": "error-handling",
@@ -260,7 +261,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "type": "grep",
           "description": "is_retriable field",
           "location": "grep -r 'is_retriable\\|isRetriable' src/",
-          "result": "4 matches in error handler (not complete across all errors)"
+          "result": "is_retriable boolean present on all error types"
         },
         {
           "type": "command",
@@ -269,8 +270,8 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "{ type: 'https://api.example.com/errors/not-found', title: 'Not Found', status: 404, detail: 'User ID not valid', is_retriable: false }"
         }
       ],
-      "findings": ["error-missing-suggestions", "error-incomplete-retriable"],
-      "notes": "RFC 9457 implemented. is_retriable present but not on all error types. Missing suggestions array and doc_uri."
+      "findings": ["error-missing-doc-uri"],
+      "notes": "RFC 9457 implemented with complete is_retriable coverage and a suggestions array. Missing doc_uri for level 3."
     },
     {
       "name": "tool-design",
@@ -296,7 +297,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "0 matches"
         }
       ],
-      "findings": ["tools-weak-descriptions", "tools-no-token-optimization"],
+      "findings": ["tools-weak-descriptions"],
       "notes": "Basic tool schemas exist but descriptions lack 'use when' context and disambiguation. No token optimization."
     },
     {
@@ -323,16 +324,8 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "0 files"
         }
       ],
-      "findings": ["context-multi-tool-missing"],
-      "notes": "Good AGENTS.md. Missing Claude-specific and Cursor-specific overrides for multi-tool context."
-    },
-    {
-      "name": "multi-agent",
-      "score": null,
-      "confidence": null,
-      "evidence": [],
       "findings": [],
-      "notes": "N/A: Project is a web API, not an agent system"
+      "notes": "Good AGENTS.md. Missing Claude-specific and Cursor-specific overrides for multi-tool context."
     },
     {
       "name": "testing",
@@ -364,11 +357,11 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "42 tests, 81% coverage. No error recovery or multi-step flow tests."
         }
       ],
-      "findings": ["testing-error-recovery-missing", "testing-multi-step-missing"],
+      "findings": ["testing-error-recovery-missing"],
       "notes": "Basic tests exist but no agent-specific evaluation. Missing error recovery and multi-step flow testing."
     },
     {
-      "name": "data-retrievability",
+      "name": "retrievability",
       "score": null,
       "confidence": null,
       "evidence": [],
@@ -379,9 +372,10 @@ export type Scorecard = z.infer<typeof Scorecard>;
   "findingClusters": [
     {
       "name": "Agent tool discoverability",
-      "rationale": "Agents struggle to find and understand tools because OpenAPI descriptions lack agent context and no MCP server exists.",
+      "rationale": "Agents struggle to find and understand tools because tool descriptions are terse, no MCP server exists, and llms.txt is missing.",
       "findings": [
         {
+          "id": "tools-weak-descriptions",
           "what": "tools/search-users.ts:1–20: Tool descriptions are terse (3 words) with no 'use when' context",
           "why": "Agents use tool descriptions as prompts. Terse descriptions lead to incorrect tool selection.",
           "fix": "Rewrite descriptions to include: when to use, when NOT to use, required parameters, return type. Target 30-50 words.",
@@ -391,6 +385,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "severity": "high"
         },
         {
+          "id": "mcp-not-implemented",
           "what": "mcp-server: 0 files matching **/.mcp.json (no MCP server exists)",
           "why": "Agents consume MCP servers to discover tools. Without MCP, agents must rely on API docs or CLI help.",
           "fix": "Create .mcp.json and MCP server implementation. Expose 6 existing tools via MCP. Use InMemoryTransport for testing.",
@@ -400,6 +395,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "severity": "critical"
         },
         {
+          "id": "discovery-llms-txt-missing",
           "what": "llms.txt missing from web root",
           "why": "Agent web crawlers look for llms.txt to understand project scope and API surface. Without it, discovery is harder.",
           "fix": "Create llms.txt at project root with H2 sections for API, CLI, tools, and links to key docs.",
@@ -414,27 +410,20 @@ export type Scorecard = z.infer<typeof Scorecard>;
     },
     {
       "name": "Error recovery for agents",
-      "rationale": "Agents cannot recover from errors because error responses lack suggestions, complete is_retriable markers, and doc_uri links.",
+      "rationale": "Agents cannot link an error back to documentation, and testing does not cover recovery flows.",
       "findings": [
         {
-          "what": "src/middleware/errors.ts: is_retriable present on ~50% of error types, missing on validation errors",
-          "why": "Agents need to know which errors are retriable. Partial implementation leaves ambiguity.",
-          "fix": "Add is_retriable to all error handlers. Validation errors are not retriable. Rate limit 429 is retriable.",
+          "id": "error-missing-doc-uri",
+          "what": "src/middleware/errors.ts: Problem Details responses omit doc_uri",
+          "why": "Agents use doc_uri to look up the relevant error-reference page without guessing a URL.",
+          "fix": "Add a doc_uri field to the Problem Details response, pointing at the matching error-reference page.",
           "dimension": "error-handling",
           "currentScore": 2,
           "targetScore": 3,
-          "severity": "high"
+          "severity": "medium"
         },
         {
-          "what": "Error responses lack suggestions array (e.g., 'retry after 5s', 'increase timeout')",
-          "why": "Agents use suggestions to decide next steps. Without them, agents may retry immediately or give up.",
-          "fix": "Add suggestions[] array to error schema. Examples: rate limit 429 → ['wait 60s', 'reduce request size'].",
-          "dimension": "error-handling",
-          "currentScore": 2,
-          "targetScore": 3,
-          "severity": "high"
-        },
-        {
+          "id": "testing-error-recovery-missing",
           "what": "tests/: No error recovery tests. grep 'retry' returns 2 matches (minimal).",
           "why": "Without tests, error recovery logic regresses. Agents depend on consistent behavior.",
           "fix": "Add tests for: rate limit → retry, validation error → no retry, timeout → retry. Cover multi-step recovery.",
@@ -444,7 +433,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "severity": "medium"
         }
       ],
-      "suggestedApproach": "Update error schema (1 hour). Add suggestions logic (1 hour). Write recovery tests (2 hours). Total: 4 hours.",
+      "suggestedApproach": "Add doc_uri to the error schema (1 hour). Write recovery tests (2 hours). Total: 3 hours.",
       "dependencies": []
     }
   ],
@@ -456,7 +445,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
     "percentile": 35
   },
   "trend": {
-    "previousDate": "2026-03-15T10:00:00Z",
+    "previousDate": "2026-05-01T10:00:00Z",
     "previousScore": 8,
     "delta": 3,
     "status": "improved"

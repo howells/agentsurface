@@ -676,7 +676,7 @@
       "layer": "payments",
       "definitionSha256": "eed7046cc7bc960210544e7cc42872309d063f236dd3c3a5bc98bc3043a31c29",
       "cardId": "machine-payments",
-      "reference": "/docs/protocols/mpp",
+      "reference": "/docs/agentic-commerce/payments",
       "treatment": "covered",
       "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
     },
@@ -686,7 +686,7 @@
       "layer": "payments",
       "definitionSha256": "d7f8b410fa771e2b94c7b947189b191d30519dc31021730e34180b75254d91bb",
       "cardId": "machine-payments",
-      "reference": "/docs/protocols/agentic-commerce",
+      "reference": "/docs/agentic-commerce/payments",
       "treatment": "covered",
       "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
     },
@@ -736,7 +736,7 @@
       "layer": "payments",
       "definitionSha256": "3fa0c304be6650dfb3694bc1143963593e17b146fdf4c0113b49b4bfcd0156bf",
       "cardId": "checkout",
-      "reference": "/docs/protocols/agentic-commerce",
+      "reference": "/docs/agentic-commerce/checkout-protocols",
       "treatment": "covered",
       "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
     },
@@ -746,7 +746,7 @@
       "layer": "payments",
       "definitionSha256": "4195b01275155721332c1e31865e28d641c1b6c74e8f3bc96f60538008d7820d",
       "cardId": "checkout",
-      "reference": "/docs/protocols/acp",
+      "reference": "/docs/agentic-commerce/checkout-protocols",
       "treatment": "covered",
       "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
     },
@@ -756,7 +756,7 @@
       "layer": "payments",
       "definitionSha256": "6b85aebbdcd6247a16af6907e3ea9c25228c802772269fb0e59ed2894e0613d9",
       "cardId": "delegated-spending",
-      "reference": "/docs/protocols/acp",
+      "reference": "/docs/agentic-commerce/checkout-protocols",
       "treatment": "covered",
       "note": "Covered by the named feature card; detailed implementation criteria remain in the linked reference."
     },
@@ -766,7 +766,7 @@
       "layer": "payments",
       "definitionSha256": "bd4d634deade4c27572351c91bf17ec463da85385cc287da6510ddaa08984a27",
       "cardId": "delegated-spending",
-      "reference": "/docs/protocols/agentic-commerce",
+      "reference": "/docs/agentic-commerce/payments",
       "treatment": "adapted",
       "note": "Signed mandates express authority; they do not replace settlement, checkout, or provider compatibility."
     },

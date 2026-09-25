@@ -1,0 +1,74 @@
+---
+title: RAG Patterns
+description: The retrieval pipeline from chunking through reranking to agentic and graph-augmented RAG - condensed current practice
+lastVerified: 2026-09-25
+---
+
+RAG comes in many shapes. Treat each named variant below as a design move; most production systems combine several: hybrid retrieval, reranking, contextual chunks, and evaluation.
+
+## Production default pipeline
+
+1. Ingest with stable document IDs, metadata, permissions, and source hashes.
+2. Chunk semantically (512–1,024 tokens, 10–30% overlap is a reasonable starting default); add contextual chunk descriptions where ambiguity is common.
+3. Retrieve with hybrid search: dense embeddings plus a sparse (BM25 or full-text) index, fused with Reciprocal Rank Fusion or a database-native hybrid query.
+4. Rerank the top 50–100 candidates down to 5–10.
+5. Enforce metadata and authorization filters during retrieval.
+6. Generate with citations back to source chunks.
+7. Evaluate recall, ranking quality, faithfulness, latency, and cost - see [Retrieval Evals](/docs/agent-retrieval/retrieval-evals).
+
+Keep chunk metadata (`document_id`, `source`, `section`, `tenant_id`, `updated_at`, `content_hash`) with every indexed unit - chunking without provenance produces unattributable, unfilterable results.
+
+## Pattern taxonomy
+
+| Pattern                                                                                                    | Use when                                                          | Avoid when                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Naive** (embed, retrieve top-k, generate)                                                                | Prototypes, small clean corpora                                   | Production - fails on exact identifiers and multi-hop questions                                                                                      |
+| **Hybrid** (BM25 + dense + fusion)                                                                         | Corpus has product names, codes, or IDs alongside prose           | Rarely - this is the default production stance                                                                                                       |
+| **Reranked**                                                                                               | Retrieved context is noisy                                        | Ingestion or chunking is broken - reranking cannot recover a missing passage                                                                         |
+| **Contextual** (Anthropic's Contextual Retrieval pattern: prepend a chunk-context summary before indexing) | Chunks are ambiguous without surrounding document context         | Index-time LLM cost or staleness of generated context is unacceptable                                                                                |
+| **Parent-child**                                                                                           | Small chunks rank well but generation needs a full section        | -                                                                                                                                                    |
+| **Hierarchical / RAPTOR**                                                                                  | Long documents need both local facts and document-level synthesis | Documents change frequently, or exact-source traceability matters more than abstraction                                                              |
+| **HyDE / multi-query / RAG-Fusion**                                                                        | Queries are short, vague, or phrased differently from source docs | Latency and model cost outweigh the gain on simple lookups                                                                                           |
+| **GraphRAG**                                                                                               | Relationships are first-class, multi-hop, and worth maintaining   | Entity resolution is unreliable, or hybrid retrieval already answers most questions - see [Knowledge Graphs](/docs/agent-retrieval/knowledge-graphs) |
+| **Agentic RAG** (agent plans subqueries, chooses tools, iterates)                                          | Multi-step questions spanning documents, tables, and APIs         | Simple FAQ-style lookups - adds latency, cost, and failure surface                                                                                   |
+| **Self-RAG / Corrective RAG**                                                                              | Factuality matters and retrieval quality varies by query          | You cannot afford extra model calls per query                                                                                                        |
+| **Multimodal RAG** (ColPali-style late interaction)                                                        | Source truth is in charts, tables, scans, or slides               | OCR-based chunking already answers most queries                                                                                                      |
+| **Structured/tool-backed** (SQL, OpenAPI, MCP tools)                                                       | The answer depends on live state, joins, or permissions           | Never; the retrieval layer here is a live query against a system of record                                                                           |
+
+## Hybrid retrieval and fusion
+
+```typescript
+function reciprocalRankFusion(resultLists: SearchResult[][], limit = 50, k = 60) {
+  const scores = new Map<string, { score: number; result: SearchResult }>();
+  for (const results of resultLists) {
+    results.forEach((result, index) => {
+      const existing = scores.get(result.id);
+      scores.set(result.id, {
+        score: (existing?.score ?? 0) + 1 / (k + index + 1),
+        result,
+      });
+    });
+  }
+  return [...scores.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+}
+```
+
+## Agentic retrieval as a bounded escalation
+
+Use agentic retrieval (query planning, multi-hop iteration, tool selection) for multi-hop questions, schema-plus-vector queries, or answer validation. Put hard bounds around it: maximum sub-queries, maximum tool calls, a token and cost budget per request, required metadata filters, and trace IDs for replay.
+
+## Anti-patterns
+
+- Naming the architecture after the newest acronym instead of the failure mode it fixes.
+- Adding graph retrieval before entity resolution is reliable.
+- Using agentic RAG for single-hop lookups.
+- Expanding queries without reranking.
+- Measuring answer quality without measuring retrieval quality.
+
+## See also
+
+- [Original RAG paper](https://arxiv.org/abs/2005.11401)
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)
+- [RAPTOR paper](https://arxiv.org/abs/2401.18059)
+- [Self-RAG paper](https://arxiv.org/abs/2310.11511)
+- [Corrective RAG paper](https://arxiv.org/abs/2401.15884)

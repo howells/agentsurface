@@ -1,28 +1,29 @@
 ---
 title: Schemas
 description: Typed input and output schemas with Zod and JSON Schema for agent reasoning
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Tool schemas define input parameters and output structure, enabling agents to reason reliably over results and avoiding hallucination. Three rules: (1) Flat structure (one or two levels max; OpenAI strict mode rejects nesting), (2) Every field must have description (.describe() in Zod, description in JSON Schema), (3) Enums over free text (constrain values where server enforces them). Input examples reduce errors. Output schemas + toModelOutput reduce token cost. Avoid nullable parameters and union types (problematic for strict mode).
+Tool schemas define input parameters and output structure, enabling agents to reason reliably over results and avoiding hallucination. Three rules: (1) Flat structure (one or two levels max; each level needs `additionalProperties: false` under OpenAI strict mode), (2) Every field must have description (.describe() in Zod, description in JSON Schema), (3) Enums over free text (constrain values where server enforces them). Input examples reduce errors. Declare output schemas so downstream tools get typed results. OpenAI strict mode requires every property in `required`, with optional fields made nullable rather than omitted; nested union types are rejected outright.
 
 - **Flat structures**: Max 1-2 levels deep
 - **Descriptions**: Every field documented with examples
 - **Enums**: Constrained values where possible
 - **Input examples**: On parameters to guide agent
-- **Output schema**: Declare return structure
-- **toModelOutput**: Optimize token usage in responses
+- **Output schema**: Declare return structure for downstream consumers
+- **OpenAI strict mode**: every property stays in `required`; optional means nullable, not omitted
 
 ---
 
-Tool schemas are the contract between the agent and the server. They define what parameters the agent can pass and what the server returns. Well-designed schemas prevent hallucination, reduce token cost, and enable agents to reason reliably over results.
+Tool schemas are the contract between the agent and the server. They define what parameters the agent can pass and what the server returns. Well-designed schemas reduce parameter errors and token cost, and give agents typed results to reason over.
 
 ## Input Schemas: Flat, Typed, Annotated
 
 ### The Three Rules
 
-1. **Flat structure preferred.** Avoid deep nesting; one or two levels maximum. Deeply nested objects are harder for agents to reason about and rejected by OpenAI strict mode.
+1. **Flat structure preferred.** Avoid deep nesting; one or two levels maximum. Deeply nested objects are harder for agents to reason about, and OpenAI strict mode requires `additionalProperties: false` and a full `required` list at every nested level, so each level of nesting adds another place to get that wrong.
 2. **Every field must have a description.** Use `.describe()` in Zod or `description` in JSON Schema.
 3. **Enums over free text.** Constrain values wherever the server enforces them.
 
@@ -179,24 +180,24 @@ file_ids: z.array(z.string().uuid()).max(50).optional()
 
 ## Context Parameters vs Tool Parameters
 
-An input schema should contain only the domain inputs the agent legitimately decides. Authentication tokens, session-derived user IDs, and internal system identifiers are context the execution layer injects at runtime — they must never appear as tool parameters. Asking the agent to supply them invites hallucinated or leaked credentials and couples the tool contract to implementation details.
+An input schema should contain only the domain inputs the agent legitimately decides. Authentication tokens, session-derived user IDs, and internal system identifiers are context the execution layer injects at runtime - they must never appear as tool parameters. Asking the agent to supply them invites hallucinated or leaked credentials and couples the tool contract to implementation details.
 
 ```typescript
-// Bad — agent is responsible for auth context it should never handle
+// Bad: agent is responsible for auth context it should never handle
 {
   name: "create_document",
   schema: {
     properties: {
-      auth_token: { type: "string" },      // Wrong — execution layer concern
-      user_id: { type: "string" },         // Wrong — comes from session
-      organization_id: { type: "string" }, // Wrong — comes from session
+      auth_token: { type: "string" },      // Wrong: execution layer concern
+      user_id: { type: "string" },         // Wrong: comes from session
+      organization_id: { type: "string" }, // Wrong: comes from session
       title: { type: "string" },
       content: { type: "string" }
     }
   }
 }
 
-// Good — only domain inputs; auth/session context injected at runtime
+// Good: only domain inputs; auth/session context injected at runtime
 {
   name: "create_document",
   schema: {
@@ -210,7 +211,7 @@ An input schema should contain only the domain inputs the agent legitimately dec
 }
 ```
 
-Frameworks provide dedicated mechanisms for injecting this context outside the schema — LangChain's `InjectedToolArg`, an execute-context object, or a closure over the request. Keep the schema free of anything the session already knows.
+Frameworks provide dedicated mechanisms for injecting this context outside the schema - LangChain's `InjectedToolArg`, an execute-context object, or a closure over the request. Keep the schema free of anything the session already knows.
 
 ## Output Schemas: Semantic Content
 
@@ -267,7 +268,7 @@ server.tool(
 
 ## Strict Mode for OpenAI Compatibility
 
-OpenAI requires `strict: true` and `additionalProperties: false` at every object level. Required when targeting OpenAI Agents SDK.
+OpenAI requires `strict: true` and `additionalProperties: false` at every object level, and every property listed in `required` - including fields that are logically optional (see Nullable Parameters below). Required when targeting OpenAI Agents SDK.
 
 ```typescript
 // Zod
@@ -316,23 +317,26 @@ const schema = z
 ### Nullable Parameters
 
 ```typescript
-// Bad — OpenAI requires explicit omission, not null
-assignee: z.string().nullable().optional();
+// Bad: OpenAI strict mode has no concept of an omitted field; every
+// property must be listed in `required`, so plain .optional() doesn't work
+assignee: z.string().optional();
 
-// Good
-assignee: z.string().optional(); // Omit entirely if not needed
+// Good: keep the field in `required`, make it nullable instead
+assignee: z.string().nullable(); // emits { "type": ["string", "null"] }, stays in `required`
 ```
+
+OpenAI strict mode requires every property to appear in the schema's `required` array - there's no way to mark a field as absent. To express "this field is optional," make it nullable (`"type": ["string", "null"]`) and have the caller pass `null` rather than omitting the key.
 
 ### Nested Union Types
 
 ```typescript
-// Bad — OpenAI strict mode rejects
+// Bad: OpenAI strict mode rejects
 result: z.union([
   z.object({ type: z.literal('success'), data: z.any() }),
   z.object({ type: z.literal('error'), message: z.string() })
 ])
 
-// Good — use flat discriminated union or separate fields
+// Good: use flat discriminated union or separate fields
 result_type: z.enum(['success', 'error']),
 result_data: z.any().optional(),
 error_message: z.string().optional(),
@@ -357,7 +361,7 @@ Use UUID everywhere or use explicit string + format constraints, never mix:
 user_id: z.string().uuid(),
 order_id: z.string(),  // Is this a UUID? a number?
 
-// Good — all IDs are UUIDs
+// Good: all IDs are UUIDs
 user_id: z.string().uuid(),
 order_id: z.string().uuid(),
 ```
@@ -368,15 +372,15 @@ Schemas are included in every tool-call request. Reduce schema size by:
 
 - Using `.describe()` with short, punchy sentences (not paragraphs)
 - Removing redundant descriptions that are obvious from the field name
-- Using MCP lazy loading to defer tool metadata until needed
+- Deferring tool metadata until needed with provider-side tool search (`defer_loading` plus a tool search tool) or client-side `activeTools`
 - Splitting a large tool with 30 parameters into two smaller tools
 
 ```typescript
-// Bad — bloated description
+// Bad: bloated description
 due_date: z.string()
   .describe('The date that the customer is expected to pay the invoice. This should be set to a business day if possible, and you should avoid weekends and holidays. The format must be YYYY-MM-DD with a four-digit year, two-digit month, and two-digit day of the month.'),
 
-// Good — concise but complete
+// Good: concise but complete
 due_date: z.string()
   .describe('Payment due date in YYYY-MM-DD format. Avoid weekends/holidays.'),
 ```
@@ -402,8 +406,8 @@ console.log(JSON.stringify(jsonSchema, null, 2));
 
 ## See also
 
-- `/docs/tool-design/naming-and-descriptions` — descriptions as prompts
-- `/docs/tool-design/anti-patterns` — schema design mistakes
+- `/docs/tool-design/naming-and-descriptions` - descriptions as prompts
+- `/docs/tool-design/anti-patterns` - schema design mistakes
 - ([JSON Schema 2020-12](https://json-schema.org/specification.html))
 - ([OpenAI strict mode](https://platform.openai.com/docs/guides/function-calling))
 - ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))

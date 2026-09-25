@@ -1,6 +1,7 @@
 ---
 title: Monorepos
 description: Nested context files, precedence rules, and hierarchical AGENTS.md patterns
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -335,20 +336,14 @@ See ../AGENTS.md for cross-package info.
 
 ## Precedence Rules
 
-When searching for conventions, agents follow this order:
+There is no single cross-tool precedence ladder - each tool resolves its own files independently, and the rules don't merge:
 
-1. **Package-level AGENTS.md** (e.g., packages/api/AGENTS.md)
-2. **Root AGENTS.md**
-3. **Root CLAUDE.md** (if present)
-4. **Root .cursor/rules/** (if present)
+- **AGENTS.md itself**: nested files win over the root. `packages/api/AGENTS.md` overrides `AGENTS.md` (root) for anything under `packages/api/`.
+- **Claude Code**: loads `CLAUDE.md` when one exists anywhere from the working directory up to the repo root, and `AGENTS.md` only when no `CLAUDE.md` exists; combine the two with the `@AGENTS.md` import - see [CLAUDE.md](/docs/context-files/claude-md) for the exact rule.
+- **Cursor**: reads `AGENTS.md` natively (nested wins) and layers `.cursor/rules/*.mdc` on top for glob-scoped detail - see [Cursor and Copilot](/docs/context-files/cursor-and-copilot).
+- **GitHub Copilot**: reads `AGENTS.md` directly (coding agent, code review) and separately reads `.github/copilot-instructions.md` plus path-scoped `.github/instructions/*.instructions.md`.
 
-**Example:** For API server conventions, the agent reads:
-
-1. packages/api/AGENTS.md (first source)
-2. If not found, fall back to AGENTS.md (root)
-3. If still unclear, check CLAUDE.md (Claude-specific hints)
-
-This hierarchical lookup keeps each file focused on its scope.
+**Example:** For API server conventions, a package-scoped `packages/api/AGENTS.md` is what every tool prefers over the root file for that package - that part is shared. What differs is whether a given tool also reads a tool-specific file (`CLAUDE.md`, `.cursor/rules/`, `.github/instructions/`) alongside it, and each tool's own docs are the source of truth for that.
 
 ## Cross-Package Tool Filters
 
@@ -481,7 +476,7 @@ Components are PascalCase and exported as named exports.
 
 ## See also
 
-- `/docs/context-files/agents-md` — AGENTS.md spec
-- `/docs/context-files/cursor-and-copilot` — scoped Cursor rules
-- `/templates/discovery/monorepo-AGENTS.md` — starter template
+- `/docs/context-files/agents-md` - AGENTS.md spec
+- `/docs/context-files/cursor-and-copilot` - scoped Cursor rules
+- `/templates/discovery/monorepo-AGENTS.md` - starter template
 - ([Turborepo docs](https://turbo.build/repo/docs))

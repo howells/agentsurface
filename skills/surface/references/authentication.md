@@ -8,12 +8,12 @@ Public read-only capabilities may require no authentication. For protected acces
 
 ## Scoring rubric
 
-| Score | Criteria | Evidence |
-| --- | --- | --- |
-| 0 | No usable authorization path for the intended client and identity. | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete. |
-| 1 | Programmatic access works, but permissions, credential lifetime or validation are incomplete. | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour. |
-| 2 | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism. |
-| 3 | Level 2 plus verified discovery, isolation and credential recovery for the supported flows. | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
+| Score | Criteria                                                                                          | Evidence                                                                                                                                                                                                                    |
+| ----- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No usable authorization path for the intended client and identity.                                | Protected requests return login HTML or require unsupported browser state; required consent or token acquisition cannot complete.                                                                                           |
+| 1     | Programmatic access works, but permissions, credential lifetime or validation are incomplete.     | Broad or permanent credentials, incomplete scope enforcement, or unclear refresh and revocation behaviour.                                                                                                                  |
+| 2     | A supported grant fits the identity, with scoped, time-bounded access and server-side validation. | Authorization Code with PKCE for user delegation, or Client Credentials for service-owned M2M; validate token issuer, audience/resource, expiry and permissions using the token format's validation mechanism.              |
+| 3     | Level 2 plus verified discovery, isolation and credential recovery for the supported flows.       | Remote MCP protected-resource metadata where applicable; tested renewal, revocation and wrong-user/wrong-resource rejection; attributable actions. Token exchange or other extensions only when the use case requires them. |
 
 ## Evidence to gather
 
@@ -44,6 +44,7 @@ grant_type=client_credentials
 This returns a short-lived access token (typically 15 min–1 hour). The agent includes this token in the `Authorization: Bearer <token>` header on every request. Tokens are opaque (the server validates them), or JWT (the client can inspect but must validate the signature).
 
 Key practices:
+
 - Scope narrowly per resource or operation. `scope=users:read:id` is better than `scope=*`.
 - Tokens expire; agents must handle 401 by re-requesting.
 - Client credentials should not be embedded in code. Read from env vars (`process.env.OAUTH_CLIENT_ID`) or secret managers.
@@ -56,7 +57,7 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
 - **Scope per resource or operation.** Stripe's Restricted API Keys let you specify `allowed_apis: ["charges", "refunds"]`.
 - **Prefix-taggable for revocation.** If a key starts with `sk_live_` or `sk_test_`, you can rotate all test keys at once.
 - **Rotation API.** Offer a tool or endpoint to generate a new key and retire the old one.
-- **Not a replacement for OAuth**—but pragmatic for simple agent integrations.
+- **Not a replacement for OAuth** - but pragmatic for simple agent integrations.
 
 ### Protected resource metadata
 
@@ -84,7 +85,7 @@ What this changes in practice:
 - Authorization servers fetch and cache that document rather than minting per-client records.
 - Servers that already support DCR should keep it working for existing clients through the deprecation window and add Client ID Metadata Document support alongside.
 
-The 2026-07-28 revision also tightens related requirements: authorization servers validate `iss` per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html), `application_type` becomes required where DCR is still used, and credentials are bound to the issuing authorization server — keyed by issuer, and re-registered if the issuer changes.
+The 2026-07-28 revision also tightens related requirements: authorization servers validate `iss` per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html), `application_type` becomes required where DCR is still used, and credentials are bound to the issuing authorization server - keyed by issuer, and re-registered if the issuer changes.
 
 ### auth.md for agentic registration
 
@@ -128,24 +129,25 @@ Always separate agent identity from user identity in logs and audits.
 ([RFC 9449 Demonstration of Proof-of-Possession](https://www.rfc-editor.org/rfc/rfc9449.html)) binds an access token to the client's public key. If a token is exfiltrated, it cannot be replayed because the attacker lacks the private key.
 
 The client:
+
 1. Generates a keypair.
 2. Signs a `DPoP` JWT per request (includes method, URI, timestamp, public key hash).
 3. Sends both the `Authorization` and `DPoP` headers.
 
-The server validates the DPoP signature and ensures the public key matches. Growing adoption in 2025–2026: Connect2id, ZITADEL, and MCP spec encourages it for sensitive remote servers.
+The server validates the DPoP signature and ensures the public key matches. DPoP is a general OAuth 2.0 mechanism, not part of the MCP authorization specification itself - MCP's auth model builds on OAuth 2.1 and RFC 9728 protected-resource metadata but does not mandate or reference DPoP. Adopt it as an independent hardening step for sensitive remote servers (growing adoption in identity providers such as Connect2id and ZITADEL), and only claim DPoP support when the server actually implements RFC 9449.
 
 TypeScript example using `jose`:
 
 ```typescript
-import { SignJWT, jwtVerify, exportSPKI, generateKeyPair } from 'jose';
+import { SignJWT, jwtVerify, exportSPKI, generateKeyPair } from "jose";
 
 async function generateDPopProof(method: string, uri: string, publicKeyPEM: string) {
   const secret = await crypto.subtle.importKey(
-    'pkcs8',
+    "pkcs8",
     new TextEncoder().encode(privateKeyPEM),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
-    ['sign']
+    ["sign"],
   );
 
   return new SignJWT({
@@ -155,14 +157,14 @@ async function generateDPopProof(method: string, uri: string, publicKeyPEM: stri
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 60,
   })
-    .setProtectedHeader({ alg: 'RS256', typ: 'dpop+jwt' })
+    .setProtectedHeader({ alg: "RS256", typ: "dpop+jwt" })
     .sign(secret);
 }
 ```
 
 ### OAuth 2.1
 
-([OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) consolidates best practices. It is still an Internet-Draft — draft-15 was published 2026-03-02, with IESG submission targeted for December 2026. Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
+([OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) consolidates best practices. It is still an Internet-Draft - draft-15 was published 2026-03-02, with IESG submission targeted for December 2026. Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
 
 - **PKCE mandatory** on all authorization-code flows (even confidential clients).
 - **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code only.
@@ -184,6 +186,7 @@ Use `jose` (TypeScript, platform-agnostic) or legacy `jsonwebtoken` (Node only).
 6. **Type (`typ`):** For DPoP, ensure `typ: 'at+jwt'` (not `'dpop+jwt'`).
 
 Rejection checklist:
+
 - Asymmetric key (`RS256`, `ES256`) converted to symmetric (`HS256`). This is a critical vulnerability; always reject.
 - Missing `iss`, `aud`, or `exp` claims.
 - Algorithm header (`alg`) is `none`.
@@ -191,15 +194,15 @@ Rejection checklist:
 TypeScript with `jose`:
 
 ```typescript
-import { jwtVerify } from 'jose';
-import { createRemoteJWKSet } from 'jose/jwks.remote';
+import { jwtVerify } from "jose";
+import { createRemoteJWKSet } from "jose/jwks.remote";
 
 async function validateToken(token: string, jwksUri: string) {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
   const verified = await jwtVerify(token, jwks, {
-    issuer: 'https://auth.example.com',
-    audience: 'https://api.example.com',
-    algorithms: ['RS256', 'ES256'], // whitelist safe algorithms
+    issuer: "https://auth.example.com",
+    audience: "https://api.example.com",
+    algorithms: ["RS256", "ES256"], // whitelist safe algorithms
   });
   return verified.payload;
 }
@@ -220,15 +223,15 @@ API_KEY=                  # If not using OAuth; includes prefix (sk_live_abc...)
 Support `.env` files (locally) and external secret managers:
 
 ```typescript
-import * as dotenv from 'dotenv';
-import { readFileSync } from 'fs';
+import * as dotenv from "dotenv";
+import { readFileSync } from "fs";
 
 // Local dev: .env file
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: ".env.local" });
 
 // Production: 1Password / Vault CLI
-const secret = process.env.OAUTH_CLIENT_SECRET ||
-  execSync('op read op://vault/item/field').toString().trim();
+const secret =
+  process.env.OAUTH_CLIENT_SECRET || execSync("op read op://vault/item/field").toString().trim();
 ```
 
 ### TypeScript patterns (Next.js / Node)
@@ -236,35 +239,35 @@ const secret = process.env.OAUTH_CLIENT_SECRET ||
 **Protected Next.js App Router route handler with client-credentials JWT validation:**
 
 ```typescript
-import { jwtVerify } from 'jose';
-import { createRemoteJWKSet } from 'jose/jwks.remote';
+import { jwtVerify } from "jose";
+import { createRemoteJWKSet } from "jose/jwks.remote";
 
-const jwks = createRemoteJWKSet(new URL('https://auth.example.com/.well-known/jwks.json'));
+const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const token = authHeader.slice(7);
   try {
     const verified = await jwtVerify(token, jwks, {
-      issuer: 'https://auth.example.com',
-      audience: 'https://api.example.com',
+      issuer: "https://auth.example.com",
+      audience: "https://api.example.com",
     });
 
     const agentId = verified.payload.azp;
-    const scope = (verified.payload.scope as string)?.split(' ') || [];
+    const scope = (verified.payload.scope as string)?.split(" ") || [];
     const userId = verified.payload.sub;
 
     // Log both agent and user for audit
-    console.log(`Agent ${agentId} acting on behalf of ${userId} with scopes [${scope.join(', ')}]`);
+    console.log(`Agent ${agentId} acting on behalf of ${userId} with scopes [${scope.join(", ")}]`);
 
     // Handle the request
-    return Response.json({ data: 'authorized' });
+    return Response.json({ data: "authorized" });
   } catch (err) {
-    return Response.json({ error: 'Invalid token' }, { status: 403 });
+    return Response.json({ error: "Invalid token" }, { status: 403 });
   }
 }
 ```
@@ -274,19 +277,19 @@ export async function GET(req: Request) {
 ```typescript
 async function requestDelegatedToken(userJwt: string, agentJwt: string, audience: string) {
   const form = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
     subject_token: userJwt,
-    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     actor_token: agentJwt,
-    actor_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-    requested_token_use: 'access_token',
+    actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    requested_token_use: "access_token",
     audience: audience,
-    scope: 'users:read',
+    scope: "users:read",
   });
 
-  const res = await fetch('https://auth.example.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await fetch("https://auth.example.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
@@ -321,41 +324,42 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 ## Templates and tooling
 
-- `/templates/errors-and-auth/oauth-client-credentials.ts` — complete M2M flow with short-lived tokens.
-- `/templates/errors-and-auth/jwt-validate.ts` — jose-based token validation with JWKS caching.
-- `/templates/errors-and-auth/well-known-oauth-protected-resource.ts` — Next.js endpoint serving RFC 9728 protected-resource metadata.
-- `/templates/errors-and-auth/token-exchange.ts` — RFC 8693 token exchange implementation.
-- `/templates/errors-and-auth/dpop-header.ts` — DPoP proof signing for sender-constrained tokens.
+- `/templates/errors-and-auth/oauth-client-credentials.ts` - complete M2M flow with short-lived tokens.
+- `/templates/errors-and-auth/jwt-validate.ts` - jose-based token validation with JWKS caching.
+- `/templates/errors-and-auth/well-known-oauth-protected-resource.ts` - Next.js endpoint serving RFC 9728 protected-resource metadata.
+- `/templates/errors-and-auth/token-exchange.ts` - RFC 8693 token exchange implementation.
+- `/templates/errors-and-auth/dpop-header.ts` - DPoP proof signing for sender-constrained tokens.
 
 **Libraries:**
-- `jose` — JWT signing + validation, JWKS fetching, all platforms.
-- `openid-client` — OIDC discovery, token exchange.
-- `better-auth` — drop-in auth framework for Next.js (supports OAuth + JWT).
-- `lucia` — lightweight session + JWT library.
-- `clerk/backend` — Clerk SDK for Node (auth + JWTs).
-- `workos-node` — WorkOS SDK for OAuth + SSO.
+
+- `jose` - JWT signing + validation, JWKS fetching, all platforms.
+- `openid-client` - OIDC discovery, token exchange.
+- `better-auth` - drop-in auth framework for Next.js (supports OAuth + JWT).
+- `lucia` - lightweight session + JWT library.
+- `clerk/backend` - Clerk SDK for Node (auth + JWTs).
+- `workos-node` - WorkOS SDK for OAuth + SSO.
 
 ## Citations
 
-- ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) — Client Credentials, token endpoint.
-- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) — `.well-known/oauth-authorization-server`.
-- ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) — `.well-known/oauth-protected-resource`.
-- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) — Delegated access, narrowly-scoped tokens.
-- ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) — DPoP, sender-constrained tokens.
-- ([RFC 7591: OAuth 2.0 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)) — deprecated by MCP 2026-07-28 in favour of Client ID Metadata Documents.
-- ([RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)) — `iss` validation required by MCP 2026-07-28.
-- ([OAuth 2.1 draft-ietf-oauth-v2-1-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) — PKCE, removed insecure flows, refresh token rotation. Still an Internet-Draft; draft-15 published 2026-03-02.
-- ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) — current authorization requirements.
-- ([WorkOS auth.md](https://workos.com/auth-md)) — agentic registration discovery.
-- ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) — example service and provider implementations.
-- ([ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)) — provider-attested identity assertions.
-- ([jose on npm](https://www.npmjs.com/package/jose)) — TypeScript JWT library.
+- ([RFC 6749: OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)) - Client Credentials, token endpoint.
+- ([RFC 8414: OAuth 2.0 Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414)) - `.well-known/oauth-authorization-server`.
+- ([RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)) - `.well-known/oauth-protected-resource`.
+- ([RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)) - Delegated access, narrowly-scoped tokens.
+- ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) - DPoP, sender-constrained tokens.
+- ([RFC 7591: OAuth 2.0 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)) - deprecated by MCP 2026-07-28 in favour of Client ID Metadata Documents.
+- ([RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)) - `iss` validation required by MCP 2026-07-28.
+- ([OAuth 2.1 draft-ietf-oauth-v2-1-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) - PKCE, removed insecure flows, refresh token rotation. Still an Internet-Draft; draft-15 published 2026-03-02.
+- ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) - current authorization requirements.
+- ([WorkOS auth.md](https://workos.com/auth-md)) - agentic registration discovery.
+- ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) - example service and provider implementations.
+- ([ID-JAG Internet-Draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-identity-assertion-authz-grant)) - provider-attested identity assertions.
+- ([jose on npm](https://www.npmjs.com/package/jose)) - TypeScript JWT library.
 
 ## See also
 
-- `docs/authentication` — Full guide to agent auth patterns.
-- `docs/authentication/auth-md` — Agentic registration discovery and user-claim flows.
-- `references/mcp-servers.md` — Remote MCP auth and metadata.
-- `references/scoring-rubric.md#dimension-5-authentication` — Dimension 5 scoring.
-- `templates/errors-and-auth/oauth-client-credentials.ts` — M2M token flow.
-- `templates/errors-and-auth/jwt-validate.ts` — Token validation with JWKS.
+- `docs/authentication` - Full guide to agent auth patterns.
+- `docs/authentication/auth-md` - Agentic registration discovery and user-claim flows.
+- `references/mcp-servers.md` - Remote MCP auth and metadata.
+- `references/scoring-rubric.md#dimension-5-authentication` - Dimension 5 scoring.
+- `templates/errors-and-auth/oauth-client-credentials.ts` - M2M token flow.
+- `templates/errors-and-auth/jwt-validate.ts` - Token validation with JWKS.

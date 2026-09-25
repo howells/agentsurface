@@ -1,7 +1,7 @@
 {
   "name": "surface",
   "version": "2.3.0",
-  "description": "Make software legible to agents. One skill that routes to the right workflow: audit agent readiness, scaffold agent infrastructure, generate MCP servers, write context files, or fix specific gaps.",
+  "description": "Make software legible to agents. Guide, audit or scaffold the surfaces agents use: discovery, context files, APIs, CLIs, tools, MCP servers, authentication, errors, retrieval and the tests that prove them.",
   "skills": "../skills/",
   "author": {
     "name": "Daniel Howells"
@@ -19,17 +19,14 @@
     "cli-design",
     "agent-dx",
     "audit",
-    "transformation",
+    "scorecard",
     "scaffolding",
     "llms-txt",
     "agents-md",
-    "aeo",
-    "data-retrievability",
-    "mastra",
+    "agent-discovery",
+    "retrievability",
     "tools",
-    "workflows",
-    "ai-sdk",
-    "memory",
+    "webmcp",
     "codex-compatible"
   ]
 }

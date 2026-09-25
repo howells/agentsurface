@@ -1,7 +1,7 @@
 ---
 title: Real-World MCP Patterns
 description: Recurring patterns in GitHub, Stripe, and Vercel MCP server designs
-lastVerified: 2026-07-28
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -12,14 +12,14 @@ The examples below use recurring implementation patterns: toolset grouping, envi
 - Startup configuration: load toolsets/features at server start
 - Environment-based: use env vars for API keys, endpoints, features
 - Error recovery: structured errors guide agents toward retry or alternate paths
-- Logging: write to stderr on stdio, OpenTelemetry on HTTP — the MCP logging facility is Deprecated in `2026-07-28`
-- GitHub, Stripe, Vercel all use 10-60 tools per server (not 300)
+- Logging: write to stderr on stdio, OpenTelemetry on HTTP - the MCP logging facility is Deprecated in `2026-07-28`
+- GitHub, Stripe, Vercel all use tens of tools per server, not hundreds
 
 Production MCP servers from major platforms go beyond the spec in similar ways. The GitHub MCP server, Stripe's agent toolkit, and Vercel's MCP server each deal with tool explosion, auth flexibility, and deployment variety.
 
 ## GitHub MCP Server
 
-The GitHub MCP server (`github/github-mcp-server`) is one of the most referenced open-source MCP implementations. It exposes GitHub operations — repositories, issues, pull requests, code search — to agents. Several of its design decisions are instructive.
+The GitHub MCP server (`github/github-mcp-server`) is one of the most referenced open-source MCP implementations. It exposes GitHub operations - repositories, issues, pull requests, code search - to agents. Several of its design decisions are instructive.
 
 ### Toolset Grouping
 
@@ -40,7 +40,7 @@ GitHub's server exposes over 60 tools, which would be overwhelming without organ
 }
 ```
 
-Tools in disabled toolsets are not registered — they do not appear in the `tools/list` response at all. Agents connected to a GitHub server configured for only `issues` and `pull_requests` see a manageable tool list focused on the work at hand, not a 60-tool catalog.
+Tools in disabled toolsets are not registered - they do not appear in the `tools/list` response at all. Agents connected to a GitHub server configured for only `issues` and `pull_requests` see a manageable tool list focused on the work at hand, not a 60-tool catalog.
 
 The toolset configuration is read at startup, not per-request. Toolsets are an operator concern, not a user or agent concern:
 
@@ -126,8 +126,8 @@ This env-driven auth selection pattern allows the same server binary to be deplo
 
 Stripe's MCP server approach differs significantly from GitHub's. Rather than a standalone subprocess, Stripe offers:
 
-1. **A hosted remote MCP server** at `https://mcp.stripe.com` — zero deployment required, auth via OAuth
-2. **The `@stripe/agent-toolkit` npm package** — for embedding Stripe tools directly in your own agent
+1. **A hosted remote MCP server** at `https://mcp.stripe.com` - zero deployment required, auth via OAuth
+2. **The `@stripe/agent-toolkit` npm package** - for embedding Stripe tools directly in your own agent
 
 ### Hosted Remote Server
 
@@ -145,7 +145,7 @@ Stripe's MCP server approach differs significantly from GitHub's. Rather than a 
 }
 ```
 
-Stripe handles all deployment, scaling, versioning, and API compatibility. The OAuth flow delegates access — users authorize specific Stripe capabilities without sharing their API keys. This is the pattern the November 2025 MCP spec mandates for public servers.
+Stripe handles all deployment, scaling, versioning, and API compatibility. The OAuth flow delegates access - users authorize specific Stripe capabilities without sharing their API keys. This is the pattern the `2025-11-25` MCP spec mandates for public servers.
 
 ### Agent Toolkit for Embedded Use
 
@@ -170,7 +170,7 @@ const stripeTools = new StripeAgentToolkit({
 stripeTools.registerTools(server);
 ```
 
-The `configuration.actions` object performs the same role as GitHub's toolset grouping — it limits which Stripe operations are exposed, preventing agents from accessing capabilities they should not have (refunds, subscription cancellations, account settings).
+The `configuration.actions` object performs the same role as GitHub's toolset grouping - it limits which Stripe operations are exposed, preventing agents from accessing capabilities they should not have (refunds, subscription cancellations, account settings).
 
 ### Selective Tool Exposure
 
@@ -207,7 +207,7 @@ const handler = createMcpHandler((server, req) => {
 
 ## Vercel MCP Server
 
-Vercel's MCP server is built on `mcp-on-vercel`, a template that demonstrates the full production deployment pattern. The server exposes Vercel API operations and is used as a reference implementation for the `@vercel/mcp-adapter` package.
+Vercel's MCP server is built on `mcp-on-vercel`, a template that demonstrates the full production deployment pattern. The server exposes Vercel API operations and is used as a reference implementation for the `mcp-handler` package.
 
 ```typescript
 // Vercel's pattern: domain operations with auth-gated registration
@@ -279,13 +279,13 @@ The lean response pattern is clear here: rather than returning the full Vercel A
 
 Reviewing GitHub, Stripe, and Vercel's approaches reveals five consistent patterns:
 
-**1. Domain grouping.** Tools are organized by domain entity (repos, issues, deployments) rather than by operation type. This maps to how agents think — "I need to do something with invoices" routes to the invoices group.
+**1. Domain grouping.** Tools are organized by domain entity (repos, issues, deployments) rather than by operation type. This maps to how agents think - "I need to do something with invoices" routes to the invoices group.
 
 **2. Auth flexibility.** All three support multiple authentication strategies, selected at startup via environment variables. No authentication method is hardcoded into the tool implementation.
 
 **3. Selective tool exposure.** None of them expose their full API surface. GitHub has a `--read-only` flag and toolsets. Stripe has `configuration.actions`. Vercel has scope-gated registration. Agents get exactly the tools they need for the task at hand.
 
-**4. Env-driven configuration.** Every behavioral variation — which tools to enable, which permissions to grant, which API endpoint to target — is controlled by environment variables. The server binary is environment-agnostic.
+**4. Env-driven configuration.** Every behavioral variation - which tools to enable, which permissions to grant, which API endpoint to target - is controlled by environment variables. The server binary is environment-agnostic.
 
 **5. Lean responses.** Tool responses return the minimum fields needed for the agent to proceed. Full API responses are never passed through directly.
 

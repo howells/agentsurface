@@ -1,5 +1,5 @@
 <!--
-copilot-instructions.md — GitHub Copilot custom instructions.
+copilot-instructions.md - GitHub Copilot custom instructions.
 
 What: A concise markdown file that customizes GitHub Copilot's behavior for your project.
 Placed at .github/copilot-instructions.md.
@@ -33,7 +33,7 @@ These instructions customize GitHub Copilot for Acme Agent Tools.
 
 ## Project
 
-**Acme Agent Tools** — TypeScript SDK + MCP server + Next.js dashboard for agent integration.
+**Acme Agent Tools** - TypeScript SDK + MCP server + Next.js dashboard for agent integration.
 
 Monorepo: pnpm workspaces (packages/sdk, packages/api, packages/dashboard).
 
@@ -157,7 +157,7 @@ Do NOT use `cd packages/X && npm` (breaks hoisting).
 
 ## See also
 
-- [AGENTS.md](../AGENTS.md) — Complete project context
+- [AGENTS.md](../AGENTS.md) - Complete project context
 - [GitHub Copilot docs](https://docs.github.com/en/copilot)
-- [Cursor rules](../.cursor/rules/project.mdc) — Cursor IDE (different tool)
-- [Claude Code instructions](../CLAUDE.md) — Claude Code (different tool)
+- [Cursor rules](../.cursor/rules/project.mdc) - Cursor IDE (different tool)
+- [Claude Code instructions](../CLAUDE.md) - Claude Code (different tool)

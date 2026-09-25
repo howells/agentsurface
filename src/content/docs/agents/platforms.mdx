@@ -1,0 +1,95 @@
+---
+title: Platforms
+description: Current Anthropic, OpenAI, and Gemini platform surfaces for agent systems - hosted tools, MCP connectors, Agent Skills, code execution, and model guidance.
+lastVerified: 2026-09-25
+---
+
+## Summary
+
+Treat Claude, OpenAI, and Gemini as platforms: all three ship a hosted execution surface, and Claude and OpenAI add MCP connectors for reaching external tools plus a shared cross-vendor Agent Skills mechanism. The common failure is scaffolding against last quarter's shape - a retired API, a superseded model ID, or a renamed parameter.
+
+Anthropic docs live at `platform.claude.com`; Claude Code docs live at `code.claude.com`. OpenAI docs live at `platform.openai.com` and `developers.openai.com`. Gemini docs live at `ai.google.dev` and `blog.google`.
+
+## Anthropic
+
+| Surface                        | Use when                                                              | Notes                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Managed Agents          | Anthropic should run the autonomous agent harness                     | Public beta since 2026-04-08. Sessions, environments, SSE events, cron deployments, MCP tunnels; a session that mounts a GitHub repo now auto-discovers skills in that repo's `.claude/skills` (since 2026-08-07).                                                                                                              |
+| Claude Code / Claude Agent SDK | Coding-agent work: repo inspection, editing, tests, incident response | Same product; `@anthropic-ai/claude-agent-sdk` (npm), `claude-agent-sdk` (PyPI).                                                                                                                                                                                                                                                |
+| Messages API + MCP connector   | A request needs remote MCP tool calls without a managed session       | Tool-call support only, not the full MCP primitive set. Beta headers `inline-tools-2026-09-15` and `mcp-client-2026-09-15` (2026-09-22) let a mid-conversation system message add or redefine tools and pin a connected server's fetched tool list across requests, so a catalog change no longer invalidates the prompt cache. |
+| Agent Skills                   | Reusable procedures, scripts, and domain workflows                    | Cross-vendor open standard (`agentskills.io`), not Claude-only. The Skills API (`/v1/skills`) left beta 2026-08-19; no beta header required.                                                                                                                                                                                    |
+| Computer use / browser use     | The agent should act on a real UI, not just call an API               | `computer_toolset_20260801` and `browser_toolset_20260801` left beta 2026-08-19, available across the current Claude model line. The earlier `computer_20251124` tool now errors on Opus 5.5 and later - migrate to the toolset ID.                                                                                             |
+| Built-in tools                 | Web search, web fetch, code execution, tool search, memory tool       | GA since 2026-02-17. Compaction on demand (beta header `compact-2026-09-04`, shipped 2026-09-14) lets a caller compact a conversation into a signed summary block on its own schedule and resend that block in place of the summarized messages.                                                                                |
+
+Choose **Managed Agents** when sessions, credential vaulting, webhooks, or scheduled runs should be Anthropic-operated rather than embedded in your own app server. Choose **Claude Code / Agent SDK** when a human or service needs the coding harness directly. Choose the **MCP connector** when a single Messages API request just needs remote tool calls. Choose a **custom MCP server** when Claude, OpenAI, and other clients all need the same vendor-neutral contract.
+
+Current model IDs as of 2026-09-24: **Opus 5.5** (`claude-opus-5-5`) is the recommended default for agent and coding work; **Fable 5.1** (`claude-fable-5-1`) is the flagship for deep reasoning and long tasks; **Sonnet 5** (`claude-sonnet-5`) is the balanced mid tier; **Haiku 4.5** (`claude-haiku-4-5`) remains the low-latency option. Current pinned IDs are dateless - do not append a date suffix (`claude-haiku-4-5` is the dateless alias of the dated `claude-haiku-4-5-20251001`). See [Model Reference](/docs/reference-links/models) for the full allowlist.
+
+## OpenAI
+
+| Surface                       | Use when                                                                  | Notes                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Responses API + Conversations | The base for all new OpenAI agent work                                    | The Assistants API was sunset 2026-08-26 - every call to it now errors, no transition window. Threads/Runs map to Conversations/Responses; there is no automated migration tool. Async tool calls and mid-turn steering (2026-09-03) let the model keep working while a tool runs and let a caller send corrections into an in-progress response over WebSockets. |
+| Agents API (beta)             | OpenAI should run the agent harness, not your own app server              | Public beta since 2026-09-10: a managed Codex harness with OpenAI handling session orchestration, context compaction, and recovery; durable sessions, progress streaming, custom tools, MCP servers, and a choice of OpenAI-hosted or customer-provided sandboxes.                                                                                                |
+| OpenAI Agents SDK             | Embedding the agent loop in an app or service                             | `@openai/agents` (npm), `openai-agents` / `agents` (PyPI). Agents, handoffs, guardrails, sessions, tracing.                                                                                                                                                                                                                                                       |
+| Hosted Shell tool             | The agent should run real shell commands in an isolated container         | Fresh-per-request or reused-across-turns containers; common runtimes preinstalled.                                                                                                                                                                                                                                                                                |
+| Agent Skills in the API       | Reusable procedures loaded into the Shell environment on demand           | Same open `SKILL.md` standard as Anthropic and other adopters.                                                                                                                                                                                                                                                                                                    |
+| Server-side compaction        | A run outgrows the context window                                         | Summarizes prior turns server-side; not a memory system or an audit log.                                                                                                                                                                                                                                                                                          |
+| Built-in hosted tools         | Web search, file search, code interpreter, computer use, image generation | Hosted by OpenAI and billed as tool use.                                                                                                                                                                                                                                                                                                                          |
+
+Any code still targeting the Assistants API belongs on the migration guide below; build new work directly on Responses + Conversations. Choose the **Agents API** when the harness itself - orchestration, compaction, recovery - should be Codex-operated rather than assembled from the SDK; choose the **Agents SDK** when the app needs to own that loop directly.
+
+Current model IDs as of 2026-09-24: **GPT-5.6 Sol** (`gpt-5.6-sol`, flagship reasoning), **GPT-5.6 Terra** (`gpt-5.6-terra`, balanced default), **GPT-5.6 Luna** (`gpt-5.6-luna`, fastest/cheapest). See [Model Reference](/docs/reference-links/models).
+
+## Gemini
+
+Google's managed-agent surface on the Gemini API, expanded 2026-07-28:
+
+| Surface           | Use when                                                | Notes                                                                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment hooks | Custom checks should run around every tool call         | A `.agents/hooks.json` script runs on `pre_tool_execution` and `post_tool_execution` inside the sandbox - block, lint, or audit a tool call before or after it executes.                                |
+| Token budgets     | A run must not exceed a known cost                      | `max_total_tokens` caps input, output, and thinking tokens combined; the task pauses safely at the limit and returns `status: "incomplete"` with environment state preserved, rather than erroring out. |
+| Cron scheduling   | An agent should run unattended on a schedule            | Triggers bind an agent, environment, prompt, and cron schedule into a persistent resource that fires without manual intervention; sandboxes persist across scheduled runs.                              |
+| Environments API  | Sandbox sessions need programmatic lifecycle management | List, inspect, and delete environments directly instead of waiting on the default 7-day timeout.                                                                                                        |
+
+Gemini 3.7 Flash is the current default model for these managed agents, with Gemini 3.5 Flash-Lite available for cost-sensitive runs. This is a narrower surface than Claude Managed Agents or the OpenAI Agents API - no Agent Skills mechanism, no MCP connector for the managed-agent path yet - so treat it as the right fit for scheduled, budget-bounded background agents on Gemini rather than a general replacement for the other two.
+
+## MCP Notes
+
+None of the three platforms support the full MCP primitive set through every path. State which path is in use, and do not assume support for resources, prompts, roots, sampling, elicitation, or tasks unless the specific surface documents it:
+
+- Claude Code uses local stdio and remote Streamable HTTP MCP servers via `.mcp.json`, and can itself act as an MCP server with `claude mcp serve`.
+- The Claude Messages API MCP connector supports `mcp_toolset` with `defer_loading` for large catalogs and OAuth bearer tokens, but only MCP tool calls.
+- OpenAI can call remote MCP servers as hosted tools from a Responses request, plus OpenAI-maintained connectors for common third-party systems; private servers reach it through a secure tunnel.
+
+See [MCP Protocol](/docs/protocols/mcp) and [MCP Auth Model](/docs/authentication/mcp-auth-model) for the protocol-level detail these platforms build on.
+
+## Security Guidance
+
+The same rules apply across all three platforms:
+
+- Treat model-visible tool descriptions, MCP annotations, connector metadata, and Skill content as advisory input, never a trust boundary.
+- Enforce authorization, tenant identity, and scope checks in trusted server code - not in the prompt.
+- Gate destructive, external, authenticated, production, browser, and sandbox/container tools with confirmation policies (see [Prompts and Configuration](/docs/agents/prompts-and-configuration) and [Guardrails](/docs/agents/guardrails)).
+- Keep production credentials out of prompts, Skill text, and sandbox/container environments; broker privileged actions through a server-side tool the sandbox cannot bypass.
+- Log agent/session identity, user or tenant context, tool calls, approvals, and outcomes.
+
+## Related
+
+- [Frameworks](/docs/agents/frameworks)
+- [Browser and Sandboxes](/docs/agents/browser-and-sandboxes)
+- [Model Reference](/docs/reference-links/models)
+- [MCP Protocol](/docs/protocols/mcp)
+- [Tool Design](/docs/tool-design)
+
+## Source Links
+
+- [Claude Platform docs](https://platform.claude.com/docs)
+- [Claude Managed Agents overview](https://platform.claude.com/docs/en/managed-agents/overview)
+- [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview)
+- [Claude release notes](https://platform.claude.com/docs/en/release-notes/overview)
+- [OpenAI Platform docs](https://platform.openai.com/docs)
+- [OpenAI API changelog](https://developers.openai.com/api/docs/changelog)
+- [Assistants migration guide](https://developers.openai.com/api/docs/assistants/migration)
+- [Agent Skills standard (agentskills.io)](https://agentskills.io)
+- [Gemini API docs](https://ai.google.dev)

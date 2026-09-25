@@ -1,6 +1,6 @@
 /**
  * RateLimit + Retry-After header parsing and emission
- * Canonical: https://www.ietf.org/archive/id/draft-ietf-httpapi-ratelimit-headers-09.html
+ * Canonical: https://www.ietf.org/archive/id/draft-ietf-httpapi-ratelimit-headers-11.html
  *            https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after
  * Use: Parse rate-limit signals from a response so an agent knows whether and when to
  *      retry, and emit consistent RateLimit headers from your own server.

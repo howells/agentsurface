@@ -1,17 +1,17 @@
 ---
 title: Agent-to-Agent Protocol (A2A)
 description: Vendor-neutral protocol for task delegation between AI agents across organizational boundaries
-lastVerified: 2026-07-06
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-A2A is horizontal (agent-to-agent) vs. MCP which is vertical (agent-to-tools). One agent discovers a peer's capabilities via AgentCard at `/.well-known/agent.json`, hands off a task with context, and receives results asynchronously. Works across organizational boundaries without pre-shared secrets. Spec: v1.0.1 (2026-05-28; v1.0.0 shipped 2026-03-12), governed by the Linux Foundation AAIF.
+A2A is horizontal (agent-to-agent) vs. MCP which is vertical (agent-to-tools). One agent discovers a peer's capabilities via AgentCard at `/.well-known/agent-card.json`, hands off a task with context, and receives results asynchronously. Works across organizational boundaries without pre-shared secrets. Spec: v1.0.1 (2026-05-28; v1.0.0 shipped 2026-03-12). Donated to the Linux Foundation 2025-06-23; [accepted as a Growth Stage project at the Agentic AI Foundation (AAIF)](https://a2a-protocol.org/latest/blog/2026/08/27/a-new-chapter-for-a2a-joining-the-agentic-ai-foundation/) on 2026-08-27.
 
 ```
 Orchestrator        Specialist
    (Agent A)        (Agent B)
-     ├─ GET /.well-known/agent.json
+     ├─ GET /.well-known/agent-card.json
      │  (discover capabilities)
      ├─ POST /tasks (hand off task)
      └─ Poll or callback for result
@@ -22,19 +22,19 @@ Orchestrator        Specialist
 - OAuth 2.1 + DPoP for authentication between agents; Agent Cards can be cryptographically signed
 - Works across org boundaries, different infrastructure
 - Multi-transport: JSON-RPC, gRPC, and HTTP+JSON
-- v1.0.1: production-grade — 150+ organizations, SDKs in 5 languages, an 8-state task lifecycle
+- v1.0.1: production-grade - 150+ organizations, SDKs in 5 languages, an 8-state task lifecycle
 
-A2A solves a different problem than MCP. Where MCP connects an agent to tools and data sources, A2A connects agents to other agents. It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back — across organizational and deployment boundaries.
+A2A solves a different problem than MCP. Where MCP connects an agent to tools and data sources, A2A connects agents to other agents. It defines how one agent discovers a peer agent's capabilities, hands off a task with full context, and receives results back - across organizational and deployment boundaries.
 
 ## Origin and Governance
 
-Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. In June 2025 it joined the Linux Foundation, and it now sits under the Agentic AI Foundation (AAIF) alongside MCP, making A2A a vendor-neutral standard. The spec reached v1.0.0 on 2026-03-12 and v1.0.1 on 2026-05-28 — production-grade, with 150+ participating organizations and SDKs across five languages. For current adopters and governance details, use the A2A project site rather than copying a vendor list into implementation docs.
+Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. It was donated to the Linux Foundation on 2025-06-23, and was accepted as a **Growth Stage project** at the Agentic AI Foundation (AAIF) - alongside MCP - on 2026-08-27, making A2A a vendor-neutral standard. The spec reached v1.0.0 on 2026-03-12 and v1.0.1 on 2026-05-28 - production-grade, with 150+ participating organizations and SDKs across five languages. For current adopters and governance details, use the A2A project site rather than copying a vendor list into implementation docs.
 
-IBM's separate "ACP" (Agent Communication Protocol) was absorbed into A2A in August 2025 and is dead as a standalone effort. See the [ACP page](/docs/protocols/acp) for the three unrelated protocols that share that acronym.
+IBM's separate "ACP" (Agent Communication Protocol) was absorbed into A2A in August 2025 and is dead as a standalone effort. See [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) for the three unrelated protocols that share that acronym.
 
 ## Purpose
 
-In a multi-agent system, not every agent can or should do everything. A travel booking agent does not need to understand flight pricing algorithms — it needs to hand that task to a specialist flight agent. A customer support orchestrator should not contain HR policy logic — it should delegate HR questions to an HR specialist agent.
+In a multi-agent system, not every agent can or should do everything. A travel booking agent does not need to understand flight pricing algorithms - it needs to hand that task to a specialist flight agent. A customer support orchestrator should not contain HR policy logic - it should delegate HR questions to an HR specialist agent.
 
 A2A defines how that delegation works in practice:
 
@@ -72,17 +72,17 @@ In most production systems, both protocols are present: agents use MCP to access
 
 ## Task Lifecycle
 
-### Discovery
+### Phase 1: Discovery
 
-Before an agent can delegate a task, it must find an agent that can handle it and verify its capabilities. A2A uses AgentCard for discovery — a JSON document published at a well-known URL on the target agent's domain.
+Before an agent can delegate a task, it must find an agent that can handle it and verify its capabilities. A2A uses AgentCard for discovery - a JSON document published at a well-known URL on the target agent's domain.
 
 The canonical location is:
 
 ```
-GET /.well-known/agent.json
+GET /.well-known/agent-card.json
 ```
 
-For backward compatibility, `.well-known/agent-card.json` is accepted as a fallback.
+For backward compatibility with pre-1.0 servers, `.well-known/agent.json` is accepted as a fallback.
 
 A client agent fetches this document to learn:
 
@@ -93,7 +93,7 @@ A client agent fetches this document to learn:
 
 ### Phase 2: Authorization
 
-Once the client has read the Agent Card and confirmed the specialist can handle the task, it establishes authorization. A2A uses standard OAuth 2.1 — the client obtains a token scoped to the specific agent, using the authorization details declared in the Agent Card.
+Once the client has read the Agent Card and confirmed the specialist can handle the task, it establishes authorization. A2A uses standard OAuth 2.1 - the client obtains a token scoped to the specific agent, using the authorization details declared in the Agent Card.
 
 ### Phase 3: Communication
 
@@ -101,7 +101,7 @@ With a valid token, the client sends task requests to the specialist over HTTPS 
 
 ## AgentCard Structure
 
-The AgentCard is the core discovery document. Every A2A-compatible agent publishes one at `/.well-known/agent.json`.
+The AgentCard is the core discovery document. Every A2A-compatible agent publishes one at `/.well-known/agent-card.json`.
 
 ```json
 {
@@ -156,7 +156,7 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
 | -------------------- | -------- | ------------------------------------------------------------ |
 | `id`                 | Yes      | Globally unique identifier for this agent                    |
 | `name`               | Yes      | Human-readable display name                                  |
-| `description`        | Yes      | What tasks this agent handles — the primary discovery signal |
+| `description`        | Yes      | What tasks this agent handles - the primary discovery signal |
 | `version`            | Yes      | SemVer version of this agent's capabilities                  |
 | `url`                | Yes      | Base URL for the agent's JSON-RPC endpoint                   |
 | `capabilities`       | Yes      | Which A2A features this agent supports                       |
@@ -199,7 +199,7 @@ Content-Type: application/json
 {
   "jsonrpc": "2.0",
   "id": "task-8821",
-  "method": "tasks/send",
+  "method": "SendMessage",
   "params": {
     "id": "task-8821",
     "message": {
@@ -257,7 +257,7 @@ data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"st
 data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"completed"},"artifacts":[{"parts":[{"type":"application/json","data":{"flights":[...]}}]}]}}
 ```
 
-Each event carries a partial or final result. The stream ends when the task reaches a terminal state (`completed`, `failed`, or `canceled`).
+Each event carries a partial or final result. The stream ends when the task reaches a terminal state (`completed`, `failed`, `canceled`, or `rejected`).
 
 ### Input Required
 
@@ -291,7 +291,7 @@ The orchestrator responds by sending additional input to the same task ID:
 {
   "jsonrpc": "2.0",
   "id": "task-8821-followup",
-  "method": "tasks/send",
+  "method": "SendMessage",
   "params": {
     "id": "task-8821",
     "message": {
@@ -306,10 +306,10 @@ The orchestrator responds by sending additional input to the same task ID:
 
 Use A2A when the work itself should be done by a separate agent that owns the domain knowledge and tooling:
 
-- **Cross-organizational delegation** — sending a task to an agent operated by a different organization
-- **Specialist routing** — an orchestrator directing tasks to domain-specific agents (legal, HR, finance)
-- **Parallel execution** — dispatching independent subtasks to multiple agents simultaneously and aggregating results
-- **Long-running workflows** — tasks that take minutes or hours, where the result is delivered asynchronously
+- **Cross-organizational delegation** - sending a task to an agent operated by a different organization
+- **Specialist routing** - an orchestrator directing tasks to domain-specific agents (legal, HR, finance)
+- **Parallel execution** - dispatching independent subtasks to multiple agents simultaneously and aggregating results
+- **Long-running workflows** - tasks that take minutes or hours, where the result is delivered asynchronously
 
 Do not use A2A when you just need to call a function or read data. That is what MCP tools and resources are for.
 
@@ -328,10 +328,10 @@ The `skills` array in an AgentCard describes discrete capabilities the agent exp
 
 ## Spec & References
 
-- [A2A v1.0.1 Specification](https://a2a-protocol.org/latest/specification/) — official A2A specification from the Linux Foundation
-- [A2A Project Homepage](https://a2aproject.github.io/A2A/latest/) — documentation and resources
+- [A2A v1.0.1 Specification](https://a2a-protocol.org/latest/specification/) - official A2A specification from the Linux Foundation
+- [A2A Project Homepage](https://a2aproject.github.io/A2A/latest/) - documentation and resources
 
 ## Related Pages
 
-- [MCP Protocol](/docs/protocols/mcp) — the vertical counterpart: connecting agents to tools and data
-- [Protocol Comparison](/docs/protocols/comparison) — full landscape and decision guide
+- [MCP Protocol](/docs/protocols/mcp) - the vertical counterpart: connecting agents to tools and data
+- [Protocol Comparison](/docs/protocols/comparison) - full landscape and decision guide

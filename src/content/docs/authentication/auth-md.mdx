@@ -1,7 +1,7 @@
 ---
 title: auth.md
 description: Discover agent registration, verify identity, and exchange assertions for scoped access
-lastVerified: 2026-09-10
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -12,25 +12,9 @@ The current reference separates identity registration from access-token issuance
 
 ## Discovery Shape
 
-Serve the walkthrough as Markdown at `/auth.md`. For an OAuth-protected API, publish [protected-resource metadata](/docs/authentication/protected-resource-metadata) on the resource server and link to it from authentication challenges:
+Serve the walkthrough as Markdown at `/auth.md`. For an OAuth-protected API, publish [protected-resource metadata](/docs/authentication/protected-resource-metadata) on the resource server and link to it from the `WWW-Authenticate` challenge - see that page for the 401 response and resource-document shape; `auth.md` adds nothing new there.
 
-```http
-HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
-```
-
-The resource document identifies the API and its authorization server:
-
-```json
-{
-  "resource": "https://api.example.com/",
-  "authorization_servers": ["https://auth.example.com/"],
-  "scopes_supported": ["items:read"],
-  "bearer_methods_supported": ["header"]
-}
-```
-
-On the authorization-server origin, publish RFC 8414 metadata with the optional registration extension. This example advertises all three methods; remove methods and endpoints the service does not implement.
+What's specific to `auth.md` is the authorization-server side: publish RFC 8414 metadata with the optional registration extension. This example advertises all three methods; remove methods and endpoints the service does not implement.
 
 ```json
 {
@@ -55,7 +39,7 @@ On the authorization-server origin, publish RFC 8414 metadata with the optional 
 }
 ```
 
-The ID-JAG URN belongs inside `identity_assertion.assertion_types_supported`, not in `identity_types_supported`. The current endpoint fields are `identity_endpoint`, `claim_endpoint`, and `events_endpoint`; the earlier `register_uri` example is obsolete. Match your implementation to a pinned profile revision. [Service implementation guide](https://github.com/workos/auth.md/blob/main/agent-services/README.md).
+The ID-JAG URN belongs inside `identity_assertion.assertion_types_supported`, not in `identity_types_supported`. The current endpoint fields are `identity_endpoint`, `claim_endpoint`, and `events_endpoint`. Match your implementation to a pinned profile revision. [Service implementation guide](https://github.com/workos/auth.md/blob/main/agent-services/README.md).
 
 ## Flow Selection
 

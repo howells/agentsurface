@@ -1,6 +1,7 @@
 ---
 title: Serving Markdown to Agents
 description: Content negotiation patterns for returning Markdown instead of HTML to AI agents
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -13,7 +14,7 @@ HTML consumes 5-6x more tokens than Markdown for the same content. Content negot
 - Not all agents send Accept headers yet (optional optimization)
 - Biggest impact on documentation-heavy systems
 
-HTML costs tokens. A heading in HTML is `<h2 class="text-2xl font-bold mt-8 mb-4">Authentication</h2>` — roughly 15 tokens. The same heading in Markdown is `## Authentication` — 3 tokens. Across a full documentation page, the reduction is consistent: serving Markdown instead of HTML cuts token consumption by approximately 80%.
+HTML costs tokens. A heading in HTML is `<h2 class="text-2xl font-bold mt-8 mb-4">Authentication</h2>` - roughly 15 tokens. The same heading in Markdown is `## Authentication` - 3 tokens. Across a full documentation page, the reduction is consistent: serving Markdown instead of HTML cuts token consumption by approximately 80%.
 
 For agents operating within context window budgets, this matters. An agent that can read five pages in Markdown reads one page in HTML for the same cost.
 
@@ -33,7 +34,7 @@ Accept: text/markdown, text/plain;q=0.9, */*;q=0.8
 
 Your server reads the `Accept` header and returns the format with the highest priority that it can serve. If no matching format is available, it falls back to HTML.
 
-Not all agents send `Accept: text/markdown` today. Many still accept `*/*` and receive HTML. Content negotiation is an opt-in optimization — pages that serve it benefit agents that request it; all other clients receive HTML as before.
+Not all agents send `Accept: text/markdown` today. Many still accept `*/*` and receive HTML. Content negotiation is an opt-in optimization - pages that serve it benefit agents that request it; all other clients receive HTML as before.
 
 ## Next.js App Router Implementation
 
@@ -77,8 +78,8 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     notFound();
   }
 
-  // source.getPage returns the MDX source — strip frontmatter for clean Markdown
-  const markdown = stripFrontmatter(page.data._raw.flattenedPath);
+  // source.getPage returns the MDX source - strip frontmatter for clean Markdown
+  const markdown = stripFrontmatter(page.data._raw.sourceFileContent);
 
   const tokenCount = estimateTokens(markdown);
 
@@ -107,7 +108,7 @@ function estimateTokens(text: string): number {
 A simpler approach that avoids middleware complexity: serve Markdown at `.md`-suffixed URLs. This is the convention used by `llms.txt` link lists.
 
 ```typescript
-// app/docs/[...slug]/route.ts — handles /docs/authentication.md
+// app/docs/[...slug]/route.ts - handles /docs/authentication.md
 export async function GET(request: Request, { params }: { params: { slug: string[] } }) {
   const lastSegment = params.slug[params.slug.length - 1];
 
@@ -169,11 +170,11 @@ app.get("/docs/:slug", async (req, res) => {
 
 ## Required Headers
 
-**`Content-Type: text/markdown; charset=utf-8`** — Identifies the response as Markdown. Use the registered MIME type. Do not use `text/plain` for Markdown responses — it loses semantic meaning.
+**`Content-Type: text/markdown; charset=utf-8`** - Identifies the response as Markdown. Use the registered MIME type. Do not use `text/plain` for Markdown responses - it loses semantic meaning.
 
-**`Vary: Accept`** — Critical for CDN caching correctness. Without this header, a CDN may cache the Markdown response and serve it to browsers requesting HTML (or vice versa). `Vary: Accept` tells the CDN to cache separate copies for different `Accept` values.
+**`Vary: Accept`** - Required for correct CDN caching. Without this header, a CDN may cache the Markdown response and serve it to browsers requesting HTML (or vice versa). `Vary: Accept` tells the CDN to cache separate copies for different `Accept` values.
 
-**`x-markdown-tokens`** — An informal header carrying the estimated token count. Not standardized, but useful for agents that want to budget their context window before fetching. Omit if you do not compute it.
+**`x-markdown-tokens`** - An informal header carrying the estimated token count. Not standardized, but useful for agents that want to budget their context window before fetching. Omit if you do not compute it.
 
 ```
 HTTP/2 200
@@ -199,6 +200,22 @@ Link: <https://docs.example.com/authentication>; rel="canonical"
 
 Without a canonical link, a Markdown mirror looks like a duplicate page rather than an alternate representation of the HTML original - `rel="canonical"` tells search engines and agents which URL is authoritative when the same content is served at more than one path.
 
+## Locale and language negotiation
+
+The same negotiation mechanics that pick a format also pick a language. `Accept-Language` (RFC 7231 §5.3.5) works exactly like `Accept` - a client sends its preferred locales with weights, and your server returns the closest match:
+
+```
+Accept-Language: fr-CA, fr;q=0.9, en;q=0.5
+```
+
+Three places carry locale for agent-facing content, and they need to agree:
+
+- **`hreflang`** - `<link rel="alternate" hreflang="fr-CA" href="https://example.com/fr-ca/docs/authentication">` on every localized page, pointing at every other locale of that same page plus an `x-default` fallback. This is how a client picks the right URL before fetching anything.
+- **Markdown routes** - keep the locale segment in the path (`/fr-ca/docs/authentication.md`, not a query parameter or cookie), so a Markdown fetch resolves the same locale as the HTML page it mirrors, and so the URL alone (no session state) determines what's returned.
+- **`llms.txt`** - publish a localized index per locale you support content in (`/fr-ca/llms.txt`) rather than one English index with mixed-language links, and cross-link each locale's index to the others.
+
+Don't guess a locale from IP geolocation alone for agent traffic - many agents run from a single region's infrastructure regardless of the human they're acting for. Respect `Accept-Language` and an explicit path segment over inferred location.
+
 ## Cloudflare Markdown for Agents
 
 Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown conversion at the edge. When enabled, Cloudflare intercepts requests with `Accept: text/markdown`, fetches the HTML origin response, converts it to Markdown, and returns the Markdown to the agent. Cloudflare docs also expose `.md` paths such as `/index.md`, which gives agents a URL fallback when they cannot set request headers.
@@ -207,7 +224,13 @@ This requires no changes to your origin server. Enable it in AI Crawl Control fo
 
 The response should include `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and a `Content-Signal` header. Cloudflare's default converted responses currently signal `ai-train=yes, search=yes, ai-input=yes`; override content-use policy where the platform allows it.
 
-The conversion is pragmatic, not magic. It only converts HTML origin responses, and Cloudflare documents a 2 MB origin response limit. Origin-served Markdown is preferable when you control the stack. Use edge conversion when modifying the origin is impractical. For arbitrary document conversion or dynamic pages, consider Workers AI `AI.toMarkdown()` or Browser Run's Markdown endpoint.
+It only converts HTML origin responses, and Cloudflare documents a 2 MB origin response limit. Origin-served Markdown is preferable when you control the stack. Use edge conversion when modifying the origin is impractical. For arbitrary document conversion or dynamic pages, consider Workers AI `AI.toMarkdown()` or Browser Run's Markdown endpoint.
+
+## Agent-mode page view
+
+A stripped-down structured view, served at a distinct URL or query parameter such as `?mode=agent`, is a separate pattern from Markdown negotiation: plain content with direct links to the underlying endpoints, no navigation chrome, no client-side rendering dependency. There's no formal standard for it - it's a site-specific convention that Ora's `agent-mode-view` check looks for by name.
+
+If you already serve Markdown via content negotiation, you usually don't need a second agent-mode view - it duplicates the same job through a different mechanism. Build one when the page's real value for an agent is a set of actions (direct links to sign up, get keys, or hit an endpoint) rather than prose content, since that's not something a Markdown conversion of the HTML expresses. Whichever mechanism you pick, keep it a single source of truth: an agent-mode view that quietly drifts from the canonical page's facts, prices, or links is worse than not having one, because nothing signals that it's stale.
 
 ## HTML Fallback Signals
 
@@ -285,9 +308,9 @@ Displaying the token count alongside the copy confirmation sets expectations for
 When generating Markdown for agents, preserve:
 
 - All code blocks with language identifiers
-- Table content — agents parse Markdown tables directly
-- Internal links — relative links are still useful for context
-- Heading hierarchy — agents use this for navigation and summarization
+- Table content - agents parse Markdown tables directly
+- Internal links - relative links are still useful for context
+- Heading hierarchy - agents use this for navigation and summarization
 
 Strip:
 
@@ -295,7 +318,7 @@ Strip:
 - Footer content (social links, legal notices)
 - Cookie consent banners and modals
 - Advertisement placeholders
-- HTML-only interactive elements (accordions, tabs — flatten to headings and content)
+- HTML-only interactive elements (accordions, tabs - flatten to headings and content)
 
 ## Missing paths and representation parity
 

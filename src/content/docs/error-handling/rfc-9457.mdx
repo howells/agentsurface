@@ -1,6 +1,7 @@
 ---
 title: RFC 9457 Problem Details
 description: The current standard for structured HTTP error responses that agents can parse and act on
+lastVerified: 2026-09-24
 ---
 
 ## Summary
@@ -24,7 +25,7 @@ RFC 9457 standardizes error response format with five core fields: type (stable 
 - trace_id: correlation ID for internal lookup
 - Content-Type: application/problem+json signals RFC 9457 format
 
-RFC 9457 (March 2024) defines a standard JSON format for HTTP error responses. It obsoletes RFC 7807 (April 2015) with improved registration procedures for extension types, explicit internationalization support, and enhanced security guidance. Like its predecessor, it answers a fundamental problem: HTTP status codes alone are insufficient for agents to decide whether to retry, modify the request, or escalate.
+RFC 9457 (July 2023) defines a standard JSON format for HTTP error responses. It obsoletes RFC 7807 (2016). Like its predecessor, it answers a fundamental problem: HTTP status codes alone are insufficient for agents to decide whether to retry, modify the request, or escalate.
 
 The format has become widespread. The `application/problem+json` content type signals that the response body follows the standard, allowing agents and client libraries to handle errors consistently regardless of which service returned them.
 
@@ -48,7 +49,7 @@ The format has become widespread. The `application/problem+json` content type si
 | `detail`   | Optional    | A human-readable explanation specific to this occurrence of the problem.                           |
 | `instance` | Optional    | A URI reference that identifies the specific occurrence of the problem.                            |
 
-`type` is the most critical field for agents. It is the stable, parseable identifier that agents can branch on:
+The `type` URI is the stable, parseable identifier that agents can branch on:
 
 ```typescript
 const response = await fetch("/accounts/acme/charge", {
@@ -75,13 +76,13 @@ if (!response.ok) {
 }
 ```
 
-Agents should never branch on the `title` or `detail` fields — those are prose for humans and may change between releases. `type` is the stable contract.
+Agents should never branch on the `title` or `detail` fields - those are prose for humans and may change between releases. `type` is the stable contract.
 
 ## RFC 9457 vs RFC 7807
 
 RFC 9457 retains full backward compatibility with RFC 7807 while adding:
 
-- **Formal extension registration**: The IANA Problem Details extension registry codifies how vendor extensions (like `is_retriable`, `trace_id`) are declared and documented.
+- **Formal type registration**: The [IANA HTTP Problem Types registry](https://www.iana.org/assignments/http-problem-types) gives `type` URIs a place to be registered and documented. It covers the `type` values themselves, not extension member names like `is_retriable` or `trace_id` - there is no registry for those; document them in your own API reference.
 - **Internationalization support**: Extensions may include language tags and localized explanations.
 - **Security clarifications**: Explicit guidance on preventing information disclosure (no stack traces, internal error codes sanitized).
 - **Instance URI semantics**: Clearer definition of when `instance` should be a server-relative URI vs absolute URI.
@@ -90,7 +91,7 @@ For practical purposes, both standards share the core five fields and the extens
 
 ## Recommended Extensions for Agent APIs
 
-The RFC explicitly allows extension fields beyond the five core ones. For agent-readable APIs, these extensions carry the structured recovery information agents need to decide whether to retry unchanged, modify and retry, or escalate. They are not part of the RFC itself, but follow its registry pattern for vendor-specific error metadata.
+The RFC explicitly allows extension fields beyond the five core ones. For agent-readable APIs, these extensions carry the structured recovery information agents need to decide whether to retry unchanged, modify and retry, or escalate. They are not part of the RFC itself and have no IANA registry of their own - document them in your own API reference instead.
 
 | Field            | Type        | Purpose                                              |
 | ---------------- | ----------- | ---------------------------------------------------- |
@@ -103,7 +104,7 @@ The RFC explicitly allows extension fields beyond the five core ones. For agent-
 
 ### `is_retriable`
 
-A boolean that explicitly tells the agent whether retrying the same request unchanged might succeed. `false` marks a terminal error where the request itself is wrong — do not infer retriability from the status code alone:
+A boolean that explicitly tells the agent whether retrying the same request unchanged might succeed. `false` marks a terminal error where the request itself is wrong - do not infer retriability from the status code alone:
 
 ```json
 {
@@ -118,7 +119,7 @@ A boolean that explicitly tells the agent whether retrying the same request unch
 
 ### `retry_after_ms`
 
-How long to wait before retrying, in milliseconds. It is the numeric equivalent of the `Retry-After` header, carried in the body for clients that process the body but not headers — and preferred over the header for parsing consistency. Agents can sleep on it directly:
+How long to wait before retrying, in milliseconds. It is the numeric equivalent of the `Retry-After` header, carried in the body for clients that process the body but not headers - and preferred over the header for parsing consistency. Agents can sleep on it directly:
 
 ```typescript
 if (error.is_retriable && error.retry_after_ms) {
@@ -171,7 +172,7 @@ A link to detailed documentation for this error type. Unlike `type`, which is a 
 
 ### `trace_id`
 
-A correlation ID linking this error to a specific request in the service's observability stack — server logs and OpenTelemetry spans. When an agent escalates to a human, the human or support team can look up the trace without reproducing the issue:
+A correlation ID linking this error to a specific request in the service's observability stack - server logs and OpenTelemetry spans. When an agent escalates to a human, the human or support team can look up the trace without reproducing the issue:
 
 ```json
 {
@@ -187,7 +188,7 @@ A correlation ID linking this error to a specific request in the service's obser
 
 ### `errors`
 
-RFC 9457 allows aggregating multiple problems under an `errors` array — useful for batch operations or multi-field validation. Each element follows the same Problem Details schema, so an agent can recurse into it to recover per item:
+RFC 9457 allows aggregating multiple problems under an `errors` array - useful for batch operations or multi-field validation. Each element follows the same Problem Details schema, so an agent can recurse into it to recover per item:
 
 ```json
 {
@@ -251,7 +252,7 @@ async function callTool(tool: string, params: Record<string, unknown>): Promise<
     const error = await response.json();
 
     if (error.is_retriable === false) {
-      // Terminal error — escalate or fail the task
+      // Terminal error - escalate or fail the task
       throw new Error(`${error.title}: ${error.detail}. See ${error.doc_uri}`);
     }
 
@@ -262,7 +263,7 @@ async function callTool(tool: string, params: Record<string, unknown>): Promise<
     }
 
     if (error.suggestions && error.suggestions.length > 0) {
-      // Recoverable with modification — agent rewrites params
+      // Recoverable with modification - agent rewrites params
       // (implementation depends on agent framework)
     }
   }
@@ -353,6 +354,6 @@ function problemResponse(res: Response, status: number, problem: ProblemDetails)
 
 ## Related Pages
 
-- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) — structuring error content to enable recovery
-- [Retry Patterns](/docs/error-handling/retry-patterns) — how agents should act on error information
-- [Templates: Problem Details Schema](/templates/errors-and-auth/problem-details.ts) — Zod implementation
+- [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) - structuring error content to enable recovery
+- [Retry Patterns](/docs/error-handling/retry-patterns) - how agents should act on error information
+- [Templates: Problem Details Schema](/templates/errors-and-auth/problem-details.ts) - Zod implementation

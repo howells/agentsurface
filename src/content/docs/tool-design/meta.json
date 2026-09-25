@@ -5,6 +5,7 @@
     "naming-and-descriptions",
     "schemas",
     "idempotency-and-safety",
+    "human-approval",
     "tool-curation",
     "cross-framework-portability",
     "token-budget",

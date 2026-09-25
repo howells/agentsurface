@@ -1,31 +1,32 @@
 ---
 title: CLI Design
 description: Building CLIs that AI agents can operate as effectively as human users
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
 CLI Design covers command-line surfaces that agents can script without scraping terminal prose. Use it when a product exposes capabilities through commands, local automation, package scripts, or developer tools.
 
-- **Owns:** command structure, JSON output, raw payload input, schema introspection, exit codes, input hardening, safety flags, and packaging CLI knowledge for agents.
+- **Owns:** command structure, JSON output, raw payload input, schema introspection, exit codes, context window discipline, input hardening, safety flags, and packaging CLI knowledge for agents.
 - **Does not own:** model-callable tool schemas in general; see [Tool Design](/docs/tool-design). HTTP service contracts; see [API Surface](/docs/api-surface).
 - **Agent-ready means:** every command can be discovered, invoked non-interactively, parsed structurally, retried safely, and diagnosed from exit status plus error body.
 
 ## Start Here
 
-- [Command Structure](/docs/cli-design/command-structure) — shape commands around stable resources and verbs.
-- [Machine-Readable Output](/docs/cli-design/machine-readable-output) — return parseable JSON, not terminal-only formatting.
-- [Raw Payload Input](/docs/cli-design/raw-payload-input) — accept files or stdin for complex structured input.
-- [Schema Introspection](/docs/cli-design/schema-introspection) — let agents discover commands and options programmatically.
-- [Context Window Discipline](/docs/cli-design/context-window-discipline) — keep help, logs, and results compact.
-- [Input Hardening](/docs/cli-design/input-hardening) — reject malformed arguments with actionable errors.
-- [Safety Rails](/docs/cli-design/safety-rails) — support dry runs, confirmations, and non-interactive execution.
-- [Agent Knowledge Packaging](/docs/cli-design/agent-knowledge-packaging) — ship command guidance agents can retrieve.
-- [CLI Scale](/docs/cli-design/cli-scale) — keep large command sets navigable.
+- [Command Structure](/docs/cli-design/command-structure) - shape commands around stable resources and verbs.
+- [Machine-Readable Output](/docs/cli-design/machine-readable-output) - return parseable JSON, not terminal-only formatting.
+- [Raw Payload Input](/docs/cli-design/raw-payload-input) - accept files or stdin for complex structured input.
+- [Schema Introspection](/docs/cli-design/schema-introspection) - let agents discover commands and options programmatically.
+- [Context Window Discipline](/docs/cli-design/context-window-discipline) - keep help, logs, and results compact.
+- [Input Hardening](/docs/cli-design/input-hardening) - reject malformed arguments with actionable errors.
+- [Safety Rails](/docs/cli-design/safety-rails) - support dry runs, confirmations, and non-interactive execution.
+- [Agent Knowledge Packaging](/docs/cli-design/agent-knowledge-packaging) - ship command guidance agents can retrieve.
+- [CLI Scale](/docs/cli-design/cli-scale) - score a CLI against the seven-axis agent-readiness framework.
 
 ## Related
 
-- [Error Handling: CLI Errors](/docs/error-handling/cli-errors) — structured failures and stable exit codes.
-- [Tool Design](/docs/tool-design) — use when commands become model-callable tools.
-- [Context Files](/docs/context-files) — document canonical commands for coding agents.
-- [Testing](/docs/testing) — add contract tests for CLI output and failure modes.
+- [Error Handling: CLI Errors](/docs/error-handling/cli-errors) - structured failures and stable exit codes.
+- [Tool Design](/docs/tool-design) - use when commands become model-callable tools.
+- [Context Files](/docs/context-files) - document canonical commands for coding agents.
+- [Testing](/docs/testing) - add contract tests for CLI output and failure modes.

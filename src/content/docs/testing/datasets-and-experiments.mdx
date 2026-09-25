@@ -1,14 +1,14 @@
 ---
 title: Datasets and Experiments
-description: Vendor-neutral golden-dataset curation — sourcing, labeling, hygiene, versioning, and drift detection so experiments measure something real
-lastVerified: 2026-07-06
+description: Vendor-neutral golden-dataset curation - sourcing, labeling, hygiene, versioning, and drift detection so experiments measure something real
+lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-An eval is only as good as the dataset behind it. Teams build harnesses, scorers, and CI gates first — and never build the dataset. The result is a green pipeline measuring nothing: a suite that passes because its cases are trivial, stale, or leaked from the same prompts the agent already memorized. This page is the dataset-first counterpart to the platform pages: how to source, label, clean, version, and refresh the golden set that every experiment is pinned to. The tool mechanics (running experiments, diffing results, gating merges) live in the platform and CI pages and are linked, not restated.
+An eval is only as good as the dataset behind it. Teams build harnesses, scorers, and CI gates first - and never build the dataset. The result is a green pipeline measuring nothing: a suite that passes because its cases are trivial, stale, or leaked from the same prompts the agent already memorized. This page is the dataset-first counterpart to the platform pages: how to source, label, clean, version, and refresh the golden set that every experiment is pinned to. The tool mechanics (running experiments, diffing results, gating merges) live in the platform and CI pages and are linked rather than restated.
 
-- **Decision rule**: curated golden vs. production sampling vs. synthetic generation — matched to decision stakes
+- **Decision rule**: curated golden vs. production sampling vs. synthetic generation - matched to decision stakes
 - **Sourcing**: production traces as a candidate pool, failure mining, reviewed synthetic edge cases
 - **Labeling**: rubric-anchored labels, defined labelers, adjudication for disagreement
 - **Hygiene**: dedup, leakage checks against training/few-shot content, PII scrubbing before storage
@@ -17,20 +17,19 @@ An eval is only as good as the dataset behind it. Teams build harnesses, scorers
 
 ---
 
-Eval quality is capped by dataset quality. A scorer can be perfect and a harness can be fast, but if the cases do not represent the tasks users actually send — or if they leak answers the agent has already seen — the score is a number with no meaning. The first failure mode of agent evaluation is not a bad grader; it is a dataset that was assembled once, by hand, from whatever examples were nearby, and then frozen while production drifted away from it.
+Eval quality is capped by dataset quality. A scorer can be perfect and a harness can be fast, but if the cases do not represent the tasks users actually send - or if they leak answers the agent has already seen - the score is a number with no meaning. The first failure mode of agent evaluation is a dataset that was assembled once, by hand, from whatever examples were nearby, and then frozen while production drifted away from it.
 
 <Callout type="warn">
-  A passing eval suite is not evidence of a working agent. It is evidence that the agent handles the
-  cases in the dataset. Those two things are equal only when the dataset is a faithful, current,
-  leak-free sample of real work — which is a property you build and maintain, not one you get for
-  free.
+  A passing eval suite is evidence that the agent handles the cases in the dataset. Whether that
+  means the agent works depends on the dataset being a faithful, current, leak-free sample of real
+  work - a property you build and maintain, not one you get for free.
 </Callout>
 
 Treat the dataset as the primary artifact and the harness as plumbing. The rest of this page is the lifecycle of that artifact.
 
 ## Decision rule: where cases come from
 
-Three sourcing strategies trade off cost, realism, and coverage. Pick per dataset by what the eval decides, not by convenience.
+Three sourcing strategies trade off cost, realism, and coverage. Pick per dataset by what the eval decides.
 
 | Strategy                 | Use when                                                                           | Cost per case                   | Risk                                                          |
 | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------- |
@@ -38,9 +37,9 @@ Three sourcing strategies trade off cost, realism, and coverage. Pick per datase
 | **Production sampling**  | You need distributional realism and volume for comparisons                         | Low to source, medium to label  | Reflects current traffic only; needs labeling                 |
 | **Synthetic generation** | A failure mode is rare or not yet in production (new capability, adversarial edge) | Low to generate, high to review | Unreviewed synthetic cases encode the generator's blind spots |
 
-Most mature suites blend all three: a small curated core that gates releases, a larger sampled body that measures regressions distributionally, and a synthetic edge-case layer that probes failure modes production has not yet produced. Synthetic cases never enter the set without human review — an unreviewed generator quietly teaches the eval to accept its own mistakes.
+Most mature suites blend all three: a small curated core that gates releases, a larger sampled body that measures regressions distributionally, and a synthetic edge-case layer that probes failure modes production has not yet produced. Synthetic cases never enter the set without human review - an unreviewed generator quietly teaches the eval to accept its own mistakes.
 
-Size follows stakes, not ambition. A ship gate needs enough cases that a single flaky run does not flip the verdict (see the statistical-significance treatment in [CI integration](/docs/testing/ci-integration)); an exploratory capability probe can be a few dozen hand-authored frontier tasks.
+Match dataset size to the stakes of the decision the eval gates. A ship gate needs enough cases that a single flaky run does not flip the verdict (see the statistical-significance treatment in [CI integration](/docs/testing/ci-integration)); an exploratory capability probe can be a few dozen hand-authored frontier tasks.
 
 | Decision the eval makes          | Working size  | Sourcing bias                                        |
 | -------------------------------- | ------------- | ---------------------------------------------------- |
@@ -50,23 +49,23 @@ Size follows stakes, not ambition. A ship gate needs enough cases that a single 
 
 ## Sourcing: production traces to candidate pool
 
-Production is the richest source of realistic cases, but raw traces are not a dataset — they are a candidate pool that has to be mined, labeled, and cleaned.
+Production is the richest source of realistic cases, but raw traces are not a dataset - they are a candidate pool that has to be mined, labeled, and cleaned.
 
 1. **Sample the trace pool.** Pull traces across the distribution you care about (by scenario, tool path, user segment), not just recent or convenient ones. Stratify so rare-but-important scenarios are not drowned out by the common case.
-2. **Mine failures first.** The highest-value cases are tasks that already broke. Cluster low-scoring or thumbs-down production runs, deduplicate them into distinct failure modes, and promote representatives into a regression body. This mirrors the "start with real failures" discipline in the [evaluation framework](/docs/testing/evaluation-framework) — the dataset side of the same idea.
+2. **Mine failures first.** The highest-value cases are tasks that already broke. Cluster low-scoring or thumbs-down production runs, deduplicate them into distinct failure modes, and promote representatives into a regression body. This mirrors the "start with real failures" discipline in the [evaluation framework](/docs/testing/evaluation-framework) - the dataset side of the same idea.
 3. **Generate the edges you are missing.** For failure modes production has not yet exercised (a new tool, an adversarial input class), synthesize candidates, then route every one through human review before it counts as a labeled case.
 
-The output of sourcing is a pool of inputs with candidate expected outcomes — not yet trustworthy labels. Labeling turns the pool into a dataset.
+The output of sourcing is a pool of inputs with candidate expected outcomes - not yet trustworthy labels. Labeling turns the pool into a dataset.
 
 ## Labeling workflows
 
 A case is `input → expected outcome`. The expected outcome is a judgment, and judgments need a defined process or they will not be reproducible.
 
-- **Anchor labels to a rubric.** Label against the same success criteria the scorer uses, not a labeler's private intuition. A rubric-anchored label ("`status == sent` and no draft left behind") survives re-labeling; a vibe does not.
+- **Anchor labels to a rubric.** Label against the same success criteria the scorer uses, not a labeler's private intuition. A rubric-anchored label ("`status == sent` and no draft left behind") survives re-labeling.
 - **Name who labels.** Domain experts for high-stakes curated sets; a calibrated model-based labeler for volume, spot-checked by humans. Record the labeler on the case so a suspect label can be traced to its source.
 - **Adjudicate disagreement, do not average it.** When two labelers disagree, the disagreement is signal: the case is ambiguous or the rubric is underspecified. Route it to an adjudicator who either resolves it with a rubric clarification or drops the case as genuinely undecidable. Averaging conflicting labels manufactures a fake consensus that will confuse every future comparison.
 
-Calibrating a model-based labeler against human judgment is the same problem as calibrating an LLM judge — see [LLM-as-judge](/docs/testing/llm-as-judge) for the bias and agreement mechanics.
+Calibrating a model-based labeler against human judgment is the same problem as calibrating an LLM judge - see [LLM-as-judge](/docs/testing/llm-as-judge) for the bias and agreement mechanics.
 
 ## Dataset hygiene
 
@@ -80,7 +79,7 @@ Before a case is stored, it passes three checks. Skipping them is how a dataset 
 
 The dataset is a versioned artifact. Every experiment records the exact dataset version it ran against, and that pin is what makes two experiments comparable at all.
 
-Without pinning, a score change is unattributable: did the agent improve, or did someone add three easy cases to the dataset between runs? With pinning, the causes separate cleanly — a run against a fixed version isolates model/prompt changes, and a deliberate dataset bump is its own reviewable event with its own provenance (which traces were added, who labeled them, why).
+Without pinning, a score change is unattributable: did the agent improve, or did someone add three easy cases to the dataset between runs? With pinning, the causes separate cleanly - a run against a fixed version isolates model/prompt changes, and a deliberate dataset bump is its own reviewable event with its own provenance (which traces were added, who labeled them, why).
 
 Practical shape, regardless of platform:
 
@@ -88,30 +87,30 @@ Practical shape, regardless of platform:
 - Each case carries provenance: its source (which production incident, which generator), its labeler, and its label timestamp.
 - Every experiment stores the dataset version alongside the model, prompt, and code revision, so a historical result can be reproduced exactly.
 
-For the platform-specific mechanics — pulling a pinned dataset version, running an experiment against it, and reading the diff against a baseline — see the [Braintrust](/docs/testing/braintrust) worked example, and [CI integration](/docs/testing/ci-integration) for pinning inside a pipeline.
+For the platform-specific mechanics - pulling a pinned dataset version, running an experiment against it, and reading the diff against a baseline - see the [Braintrust](/docs/testing/braintrust) worked example, and [CI integration](/docs/testing/ci-integration) for pinning inside a pipeline.
 
 ## Drift detection
 
-A dataset is a snapshot; production is a moving distribution. Over time the two diverge — new user intents, new tool paths, a shifted input mix — and the eval keeps grading yesterday's traffic. Undetected, this is the slow version of the frozen-dataset failure: the suite stays green while its relevance decays.
+A dataset is a snapshot; production is a moving distribution. Over time the two diverge - new user intents, new tool paths, a shifted input mix - and the eval keeps grading yesterday's traffic. Undetected, this is the slow version of the frozen-dataset failure: the suite stays green while its relevance decays.
 
 - **Compare distributions on a schedule.** Periodically measure whether the live input distribution (scenario mix, input length, tool-path frequency) still resembles the dataset. A growing gap is the signal to re-sample.
-- **Re-sample, then re-label.** Refresh the sampled body from recent production on a cadence tied to how fast your product changes — and route new cases through the same labeling and hygiene gates. A re-sample that skips labeling just imports unlabeled noise.
+- **Re-sample, then re-label.** Refresh the sampled body from recent production on a cadence tied to how fast your product changes - and route new cases through the same labeling and hygiene gates. A re-sample that skips labeling just imports unlabeled noise.
 - **Version the refresh.** A re-sampled dataset is a new version, and comparisons that cross the boundary are dataset changes, not agent changes. Keep them separate.
 
 ## Gates and verdicts
 
-The dataset produces the score; the [CI integration](/docs/testing/ci-integration) page owns what the score does to a merge — baseline comparison, the delta threshold that blocks, and the statistical tests that separate a real regression from run-to-run noise. Two dataset-side obligations make those gates trustworthy:
+The dataset produces the score; the [CI integration](/docs/testing/ci-integration) page owns what the score does to a merge - baseline comparison, the delta threshold that blocks, and the statistical tests that separate a real regression from run-to-run noise. Two dataset-side obligations make those gates trustworthy:
 
 - **Pin the dataset version in the gate.** A gate comparing runs on different dataset versions is comparing nothing. The pipeline must fail on an unpinned or mismatched version before it interprets any delta.
 - **Keep the gating core stable.** The cases that decide ship/no-ship should change deliberately and rarely. Churning the gate dataset every week makes its verdicts incomparable across time.
 
 ## Platform landscape
 
-Dataset-and-experiment primitives are converging across platforms: Braintrust, LangSmith, Arize Phoenix, and Weights & Biases Weave all implement versioned datasets, experiments pinned to a dataset version, and diff views comparing runs. They differ in hosting model, trace integration, and human-review tooling, but the curation methodology above is the part none of them can do for you — a managed platform stores and versions the dataset; it does not decide which cases belong in it. This guide uses [Braintrust](/docs/testing/braintrust) as its worked example; the sourcing, labeling, and hygiene practices port to any of them.
+Dataset-and-experiment primitives are converging across platforms: Braintrust, LangSmith, Arize Phoenix, and Weights & Biases Weave all implement versioned datasets, experiments pinned to a dataset version, and diff views comparing runs. They differ in hosting model, trace integration, and human-review tooling, but the curation methodology above is the part none of them can do for you - a managed platform stores and versions the dataset; it does not decide which cases belong in it. This guide uses [Braintrust](/docs/testing/braintrust) as its worked example; the sourcing, labeling, and hygiene practices port to any of them.
 
 ## Checklist
 
-- [ ] Each dataset's sourcing strategy is chosen from the decision the eval makes, not convenience
+- [ ] Each dataset's sourcing strategy is chosen from the decision the eval makes
 - [ ] The regression body starts from mined production failures, not hand-invented cases
 - [ ] Synthetic cases pass human review before entering the set
 - [ ] Labels are anchored to the scorer's rubric and record their labeler
@@ -122,8 +121,8 @@ Dataset-and-experiment primitives are converging across platforms: Braintrust, L
 
 ## See also
 
-- `/docs/testing/evaluation-framework` — capability vs. regression evals; building the first eval set
-- `/docs/testing/braintrust` — worked example of versioned datasets and pinned experiments
-- `/docs/testing/ci-integration` — baseline comparison, regression gating, statistical significance
-- `/docs/testing/llm-as-judge` — calibrating model-based labelers against human judgment
-- `/docs/testing/metrics` — pass@k, tool F1, and the scores a dataset feeds
+- `/docs/testing/evaluation-framework` - capability vs. regression evals; building the first eval set
+- `/docs/testing/braintrust` - worked example of versioned datasets and pinned experiments
+- `/docs/testing/ci-integration` - baseline comparison, regression gating, statistical significance
+- `/docs/testing/llm-as-judge` - calibrating model-based labelers against human judgment
+- `/docs/testing/metrics` - pass@k, tool F1, and the scores a dataset feeds

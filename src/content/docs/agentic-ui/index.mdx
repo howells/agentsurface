@@ -1,13 +1,14 @@
 ---
 title: Agentic UI
 description: Interface patterns for chat, copilots, generative UI, tool progress, approvals, and resumable agent work.
+lastVerified: 2026-09-24
 ---
 
 ## Summary
 
-Agentic UI is the product surface around agent work. It is not only a chat box. A good agentic interface shows what the agent is doing, what it needs from the user, what it changed, and how the user can stop, correct, approve, or resume the work.
+Agentic UI is the product surface around agent work. A good agentic interface shows what the agent is doing, what it needs from the user, what it changed, and how the user can stop, correct, approve, or resume the work.
 
-- Use chat for conversation, not as the only control surface.
+- Use chat for conversation and back it with explicit controls.
 - Render tool calls and workflow state as first-class UI events.
 - Separate draft, approval, execution, and completion states.
 - Make cancellation and correction available while work is running.
@@ -15,10 +16,11 @@ Agentic UI is the product surface around agent work. It is not only a chat box. 
 
 ## Section Pages
 
-This page is the overview: the UI shapes, the event model, tool rendering, and streaming. Two topics have their own pages:
+This page is the overview: the UI shapes, the event model, tool rendering, and streaming. Three topics have their own pages:
 
-- [Session Control](/docs/agentic-ui/session-control) — the controller layer between the UI and the agent loop: modes, subagent surfacing, tool approvals, thread state, and mid-run steering.
-- [MCP Apps](/docs/agentic-ui/mcp-apps) — interactive UI delivered through MCP tool results, so a server can ship a rich interface to any supporting client.
+- [Session Control](/docs/agentic-ui/session-control) - the controller layer between the UI and the agent loop: modes, subagent surfacing, tool approvals, thread state, and mid-run steering.
+- [MCP Apps](/docs/agentic-ui/mcp-apps) - interactive UI delivered through MCP tool results, so a server can ship a rich interface to any supporting client.
+- [Browser Agent Accessibility](/docs/agentic-ui/browser-agent-accessibility) - landmarks, native controls, computed names, form labels, and untrusted instructions in accessibility content.
 
 ## UI Shapes
 
@@ -34,7 +36,7 @@ This page is the overview: the UI shapes, the event model, tool rendering, and s
 
 ## Event Model
 
-Agentic UI should consume structured events, not scrape prose.
+Agentic UI should consume structured events rather than scraped prose.
 
 Common event types:
 
@@ -55,7 +57,7 @@ Common event types:
 
 Every event should carry a stable run ID, timestamp, source, and display-safe summary. Sensitive tool inputs and raw model prompts should stay out of client-visible events unless the product explicitly exposes them.
 
-You do not have to invent this event vocabulary from scratch. AG-UI, originated at CopilotKit, is an emerging multi-vendor event protocol for streaming agent state to a UI; track its status on the [Emerging Standards Watchlist](/docs/protocols/emerging-standards).
+You do not have to invent this event vocabulary from scratch. AG-UI, originated at CopilotKit, is the current de facto layer for streaming agent state to a UI across vendors - adopted via SDKs in Microsoft Agent Framework, Google ADK, AWS Strands, Mastra, and others, but with no canonical pinned spec version; adopt it through a maintained SDK rather than hand-implementing the wire format. Track its status on the [Emerging Standards Watchlist](/docs/protocols/emerging-standards).
 
 ## Tool Rendering
 
@@ -130,12 +132,7 @@ Before shipping an agentic UI, verify:
 
 - [Session Control](/docs/agentic-ui/session-control)
 - [MCP Apps](/docs/agentic-ui/mcp-apps)
-- [Human-in-the-Loop](/docs/multi-agent/human-in-the-loop)
-- [External-App Routing](/docs/cookbook/external-app-routing)
-- [Notification to Conversation](/docs/cookbook/notification-to-conversation)
+- [Browser Agent Accessibility](/docs/agentic-ui/browser-agent-accessibility)
+- [Human Approval](/docs/tool-design/human-approval)
 - [Tool Design](/docs/tool-design)
-- [Runtime Boundaries](/docs/runtime-boundaries)
-
-## Browser semantics
-
-[Browser Agent Accessibility](/docs/agentic-ui/browser-agent-accessibility) covers landmarks, native controls, computed names, form labels, and untrusted instructions in accessibility content. Verify a real user journey alongside automated scans.
+- [Durable Execution](/docs/agents/durable-execution)
