@@ -29,6 +29,7 @@ const ENTRY_POINTS: string[] = [
   `- [Access policy](${SITE_ORIGIN}/auth.md): Public, read-only access without credentials.`,
   `- [AGENTS.md](${SITE_ORIGIN}/AGENTS.md): Project context and working conventions for coding agents.`,
   `- [surface skill](${SITE_ORIGIN}/skills/surface/SKILL.md): The operational workflow for guide, audit, scaffold, transform, and generate tasks.`,
+  `- [Docs index](${SITE_ORIGIN}/docs/llms.txt): The docs page tree on its own, without these entry points.`,
   `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Every documentation page as Markdown, in one file.`,
   `- [Homepage as Markdown](${SITE_ORIGIN}/index.md): The homepage guide (also served for \`Accept: text/markdown\` or \`/?mode=agent\`).`,
   `- [Any docs page as Markdown](${SITE_ORIGIN}/docs.md): Append \`.md\` to a docs URL, e.g. \`/docs/discovery/llms-txt.md\`, or send \`Accept: text/markdown\`.`,
