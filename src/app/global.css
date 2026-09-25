@@ -115,16 +115,20 @@
 
 /* ── Docs Layout Refinements ───────────── */
 
+/* From md up the site header (h-12) stays pinned above the docs grid, so the sticky sidebar and
+   contents start under it. On phones it scrolls away and the docs bar takes the top. */
+@media (width >= 48rem) {
+  #nd-docs-layout {
+    --fd-banner-height: 3rem;
+  }
+}
+
 #nd-page {
   max-width: 900px;
   margin-inline-start: 0;
   margin-inline-end: auto;
-  padding-top: 2rem;
+  padding-top: 3rem;
   padding-bottom: 1.5rem;
-}
-
-#nd-page > h1 {
-  letter-spacing: -0.02em;
 }
 
 #nd-page .prose {
@@ -145,6 +149,24 @@
   --tw-prose-th-borders: var(--color-fd-border);
 }
 
+/* Headings follow the site type roles: size and colour carry the hierarchy, not weight. */
+#nd-page
+  .prose
+  :where(h2, h3, h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-weight: 400;
+}
+
+#nd-page .prose :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+#nd-page .prose :where(h3, h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
 #nd-page
   .prose
   :where(a:not([data-card])):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
@@ -162,19 +184,31 @@
   background-color: var(--color-fd-background);
 }
 
-#nd-sidebar > div:nth-child(2) p {
-  color: var(--color-fd-foreground);
+/* Search and the collapse button share the sidebar's top row. */
+#nd-sidebar > div:first-child > div:first-child {
+  align-items: center;
+  gap: 0.5rem;
 }
 
-#nd-sidebar > div:nth-child(2) a {
-  color: var(--color-fd-muted-foreground);
-  font-size: 0.875rem;
+#nd-sidebar > div:first-child > div:first-child > button:last-child {
+  margin-block: 0;
 }
 
-/* Active nav item uses the sage accent wash (var() mode-switches for dark). */
-#nd-sidebar > div:nth-child(2) a[data-active="true"] {
+/* Part labels read like the homepage eyebrows, on the desktop sidebar and the phone menu alike. */
+:is(#nd-sidebar, #nd-sidebar-mobile) p {
   color: var(--color-fd-accent-foreground);
-  background-color: var(--accent);
+  font-weight: 400;
+}
+
+:is(#nd-sidebar, #nd-sidebar-mobile) a {
+  color: var(--color-fd-muted-foreground);
+}
+
+/* Hover and the current page change colour only, like the homepage links. */
+:is(#nd-sidebar, #nd-sidebar-mobile) a:hover,
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"] {
+  color: var(--color-fd-foreground);
+  background-color: transparent;
 }
 
 #nd-toc h3,
@@ -188,7 +222,7 @@
 
 @media (width >= 80rem) {
   #nd-page {
-    padding-top: 2.5rem;
+    padding-top: 3.5rem;
   }
 }
 

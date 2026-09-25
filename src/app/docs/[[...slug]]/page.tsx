@@ -1,7 +1,18 @@
+import { DocsPager } from "@/components/DocsPager";
+import { IntroText } from "@/components/PageIntro";
 import { source } from "@/lib/source";
-import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
-import { notFound } from "next/navigation";
+import { getBreadcrumbItems } from "fumadocs-core/breadcrumb";
+import { findNeighbour } from "fumadocs-core/page-tree";
+import { DocsBody, DocsPage } from "fumadocs-ui/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+/** The nearest section above the page, or the part it sits in when the page is the section's own index. */
+function sectionOf(url: string, title: string) {
+  const items = getBreadcrumbItems(url, source.pageTree, { includeSeparator: true });
+  return items.findLast((item) => item.name !== title);
+}
 
 export default async function Page(props: { params: Promise<{ slug?: string[] }> }) {
   const params = await props.params;
@@ -12,17 +23,30 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
 
   const MDX = page.data.body;
   const lastVerified = page.data.lastVerified;
+  const section = sectionOf(page.url, page.data.title);
 
   return (
-    <DocsPage toc={page.data.toc}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
-      {lastVerified ? (
-        <p className="text-fd-muted-foreground -mt-2 mb-2 text-xs">Last verified: {lastVerified}</p>
-      ) : null}
+    <DocsPage toc={page.data.toc} breadcrumb={{ enabled: false }} footer={{ enabled: false }}>
+      <IntroText
+        className="mb-4"
+        eyebrow={
+          section?.url && section.url !== page.url ? (
+            <Link href={section.url} className="hover:underline underline-offset-4 focus-ring">
+              {section.name}
+            </Link>
+          ) : (
+            (section?.name ?? "Documentation")
+          )
+        }
+        title={page.data.title}
+        meta={lastVerified ? `Last verified ${lastVerified}` : undefined}
+      >
+        {page.data.description}
+      </IntroText>
       <DocsBody>
         <MDX components={{ ...defaultMdxComponents }} />
       </DocsBody>
+      <DocsPager {...findNeighbour(source.pageTree, page.url)} />
     </DocsPage>
   );
 }

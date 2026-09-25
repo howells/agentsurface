@@ -6,7 +6,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOTS = ["src/app/(home)", "src/app/glossary", "src/app/patterns", "src/components"];
+const ROOTS = [
+  "src/app/(home)",
+  "src/app/docs",
+  "src/app/glossary",
+  "src/app/patterns",
+  "src/components",
+];
 const ROLES = "type-display / type-heading / type-body / type-small";
 const NAMED_TEXT_SIZE = /^text-(xs|sm|base|lg|xl|[2-9]xl)$/u;
 const ARBITRARY_SIZE = /^text-\[(?!#|var\(|rgb|hsl|okl(?:ch|ab)|color[-:(]|currentColor)[^\]]+\]$/u;
