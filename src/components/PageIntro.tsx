@@ -31,7 +31,7 @@ export function IntroText({ eyebrow, title, children, meta, actions, className }
 /** Page opener in the site column. Vertical padding belongs to the page. */
 export function PageIntro({ className, ...props }: IntroTextProps) {
   return (
-    <section className={cn("mx-auto w-full max-w-5xl px-6 sm:px-10", className)}>
+    <section className={cn("page-column", className)}>
       <IntroText {...props} />
     </section>
   );

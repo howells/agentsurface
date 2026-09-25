@@ -16,6 +16,12 @@ export const guideSource = loader({
 
 type GuidePage = ReturnType<typeof guideSource.getPages>[number];
 
+/** Whole minutes to read a guide page at an average 230 words a minute. */
+export async function readingMinutes(page: GuidePage): Promise<number> {
+  const words = (await page.data.getText("processed")).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 230));
+}
+
 /** Frontmatter + processed Markdown body + the area's recommendations, as served at /guide/<area>.md. */
 export async function renderGuidePage(page: GuidePage): Promise<string> {
   const { data } = page;

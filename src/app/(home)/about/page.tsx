@@ -24,7 +24,7 @@ export default function AboutPage() {
           to build agents of your own. Daniel Howells writes and maintains it.
         </PageIntro>
 
-        <div className="mx-auto max-w-5xl px-6 pb-16 sm:px-10">
+        <div className="page-column pb-16">
           <InfoSection title="What it covers">
             <p>
               The guide has two parts. <Link href="/docs">Make your product agent-ready</Link>{" "}

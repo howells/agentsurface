@@ -17,8 +17,8 @@ export function SiteHeader({ wide = false }: SiteHeaderProps) {
     >
       <div
         className={cn(
-          "mx-auto flex h-12 items-center justify-between",
-          wide ? "max-w-[97rem] px-4" : "max-w-5xl px-6 sm:px-10",
+          "flex h-12 items-center justify-between",
+          wide ? "mx-auto max-w-[97rem] px-4" : "page-column",
         )}
       >
         <Link href="/" className="type-small font-mono text-fd-foreground focus-ring">

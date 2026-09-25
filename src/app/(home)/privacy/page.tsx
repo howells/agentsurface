@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           visit is the request log kept by the company that hosts the site.
         </PageIntro>
 
-        <div className="mx-auto max-w-5xl px-6 pb-16 sm:px-10">
+        <div className="page-column pb-16">
           <InfoSection title="What we collect">
             <p>
               Nothing about you directly. The site has no sign-in, no forms, no analytics scripts,

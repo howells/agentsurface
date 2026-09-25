@@ -38,7 +38,7 @@ export default async function PatternsPage({
           line, and how it tightens along its length. The result is the artwork on the glossary
           cards, and you can download any variation as SVG.
         </PageIntro>
-        <section className="mx-auto max-w-5xl px-6 pb-20 sm:px-10">
+        <section className="page-column pb-20">
           <PatternStudio initial={initial} />
         </section>
       </main>

@@ -312,6 +312,10 @@
   .focus-ring {
     @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring;
   }
+  /* The site's page column: as wide as the docs shell, with text measures set inside it. */
+  .page-column {
+    @apply mx-auto w-full max-w-[97rem] px-4 sm:px-6 lg:px-8;
+  }
   .type-display {
     @apply text-[clamp(2.25rem,1.5rem+3.2vw,3.5rem)] font-normal leading-[1.08] tracking-[-0.02em] text-pretty;
   }

@@ -30,7 +30,7 @@ export function TextGrid({ items, numbered = false, size = "large", className }:
     <ol
       className={cn(
         "not-prose grid gap-x-10",
-        large ? "sm:grid-cols-2 lg:grid-cols-3" : "my-8 sm:grid-cols-2",
+        large ? "sm:grid-cols-2 lg:grid-cols-4" : "my-8 sm:grid-cols-2",
         className,
       )}
     >

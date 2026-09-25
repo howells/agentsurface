@@ -33,14 +33,14 @@ export default function GlossaryPage() {
 
         {/* Terms */}
         <section className="w-full border-t border-fd-border">
-          <div className="mx-auto max-w-5xl px-6 py-12 sm:px-10">
+          <div className="page-column py-12">
             <GlossaryGrid terms={glossaryTerms} layout="grid" showFilters />
           </div>
         </section>
 
         {/* Footer note */}
         <section className="w-full border-t border-fd-border">
-          <div className="mx-auto max-w-5xl px-6 py-12 sm:px-10">
+          <div className="page-column py-12">
             <p className="type-body text-fd-muted-foreground max-w-lg">
               The same definitions, grouped by category with links to the guide for each term, are
               in the{" "}

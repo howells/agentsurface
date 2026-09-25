@@ -1,13 +1,14 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DocsPager } from "@/components/DocsPager";
 import { guideMdxComponents } from "@/components/GuideProse";
 import { PageIntro } from "@/components/PageIntro";
 import { SiteFooter } from "@/components/SiteFooter";
-import { TextGrid } from "@/components/TextGrid";
+import { RecommendationList } from "@/components/RecommendationList";
 import { guideStages } from "@/data/homepage-guide";
 import { guideSource } from "@/lib/guide-source";
+import { cn } from "@/lib/utils";
 
 const BASE_URL = "https://agentsurface.dev";
 
@@ -80,40 +81,64 @@ export default async function GuideAreaPage(props: { params: Promise<{ area: str
           {page.data.description}
         </PageIntro>
 
-        <article className="mx-auto max-w-5xl px-6 pb-4 sm:px-10">
-          <div className="max-w-2xl">
+        <div className="page-column grid gap-12 pb-16 lg:grid-cols-12 lg:gap-10">
+          <article className="max-w-2xl lg:col-span-7">
             <Body components={guideMdxComponents} />
-          </div>
-        </article>
+          </article>
+          <nav
+            aria-label="Areas of the guide"
+            className="max-lg:hidden lg:sticky lg:top-20 lg:col-span-3 lg:col-start-10 lg:self-start"
+          >
+            <p className="type-small text-fd-muted-foreground">The guide</p>
+            <ol className="mt-3 border-t border-fd-border">
+              {guideStages.map((candidate, index) => {
+                const current = candidate.id === stage.id;
+                return (
+                  <li key={candidate.id} className="border-b border-fd-border">
+                    <Link
+                      href={`/guide/${candidate.id}`}
+                      aria-current={current ? "page" : undefined}
+                      className={cn(
+                        "flex items-baseline gap-3 py-2.5 type-body transition-colors duration-150 focus-ring motion-reduce:transition-none",
+                        current
+                          ? "text-fd-foreground"
+                          : "text-fd-muted-foreground hover:text-fd-foreground",
+                      )}
+                    >
+                      <span className="tabular-nums text-fd-muted-foreground">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      {candidate.name}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </div>
 
         <section
+          id="recommendations"
           aria-labelledby="guide-recommendations-heading"
-          className="mx-auto max-w-5xl px-6 pb-4 pt-14 sm:px-10"
+          className="border-t border-fd-border"
         >
-          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-            <h2 id="guide-recommendations-heading" className="type-body">
-              Recommendations for {stage.name.toLowerCase()}
-            </h2>
-            <Link
-              href={`/#${stage.id}`}
-              className="inline-flex items-center gap-1.5 type-small text-fd-muted-foreground hover:text-fd-foreground focus-ring"
-            >
-              Open in the full guide
-              <ArrowRight aria-hidden="true" className="size-3.5" />
-            </Link>
+          <div className="page-column grid gap-8 pb-6 pt-14 lg:grid-cols-12 lg:gap-10 lg:pt-20">
+            <header className="lg:sticky lg:top-20 lg:col-span-4 lg:self-start">
+              <p className="type-body text-fd-accent-foreground">What to do</p>
+              <h2 id="guide-recommendations-heading" className="mt-3 max-w-md type-heading">
+                {stage.question}
+              </h2>
+              <p className="mt-4 max-w-md type-body text-fd-muted-foreground">
+                {stage.description}
+              </p>
+            </header>
+            <div className="min-w-0 lg:col-span-8">
+              <RecommendationList stage={stage} />
+            </div>
           </div>
-          <TextGrid
-            size="compact"
-            items={stage.cards.map((card) => ({
-              description: card.what,
-              eyebrow: card.feature,
-              href: card.href,
-              title: card.title,
-            }))}
-          />
         </section>
 
-        <div className="mx-auto max-w-5xl px-6 pb-20 sm:px-10">
+        <div className="page-column pb-20">
           <DocsPager previous={previous} next={next} />
           <Link
             href="/"

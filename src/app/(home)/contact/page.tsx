@@ -19,7 +19,7 @@ export default function ContactPage() {
           GitHub, where anyone can see the fix.
         </PageIntro>
 
-        <div className="mx-auto max-w-5xl px-6 pb-16 sm:px-10">
+        <div className="page-column pb-16">
           <InfoSection title="Report a mistake">
             <p>
               <a href="https://github.com/howells/agentsurface/issues/new">Open an issue</a> with

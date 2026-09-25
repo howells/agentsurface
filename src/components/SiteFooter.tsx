@@ -9,7 +9,7 @@ const links = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-fd-border">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-8 type-small text-fd-muted-foreground sm:px-10">
+      <div className="page-column flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-8 type-small text-fd-muted-foreground">
         <span>
           Agent Surface by{" "}
           <a href="https://danielhowells.com" className="hover:text-fd-foreground focus-ring">
