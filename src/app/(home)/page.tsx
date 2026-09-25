@@ -31,7 +31,7 @@ function AreaOverview() {
               </span>
               {stage.name}
             </span>
-            <span className="mt-3 block text-balance type-heading text-fd-foreground transition-colors duration-150 group-hover:text-fd-accent-foreground motion-reduce:transition-none">
+            <span className="mt-3 block type-heading text-fd-foreground transition-colors duration-150 group-hover:text-fd-accent-foreground motion-reduce:transition-none">
               {stage.question}
             </span>
             <span className="mt-auto flex items-center gap-1.5 pt-4 type-small tabular-nums text-fd-muted-foreground">

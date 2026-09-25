@@ -18,7 +18,7 @@ export function IntroText({ eyebrow, title, children, meta, actions, className }
   return (
     <header className={className}>
       <p className="type-body text-fd-accent-foreground">{eyebrow}</p>
-      <h1 className="mt-4 max-w-3xl text-balance type-display">{title}</h1>
+      <h1 className="mt-4 max-w-3xl type-display">{title}</h1>
       <p className="mt-6 max-w-2xl type-body text-fd-muted-foreground">{children}</p>
       {meta && <p className="mt-3 type-small text-fd-muted-foreground">{meta}</p>}
       {actions && (

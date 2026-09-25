@@ -290,6 +290,14 @@
   html {
     @apply font-sans;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-pretty;
+  }
 }
 
 /* ── Type case ──────────────────────────
@@ -305,10 +313,10 @@
     @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring;
   }
   .type-display {
-    @apply text-[clamp(2.25rem,1.5rem+3.2vw,3.5rem)] font-normal leading-[1.08] tracking-[-0.02em];
+    @apply text-[clamp(2.25rem,1.5rem+3.2vw,3.5rem)] font-normal leading-[1.08] tracking-[-0.02em] text-pretty;
   }
   .type-heading {
-    @apply text-2xl font-normal leading-[1.2] tracking-[-0.015em];
+    @apply text-2xl font-normal leading-[1.2] tracking-[-0.015em] text-pretty;
   }
   .type-body {
     @apply text-sm font-normal leading-[1.6] tracking-normal;
