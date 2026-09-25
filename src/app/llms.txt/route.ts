@@ -30,6 +30,7 @@ const ENTRY_POINTS: string[] = [
   `- [AGENTS.md](${SITE_ORIGIN}/AGENTS.md): Project context and working conventions for coding agents.`,
   `- [surface skill](${SITE_ORIGIN}/skills/surface/SKILL.md): The operational workflow for guide, audit, scaffold, transform, and generate tasks.`,
   `- [Docs index](${SITE_ORIGIN}/docs/llms.txt): The docs page tree on its own, without these entry points.`,
+  `- [API index](${SITE_ORIGIN}/api/llms.txt): The documentation API's two operations, with examples.`,
   `- [Build agents index](${SITE_ORIGIN}/docs/agents/llms.txt): Only the pages for teams building agents of their own.`,
   `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Every documentation page as Markdown, in one file.`,
   `- [Homepage as Markdown](${SITE_ORIGIN}/index.md): The homepage guide (also served for \`Accept: text/markdown\` or \`/?mode=agent\`).`,
