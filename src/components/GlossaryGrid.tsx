@@ -17,6 +17,7 @@ import foundationArt from "@/assets/glossary/foundation.svg";
 import memoryKnowledgeArt from "@/assets/glossary/memory-knowledge.svg";
 import opsLifecycleArt from "@/assets/glossary/ops-lifecycle.svg";
 import paymentsArt from "@/assets/glossary/payments.svg";
+import { glossaryCategories } from "@/data/glossary";
 import type { GlossaryTerm } from "@/data/glossary";
 
 // ── Line fields by category ─────────────────────────────────────────────────
@@ -284,8 +285,15 @@ export function GlossaryGrid({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState(ALL);
 
-  const categories = [...new Set(terms.map((t) => t.category))];
-  const visible = filter === ALL ? terms : terms.filter((t) => t.category === filter);
+  const present = new Set(terms.map((t) => t.category));
+  const categories = glossaryCategories.map((c) => c.name).filter((name) => present.has(name));
+  // Same order as the docs glossary: category order, then A to Z.
+  const order = new Map<string, number>(glossaryCategories.map((c, index) => [c.name, index]));
+  const ordered = terms.toSorted(
+    (a, b) =>
+      (order.get(a.category) ?? 0) - (order.get(b.category) ?? 0) || a.name.localeCompare(b.name),
+  );
+  const visible = filter === ALL ? ordered : ordered.filter((t) => t.category === filter);
   const activeTerm = terms.find((t) => t.id === activeId) ?? null;
 
   useEffect(() => {

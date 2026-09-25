@@ -3,6 +3,7 @@ import { GlossaryList } from "@/components/GlossaryList";
 import { IntroText } from "@/components/PageIntro";
 import { Term } from "@/components/Term";
 import { TextGridList } from "@/components/TextGrid";
+import { glossaryCategories } from "@/data/glossary";
 import { source } from "@/lib/source";
 import { getBreadcrumbItems } from "fumadocs-core/breadcrumb";
 import { findNeighbour } from "fumadocs-core/page-tree";
@@ -72,8 +73,21 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
     ],
   };
 
+  // The glossary's sections come from data rather than MDX headings, so add them to the TOC here.
+  const toc =
+    page.url === "/docs/glossary"
+      ? [
+          ...page.data.toc,
+          ...glossaryCategories.map((category) => ({
+            depth: 2,
+            title: category.name,
+            url: `#${category.id}`,
+          })),
+        ]
+      : page.data.toc;
+
   return (
-    <DocsPage toc={page.data.toc} breadcrumb={{ enabled: false }} footer={{ enabled: false }}>
+    <DocsPage toc={toc} breadcrumb={{ enabled: false }} footer={{ enabled: false }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

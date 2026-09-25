@@ -1,44 +1,20 @@
-import { glossaryTerms } from "@/data/glossary";
-import type { GlossaryTerm } from "@/data/glossary";
+import { glossaryByCategory } from "@/data/glossary";
 import Link from "next/link";
 
-function letterOf(term: GlossaryTerm): string {
-  const first = term.name[0]?.toUpperCase() ?? "#";
-  return /[A-Z]/.test(first) ? first : "#";
-}
-
-/** The docs glossary: A to Z jump links, then one ruled row per term, anchored by its id. */
+/** The docs glossary: one section per category (in the page's table of contents), a ruled row per term, anchored by its id. */
 export function GlossaryList() {
-  const sorted = glossaryTerms.toSorted((a, b) => a.name.localeCompare(b.name));
-  const groups = new Map<string, GlossaryTerm[]>();
-  for (const term of sorted) {
-    const letter = letterOf(term);
-    groups.set(letter, [...(groups.get(letter) ?? []), term]);
-  }
-
   return (
     <div className="not-prose mt-8">
-      <nav aria-label="Glossary letters" className="flex flex-wrap gap-x-1 gap-y-1">
-        {[...groups.keys()].map((letter) => (
-          <a
-            key={letter}
-            href={`#letter-${letter}`}
-            className="grid size-8 place-items-center rounded-md type-small tabular-nums text-fd-muted-foreground transition-colors hover:bg-fd-muted hover:text-fd-foreground focus-ring"
-          >
-            {letter}
-          </a>
-        ))}
-      </nav>
-
-      {[...groups.entries()].map(([letter, terms]) => (
-        <section key={letter} aria-labelledby={`letter-${letter}`} className="mt-10">
-          <h2
-            id={`letter-${letter}`}
-            className="scroll-mt-24 pb-3 type-small tabular-nums text-fd-muted-foreground"
-          >
-            {letter}
+      {glossaryByCategory().map((category) => (
+        <section key={category.id} aria-labelledby={category.id} className="mt-12 first:mt-0">
+          <h2 id={category.id} className="scroll-mt-24 type-heading text-fd-foreground">
+            {category.name}
           </h2>
-          {terms.map((term) => (
+          <p className="mt-2 mb-5 type-body text-fd-muted-foreground">
+            {category.description}{" "}
+            <span className="tabular-nums">{category.terms.length} terms.</span>
+          </p>
+          {category.terms.map((term) => (
             <div
               key={term.id}
               id={term.id}

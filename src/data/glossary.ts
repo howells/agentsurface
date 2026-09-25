@@ -1,8 +1,54 @@
+/** Glossary categories in reading order. The docs glossary, its Markdown and the /glossary cards all group by these. */
+export const glossaryCategories = [
+  {
+    description: "The model concepts everything else builds on.",
+    id: "foundation",
+    name: "Foundation",
+  },
+  {
+    description: "What makes a website, app or API something an agent can find, read and use.",
+    id: "agent-readiness",
+    name: "Agent readiness",
+  },
+  {
+    description: "How agents connect to data and services: APIs, protocols and retrieval.",
+    id: "data-integration",
+    name: "Data & integration",
+  },
+  {
+    description: "How agents prove who they are and act with delegated, limited permission.",
+    id: "auth-identity",
+    name: "Auth & identity",
+  },
+  {
+    description: "What an agent system is built from: loops, tools, orchestration and runtimes.",
+    id: "agent-infrastructure",
+    name: "Agent infrastructure",
+  },
+  {
+    description: "How agents keep and recall information across turns and sessions.",
+    id: "memory-knowledge",
+    name: "Memory & knowledge",
+  },
+  {
+    description: "Running agents in production: testing, tracing, safety and recovery.",
+    id: "ops-lifecycle",
+    name: "Ops & lifecycle",
+  },
+  {
+    description: "How agents buy things and move money within agreed limits.",
+    id: "payments",
+    name: "Payments",
+  },
+] as const;
+
+export type GlossaryCategory = (typeof glossaryCategories)[number]["name"];
+
 export interface GlossaryTerm {
   id: string;
   acronym: string;
   name: string;
-  category: string;
+  category: GlossaryCategory;
   definition: string;
   detail: string;
   /** Exact surface forms matched in docs prose to auto-link this term. Acronyms are case-sensitive. */
@@ -1309,7 +1355,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "mid-run-steering",
     acronym: "Mid-Run Steering",
     name: "Mid-Run Steering",
-    category: "Agentic UI",
+    category: "Agent infrastructure",
     definition:
       "Letting a user redirect or correct an agent while it's still working, rather than only before or after a run.",
     detail:
@@ -1404,7 +1450,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     id: "accessibility-tree",
     acronym: "Accessibility Tree",
     name: "Accessibility Tree",
-    category: "Agentic UI",
+    category: "Agent readiness",
     definition:
       "A structured, semantic view of a page's interactive elements that assistive tools and browser agents read instead of raw pixels.",
     detail:
@@ -1436,3 +1482,13 @@ export const glossaryTerms: GlossaryTerm[] = [
     href: "/docs/error-handling/retry-patterns#circuit-breakers",
   },
 ];
+
+/** Terms grouped by category, in category order, A to Z within each. */
+export function glossaryByCategory() {
+  return glossaryCategories.map((category) => ({
+    ...category,
+    terms: glossaryTerms
+      .filter((term) => term.category === category.name)
+      .toSorted((a, b) => a.name.localeCompare(b.name)),
+  }));
+}
