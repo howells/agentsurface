@@ -192,7 +192,7 @@ export function RecommendationList({ stage }: { stage: GuideStage }) {
                   />
                 )}
                 {group.label}
-                <span className="tabular-nums opacity-70">{group.cards.length}</span>
+                <span className="tabular-nums text-fd-muted-foreground">{group.cards.length}</span>
               </h3>
             )}
             <ul className="divide-y divide-fd-border">

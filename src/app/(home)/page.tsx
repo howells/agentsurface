@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, BookOpen } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { AreaNav } from "@/components/AreaNav";
 import { PageIntro } from "@/components/PageIntro";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
@@ -16,28 +16,29 @@ export const metadata: Metadata = {
 
 function AreaOverview() {
   return (
-    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <ol className="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
       {guideStages.map((stage, index) => (
-        <li key={stage.id}>
+        <li key={stage.id} className="border-t border-fd-border">
           <a
             href={`#${stage.id}`}
-            className="group flex flex-col rounded-2xl sm:min-h-44 border border-fd-border bg-fd-card p-5 shadow-sm transition-[box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            className="group flex h-full flex-col pb-8 pt-4 focus-ring sm:pb-10"
           >
-            <span className="flex items-baseline justify-between type-small tabular-nums text-fd-muted-foreground">
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <span className="flex items-center gap-1">
-                {stage.cards.length}
-                <span className="sr-only"> recommendations</span>
-                <ArrowDown
-                  aria-hidden="true"
-                  className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
-                />
+            <span className="type-small tabular-nums text-fd-muted-foreground">
+              <span aria-hidden="true" className="mr-3">
+                {String(index + 1).padStart(2, "0")}
               </span>
+              {stage.name}
             </span>
-            <span className="mt-auto block pt-6 type-body sm:pt-10 text-fd-foreground">
+            <span className="mt-3 block text-balance type-heading text-fd-foreground transition-colors duration-150 group-hover:text-fd-accent-foreground motion-reduce:transition-none">
               {stage.question}
             </span>
-            <span className="mt-1 block type-small text-fd-muted-foreground">{stage.name}</span>
+            <span className="mt-auto flex items-center gap-1.5 pt-4 type-small tabular-nums text-fd-muted-foreground">
+              {stage.cards.length} recommendations
+              <ArrowDown
+                aria-hidden="true"
+                className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+              />
+            </span>
           </a>
         </li>
       ))}
@@ -148,7 +149,6 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl px-6 py-14 sm:px-10">
           <div className="grid gap-10 md:grid-cols-2 md:gap-16">
             <div>
-              <BookOpen aria-hidden="true" className="mb-4 size-5 text-fd-accent-foreground" />
               <h2 id="next-heading" className="type-heading">
                 Put the guide to work
               </h2>
