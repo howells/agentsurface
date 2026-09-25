@@ -16,12 +16,12 @@ For public repositories, these files are also crawlable web content. They advert
 
 ## What Belongs Where
 
-- `AGENTS.md` - the tool-neutral baseline every coding agent reads. Commands, tech stack, testing rules, and permission boundaries go here.
-- `CLAUDE.md` - a thin Claude Code overlay for skill triggers, tool boundaries, permission mode, and session hints. References `AGENTS.md`; never repeats it.
+- `AGENTS.md` - the tool-neutral baseline every coding agent reads. Commands, tech stack, testing rules, and permission boundaries go here. Most repos need nothing else.
+- `CLAUDE.md` - optional, only when Claude Code needs instructions no other tool should see (skill triggers, model choice, session hints). When present, it must start with a literal `@AGENTS.md` import or Claude Code never loads AGENTS.md. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
 - `.cursor/rules/*.mdc` and `.github/copilot-instructions.md` - tool-specific overrides layered on the same baseline.
 
 ## Full Guidance
 
 - [Context Files: AGENTS.md](/docs/context-files/agents-md) - the canonical spec: structure, discovery and precedence, length limits, anti-patterns, and security.
-- [Context Files: CLAUDE.md](/docs/context-files/claude-md) - Claude Code-specific overrides.
+- [Context Files: CLAUDE.md](/docs/context-files/claude-md) - optional Claude Code overlay, only when needed.
 - [Context Files: Cursor Rules and GitHub Copilot](/docs/context-files/cursor-and-copilot) - tool-specific variants and sync patterns.

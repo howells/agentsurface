@@ -1,196 +1,128 @@
 ---
 title: CLAUDE.md
-description: Claude Code-specific overrides on top of AGENTS.md
+description: Claude Code reads AGENTS.md on its own, so most repositories no longer need a CLAUDE.md. When one still helps, and how to write it so it doesn't hide AGENTS.md
 lastVerified: 2026-09-25
 ---
 
 ## Summary
 
-CLAUDE.md is a thin overlay on top of AGENTS.md for Claude Code-specific behavior only: skill triggers, tool allow/denylisting, permission mode, and session-level context hints. If Claude Code should behave differently from Cursor or Copilot, document it here - never repeat AGENTS.md content, reference it instead.
+From v2.1.277 (18 September 2026), Claude Code reads `AGENTS.md` as project instructions on its own. A repository with a good `AGENTS.md` doesn't need a `CLAUDE.md`, an import, or a setting. Write `AGENTS.md` for every coding agent and stop there unless Claude Code needs something no other tool should see.
 
-By default, Claude Code reads `CLAUDE.md` files only when one exists in the working directory or above it; if none exists, it reads `AGENTS.md` directly. **If both files exist, only `CLAUDE.md` loads - `AGENTS.md` is skipped entirely** unless the `CLAUDE.md` imports it with a literal `@AGENTS.md` line. See [Claude Code's memory docs](https://code.claude.com/docs/en/memory) for the full resolution order and the setting that changes it.
-
-- **Skill triggers**: which skills to auto-invoke for this codebase
-- **Tool allow/deny**: Claude-specific tool restrictions
-- **Permission mode**: default mode and per-task overrides
-- **Session hints**: context engineering for long-running sessions
-- **Avoid**: repeating AGENTS.md, general conventions, project overview, model routing, or memory configuration (those belong to agent-building guidance, not to a repository context file)
+- **Default: no `CLAUDE.md`.** Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` in the working directory or above it
+- **A `CLAUDE.md` hides `AGENTS.md`.** If any of those three files exists, Claude Code reads it instead and skips `AGENTS.md`, unless the file imports it with `@AGENTS.md`
+- **If you add one, start it with `@AGENTS.md`** and put only Claude-only instructions below the import
+- **Enforced rules go in settings.** Tool allow and deny rules and the default permission mode belong in `.claude/settings.json`. Instruction files are context Claude weighs, not configuration it enforces
+- **Old workarounds can go**: a `CLAUDE.md` that only imports `AGENTS.md`, a `CLAUDE.md` symlink, or a `SessionStart` hook that prints `AGENTS.md`
 
 ---
 
-CLAUDE.md is a thin overlay on top of AGENTS.md. It defines Claude Code-specific behavior only: skill triggers, tool boundaries, permission mode, session-level hints. If Claude Code should behave differently from Cursor or Copilot, document it here.
+## Which files Claude Code reads
 
-## When to Use CLAUDE.md
+With the default setting:
 
-- Specific Claude skills should be triggered for this codebase
-- Claude-specific tools (like `/review`) should be allowed or forbidden
-- Permission mode differs from the account default
-- Session-level hints apply to this codebase (for example, how to load per-package AGENTS.md in a monorepo)
-- Your repository also has an `AGENTS.md` and you want Claude Code to read both - add a literal `@AGENTS.md` import (see below)
+| In the repository                                                                     | What Claude Code reads                                             |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `AGENTS.md` only                                                                      | `AGENTS.md`                                                        |
+| `AGENTS.md`, plus a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` on the path | The `CLAUDE.md` files only                                         |
+| `AGENTS.md`, plus a `CLAUDE.md` that imports it with `@AGENTS.md`                     | Both: `AGENTS.md` through the import, then the rest of `CLAUDE.md` |
+| `CLAUDE.md` only                                                                      | `CLAUDE.md`                                                        |
 
-## When NOT to Use CLAUDE.md
+The details that change outcomes:
 
-- Documenting general project conventions (use AGENTS.md instead)
-- Repeating commands already in AGENTS.md (reference instead)
-- Listing coding standards or tech stack (link to AGENTS.md)
-- Model selection or memory configuration - those are agent-building decisions, not repository context; keep this file scoped to what an agent needs to work safely in this repo
+- **What doesn't count.** A user's `~/.claude/CLAUDE.md`, an organization's managed `CLAUDE.md`, and `.claude/rules/` files don't stop `AGENTS.md` loading. They load alongside it.
+- **Nested files.** Every `AGENTS.md` and `.claude/AGENTS.md` from the working directory upward loads at session start. A subdirectory's `AGENTS.md` loads when Claude reads a file in that directory, as long as the directory has no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` of its own. `@path` imports inside `AGENTS.md` are expanded.
+- **What isn't read.** `AGENTS.local.md`, `AGENTS.override.md`, and anything under `.agents/`.
+- **`CLAUDE.local.md` counts.** A developer who adds one for personal notes in an `AGENTS.md`-only repository stops Claude Code reading `AGENTS.md` for themselves, with no warning. Start the local file with `@AGENTS.md`, or set **Project instructions** to `claude-md-and-agents-md`.
+- **The setting is per person.** **Project instructions** (in `/config`) takes `claude-md-or-agents-md` (the default), `claude-md-and-agents-md`, `claude-md`, or `managed-only`. It can be set in user or managed settings, but Claude Code ignores it in a project's settings files, so a repository can't choose it for contributors. Write the repository for the default.
+- **Checking what loaded.** `/memory` lists the instruction files Claude read.
 
-## Structure
+See [Claude Code's memory docs](https://code.claude.com/docs/en/memory#agents-md) for the full rules.
 
-### 1. Reference (or import) AGENTS.md
+## Sessions that still need a CLAUDE.md
 
-If your repository has both files and you want Claude Code to read `AGENTS.md` too, import it explicitly - a plain-English pointer like "See AGENTS.md" does not load the file, it only works if Claude decides to go read it:
+In these sessions Claude Code reads `CLAUDE.md` files only:
+
+- Claude Code before v2.1.277
+- Before v2.1.281 (23 September 2026), some sessions such as Amazon Bedrock or with telemetry disabled
+- The built-in `agents-md` plugin disabled in `/plugin`
+- Sometimes, the first session after upgrading from v2.1.276 or earlier
+
+If contributors or automation run in any of these, keep a `CLAUDE.md` that contains `@AGENTS.md`. On newer versions the import never loads `AGENTS.md` twice.
+
+## When to add a CLAUDE.md
+
+Only when Claude Code needs instructions that other agents shouldn't get:
+
+- Claude Code skills, subagents or slash commands this repository expects Claude to use
+- Hooks or MCP servers the repository configures for Claude Code that change how Claude should work
+- Workflow notes that only make sense in Claude Code
+
+Keep out of it:
+
+- **Anything true for every agent.** Commands, conventions, boundaries and layout belong in `AGENTS.md`.
+- **Tool rules and permission mode.** Put them in `.claude/settings.json`, where Claude Code enforces them (see below).
+- **Hard stops.** A rule that must hold whatever Claude decides needs a `PreToolUse` hook, not a sentence.
+- **Model choice and memory configuration.** Those are decisions about building agents, not context for working in this repository.
+
+## Writing one
+
+Put the import on the first line and only Claude-only lines under it:
 
 ```markdown
-# CLAUDE.md
-
 @AGENTS.md
 
 ## Claude Code
 
-This file adds Claude Code-specific guidance only.
+- Run /security-review on changes under src/auth/ and src/crypto/
+- The PostToolUse hook in .claude/settings.json formats files after each edit; don't run the formatter by hand
 ```
 
-If you don't need `AGENTS.md` loaded automatically (for example, this repo has no `AGENTS.md`, or you deliberately want Claude Code's instructions to differ), skip the import and just state the relationship in prose.
+In most repositories that need a `CLAUDE.md`, that's the whole file. Claude reads `AGENTS.md` first, then the lines below it.
 
-### 2. Allowed Tools
+A sentence such as "See AGENTS.md" doesn't load the file. Claude only sees it if it decides to open it, so always use the `@AGENTS.md` import.
 
-```markdown
-## Tools
+A symlink (`ln -s AGENTS.md CLAUDE.md`) also avoids duplication, but it leaves no room for Claude-only lines, Claude's edit tools refuse to write through it, and a Windows clone without `core.symlinks` checks it out as a one-line text file. Use the import.
 
-Always allowed:
+## Tool rules belong in settings
 
-- Read, Bash, Git
-- File creation and editing
-- Tool use (any MCP server configured for the project, e.g. `.claude/mcp.json`)
+Instruction files are context. Claude Code doesn't enforce a sentence saying "never deploy". Permission rules in `.claude/settings.json` are enforced for everyone who works in the repository:
 
-Ask first:
-
-- Database migrations (pnpm db:migrate)
-- External API calls (e.g., curl to production)
-
-Never allowed:
-
-- Production deployments
-- Credential rotation
-- Branch/tag deletion
+```json
+{
+  "permissions": {
+    "allow": ["Bash(pnpm test *)", "Bash(pnpm lint)"],
+    "ask": ["Bash(pnpm db:migrate)"],
+    "deny": ["Bash(vercel deploy *)", "Read(./.env)"],
+    "defaultMode": "plan"
+  }
+}
 ```
 
-If AGENTS.md boundaries suffice, omit this section.
+`deny` and `ask` rules apply straight away; `allow` rules in a project file apply once each contributor trusts the folder. A project file can't set `auto` or `bypassPermissions` as the default mode. Those only take effect from user or managed settings. See [Claude Code permissions](https://code.claude.com/docs/en/permissions) for the rule syntax.
 
-### 3. Claude Skills
+## Moving off an older setup
 
-Reference skills that should be auto-triggered for this codebase:
+| What the repository has                                | What to do                                                                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| A `CLAUDE.md` containing only `@AGENTS.md`             | Delete it, unless some sessions can't read `AGENTS.md` (see above)                                           |
+| A `CLAUDE.md` that says "see AGENTS.md" in words       | Delete it, or replace the sentence with `@AGENTS.md`                                                         |
+| A `CLAUDE.md` that restates `AGENTS.md`                | Move anything missing into `AGENTS.md`, then delete the file or cut it to Claude-only lines under the import |
+| A `CLAUDE.md` symlinked to `AGENTS.md`                 | Harmless. Delete it when convenient                                                                          |
+| A `SessionStart` hook that prints `AGENTS.md`          | Remove it. It now adds a second copy to the context                                                          |
+| Tool rules or a permission mode written in `CLAUDE.md` | Move them to `permissions` in `.claude/settings.json`                                                        |
 
-```markdown
-## Skills
+## Monorepos
 
-Auto-trigger these skills when relevant:
+Each package keeps its own `AGENTS.md`, and Claude Code picks it up when it reads a file in that package. A package-level `CLAUDE.md` hides that package's `AGENTS.md` just as a root one does, so if a package needs one, start it with `@AGENTS.md`. See [Monorepos](/docs/context-files/monorepos) for how other tools resolve nested files.
 
-- /review - for pull request analysis
-- /security-review - for auth/crypto changes
+## Auto memory and rules
 
-Disable:
-
-- /schedule - not useful for this codebase
-```
-
-See https://code.claude.com/docs/en/skills for the skill reference.
-
-### 4. Permission Mode
-
-If the default permission mode should differ for this codebase:
-
-```markdown
-## Permissions
-
-Default: plan (explore before editing)
-
-Use bypassPermissions for:
-
-- Automated refactoring tasks
-- Lint fixes and formatting
-
-Use dontAsk for:
-
-- Code exploration (reading, grepping)
-- Draft PR creation
-```
-
-See [Claude Code's permission modes](https://code.claude.com/docs/en/permission-modes) for the current mode list and what each one auto-approves.
-
-### 5. Session Hints
-
-Long-running sessions need context engineering:
-
-```markdown
-## Session Hints
-
-- Break complex tasks into multiple sessions to avoid context bloat
-- Use /compact at task end to compact conversation history
-- For monorepo work, note which package's AGENTS.md applies before editing
-```
-
-### A note on memory
-
-CLAUDE.md is instructions you write. Claude Code also maintains **auto memory** - notes Claude writes itself from your corrections, loaded automatically alongside CLAUDE.md - and `.claude/rules/`, a directory for splitting instructions into topic-scoped files (optionally scoped to a glob via `paths` frontmatter) instead of one long CLAUDE.md. Neither belongs inside CLAUDE.md itself; mention them here only if this repository relies on one and a contributor needs to know that. See [Claude Code's memory docs](https://code.claude.com/docs/en/memory) for how both work.
-
-## Example: Simple Override
-
-```markdown
-# CLAUDE.md
-
-@AGENTS.md
-
-## Skills
-
-Auto-trigger:
-
-- /review for PR analysis
-- /security-review for auth changes
-
-## Permissions
-
-Default: plan
-
-Use dontAsk for: reading files, running tests, git operations.
-```
-
-This is minimal - no duplication with AGENTS.md.
-
-## Do's and Don'ts
-
-**Do:**
-
-- Reference AGENTS.md instead of repeating it (import it with `@AGENTS.md` if you need Claude Code to load it automatically)
-- Document Claude-specific decisions (permission mode, skills, tool boundaries)
-- Keep it concise - target under 200 lines
-
-**Don't:**
-
-- Duplicate AGENTS.md content
-- Explain general project conventions here (AGENTS.md)
-- Over-specify behavior (let Claude Code use its judgment)
-- Fold in model routing or memory configuration - that belongs to agent-building guidance, not a repository context file
-
-## File Placement
-
-CLAUDE.md lives at project root, same level as AGENTS.md:
-
-```
-.
-├── AGENTS.md
-├── CLAUDE.md
-├── CONTRIBUTING.md
-└── src/
-```
-
-For monorepos, an optional CLAUDE.md at package level (packages/api/CLAUDE.md) adds package-specific Claude hints. See [Monorepos](/docs/context-files/monorepos) for per-tool precedence.
+Claude Code also keeps **auto memory**, notes Claude writes itself from your corrections, and reads `.claude/rules/`, topic files that can be scoped to paths with `paths` frontmatter. Both load alongside `AGENTS.md`. Neither needs a mention in `CLAUDE.md` unless a contributor has to know the repository relies on one. See [Claude Code's memory docs](https://code.claude.com/docs/en/memory) for how both work.
 
 ## See also
 
-- `/docs/context-files/agents-md` - AGENTS.md spec
-- `/docs/context-files/cursor-and-copilot` - Cursor/Copilot variants
-- ([Claude Code memory docs](https://code.claude.com/docs/en/memory)) - full CLAUDE.md/AGENTS.md resolution order, auto memory, and `.claude/rules/`
-- ([Claude Code permission modes](https://code.claude.com/docs/en/permission-modes)) - current mode list
-- `/templates/discovery/CLAUDE.md` - starter template
+- [AGENTS.md](/docs/context-files/agents-md) - the file every agent reads
+- [Cursor and Copilot](/docs/context-files/cursor-and-copilot) - other tools' overlays
+- [Claude Code memory docs](https://code.claude.com/docs/en/memory#agents-md) - instruction file resolution, the Project instructions setting, auto memory and `.claude/rules/`
+- [Claude Code permissions](https://code.claude.com/docs/en/permissions) - permission rules and modes
+- `/templates/discovery/CLAUDE.md` - optional starter overlay

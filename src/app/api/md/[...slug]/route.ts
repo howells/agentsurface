@@ -1,12 +1,17 @@
 import { apiError } from "@/lib/api-error";
-import { normalizeSlug, readDocsFile } from "@/lib/docs-fs";
+import { markdownHeaders } from "@/lib/markdown";
+import { docsLlms, source } from "@/lib/source";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = false;
 
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+/** `index` (and the empty path) address the docs root; everything else maps to its slug segments. */
+function resolveSlug(segments: string[]): string[] {
+  if (segments.length === 0 || (segments.length === 1 && segments[0] === "index")) {
+    return [];
+  }
+  return segments;
 }
 
 export async function GET(
@@ -14,9 +19,9 @@ export async function GET(
   { params }: { params: Promise<{ slug: string[] }> },
 ) {
   const { slug } = await params;
-  const normalized = normalizeSlug(slug.join("/"));
+  const page = source.getPage(resolveSlug(slug));
 
-  if (!normalized) {
+  if (!page) {
     return apiError(
       404,
       "PAGE_NOT_FOUND",
@@ -25,24 +30,6 @@ export async function GET(
     );
   }
 
-  const content = readDocsFile(normalized);
-
-  if (content === null) {
-    return apiError(
-      404,
-      "PAGE_NOT_FOUND",
-      "Documentation page not found",
-      "Search /api/docs/search?query=discovery or use a slug from /llms.txt.",
-    );
-  }
-
-  return new NextResponse(content, {
-    headers: {
-      "Cache-Control": "public, max-age=3600",
-      "Content-Signal": "search=yes, ai-input=yes, ai-train=no",
-      "Content-Type": "text/markdown; charset=utf-8",
-      Vary: "Accept",
-      "x-markdown-tokens": String(estimateTokens(content)),
-    },
-  });
+  const content = await docsLlms.page(page);
+  return new NextResponse(content, { headers: markdownHeaders(content) });
 }

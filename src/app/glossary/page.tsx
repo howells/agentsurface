@@ -1,10 +1,12 @@
 import { glossaryTerms } from "@/data/glossary";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
 import { PageIntro } from "@/components/PageIntro";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import Link from "next/link";
 
 export const metadata = {
+  alternates: { canonical: "/glossary" },
   description: `Plain-language definitions of ${glossaryTerms.length} terms covering AI agents, APIs, discovery, identity, reliability, and payments.`,
   title: "Agentic Glossary",
 };
@@ -53,6 +55,7 @@ export default function GlossaryPage() {
           </div>
         </section>
       </main>
+      <SiteFooter />
     </>
   );
 }

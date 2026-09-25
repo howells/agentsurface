@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@howells/envy": "catalog:",
-    "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@radix-ui/react-scroll-area": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/mdx": "catalog:",

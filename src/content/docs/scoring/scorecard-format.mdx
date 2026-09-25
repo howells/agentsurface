@@ -312,10 +312,10 @@ export type Scorecard = z.infer<typeof Scorecard>;
           "result": "Commands section present with exact invocations. Permission boundaries defined (always/ask-first/never). 45 lines."
         },
         {
-          "type": "file",
-          "description": "CLAUDE.md presence",
-          "location": "CLAUDE.md",
-          "result": "Not found"
+          "type": "grep",
+          "description": "CLAUDE.md imports AGENTS.md",
+          "location": "grep -c '^@AGENTS.md' CLAUDE.md",
+          "result": "No CLAUDE.md present - not required for a top score"
         },
         {
           "type": "grep",
@@ -325,7 +325,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
         }
       ],
       "findings": [],
-      "notes": "Good AGENTS.md. Missing Claude-specific and Cursor-specific overrides for multi-tool context."
+      "notes": "Good AGENTS.md. No CLAUDE.md or Cursor rules present - neither is required; add one only if that tool needs something AGENTS.md can't give it."
     },
     {
       "name": "testing",

@@ -31,7 +31,7 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
   const headers = new Headers(response.headers);
-  headers.set("Content-Signal", "search=yes, ai-input=yes, ai-train=no");
+  headers.set("Content-Signal", "search=yes, ai-input=yes, ai-train=yes");
   return new Response(response.body, {
     headers,
     status: response.status,

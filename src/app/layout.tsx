@@ -20,28 +20,47 @@ const inter = localFont({
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  applicationCategory: "DeveloperApplication",
-  author: {
-    "@type": "Person",
-    name: "Daniel Howells",
-    url: "https://github.com/howells",
-  },
-  codeRepository: "https://github.com/howells/agentsurface",
-  description:
-    "A guide and implementation kit for agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and operational skills.",
-  license: "https://opensource.org/licenses/MIT",
-  name: "Agent Surface",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
-  operatingSystem: "Any",
-  url: BASE_URL,
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      applicationCategory: "DeveloperApplication",
+      author: {
+        "@type": "Person",
+        name: "Daniel Howells",
+        sameAs: ["https://github.com/howells", "https://danielhowells.com"],
+        url: "https://github.com/howells",
+      },
+      codeRepository: "https://github.com/howells/agentsurface",
+      description:
+        "A guide and implementation kit for agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and operational skills.",
+      license: "https://opensource.org/licenses/MIT",
+      name: "Agent Surface",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      operatingSystem: "Any",
+      sameAs: [
+        "https://github.com/howells/agentsurface",
+        "https://github.com/howells",
+        "https://danielhowells.com",
+      ],
+      url: BASE_URL,
+    },
+    {
+      "@type": "WebSite",
+      name: "Agent Surface",
+      url: BASE_URL,
+    },
+  ],
 };
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: BASE_URL,
+    types: { "text/markdown": "/index.md" },
+  },
   description:
     "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
   metadataBase: new URL(BASE_URL),
@@ -50,19 +69,19 @@ export const metadata: Metadata = {
       "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
     images: [{ url: "/og/Make%20software%20legible%20to%20agents", width: 1200, height: 630 }],
     siteName: "Agent Surface",
-    title: "Agent Surface — Make Software Legible to Agents",
+    title: "Agent Surface - Make Software Legible to Agents",
     type: "website",
   },
   title: {
-    default: "Agent Surface — Make Software Legible to Agents",
-    template: "%s — Agent Surface",
+    default: "Agent Surface - Make Software Legible to Agents",
+    template: "%s - Agent Surface",
   },
   twitter: {
     card: "summary_large_image",
     description:
       "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
     images: ["/og/Make%20software%20legible%20to%20agents"],
-    title: "Agent Surface — Make Software Legible to Agents",
+    title: "Agent Surface - Make Software Legible to Agents",
   },
 };
 
@@ -71,6 +90,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html className={inter.variable} lang="en" suppressHydrationWarning>
       <head>
         <link rel="service-desc" href="/openapi.json" type="application/vnd.oai.openapi+json" />
+        <link rel="ard" href="/.well-known/ard.json" />
+        <link rel="ai-catalog" href="/.well-known/ai-catalog.json" />
         <meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)" />
         <script

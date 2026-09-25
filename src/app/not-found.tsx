@@ -1,19 +1,43 @@
 import Link from "next/link";
+import { PageIntro } from "@/components/PageIntro";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export default function NotFound() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-      <p className="font-mono text-sm text-fd-muted-foreground">404</p>
-      <h1 className="mt-3 text-2xl font-semibold tracking-tight">Page not found</h1>
-      <p className="mt-2 text-sm text-fd-muted-foreground">
-        The page you're looking for doesn't exist or has been moved.
-      </p>
-      <Link
-        href="/"
-        className="mt-6 inline-flex h-9 items-center rounded-md bg-fd-primary px-4 text-sm font-medium text-fd-primary-foreground transition-colors hover:bg-fd-primary/90"
-      >
-        Back to home
-      </Link>
-    </main>
+    <>
+      <SiteHeader />
+      <main id="main" className="flex-1 bg-fd-background text-fd-foreground">
+        <PageIntro
+          className="pb-20 pt-16 sm:pt-20"
+          eyebrow="404"
+          title="There's no page here."
+          actions={
+            <>
+              <Link
+                href="/docs"
+                className="inline-flex items-center rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground focus-ring"
+              >
+                Browse the docs
+              </Link>
+              <Link href="/" className="underline-offset-4 hover:underline focus-ring">
+                Go to the homepage
+              </Link>
+              <Link
+                href="/llms.txt"
+                prefetch={false}
+                className="underline-offset-4 hover:underline focus-ring"
+              >
+                See every page in llms.txt
+              </Link>
+            </>
+          }
+        >
+          The address may be mistyped, or the page may have moved. Press ⌘K or Ctrl+K to search the
+          docs, or start from one of these.
+        </PageIntro>
+      </main>
+      <SiteFooter />
+    </>
   );
 }

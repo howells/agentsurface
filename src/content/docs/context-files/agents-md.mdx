@@ -332,7 +332,7 @@ This example is ~110 lines, command-first, boundary-explicit.
 
 Each tool reads AGENTS.md differently - treat it as several independent, all-or-nothing behaviors rather than one shared resolution order:
 
-- **Claude Code** reads `AGENTS.md` directly only when no `CLAUDE.md` (or `CLAUDE.local.md`) exists in the working directory or above it. If a `CLAUDE.md` exists, Claude Code reads that instead and skips `AGENTS.md` entirely, unless the `CLAUDE.md` imports it with a literal `@AGENTS.md` line. See [CLAUDE.md](/docs/context-files/claude-md) for the full behavior.
+- **Claude Code** (v2.1.277+) reads `AGENTS.md` directly as project instructions - no `CLAUDE.md`, import, or setting required, as long as no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the working directory or above it. If one of those CLAUDE files does exist, Claude Code reads that instead and skips `AGENTS.md`, unless the `CLAUDE.md` starts with a literal `@AGENTS.md` import. See [CLAUDE.md](/docs/context-files/claude-md) for the full behavior.
 - **Cursor** reads `AGENTS.md` natively - root and nested subdirectories, closest file wins - with `.cursor/rules/*.mdc` rules layered on top for glob-scoped detail.
 - **GitHub Copilot** reads the full file, plus path-scoped `.github/instructions/*.instructions.md` files with `applyTo` glob frontmatter; keep the root file concise since Copilot's context budget is smaller than Claude's or Cursor's. Copilot's coding agent and code review also read `AGENTS.md` directly (GA 2026).
 - **Gemini CLI** reads context files by a configurable filename list (`context.fileName`), which defaults to `GEMINI.md` but can include `AGENTS.md`; it is not an automatic "GEMINI.md missing" fallback.
@@ -340,7 +340,7 @@ Each tool reads AGENTS.md differently - treat it as several independent, all-or-
 ## See also
 
 - ([agents.md specification](https://agents.md))
-- `/docs/context-files/claude-md` - Claude-specific overrides
+- `/docs/context-files/claude-md` - optional Claude Code overlay, only when Claude needs instructions no other tool should see
 - `/docs/context-files/cursor-and-copilot` - Cursor/Copilot variants
 - `/docs/context-files/monorepos` - per-package patterns
 - `/templates/discovery/AGENTS.md` - starter template

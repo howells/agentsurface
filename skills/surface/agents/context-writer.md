@@ -7,10 +7,10 @@ tools: Read, Glob, Grep, Write, Bash
 
 ## Summary
 
-Emit agent onboarding context files: AGENTS.md (universal, Linux Foundation format), CLAUDE.md (Claude Code specific), monorepo topology docs, .cursor/rules for Cursor AI, and VS Code Copilot instructions. All under strict line limits, no secrets, three-tier permission boundaries.
+Emit agent onboarding context files: AGENTS.md (universal, Linux Foundation format), an optional CLAUDE.md (Claude Code specific, only when needed), monorepo topology docs, .cursor/rules for Cursor AI, and VS Code Copilot instructions. All under strict line limits, no secrets, three-tier permission boundaries.
 
 - AGENTS.md: cross-tool Markdown context (commands, stack, conventions, boundaries; authoring target ~150 lines ideal, <300 max)
-- CLAUDE.md: Claude Code specific (MCP servers, workflows, tips)
+- CLAUDE.md: optional overlay, only when Claude Code needs instructions no other tool should see (MCP servers, workflows, tips); starts with a literal `@AGENTS.md` import
 - Monorepo docs: workspace hierarchy, build order, cross-package dependencies
 - .cursor/rules: alwaysApply base rules + framework/glob patterns
 - Copilot instructions: agent constraints (e.g., no destructive ops without approval)
@@ -170,14 +170,15 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
 2. **Create CLAUDE.md** (Claude Code specific; authoring target <150 lines):
    - Location: project root
-   - Only if AGENTS.md exists
+   - Only when Claude Code needs instructions no other tool should see - MCP servers, custom slash commands, or workflows specific to Claude Code. If nothing Claude-only applies, skip this file; AGENTS.md alone is enough (Claude Code v2.1.277+ reads it directly).
+   - The file must start with a literal `@AGENTS.md` import on its own line - a prose "see AGENTS.md" reference does not load it, and without the import Claude Code stops reading AGENTS.md entirely.
+   - Enforced tool rules and permission mode belong in `.claude/settings.json` (`permissions.allow/ask/deny`, `permissions.defaultMode`), never in CLAUDE.md prose.
    - Content:
 
      ```markdown
-     # Claude Code Notes
+     @AGENTS.md
 
-     This project has been optimized for Claude Code agents.
-     For universal agent info, see [AGENTS.md](AGENTS.md).
+     # Claude Code Notes
 
      ## MCP Servers
 
@@ -327,7 +328,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 ## Outputs
 
 - `AGENTS.md` (universal)
-- `CLAUDE.md` (Claude Code specific)
+- `CLAUDE.md` (optional; only if Claude Code needs instructions no other tool should see)
 - `docs/monorepo.md` (if monorepo)
 - `.cursor/rules/*.mdc` (if Cursor used)
 - `.vscode/copilot-instructions.md` (if VS Code used)

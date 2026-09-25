@@ -47,7 +47,7 @@ Allow: /robots.txt
 Allow: /sitemap.xml
 Allow: /AGENTS.md
 # Keep this Allow: the Disallow: /*.json$ rule above would otherwise block the
-# discovery endpoints (server-card.json, agent-skills index, api-catalog.json).
+# discovery endpoints (server-card.json, agent-skills index, api-catalog).
 # Longest-match precedence lets this Allow win for /.well-known/ paths.
 Allow: /.well-known/
 

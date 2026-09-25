@@ -38,12 +38,14 @@ Enable clients to authenticate for the correct principal. User-delegated access 
    - Grant type: `client_credentials`
    - Endpoint: `POST /oauth/token` (or `/.well-known/oauth-token-endpoint`)
    - Request:
+
      ```
      POST /oauth/token
      Content-Type: application/x-www-form-urlencoded
-     
+
      client_id=agent-123&client_secret=secret&grant_type=client_credentials&scope=read:users%20write:posts
      ```
+
    - Response:
      ```json
      {
@@ -64,7 +66,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
    - Example:
      ```typescript
      const verifier = base64url(crypto.randomBytes(32));
-     const challenge = base64url(crypto.createHash('sha256').update(verifier).digest());
+     const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
      // Send challenge in auth request, verifier in token request
      ```
 
@@ -91,15 +93,17 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 5. **Implement Token Exchange (RFC 8693)** (federation/delegation):
    - For accessing downstream services or cross-tenant scenarios:
+
      ```
      POST /oauth/token
-     
+
      grant_type=urn:ietf:params:oauth:grant-type:token-exchange&
      subject_token=<access_token>&
      subject_token_type=urn:ietf:params:oauth:token-type:access_token&
      resource=<downstream-api-uri>&
      scope=<requested-scope>
      ```
+
    - Returns new token scoped to downstream service
    - Prevents token passthrough (OBO antipattern)
 
@@ -109,17 +113,12 @@ Enable clients to authenticate for the correct principal. User-delegated access 
      {
        "issuer": "https://auth.example.com",
        "token_endpoint": "https://auth.example.com/oauth/token",
-       "scopes_supported": [
-         "read:users", "write:posts", "delete:data"
-       ],
+       "scopes_supported": ["read:users", "write:posts", "delete:data"],
        "grant_types_supported": [
          "client_credentials",
          "urn:ietf:params:oauth:grant-type:token-exchange"
        ],
-       "token_endpoint_auth_methods_supported": [
-         "client_secret_basic",
-         "client_secret_post"
-       ],
+       "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
        "dpop_signing_alg_values_supported": ["RS256", "Ed25519"]
      }
      ```
@@ -134,7 +133,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
    - Example:
      ```typescript
      export async function validateApiKey(key: string) {
-       const hash = crypto.createHash('sha256').update(key).digest('hex');
+       const hash = crypto.createHash("sha256").update(key).digest("hex");
        const record = await db.apiKey.findUnique({ where: { hash } });
        if (!record || record.expiresAt < new Date()) return null;
        return record;
@@ -152,8 +151,8 @@ Enable clients to authenticate for the correct principal. User-delegated access 
    - Endpoint: `/.well-known/oauth-protected-resource`
      ```json
      {
-       "resource": "https://your-server.com",
-       "authorization_servers": ["https://auth.your-server.com"],
+       "resource": "https://mcp.example.com",
+       "authorization_servers": ["https://auth.example.com"],
        "scopes_supported": ["read", "write"],
        "bearer_methods_supported": ["header"],
        "dpop_signing_alg_values_supported": ["RS256"]

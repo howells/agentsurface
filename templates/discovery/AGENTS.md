@@ -105,7 +105,7 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 │   ├── agents/               # Subagent definitions
 │   │   ├── reviewer.md       # Code review subagent
 │   │   └── tester.md         # Test runner subagent
-│   └── CLAUDE.md             # Claude-specific overrides
+│   └── CLAUDE.md             # Claude Code overlay (optional)
 │
 ├── .cursor/
 │   └── rules/
@@ -127,7 +127,7 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 │   └── CONTRIBUTING.md       # Detailed workflow
 │
 ├── AGENTS.md                 # This file (you are here)
-├── CLAUDE.md                 # Claude Code overrides
+├── CLAUDE.md                 # Claude Code overlay (optional)
 ├── pnpm-workspace.yaml       # pnpm monorepo config
 ├── turbo.json                # Turbo cache + tasks
 ├── package.json              # Root dependencies
@@ -284,7 +284,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 - **packages/sdk/AGENTS.md** - SDK-specific commands and conventions
 - **packages/dashboard/AGENTS.md** - Next.js dashboard build and deployment
 - **packages/mcp-server/AGENTS.md** - MCP server testing and debugging
-- **CLAUDE.md** - Claude Code-specific hooks and model selection
+- **CLAUDE.md** - optional Claude Code overlay (skills, subagents, hooks); only when Claude needs instructions no other tool should see, starting with `@AGENTS.md`
 - **.cursor/rules/project.mdc** - Cursor IDE overrides
 - **CONTRIBUTING.md** - Pull request workflow, commit message style
 

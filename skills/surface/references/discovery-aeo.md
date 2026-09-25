@@ -160,7 +160,7 @@ Example structure:
 
 **Specification:** https://agents.md - contributed to the Agentic AI Foundation under the Linux Foundation.
 
-**Adoption:** Treat AGENTS.md as the cross-tool baseline for coding-agent context. Tool-specific files such as `CLAUDE.md`, Cursor rules, Copilot instructions, and Codex instructions should layer on top rather than duplicate it.
+**Adoption:** Treat AGENTS.md as the single project instruction file - Claude Code (v2.1.277+), Cursor, and Copilot all read it directly, so most repos need nothing else. Add a tool-specific file such as `CLAUDE.md`, Cursor rules, or Copilot instructions only when that tool needs something AGENTS.md can't give it, and layer it on top rather than duplicate it: a `CLAUDE.md` must start with a literal `@AGENTS.md` import or Claude Code stops reading AGENTS.md entirely.
 
 **Format:** Plain markdown. No strict schema. Recommended structure:
 
@@ -484,18 +484,23 @@ See https://a2a-protocol.org/latest/specification/ for full schema.
 
 Publish `/.well-known/api-catalog` when a service has one or more public APIs. The catalog points agents to OpenAPI specs, docs, status pages, and related machine-readable assets without forcing them to scrape a developer portal.
 
+The catalog is an RFC 9264 linkset, not a free-form list. Each API is an `anchor` with `service-desc` (spec), `service-doc` (human docs), `service-meta` and `status` links. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
+
 Minimal shape:
 
 ```json
 {
-  "apis": [
+  "linkset": [
     {
-      "id": "public-rest-api",
-      "title": "Public REST API",
-      "description": "Create, read, and manage resources.",
-      "specification": "https://api.example.com/openapi.json",
-      "documentation": "https://example.com/docs/api",
-      "status": "https://status.example.com"
+      "anchor": "https://api.example.com/v1",
+      "service-desc": [
+        {
+          "href": "https://api.example.com/openapi.json",
+          "type": "application/vnd.oai.openapi+json"
+        }
+      ],
+      "service-doc": [{ "href": "https://example.com/docs/api", "type": "text/html" }],
+      "status": [{ "href": "https://status.example.com", "type": "text/html" }]
     }
   ]
 }

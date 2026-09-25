@@ -78,9 +78,9 @@ Agents do not care about marketing. This wastes tokens and confuses intent.
 **Fix:**
 
 ```markdown
-# CLAUDE.md
-
 @AGENTS.md
+
+# CLAUDE.md
 
 ## Skills
 
@@ -197,7 +197,7 @@ Files drift out of sync. One gets updated; others stay stale. Agents see conflic
 
 **Fix:**
 
-Single source of truth. AGENTS.md is canonical; others reference it:
+Single source of truth. AGENTS.md is canonical; others defer to it - a Claude Code overlay must import it, not just mention it in prose:
 
 ```markdown
 # AGENTS.md
@@ -206,9 +206,9 @@ Commands (verified 2026-04-17):
 pnpm dev
 pnpm test
 
-# CLAUDE.md
+@AGENTS.md
 
-See AGENTS.md > Commands.
+# CLAUDE.md
 
 Claude-specific:
 
@@ -220,7 +220,7 @@ See AGENTS.md > Commands for command reference.
 This file adds Cursor-specific tips.
 ```
 
-Update once; all files reference it.
+A CLAUDE.md that only says "See AGENTS.md" in prose does not load AGENTS.md for Claude Code - only a literal `@AGENTS.md` import does that. Most repos need no CLAUDE.md at all; add one only when Claude needs instructions no other tool should see. Update the source once; overlays that import or reference it stay current automatically.
 
 ---
 
@@ -287,20 +287,16 @@ If not curated by hand, it accumulates outdated boilerplate. Agents follow gener
 Hand-curated files, updated as the project evolves:
 
 ```markdown
-# CLAUDE.md
-
 @AGENTS.md
+
+# CLAUDE.md
 
 ## Skills
 
 Auto-trigger /security-review for auth or crypto changes.
-
-## Permissions
-
-Default: plan
 ```
 
-Write from experience. Update when friction arises.
+Enforced tool rules and the default permission mode belong in `.claude/settings.json` (`permissions.allow/ask/deny`, `permissions.defaultMode`), not in CLAUDE.md prose. Write from experience. Update when friction arises.
 
 ---
 
@@ -313,7 +309,7 @@ Before committing context files:
 - [ ] All commands verified to work (within last 3 months)
 - [ ] All referenced directories exist
 - [ ] Tech stack versions current
-- [ ] CLAUDE.md references AGENTS.md, not duplicating
+- [ ] CLAUDE.md, if present, starts with a literal `@AGENTS.md` import, not duplicating
 - [ ] Cursor rules and Copilot instructions reference AGENTS.md
 - [ ] Permission boundaries explicit (always/ask/never), not aspirational
 - [ ] Links to deeper docs valid
@@ -352,5 +348,5 @@ Point at the file that enforces each gotcha.
 ## See also
 
 - `/docs/context-files/agents-md` - proper AGENTS.md structure
-- `/docs/context-files/claude-md` - Claude override patterns
+- `/docs/context-files/claude-md` - optional Claude Code overlay, only when needed
 - `/docs/context-files/drift-detection` - keeping files current

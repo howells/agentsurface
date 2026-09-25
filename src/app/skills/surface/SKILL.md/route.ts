@@ -14,7 +14,7 @@ export function GET() {
   return new NextResponse(content, {
     headers: {
       "Cache-Control": "public, max-age=3600",
-      "Content-Signal": "search=yes, ai-input=yes, ai-train=no",
+      "Content-Signal": "search=yes, ai-input=yes, ai-train=yes",
       "Content-Type": "text/markdown; charset=utf-8",
       "x-markdown-tokens": String(estimateTokens(content)),
     },

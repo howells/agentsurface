@@ -160,4 +160,4 @@ Do NOT use `cd packages/X && npm` (breaks hoisting).
 - [AGENTS.md](../AGENTS.md) - Complete project context
 - [GitHub Copilot docs](https://docs.github.com/en/copilot)
 - [Cursor rules](../.cursor/rules/project.mdc) - Cursor IDE (different tool)
-- [Claude Code instructions](../CLAUDE.md) - Claude Code (different tool)
+- [Claude Code instructions](../CLAUDE.md) - Claude Code (different tool, optional, if present)

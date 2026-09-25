@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { PageIntro } from "@/components/PageIntro";
 import { PatternStudio } from "@/components/PatternStudio";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { RILEY_DEFAULTS, decodeRiley } from "@/lib/riley";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/patterns" },
   description:
     "Draw the line fields used across Agent Surface: one repeated curve, shaped by progression, drift and ribbon. Download the result as SVG.",
   title: "Pattern studio",
@@ -40,6 +42,7 @@ export default async function PatternsPage({
           <PatternStudio initial={initial} />
         </section>
       </main>
+      <SiteFooter />
     </>
   );
 }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.agentsurface/docs",
+  "title": "Agent Surface",
+  "description": "Search and read the Agent Surface guide to making websites, apps, APIs and CLIs work with AI agents.",
+  "version": "2.3.0",
+  "websiteUrl": "https://agentsurface.dev",
+  "repository": {
+    "url": "https://github.com/howells/agentsurface",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://agentsurface.dev/apple-icon",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://agentsurface.dev/mcp"
+    }
+  ]
+}

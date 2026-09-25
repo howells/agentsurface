@@ -1,12 +1,25 @@
 {
-  "apis": [
+  "linkset": [
     {
-      "id": "public-rest-api",
-      "title": "Public REST API",
-      "description": "Replace with the API's agent-facing purpose and main capability boundaries.",
-      "specification": "https://example.com/openapi.json",
-      "documentation": "https://example.com/docs/api",
-      "status": "https://status.example.com"
+      "anchor": "https://api.example.com/v1",
+      "service-desc": [
+        {
+          "href": "https://example.com/openapi.json",
+          "type": "application/vnd.oai.openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://example.com/docs/api",
+          "type": "text/html"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://status.example.com",
+          "type": "text/html"
+        }
+      ]
     }
   ]
 }

@@ -1,7 +1,7 @@
 ---
 title: Monorepos
 description: Nested context files, precedence rules, and hierarchical AGENTS.md patterns
-lastVerified: 2026-09-24
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -26,7 +26,7 @@ The pattern is progressive disclosure: root AGENTS.md provides overview and cros
 ```
 .
 ├── AGENTS.md                      # Root: overview, cross-package commands
-├── CLAUDE.md                      # Claude-specific (applies to all packages)
+├── CLAUDE.md                      # Claude Code overlay (optional; applies to all packages)
 ├── .cursor/rules/                 # Cursor rules (can be scoped per-package)
 └── packages/
     ├── api/
@@ -339,7 +339,7 @@ See ../AGENTS.md for cross-package info.
 There is no single cross-tool precedence ladder - each tool resolves its own files independently, and the rules don't merge:
 
 - **AGENTS.md itself**: nested files win over the root. `packages/api/AGENTS.md` overrides `AGENTS.md` (root) for anything under `packages/api/`.
-- **Claude Code**: loads `CLAUDE.md` when one exists anywhere from the working directory up to the repo root, and `AGENTS.md` only when no `CLAUDE.md` exists; combine the two with the `@AGENTS.md` import - see [CLAUDE.md](/docs/context-files/claude-md) for the exact rule.
+- **Claude Code** (v2.1.277+): reads `AGENTS.md` directly when no `CLAUDE.md` exists anywhere from the working directory up to the repo root; if one does exist, Claude Code reads that instead unless it starts with a literal `@AGENTS.md` import - see [CLAUDE.md](/docs/context-files/claude-md) for the exact rule.
 - **Cursor**: reads `AGENTS.md` natively (nested wins) and layers `.cursor/rules/*.mdc` on top for glob-scoped detail - see [Cursor and Copilot](/docs/context-files/cursor-and-copilot).
 - **GitHub Copilot**: reads `AGENTS.md` directly (coding agent, code review) and separately reads `.github/copilot-instructions.md` plus path-scoped `.github/instructions/*.instructions.md`.
 

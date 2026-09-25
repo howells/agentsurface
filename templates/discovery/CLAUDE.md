@@ -1,146 +1,31 @@
 <!--
-CLAUDE.md - Claude Code-specific context overrides.
+CLAUDE.md - optional Claude Code-only overlay.
 
-What: A focused markdown file that augments AGENTS.md with Claude Code-only settings:
-slash commands, subagents, MCP servers, skills, model preference, thinking budget.
+Most repositories don't need this file. Claude Code (v2.1.277+) reads AGENTS.md
+on its own when no CLAUDE.md exists, and so do most other coding agents.
 
-When to use: When you want Claude Code to behave differently from other tools reading AGENTS.md.
-If there are no Claude-specific overrides needed, omit this file.
+Add CLAUDE.md only when Claude Code needs instructions no other tool should see:
+skills, subagents or slash commands to use here, or hooks and MCP servers that
+change how Claude should work.
 
-What to customize:
-1. Model selection (claude-opus-5-5, claude-sonnet-5, etc.)
-2. Subagents (path to .claude/agents/*.md files)
-3. MCP servers (remote servers, local stdio servers)
-4. Skills (scoped to project)
-5. Slash commands (what Claude can invoke automatically)
-6. Extended thinking budget (for reasoning-intensive tasks)
-7. Permission mode (default, acceptEdits, bypassPermissions, plan, dontAsk, auto)
+If you add it, keep the `@AGENTS.md` import on the first line. Without it,
+Claude Code reads this file instead of AGENTS.md and never loads AGENTS.md.
+A sentence such as "see AGENTS.md" doesn't load the file.
 
-Rule: Start with "See AGENTS.md for commands, testing, and boundaries."
-Only override where Claude differs. Keep <150 lines.
+Keep out of this file:
+- Anything true for every agent (commands, conventions, boundaries): AGENTS.md
+- Tool rules and the default permission mode: .claude/settings.json
+  (permissions.allow / ask / deny, permissions.defaultMode), where they're enforced
+- Model choice
 
-Citation: https://code.claude.com/docs/en/memory
+Citation: https://code.claude.com/docs/en/memory#agents-md
 -->
 
-# CLAUDE.md
+@AGENTS.md
 
-Claude Code context for Acme Agent Tools.
+## Claude Code
 
-**For shared context (commands, conventions, boundaries):** See [AGENTS.md](./AGENTS.md).
-
-This file documents Claude Code-specific settings only.
-
----
-
-## Model selection
-
-**Default:** `claude-opus-5-5` for agent-related tasks (high reasoning, tool use, code generation).
-
-**Override for specific tasks:**
-
-- Lightweight refactoring, docs: `claude-sonnet-5`
-- Very fast turnaround (prototypes): `claude-haiku-4-5-20251001`
-
-Use the `model:` override in the prompt when needed; otherwise, Claude Code defaults to Opus 5.5.
-
-**Extended thinking:** Opus 5.5 allocates its thinking budget adaptively, and thinking tokens count
-toward the context window. Drop to `claude-sonnet-5` for long, cost-sensitive sessions.
-
----
-
-## Subagents (.claude/agents/)
-
-Ephemeral, isolated contexts for side tasks. Use them to keep the parent context lean.
-
-- **reviewer.md** - Code review only. Reads the PR, checks linting and test coverage. Read-only tools. Invoke `/review`.
-- **tester.md** - Runs `pnpm test`, analyzes failures, suggests fixes. Can modify test files only. Invoke `/test`.
-- **types.md** - Runs `pnpm type-check`, reports errors with file and line. Read-only.
-
-Reach for a subagent when the task is orthogonal, the parent context is already large, a cheaper
-model will do, or you need a hard permission boundary.
-
----
-
-## MCP servers
-
-Claude Code auto-discovers MCP servers in `.claude/mcp.json`, the inline `mcp_servers:` field of
-`.claude/agents/*.md`, and workspace-level IDE settings.
-
-**Local server (stdio):**
-
-```json
-{
-  "mcpServers": {
-    "mcp-acme": {
-      "command": "node",
-      "args": ["packages/mcp-server/dist/server.js"],
-      "env": { "NODE_ENV": "development" }
-    }
-  }
-}
-```
-
-Exposes every tool in `packages/mcp-server/src/tools/`. Test with `pnpm --filter=@acme/mcp-server start`.
-
-**Remote server:**
-
-```json
-{
-  "mcpServers": {
-    "example-remote": {
-      "url": "https://api.example.com/mcp",
-      "auth": { "type": "oauth2", "clientId": "...", "clientSecret": "..." }
-    }
-  }
-}
-```
-
----
-
-## Skills and slash commands
-
-Project-scoped skills live in `.claude/skills/`:
-
-- `schema-validate.md` - Zod schema validator. Checks `src/schemas/*.ts` against spec.
-- `test-summary.md` - Summarize test results from the latest run.
-- `deploy-staging.md` - Deploy dashboard to staging and run smoke tests (ask-first).
-
-Invoke as `/schema-validate`, `/test-summary`, `/deploy-staging`. Built-in `/test`, `/lint`, and
-`/review` map onto the subagents above.
-
----
-
-## Permissions
-
-**Default mode:** `default` - ask-first for destructive actions, always-allow for read and test.
-AGENTS.md owns the full three-tier boundary list; only Claude-specific overrides belong here.
-
-- Never deploy to production without explicit confirmation
-- Never rotate secrets or modify `.env`
-- Never force-push to main
-
-Override `permission_mode` only for trusted, fully-automated tasks:
-
-```
-permission_mode: plan  # Show plan, ask for confirmation once
-```
-
----
-
-## Known issues (Claude Code-specific)
-
-**MCP server lifecycle:** After restarting the MCP server, Claude Code may hold stale tool
-definitions. Refresh the IDE tab or start a new session.
-
-**Monorepo filter commands:** `pnpm --filter=@acme/api dev` works in the Claude Code terminal, but
-IDE breakpoints only bind if you `cd packages/api/` first.
-
----
-
-## See also
-
-- [Claude Code project memory docs](https://code.claude.com/docs/en/memory)
-- [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
-- [MCP spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
-- [AGENTS.md](./AGENTS.md) - Shared context (canonical reference)
-- `.claude/agents/reviewer.md`, `.claude/agents/tester.md` - subagents
+- Run /security-review on changes under `src/auth/` and `src/crypto/`.
+- Use the `reviewer` subagent in `.claude/agents/` for pull request review; it has read-only tools.
+- The `PostToolUse` hook in `.claude/settings.json` formats each file after an edit. Don't run the formatter by hand.
+- The project MCP server in `.mcp.json` exposes the tools in `packages/mcp-server/src/tools/`. After changing a tool, restart the session so Claude sees the new definition.

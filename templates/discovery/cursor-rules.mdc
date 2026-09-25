@@ -313,5 +313,5 @@ IDE debugging (breakpoints) also requires this.
 
 - [Cursor documentation](https://docs.cursor.com)
 - [AGENTS.md](../../AGENTS.md) - Shared project context
-- [CLAUDE.md](../../CLAUDE.md) - Claude Code-specific rules (different tool)
+- [CLAUDE.md](../../CLAUDE.md) - Claude Code-specific rules (different tool, optional, if present)
 - `.github/copilot-instructions.md` - GitHub Copilot rules (different tool)

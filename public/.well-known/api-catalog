@@ -1,0 +1,21 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://agentsurface.dev",
+      "service-desc": [
+        {
+          "href": "https://agentsurface.dev/openapi.json",
+          "type": "application/vnd.oai.openapi+json",
+          "title": "Agent Surface documentation API"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://agentsurface.dev/docs",
+          "type": "text/html",
+          "title": "Agent Surface documentation"
+        }
+      ]
+    }
+  ]
+}

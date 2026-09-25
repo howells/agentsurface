@@ -14,7 +14,7 @@ lastVerified: 2026-09-25
 - /.well-known/oauth-protected-resource: OAuth resource metadata
 - /.well-known/security.txt: RFC 9116 vulnerability disclosure contact
 - /.well-known/http-message-signatures-directory: Web Bot Auth public keys
-- All responses should be JSON with Content-Type application/json, except `security.txt` (`text/plain`)
+- Serve JSON files as `application/json`, the API catalog as `application/linkset+json` and `security.txt` as `text/plain`
 - Send Access-Control-Allow-Origin on these files so browser-based agents can fetch them cross-origin
 
 The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here lets compatible agents and protocols find your capabilities without out-of-band configuration.
@@ -23,16 +23,21 @@ The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for si
 
 API Catalog (RFC 9727) gives agents one place to discover public APIs, their specs, docs, status pages, and related metadata. Use it when a product exposes APIs that should be callable or wrapped as tools.
 
+The catalog is a linkset ([RFC 9264](https://www.rfc-editor.org/rfc/rfc9264.html)), not a free-form JSON list. Each API is an `anchor` with typed links: `service-desc` for the machine-readable spec, `service-doc` for human docs, `service-meta` for other metadata and `status` for a status page. Serve it as `application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"`.
+
 ```json
 {
-  "apis": [
+  "linkset": [
     {
-      "id": "public-rest-api",
-      "title": "Public REST API",
-      "description": "Create, read, and manage resources.",
-      "specification": "https://api.example.com/openapi.json",
-      "documentation": "https://example.com/docs/api",
-      "status": "https://status.example.com"
+      "anchor": "https://api.example.com/v2",
+      "service-desc": [
+        {
+          "href": "https://api.example.com/openapi.json",
+          "type": "application/vnd.oai.openapi+json"
+        }
+      ],
+      "service-doc": [{ "href": "https://example.com/docs/api", "type": "text/html" }],
+      "status": [{ "href": "https://status.example.com", "type": "text/html" }]
     }
   ]
 }

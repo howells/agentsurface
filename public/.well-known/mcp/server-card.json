@@ -1,11 +1,24 @@
 {
+  "name": "Agent Surface",
+  "description": "Search and read Agent Surface documentation about making software legible to AI agents.",
   "version": "2.3.0",
+  "serverUrl": "https://agentsurface.dev/mcp",
+  "websiteUrl": "https://agentsurface.dev",
+  "icons": [
+    { "src": "https://agentsurface.dev/apple-icon", "mimeType": "image/png", "sizes": ["180x180"] }
+  ],
   "serverInfo": {
     "name": "agentsurface-docs",
     "title": "Agent Surface Documentation",
-    "version": "2.3.0"
+    "version": "2.3.0",
+    "icons": [
+      {
+        "src": "https://agentsurface.dev/apple-icon",
+        "mimeType": "image/png",
+        "sizes": ["180x180"]
+      }
+    ]
   },
-  "description": "Search and retrieve Agent Surface documentation. Tools: search_docs (keyword search across documentation pages), get_page (retrieve full page content by slug).",
   "transport": {
     "type": "streamable-http",
     "endpoint": "https://agentsurface.dev/mcp"
@@ -15,12 +28,16 @@
   },
   "tools": [
     {
-      "name": "search_docs",
-      "description": "Search Agent Surface documentation by keyword. Returns matching page titles, URLs, descriptions, and slugs."
+      "name": "list_pages",
+      "description": "List all docs pages with their pathnames (URLs)."
     },
     {
       "name": "get_page",
-      "description": "Retrieve the full Markdown content of a documentation page by its slug (e.g. 'discovery/llms-txt')."
+      "description": "Get the Markdown content of a docs page by its pathname (URL)."
+    },
+    {
+      "name": "search",
+      "description": "Search docs pages with a query."
     }
   ]
 }

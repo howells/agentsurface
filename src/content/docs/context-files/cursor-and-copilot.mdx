@@ -1,7 +1,7 @@
 ---
 title: Cursor Rules and GitHub Copilot
 description: Tool-specific overrides with progressive disclosure and sync patterns
-lastVerified: 2026-09-24
+lastVerified: 2026-09-25
 ---
 
 ## Summary
@@ -248,7 +248,7 @@ When AGENTS.md changes, update:
 
 ```
 AGENTS.md           ← source of truth for commands, boundaries, tech stack
-├── CLAUDE.md       (reference AGENTS.md, add Claude-only hooks)
+├── CLAUDE.md       (optional; starts with `@AGENTS.md` import, add Claude-only hooks)
 ├── .cursor/rules/  (reference AGENTS.md sections, add Cursor-only rules)
 └── .github/copilot-instructions.md (reference AGENTS.md, add Copilot focus areas)
 ```
@@ -256,7 +256,7 @@ AGENTS.md           ← source of truth for commands, boundaries, tech stack
 Before committing:
 
 1. Update AGENTS.md with new commands or boundaries
-2. Add reference links in CLAUDE.md: "See AGENTS.md > Boundaries"
+2. If a CLAUDE.md exists, leave its `@AGENTS.md` import in place - do not restate the change in prose
 3. Update Cursor rules for affected code paths
 4. Summarize in Copilot instructions (brief version of AGENTS.md)
 5. Commit all files together
@@ -291,7 +291,7 @@ echo "✓ Context files OK"
 ```
 .
 ├── AGENTS.md                          # Universal baseline
-├── CLAUDE.md                          # Claude Code overrides
+├── CLAUDE.md                          # Claude Code overlay (optional)
 ├── CONTRIBUTING.md                    # Detailed contribution guide
 ├── .cursor/
 │   └── rules/
@@ -333,11 +333,13 @@ Top-level `.github/copilot-instructions.md` applies to all packages.
 Unit: Vitest (pnpm test)
 ```
 
-**CLAUDE.md (referencing):**
+**CLAUDE.md (importing):**
 
 ```markdown
-See AGENTS.md > Testing for test setup and commands.
+@AGENTS.md
 ```
+
+That single line pulls in the whole AGENTS.md file, Testing section included - nothing to restate. Add Claude-only lines below the import only if Claude needs something no other tool should see.
 
 **.cursor/rules/tests.mdc (referencing):**
 
@@ -371,7 +373,7 @@ See AGENTS.md for full conventions.
 - Test behavior, not implementation
 ```
 
-All files reference AGENTS.md as source of truth. No duplication.
+All files reference or import AGENTS.md as source of truth. No duplication.
 
 ## Anti-Patterns
 
@@ -426,7 +428,7 @@ Too long. Keep rules focused on non-obvious patterns. AGENTS.md covers the rest.
 ## See also
 
 - `/docs/context-files/agents-md` - AGENTS.md spec
-- `/docs/context-files/claude-md` - Claude overrides
+- `/docs/context-files/claude-md` - optional Claude Code overlay, only when needed
 - ([Cursor rules docs](https://docs.cursor.com/context/rules)) - includes AGENTS.md support
 - ([GitHub Copilot repository instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)) - repo-wide and path-scoped instructions
 - `/templates/discovery/cursor-rules.mdc` - starter Cursor rules file

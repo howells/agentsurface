@@ -260,7 +260,7 @@ Update AGENTS.md immediately when:
 docs(AGENTS.md): Update Next.js version to 16
 
 - Verified all dev commands work with Next.js 16
-- Updated build output paths in CLAUDE.md
+- No changes needed in CLAUDE.md - it imports AGENTS.md, so it picked up the update automatically
 - No breaking changes to existing commands
 ```
 
@@ -350,7 +350,7 @@ Before merging code changes, verify context files:
 - [ ] No deprecated libraries or patterns
 - [ ] File count reasonable (<370 lines for AGENTS.md)
 - [ ] Links to deeper docs still valid
-- [ ] CLAUDE.md references AGENTS.md (no duplication)
+- [ ] CLAUDE.md, if present, imports AGENTS.md with `@AGENTS.md` (no duplication)
 - [ ] Cursor rules and Copilot instructions reference AGENTS.md
 
 If any fail, update AGENTS.md and re-verify.

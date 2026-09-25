@@ -1,0 +1,47 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Agent Surface",
+    "documentationUrl": "https://agentsurface.dev/docs"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:agentsurface.dev:mcp:docs",
+      "displayName": "Agent Surface MCP server",
+      "type": "application/mcp-server-card+json",
+      "url": "https://agentsurface.dev/.well-known/mcp/server-card.json",
+      "description": "Search and read Agent Surface documentation over MCP: list_pages, get_page, and search tools.",
+      "tags": ["mcp", "documentation"],
+      "representativeQueries": [
+        "how do I make my API agent-readable",
+        "search agent surface docs for llms.txt",
+        "what does agent surface say about MCP servers"
+      ]
+    },
+    {
+      "identifier": "urn:air:agentsurface.dev:api:openapi",
+      "displayName": "Agent Surface documentation API",
+      "type": "application/ai-registry+json",
+      "url": "https://agentsurface.dev/openapi.json",
+      "description": "Public, read-only OpenAPI registry of operations for documentation search and Markdown retrieval.",
+      "tags": ["openapi", "rest-api"],
+      "representativeQueries": [
+        "fetch a documentation page as markdown",
+        "search agent surface documentation by keyword"
+      ]
+    },
+    {
+      "identifier": "urn:air:agentsurface.dev:skill:surface",
+      "displayName": "Surface skill",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://agentsurface.dev/skills/surface/SKILL.md",
+      "description": "Agent skill for auditing, scaffolding, and transforming a codebase into agent-readable software.",
+      "tags": ["skill", "agent-skills"],
+      "representativeQueries": [
+        "audit my site for agent readiness",
+        "scaffold llms.txt and AGENTS.md for my project",
+        "how do I make my product legible to agents"
+      ]
+    }
+  ]
+}

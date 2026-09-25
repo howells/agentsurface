@@ -1,4 +1,5 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "surface",
   "version": "2.3.0",
   "description": "Make software legible to agents. Guide, audit or scaffold the surfaces agents use: discovery, context files, APIs, CLIs, tools, MCP servers, authentication, errors, retrieval and the tests that prove them.",

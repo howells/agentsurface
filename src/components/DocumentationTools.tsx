@@ -70,7 +70,7 @@ export function DocumentationTools() {
           if (typeof slug !== "string" || !/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/.test(slug)) {
             throw new TypeError("Use a documentation slug such as discovery/llms-txt.");
           }
-          return readResponse(`/api/md/${slug}`);
+          return readResponse(slug === "index" ? "/docs.md" : `/docs/${slug}.md`);
         },
       },
     ];
