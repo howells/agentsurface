@@ -47,7 +47,11 @@ export default function ContactPage() {
           <InfoSection title="For agents">
             <p>
               Agents don't need to contact anyone to use the site. Search and read the docs through
-              the MCP server at <code>/mcp</code>, the API described in{" "}
+              the MCP server at <code>/mcp</code> (listed in the{" "}
+              <a href="https://registry.modelcontextprotocol.io/v0/servers/dev.agentsurface%2Fdocs/versions/latest">
+                MCP Registry
+              </a>
+              ), the API described in{" "}
               <Link href="/openapi.json" prefetch={false}>
                 openapi.json
               </Link>

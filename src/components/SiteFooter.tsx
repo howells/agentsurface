@@ -28,6 +28,12 @@ export function SiteFooter() {
           >
             GitHub
           </a>
+          <a
+            href="https://registry.modelcontextprotocol.io/v0/servers/dev.agentsurface%2Fdocs/versions/latest"
+            className="hover:text-fd-foreground focus-ring"
+          >
+            MCP Registry
+          </a>
         </nav>
       </div>
     </footer>

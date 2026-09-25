@@ -47,8 +47,12 @@ export default function AboutPage() {
               <Link href="/llms.txt" prefetch={false}>
                 llms.txt
               </Link>
-              , and an MCP server at <code>/mcp</code> searches and reads the docs. None of it needs
-              an account or a key.
+              , and an MCP server at <code>/mcp</code> searches and reads the docs. The server is
+              listed in the{" "}
+              <a href="https://registry.modelcontextprotocol.io/v0/servers/dev.agentsurface%2Fdocs/versions/latest">
+                official MCP Registry
+              </a>{" "}
+              as <code>dev.agentsurface/docs</code>. None of it needs an account or a key.
             </p>
           </InfoSection>
 

@@ -34,6 +34,7 @@ const ENTRY_POINTS: string[] = [
   `- [Any docs page as Markdown](${SITE_ORIGIN}/docs.md): Append \`.md\` to a docs URL, e.g. \`/docs/discovery/llms-txt.md\`, or send \`Accept: text/markdown\`.`,
   `- [Markdown API](${SITE_ORIGIN}/api/md/index): Raw Markdown endpoint. Replace \`index\` with any docs slug, for example \`discovery/llms-txt\`.`,
   `- [MCP endpoint](${SITE_ORIGIN}/mcp): Agent Surface docs tools: \`search\`, \`list_pages\`, and \`get_page\`.`,
+  `- [MCP Registry entry](https://registry.modelcontextprotocol.io/v0/servers/dev.agentsurface%2Fdocs/versions/latest): The MCP server's listing in the official registry, as \`dev.agentsurface/docs\`.`,
   `- [MCP server card](${SITE_ORIGIN}/.well-known/mcp/server-card.json): Machine-readable description of the MCP endpoint and its tools.`,
   `- [Agent skills index](${SITE_ORIGIN}/.well-known/agent-skills/index.json): Discovery record for the surface skill.`,
   `- [API catalog](${SITE_ORIGIN}/.well-known/api-catalog): RFC 9727 linkset for the OpenAPI spec and docs.`,
