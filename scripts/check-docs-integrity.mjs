@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { glossaryTerms } from "../src/data/glossary.ts";
 
 const repoRoot = process.cwd();
 const docsRoot = path.join(repoRoot, "src/content/docs");
@@ -121,6 +122,110 @@ for (const metaFile of metaFiles) {
   for (const slug of [...expected].toSorted()) {
     if (!entries.includes(slug)) {
       metaIssues.push(`${path.relative(repoRoot, metaFile)} is missing page "${slug}"`);
+    }
+  }
+}
+
+// Glossary single-source-of-truth checks.
+//
+// src/data/glossary.ts is the only place a term's definition may live. These
+// checks keep that promise: every `<Term id>` in the docs names a real term,
+// every glossary href resolves to a real page and heading anchor, ids and
+// aliases don't collide, and no docs page hand-writes a definitions section
+// that duplicates the glossary.
+const glossaryIssues = [];
+
+const glossaryIds = new Set();
+for (const term of glossaryTerms) {
+  if (glossaryIds.has(term.id)) {
+    glossaryIssues.push(`src/data/glossary.ts — duplicate term id: ${term.id}`);
+  }
+  glossaryIds.add(term.id);
+}
+
+const aliasOwner = new Map();
+for (const term of glossaryTerms) {
+  for (const alias of term.aliases) {
+    const owner = aliasOwner.get(alias);
+    if (owner && owner !== term.id) {
+      glossaryIssues.push(
+        `src/data/glossary.ts — alias "${alias}" is claimed by both "${owner}" and "${term.id}"`,
+      );
+    }
+    aliasOwner.set(alias, term.id);
+  }
+}
+
+function slugify(heading) {
+  return heading
+    .toLowerCase()
+    .replace(/[^a-z0-9 \-_]/g, "")
+    .trim()
+    .replaceAll(" ", "-");
+}
+
+const headingSlugsByRoute = new Map();
+for (const file of mdxFiles) {
+  const rel = path.relative(docsRoot, file).replaceAll(path.sep, "/");
+  const route = `/docs/${rel.replace(/\/index\.mdx$/, "").replace(/\.mdx$/, "")}`;
+  const content = stripCode(fs.readFileSync(file, "utf-8"));
+  const slugs = new Set();
+  for (const match of content.matchAll(/^#{1,6}\s+(.+)$/gm)) {
+    slugs.add(slugify(match[1]));
+  }
+  headingSlugsByRoute.set(route, slugs);
+}
+
+for (const term of glossaryTerms) {
+  if (!term.href) {
+    continue;
+  }
+  const [routePart, hashPart] = term.href.split("#");
+  if (!validRoutes.has(routePart)) {
+    glossaryIssues.push(
+      `src/data/glossary.ts — "${term.id}" href points to a missing page: ${term.href}`,
+    );
+    continue;
+  }
+  if (hashPart && !headingSlugsByRoute.get(routePart)?.has(hashPart)) {
+    glossaryIssues.push(
+      `src/data/glossary.ts — "${term.id}" href points to a missing heading anchor: ${term.href}`,
+    );
+  }
+}
+
+for (const file of mdxFiles) {
+  const content = fs.readFileSync(file, "utf-8");
+  for (const match of content.matchAll(/<Term\s+id="([^"]+)"/g)) {
+    if (!glossaryIds.has(match[1])) {
+      const line = content.slice(0, match.index).split("\n").length;
+      glossaryIssues.push(
+        `${path.relative(repoRoot, file)}:${line} — <Term id="${match[1]}"> names an unknown glossary term`,
+      );
+    }
+  }
+}
+
+const glossaryHeadingScanRoots = [docsRoot, referencesRoot];
+for (const root of glossaryHeadingScanRoots) {
+  if (!fs.existsSync(root)) {
+    continue;
+  }
+  for (const file of walk(root)) {
+    if (!/\.mdx?$/.test(file)) {
+      continue;
+    }
+    if (file === path.join(docsRoot, "glossary.mdx")) {
+      continue;
+    }
+    const content = fs.readFileSync(file, "utf-8");
+    for (const match of content.matchAll(
+      /^#{1,6}\s*(terminology|glossary|definitions|key terms)\s*$/gim,
+    )) {
+      const line = content.slice(0, match.index).split("\n").length;
+      glossaryIssues.push(
+        `${path.relative(repoRoot, file)}:${line} — hand-written "${match[1]}" section duplicates the glossary; link to /docs/glossary#id instead`,
+      );
     }
   }
 }
@@ -539,7 +644,8 @@ if (
   stampIssues.length === 0 &&
   retiredIssues.length === 0 &&
   versionIssues.length === 0 &&
-  agentSkillsIssues.length === 0
+  agentSkillsIssues.length === 0 &&
+  glossaryIssues.length === 0
 ) {
   if (freshnessIssues.length > 0) {
     console.warn("Freshness warnings (non-fatal in --no-freshness mode):");
@@ -610,6 +716,13 @@ if (versionIssues.length > 0) {
 if (agentSkillsIssues.length > 0) {
   console.error("Agent Skills discovery integrity issues:");
   for (const issue of agentSkillsIssues) {
+    console.error(`- ${issue}`);
+  }
+}
+
+if (glossaryIssues.length > 0) {
+  console.error("Glossary single-source-of-truth issues:");
+  for (const issue of glossaryIssues) {
     console.error(`- ${issue}`);
   }
 }

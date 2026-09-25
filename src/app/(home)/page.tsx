@@ -6,6 +6,7 @@ import { PageIntro } from "@/components/PageIntro";
 import { GlossaryGrid } from "@/components/GlossaryGrid";
 import { RecommendationList } from "@/components/RecommendationList";
 import { SiteFooter } from "@/components/SiteFooter";
+import { TextGrid } from "@/components/TextGrid";
 import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
 
@@ -18,33 +19,23 @@ export const metadata: Metadata = {
 
 function AreaOverview() {
   return (
-    <ol className="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
-      {guideStages.map((stage, index) => (
-        <li key={stage.id} className="border-t border-fd-border">
-          <a
-            href={`#${stage.id}`}
-            className="group flex h-full flex-col pb-8 pt-4 focus-ring sm:pb-10"
-          >
-            <span className="type-small tabular-nums text-fd-muted-foreground">
-              <span aria-hidden="true" className="mr-3">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              {stage.name}
-            </span>
-            <span className="mt-3 block type-heading text-fd-foreground transition-colors duration-150 group-hover:text-fd-accent-foreground motion-reduce:transition-none">
-              {stage.question}
-            </span>
-            <span className="mt-auto flex items-center gap-1.5 pt-4 type-small tabular-nums text-fd-muted-foreground">
-              {stage.cards.length} recommendations
-              <ArrowDown
-                aria-hidden="true"
-                className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
-              />
-            </span>
-          </a>
-        </li>
-      ))}
-    </ol>
+    <TextGrid
+      numbered
+      items={guideStages.map((stage) => ({
+        eyebrow: stage.name,
+        href: `#${stage.id}`,
+        meta: (
+          <>
+            {stage.cards.length} recommendations
+            <ArrowDown
+              aria-hidden="true"
+              className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+            />
+          </>
+        ),
+        title: stage.question,
+      }))}
+    />
   );
 }
 

@@ -225,14 +225,12 @@ function GlossaryOverlay({ term, onClose }: { term: GlossaryTerm; onClose: () =>
             >
               {term.detail}
             </motion.p>
-            {term.href && (
-              <Link
-                href={term.href}
-                className="mt-5 inline-block type-body underline underline-offset-4 focus-ring"
-              >
-                Read the implementation guide
-              </Link>
-            )}
+            <Link
+              href={term.href ?? `/docs/glossary#${term.id}`}
+              className="mt-5 inline-block type-body underline underline-offset-4 focus-ring"
+            >
+              {term.href ? "Read the implementation guide" : "Read more in the glossary"}
+            </Link>
           </div>
         </motion.dialog>
       </div>

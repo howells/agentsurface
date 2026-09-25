@@ -1,6 +1,7 @@
-import { defineDocs } from "fumadocs-mdx/config";
+import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 import { pageSchema as frontmatterSchema } from "fumadocs-core/source/schema";
 import { z } from "zod";
+import { rehypeGlossaryTerms } from "./src/lib/rehype-glossary-terms";
 
 export const docs = defineDocs({
   dir: "src/content/docs",
@@ -8,7 +9,22 @@ export const docs = defineDocs({
     // Expose processed (post-MDX) Markdown per page so `docsLlms` can render
     // real Markdown for agents instead of re-serving raw MDX source.
     postprocess: {
-      includeProcessedMarkdown: true,
+      includeProcessedMarkdown: {
+        // Layout wrappers such as <TextGrid> only change presentation, so agents
+        // get the list inside without the tag.
+        filterElement: (node) => {
+          if (node.type === "mdxjsEsm") {
+            return false;
+          }
+          if (
+            (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+            (node.name === "TextGrid" || node.name === "Term")
+          ) {
+            return "children-only";
+          }
+          return true;
+        },
+      },
     },
     // Last-modified date from git history, exposed as `page.data.lastModified`.
     lastModified: true,
@@ -23,5 +39,13 @@ export const docs = defineDocs({
         )
         .optional(),
     }),
+  },
+});
+
+export default defineConfig({
+  mdxOptions: {
+    // Auto-link the first prose occurrence of each glossary term; see
+    // src/lib/rehype-glossary-terms.ts for the skip rules and matching.
+    rehypePlugins: (defaults) => [...defaults, rehypeGlossaryTerms],
   },
 });

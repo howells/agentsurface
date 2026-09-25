@@ -12,29 +12,38 @@ The site has two parts.
 
 The core of the guide. It covers how agents find, understand and use an existing website, app, API or CLI, and how to test that they can.
 
+<TextGrid numbered>
+
 - [Discovery](/docs/discovery): robots.txt, llms.txt, structured data, Markdown routes and well-known endpoints
 - [Context Files](/docs/context-files): `AGENTS.md` and tool-specific instruction files
 - [API Surface](/docs/api-surface): OpenAPI contracts, versioning, webhooks and long-running jobs
-- [Tool Design](/docs/tool-design): names, descriptions, schemas, curation, safety and human approval
-- [CLI Design](/docs/cli-design): parseable output, input hardening and safety rails
-- [MCP Servers](/docs/mcp-servers): exposing tools, resources and prompts over MCP
-- [Authentication](/docs/authentication): scoped credentials, OAuth for agents and delegated access
-- [Error Handling](/docs/error-handling): recoverable errors, retries and idempotency
-- [Retrievability](/docs/retrievability): search and retrieval APIs and structured content agents can use
-- [Agentic UI](/docs/agentic-ui): browser-agent accessibility, MCP Apps and session control
-- [Agentic Commerce](/docs/agentic-commerce): product data, checkout protocols, payments, Shopify, trust and risk, and orders
+- [Tool Design](/docs/tool-design): Names, descriptions, schemas, curation, safety and human approval
+- [CLI Design](/docs/cli-design): Parseable output, input hardening and safety rails
+- [MCP Servers](/docs/mcp-servers): Exposing tools, resources and prompts over MCP
+- [Authentication](/docs/authentication): Scoped credentials, OAuth for agents and delegated access
+- [Error Handling](/docs/error-handling): Recoverable errors, retries and idempotency
+- [Retrievability](/docs/retrievability): Search and retrieval APIs and structured content agents can use
+- [Agentic UI](/docs/agentic-ui): Browser-agent accessibility, MCP Apps and session control
+- [Agentic Commerce](/docs/agentic-commerce): Product data, checkout protocols, payments, Shopify, trust and risk, and orders
 - [Protocols](/docs/protocols): MCP, A2A, WebMCP and emerging standards
-- [Testing](/docs/testing): evals, traces and CI gates for agent tasks
-- [Scoring](/docs/scoring): the Surface scorecard and how public scanners fit in
-- [Reference Links](/docs/reference-links): canonical specs and the model allowlist
+- [Testing](/docs/testing): Evals, traces and CI gates for agent tasks
+- [Scoring](/docs/scoring): The Surface scorecard and how public scanners fit in
+- [Reference Links](/docs/reference-links): Canonical specs and the model allowlist
+- [Glossary](/docs/glossary): Every term on the site, defined once
+
+</TextGrid>
 
 ## Build agents
 
 A secondary reference for teams building their own agents: current best practice per topic and an inventory of tools and platforms worth knowing.
 
-- [Agents](/docs/agents): frameworks, platform features, orchestration, memory, durable execution, browsers and sandboxes, guardrails
-- [Agent Retrieval](/docs/agent-retrieval): vector databases, embeddings, RAG and knowledge graphs
-- [Tooling Catalog](/docs/tooling-catalog): the inventory, grouped by purpose
+<TextGrid>
+
+- [Agents](/docs/agents): Frameworks, platform features, orchestration, memory, durable execution, browsers and sandboxes, guardrails
+- [Agent Retrieval](/docs/agent-retrieval): Vector databases, embeddings, RAG and knowledge graphs
+- [Tooling Catalog](/docs/tooling-catalog): The inventory, grouped by purpose
+
+</TextGrid>
 
 ## The `surface` skill
 
@@ -43,6 +52,8 @@ A secondary reference for teams building their own agents: current best practice
 ```sh
 npx skills add https://github.com/howells/agentsurface
 ```
+
+To use it, open Claude Code or Codex in your project and run the skill: type `/surface` in Claude Code or `$surface` in Codex. With no other instruction it audits the codebase, scores each part of its agent surface and returns the findings with a plan. Ask a question after the command to get an explanation instead, or name a surface, such as `/surface mcp`, to build or improve that part.
 
 ## Where to start
 

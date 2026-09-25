@@ -16,20 +16,28 @@ Registration can still involve human consent or an OTP claim ceremony. The runti
 
 ## Choose A Path
 
-- [API Keys](/docs/authentication/api-keys) - only when keys are scoped, rotatable, and not exposed to models.
-- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - default for standalone agent services and machine-to-machine access.
-- [Agent Identity](/docs/authentication/agent-identity) - model agents as first-class principals for audit trails.
-- [Token Exchange](/docs/authentication/token-exchange) - narrow authority for delegation and sub-agents.
-- [DPoP](/docs/authentication/dpop) - bind tokens to client keys to reduce replay risk.
-- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) - publish OAuth metadata for protected APIs.
-- [MCP Authorization](/docs/authentication/mcp-auth-model) - apply OAuth discovery and client identity to MCP.
-- [auth.md](/docs/authentication/auth-md) - describe agentic registration and credential-claim flows.
-- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) - defend write operations from duplicated or replayed requests.
-- [Auth Anti-Patterns](/docs/authentication/anti-patterns) - avoid browser sessions, unscoped tokens, and hidden delegation.
+<TextGrid>
+
+- [API Keys](/docs/authentication/api-keys) - Only when keys are scoped, rotatable, and not exposed to models.
+- [OAuth 2.1 for Agents](/docs/authentication/oauth-for-agents) - Default for standalone agent services and machine-to-machine access.
+- [Agent Identity](/docs/authentication/agent-identity) - Model agents as first-class principals for audit trails.
+- [Token Exchange](/docs/authentication/token-exchange) - Narrow authority for delegation and sub-agents.
+- [DPoP](/docs/authentication/dpop) - Bind tokens to client keys to reduce replay risk.
+- [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) - Publish OAuth metadata for protected APIs.
+- [MCP Authorization](/docs/authentication/mcp-auth-model) - Apply OAuth discovery and client identity to MCP.
+- [auth.md](/docs/authentication/auth-md) - Describe agentic registration and credential-claim flows.
+- [Idempotency and Replay Protection](/docs/authentication/idempotency-and-replay) - Defend write operations from duplicated or replayed requests.
+- [Auth Anti-Patterns](/docs/authentication/anti-patterns) - Avoid browser sessions, unscoped tokens, and hidden delegation.
+
+</TextGrid>
 
 ## Related
 
-- [API Surface](/docs/api-surface) - contracts that declare which authenticated operations exist.
-- [MCP Servers: Authentication](/docs/mcp-servers/authentication) - implementing auth inside MCP servers.
-- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) - publish metadata endpoints agents can discover.
-- [Error Handling](/docs/error-handling) - return structured auth failures agents can interpret.
+<TextGrid>
+
+- [API Surface](/docs/api-surface) - Contracts that declare which authenticated operations exist.
+- [MCP Servers: Authentication](/docs/mcp-servers/authentication) - Implementing auth inside MCP servers.
+- [Discovery: Well-Known Endpoints](/docs/discovery/well-known-endpoints) - Publish metadata endpoints agents can discover.
+- [Error Handling](/docs/error-handling) - Return structured auth failures agents can interpret.
+
+</TextGrid>

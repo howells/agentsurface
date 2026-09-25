@@ -14,16 +14,24 @@ Error Handling covers structured failures that tell agents what happened and wha
 
 ## Start Here
 
-- [RFC 9457](/docs/error-handling/rfc-9457) - use Problem Details as the base error shape, plus agent extensions (retriable flags, suggestions, trace IDs, field errors).
-- [Errors for Agents](/docs/error-handling/errors-for-agents) - write failures as recovery contracts, not blame.
-- [Retry Patterns](/docs/error-handling/retry-patterns) - separate transient failures from terminal ones.
-- [Idempotency](/docs/error-handling/idempotency) - make write retries safe.
-- [CLI Errors](/docs/error-handling/cli-errors) - map command failures to structured output and stable exit codes.
+<TextGrid>
+
+- [RFC 9457](/docs/error-handling/rfc-9457) - Use Problem Details as the base error shape, plus agent extensions (retriable flags, suggestions, trace IDs, field errors).
+- [Errors for Agents](/docs/error-handling/errors-for-agents) - Write failures as recovery contracts, not blame.
+- [Retry Patterns](/docs/error-handling/retry-patterns) - Separate transient failures from terminal ones.
+- [Idempotency](/docs/error-handling/idempotency) - Make write retries safe.
+- [CLI Errors](/docs/error-handling/cli-errors) - Map command failures to structured output and stable exit codes.
+
+</TextGrid>
 
 ## Related
 
-- [API Surface](/docs/api-surface) - expose error types as part of the HTTP contract.
-- [CLI Design](/docs/cli-design) - make command failures parseable and automatable.
-- [Tool Design: Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - classify tool operations before retrying them.
-- [Authentication](/docs/authentication) - use structured auth failures instead of opaque 401/403 responses.
-- [Testing](/docs/testing) - verify recovery and retry behavior with evals and contract tests.
+<TextGrid>
+
+- [API Surface](/docs/api-surface) - Expose error types as part of the HTTP contract.
+- [CLI Design](/docs/cli-design) - Make command failures parseable and automatable.
+- [Tool Design: Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - Classify tool operations before retrying them.
+- [Authentication](/docs/authentication) - Use structured auth failures instead of opaque 401/403 responses.
+- [Testing](/docs/testing) - Verify recovery and retry behavior with evals and contract tests.
+
+</TextGrid>

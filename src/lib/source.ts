@@ -1,4 +1,5 @@
 import { docs } from "@/.source/server";
+import { glossaryMarkdown } from "@/lib/glossary-markdown";
 import { llms, loader } from "fumadocs-core/source";
 
 const SITE_ORIGIN = "https://agentsurface.dev";
@@ -30,7 +31,11 @@ async function renderPage(page: SourcePage): Promise<string> {
     lines.push(`lastModified: ${new Date(data.lastModified).toISOString()}`);
   }
 
-  const body = await data.getText("processed");
+  // The glossary page renders its body from src/data/glossary.ts, not prose
+  // MDX, so its agent Markdown comes from the same data via glossaryMarkdown()
+  // rather than the processed-MDX snapshot (which would just show a blank
+  // `<Glossary />` element).
+  const body = page.url === "/docs/glossary" ? glossaryMarkdown() : await data.getText("processed");
 
   return `---\n${lines.join("\n")}\n---\n\n${body}`;
 }

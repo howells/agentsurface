@@ -14,18 +14,26 @@ Tool Design is the behavior contract for model-callable actions across framework
 
 ## Start Here
 
-- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - write tool names and descriptions that disambiguate intent.
-- [Schemas](/docs/tool-design/schemas) - keep inputs and outputs typed, constrained, and model-legible.
-- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - separate read, write, and destructive operations; annotation presets and the draft-then-confirm pattern.
-- [Human Approval](/docs/tool-design/human-approval) - the approval contract a tool exposes so an agent can request, wait for, and confirm human sign-off.
-- [Tool Curation](/docs/tool-design/tool-curation) - expose the smallest useful tool set per task or agent; sprawl prevention and dynamic selection.
-- [Cross-Framework Portability](/docs/tool-design/cross-framework-portability) - define once and adapt to MCP, AI SDK, OpenAI, and other runtimes.
-- [Token Budget](/docs/tool-design/token-budget) - keep tool output useful without flooding context.
-- [Anti-Patterns](/docs/tool-design/anti-patterns) - spot vague, unsafe, or expensive tool definitions.
+<TextGrid>
+
+- [Naming and Descriptions](/docs/tool-design/naming-and-descriptions) - Write tool names and descriptions that disambiguate intent.
+- [Schemas](/docs/tool-design/schemas) - Keep inputs and outputs typed, constrained, and model-legible.
+- [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - Separate read, write, and destructive operations; annotation presets and the draft-then-confirm pattern.
+- [Human Approval](/docs/tool-design/human-approval) - The approval contract a tool exposes so an agent can request, wait for, and confirm human sign-off.
+- [Tool Curation](/docs/tool-design/tool-curation) - Expose the smallest useful tool set per task or agent; sprawl prevention and dynamic selection.
+- [Cross-Framework Portability](/docs/tool-design/cross-framework-portability) - Define once and adapt to MCP, AI SDK, OpenAI, and other runtimes.
+- [Token Budget](/docs/tool-design/token-budget) - Keep tool output useful without flooding context.
+- [Anti-Patterns](/docs/tool-design/anti-patterns) - Spot vague, unsafe, or expensive tool definitions.
+
+</TextGrid>
 
 ## Related
 
-- [API Surface: Tool Definitions](/docs/api-surface/tool-definitions) - generated tools from HTTP APIs.
+<TextGrid>
+
+- [API Surface: Tool Definitions](/docs/api-surface/tool-definitions) - Generated tools from HTTP APIs.
 - [MCP Server Tool Best Practices](/docs/mcp-servers/tool-best-practices) - MCP-specific tool implementation guidance.
-- [MCP Server Annotations](/docs/mcp-servers/annotations) - canonical semantics of the four MCP behavioral hints.
-- [Error Handling: Idempotency](/docs/error-handling/idempotency) - retry-safe writes and idempotency keys.
+- [MCP Server Annotations](/docs/mcp-servers/annotations) - Canonical semantics of the four MCP behavioral hints.
+- [Error Handling: Idempotency](/docs/error-handling/idempotency) - Retry-safe writes and idempotency keys.
+
+</TextGrid>

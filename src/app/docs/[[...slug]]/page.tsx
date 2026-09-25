@@ -1,5 +1,8 @@
 import { DocsPager } from "@/components/DocsPager";
+import { GlossaryList } from "@/components/GlossaryList";
 import { IntroText } from "@/components/PageIntro";
+import { Term } from "@/components/Term";
+import { TextGridList } from "@/components/TextGrid";
 import { source } from "@/lib/source";
 import { getBreadcrumbItems } from "fumadocs-core/breadcrumb";
 import { findNeighbour } from "fumadocs-core/page-tree";
@@ -98,7 +101,14 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
         {page.data.description}
       </IntroText>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents }} />
+        <MDX
+          components={{
+            ...defaultMdxComponents,
+            TextGrid: TextGridList,
+            Term,
+            Glossary: GlossaryList,
+          }}
+        />
       </DocsBody>
       <DocsPager {...findNeighbour(source.pageTree, page.url)} />
     </DocsPage>
