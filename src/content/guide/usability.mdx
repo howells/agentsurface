@@ -1,0 +1,33 @@
+---
+title: Design your site so agents can finish what they start
+description: An agent that can read your page but not act on it leaves the task exactly where a stuck customer would.
+area: usability
+---
+
+Picture an agent booking a hotel room on a customer's behalf. It opens the search page, picks dates, narrows results by price, selects a room, and lands on a confirmation screen. If every step along the way is built from ordinary buttons, links, and form fields with clear labels, the agent moves through it the way a person would: click, read the result, click again. If the date picker is a custom widget with no label, or the "Book now" button is a styled `<div>` with no accessible name, the agent stalls. It cannot tell what the control does, so it cannot use it.
+
+This matters because a booking that never completes is a lost sale, whether the customer got stuck themselves or asked an agent to do it for them. A website that only works for a mouse and a pair of eyes now loses business to a competitor whose interface works for both.
+
+## Browser agents work the way people do, with the same requirements
+
+A browser agent is software that operates your website through its interface, clicking and typing the way a customer would, rather than calling an API behind the scenes. It reads the page's accessibility tree: the roles, labels, and states that assistive technology already relies on. That means the fixes are the same ones that have always made a site usable for people with screen readers or keyboard-only navigation. Native buttons and links instead of clickable `<div>`s. Labels tied to their form fields, not just placeholder text that disappears once you start typing. Keyboard focus that moves logically through the page. Validation messages and state changes that show up in the markup, not just as a color change a sighted mouse user would notice.
+
+One detail catches teams out: a layout that shifts after the agent has decided where to click, but before the click lands, moves the target out from under it. Reserving space for anything that loads in later, such as images or promotional banners, keeps controls where an agent (and a person) expects them to be.
+
+## Start with an accessible interface, then add search on top
+
+Accessible UI is the foundation, and it is the right place to start regardless of what else you build. Everything else in this area assumes agents can already identify and operate your controls.
+
+Once that's in place, the next question is whether customers need to search. If you run a large catalog, a documentation library, or any collection with more than a handful of items, agents need search, filters, and pagination that work predictably. Pagination is simply how a long list gets split into pages an agent can work through one at a time, using a stable position marker, rather than trying to load everything at once or losing its place halfway through. Give each item a stable identifier so an agent can refer back to the exact thing it found, and if search results include a generated summary or answer, return the source link alongside it so the customer can check where the answer came from.
+
+Some content suits a different kind of search: customers asking a question in their own words rather than picking filters. If that fits your product, a documented natural-language query interface (a published way for software to ask your site questions in plain words, such as NLWeb) gives agents structured results and source links instead of a chat-style guess. If those results stream back gradually, define how the stream signals that it's finished, or reports an error partway through, so the agent doesn't act on a partial answer.
+
+## Return a result the agent can check
+
+When an agent completes an action, it needs to know, concretely, what happened. Return the saved result along with an identifier and a status, and be precise about what that status means: a request being accepted is not the same as the work behind it finishing, a payment clearing, or an order being fulfilled. An agent that only gets a generic "success" message has no way to tell the customer what happened, or to link back to the booking, order, or document it just created.
+
+## How to tell it's working
+
+Chrome's Lighthouse tool has an Agentic Browsing category that checks a page's accessibility tree against the same kind of rules assistive technology depends on: every control has a name software can read, and the accessibility markup (ARIA) that supplies those names is used correctly. Run it against your own build before shipping. It's a useful early signal, though it checks the markup and says nothing about the outcome. The real test is running an actual task, such as searching your catalog or completing a booking, with a real agent client and watching whether it reaches the confirmation screen with a result it can report back. A page that passes every automated check can still leave an agent stuck on a control it can see but not identify.
+
+What happens when a step fails partway through, and how an agent recovers from that, is its own area, covered separately.

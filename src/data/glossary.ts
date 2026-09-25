@@ -1188,7 +1188,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     name: "Failure-Mode Taxonomy",
     category: "Ops & lifecycle",
     definition:
-      "A named set of categories for why an agent fails, tracked as a first-class artefact.",
+      "A named set of categories for why an agent fails, tracked as a first-class artifact.",
     detail:
       "Rather than treating failed eval cases as an undifferentiated pile, a failure-mode taxonomy classifies each one against categories such as extraction, reasoning, or rule application - so the classification itself becomes the input to prioritizing what to fix next, not a byproduct of triage.",
     aliases: ["failure-mode taxonomy", "failure mode taxonomy"],

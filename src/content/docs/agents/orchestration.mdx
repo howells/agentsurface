@@ -37,7 +37,7 @@ A router evaluates input and transfers full control to exactly one specialist; t
 
 OpenAI Agents SDK models this with a `handoffs` array; when the model decides to transfer, it calls `transfer_to_<agent_name>`. Python imports are `from agents import Agent, Runner` (not `openai.agents`); JS imports are `import { Agent, run } from '@openai/agents'`. LangGraph's swarm variant (below) uses `create_handoff_tool` for the same transfer-of-control primitive.
 
-On handback, pass the reasoning or trace that produced the result, not a one-line summary. A summary strips the context a downstream agent needs to stay consistent with decisions already made - why a candidate was rejected, what constraint ruled out an option - and the receiving agent either re-derives that reasoning at extra cost or silently contradicts it.
+When control comes back - a supervisor's return handoff, or a worker returning to its caller - pass the reasoning or trace that produced the result, not a one-line summary. A summary strips the context a downstream agent needs to stay consistent with decisions already made - why a candidate was rejected, what constraint ruled out an option - and the receiving agent either re-derives that reasoning at extra cost or silently contradicts it.
 
 ## Supervisor
 

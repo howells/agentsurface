@@ -1,0 +1,35 @@
+---
+title: Agents need a plan for when something breaks
+description: Errors, retries, and rate limits decide whether a failed automated task costs you a customer or just a few seconds.
+area: reliability
+---
+
+Picture an agent placing an order on a customer's behalf. It submits the request, the connection drops before a response comes back, and the agent does what agents do: it tries again. If your checkout has no way to tell "this is a retry of the same order" from "this is a new order," the customer now has two charges and two shipments, and nobody on your side knows until they call to complain. If your checkout does have that mechanism, the second attempt comes back with the same confirmation as the first, the agent reports success, and the customer never learns anything went wrong at all.
+
+That's the entire difference this area of the guide is about. Failures happen to every system, agent-driven or not. What varies is whether your product gives an agent enough information to recover from one without making it worse.
+
+## Why this shows up as lost revenue
+
+A human running into a confusing error will poke around, guess, maybe phone support. An agent has none of that patience or context. When it hits a vague failure, it typically does one of two things: it gives up silently, and the task the customer asked for never completes, or it retries blindly, and you get a duplicate charge, a duplicate order, or a support ticket you didn't expect. Either way, you usually don't find out until a customer notices - a failed automated task looks exactly like lost revenue or a billing dispute, and neither shows up on a dashboard by itself. The gap between an agent that recovers gracefully and one that doesn't is often a few fields in an error response and a single tag on each request that changes something, both explained below.
+
+## What good looks like, in plain terms
+
+A few pieces of vocabulary are unavoidable here, so it's worth being precise about them once.
+
+An [**idempotency key**](/docs/error-handling/idempotency) is a unique tag the agent attaches to a request that changes something - places an order, issues a refund, creates a record. If the same request arrives twice with the same key, because the network dropped the first response, your system recognizes it and returns the original result instead of doing the work again. It's the single mechanism that turns "retrying after a failure" from a gamble into a safe default.
+
+A [**rate limit**](/docs/error-handling/retry-patterns) is simply the cap on how many requests you'll accept from one caller in a given period, so one integration can't overwhelm your service. What matters for agents is whether you tell them about it in a form they can act on: how many requests they have left, and how long to wait before trying again. Told correctly, an agent waits and then succeeds. Told poorly, it either gives up too early or keeps hammering a service that's already struggling.
+
+A **background job** is any piece of work that doesn't finish within a single request - generating a report, processing a bulk upload, fulfilling an order that touches a warehouse system. Agents need a way to ask "is this still running, did it finish, did it fail" after the fact, because an agent that walked away and can't check back in is an agent that can't tell the customer what happened.
+
+[**API versioning**](/docs/api-surface/api-versioning) is your commitment about how long an integration will keep working unchanged. Agents don't read your changelog. If you rename a field or change what a status code means, every agent still calling the old way breaks silently, and it stays broken until someone on your team notices and fixes the integration by hand - which can take far longer than a human developer updating their own code.
+
+## Where to start
+
+Two things pay for themselves before anything else on this list. First, make your [error messages](/docs/error-handling/errors-for-agents) specific enough that an agent can act on them: name which field was wrong, why, what to send instead, and whether the failure is worth retrying at all. "Something went wrong" tells it nothing. Second, put idempotency protection on anything that creates or changes data. That second one is the sharpest exposure on this whole list - it's the direct line between a dropped connection and a customer being charged twice, and it's usually a modest change to add once you decide to do it. Rate limits, job status, and versioning matter, but they mostly protect you from friction and slow degradation. Bad errors and unsafe retries are the ones that turn into a call from an angry customer.
+
+This connects directly to how agents judge whether a task finished - see the guide's usability area for what a confirmed result should look like on your side.
+
+## How to tell it's working
+
+You'll know this is in place when a deliberately interrupted request - kill the connection partway through a write, then send the exact same request again - comes back with the same result instead of a second one, and when a deliberately malformed request comes back naming the field that's wrong instead of a generic failure. Run both tests against your own API before an agent finds the gap for you.

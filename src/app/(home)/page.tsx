@@ -9,12 +9,32 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { TextGrid } from "@/components/TextGrid";
 import { glossaryTerms } from "@/data/glossary";
 import { guideStages } from "@/data/homepage-guide";
+import { guideSource } from "@/lib/guide-source";
+
+const NUMBER_WORDS = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+];
+
+/** Spell out a small count, e.g. for "the eight areas". Falls back to the digit past ten. */
+function numberWord(count: number): string {
+  return NUMBER_WORDS[count] ?? String(count);
+}
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: { "text/markdown": "/index.md" } },
   title: "Make your website and app work with AI agents",
   description:
-    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, sign-in, usability, and payments, with clear recommendations and detailed implementation docs.",
+    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, permissions, usability, reliability, payments, and measurement, with clear recommendations and detailed implementation docs.",
 };
 
 function AreaOverview() {
@@ -42,7 +62,6 @@ function AreaOverview() {
 export default function HomePage() {
   const total = guideStages.reduce((count, stage) => count + stage.cards.length, 0);
   const areas = guideStages.map((stage) => ({
-    count: stage.cards.length,
     id: stage.id,
     name: stage.name,
   }));
@@ -60,7 +79,8 @@ export default function HomePage() {
                 href="#guide-map"
                 className="inline-flex items-center gap-2 rounded-md bg-fd-primary px-4 py-2.5 text-fd-primary-foreground focus-ring"
               >
-                See the six areas <ArrowDown aria-hidden="true" className="size-4" />
+                See the {numberWord(guideStages.length)} areas{" "}
+                <ArrowDown aria-hidden="true" className="size-4" />
               </a>
               <Link
                 href="/docs"
@@ -82,7 +102,7 @@ export default function HomePage() {
         >
           <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
             <h2 id="map-heading" className="type-body">
-              The six things to get right
+              The {numberWord(guideStages.length)} things to get right
             </h2>
             <p className="type-small text-fd-muted-foreground">{total} recommendations</p>
           </div>
@@ -106,7 +126,18 @@ export default function HomePage() {
                       {stage.question}
                     </h2>
                   </div>
-                  <p className="self-end type-body text-fd-muted-foreground">{stage.description}</p>
+                  <div className="self-end">
+                    <p className="type-body text-fd-muted-foreground">{stage.description}</p>
+                    {guideSource.getPage([stage.id]) && (
+                      <Link
+                        href={`/guide/${stage.id}`}
+                        className="mt-3 inline-flex items-center gap-1.5 type-small text-fd-muted-foreground hover:text-fd-foreground focus-ring"
+                      >
+                        Read the overview
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <RecommendationList stage={stage} />
               </div>

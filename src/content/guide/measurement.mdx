@@ -1,0 +1,39 @@
+---
+title: Measure whether agents finish the task
+description: A technical checklist tells you the page is well-formed; only a live agent trying to complete a real task tells you whether the customer actually got what they came for.
+area: measurement
+---
+
+Picture a company that ran a scanner across its website last quarter. The schema validated. The robots file was correct. The report came back green, and everyone moved on.
+
+Meanwhile, a customer asks their AI assistant to reschedule a delivery. The agent reads the order page fine, finds the reschedule option, and then hits a login step built for a human with a mouse. It can't get past it. Depending on the assistant, it either gives up, or it guesses, or it tells the customer something that isn't true. The customer is annoyed and doesn't know why. Nobody at the company sees any of this happen, because nothing was watching for it, and the technical report from last quarter is still sitting there looking green.
+
+This is the gap between a page being readable and a task being completable. A schema check tells you the ingredients are labeled correctly. It says nothing about whether an agent can get through checkout, cancel a subscription, or find the answer to a support question. Those are different questions, and only one of them gets checked by default.
+
+## Why it stays invisible
+
+Agent traffic doesn't announce itself the way a human visitor does. There's no obvious analytics event for "an AI assistant tried to do something here and failed." Unless a business deliberately builds a way to see it, agent-mediated visits and purchases just look like noise in the logs, or don't show up at all. A business can be losing customers to a broken agent flow for months without a single support ticket, because the customer often doesn't know the failure was the website's fault rather than their assistant's.
+
+A passing technical scan makes this worse, because it creates false confidence. The instinct after a clean report is to stop looking. That's exactly the wrong moment to stop, because the scan was never testing whether a task completes.
+
+## What good looks like
+
+Good measurement here has three plain pieces.
+
+The first is running an actual task, using the same kind of AI assistant a customer would use, and watching where it breaks. This is often called an end-to-end task test, and the question it answers is whether an agent can start the task and finish it, which is a different question from whether a page is formatted correctly. It should include failure cases on purpose, like a declined payment or a denied permission, as well as the happy path, because those are the moments a customer most needs the agent to behave sensibly.
+
+The second is a sandbox, meaning a test version of the product with sample data and its own credentials, clearly separate from anything real. If a task involves money, an account, or a piece of customer data, testing it without a sandbox means either testing on real customers or not testing it at all. A documented sandbox lets an agent, or the developer testing it, run the whole task, including the parts that could go wrong, without risk.
+
+The third is monitoring, sometimes called [observability](/docs/testing/observability): an ongoing record of what agents did on the live site, including which step failed, what error came back, and how long it took. This is what turns "a customer complained once" into "fourteen agents failed at the same step this week," which is the difference between a mystery and a fix.
+
+## Where to start
+
+Start with the end-to-end task test. For each task the business wants an agent to be able to complete, run it for real, in the actual client a customer would use, and write down exactly where it breaks. This alone usually surfaces problems no technical checklist would ever catch, because it tests outcomes.
+
+Pair that immediately with monitoring, so failures on the live site don't depend on someone thinking to test again. A task can pass in testing and still fail in production once a form field changes or a session token expires. Without monitoring, that regression sits there unnoticed until a customer hits it. For a public product, add a light check of search visibility too: test what agents say when asked about the brand, the use cases customers have, and the developer docs, since that's a related but separate question from whether the site itself works, covered more fully under [commercial and entity discovery](/docs/discovery/commercial-and-entity-discovery).
+
+## What changes when this is in place
+
+The clearest sign this is working is a specific list of what broke and what was fixed. After the first round of task tests, a business typically ends up with something like: the reschedule flow breaks at the login step for agents, the cancellation flow works but takes nine steps when it should take three, and the returns page describes a policy that changed eight months ago. Each of those gets fixed, and the same task gets tested again to confirm the fix holds.
+
+From there, the visible change is a before-and-after: task completion rate on the tested journeys, and, where it applies, whether an agent describes the product correctly when asked about it instead of guessing from an outdated page. Neither number exists until someone measures it once, then measures it again after the fix.

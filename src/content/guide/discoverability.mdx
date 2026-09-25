@@ -1,0 +1,33 @@
+---
+title: Agents can only recommend what they can find
+description: Discoverability decides whether an AI agent evaluating your business on a customer's behalf ever gets past the front door.
+area: discoverability
+---
+
+A customer asks their AI assistant to find a supplier that can handle a specific job, compare a few options, and pull up pricing and setup requirements for each. The assistant works through this the way a diligent junior researcher would: it visits each company's website, tries to read the pages, checks whether there's a sitemap or index pointing at the useful information, and looks for a name, an address, and some way to confirm who actually runs the business. Companies that pass this test get compared side by side. Companies that fail it get dropped, usually without anyone on the losing side knowing a request ever happened.
+
+Assistants already fetch a page the moment someone asks about a company, and separately crawl sites on a schedule to keep their own answers current. A site that blocks these visits, or buries its useful facts behind logins, broken links, or pages a machine can't parse, is invisible on a channel customers are already using to shortlist vendors.
+
+Getting this right is a business decision that happens to have technical fixes. A supplier that a customer has never heard of can still win a deal once an agent puts it in front of them. A supplier an agent can't locate never enters the conversation at all. The same work that makes a site easy for agents to read also makes it easier for an agent to recommend the business by name and send the customer back to the right page.
+
+## What good looks like
+
+Start with access. `robots.txt` is a plain-text file at the root of your site that tells automated visitors which pages they may read. Separately, you can state what they're allowed to do with what they read: show it in a search result, use it to answer a customer's question right now, or feed it into training a model. Those are different decisions with different consequences. Blocking access closes the door outright; declining to allow training still lets your content appear in an agent's answer to a live question. See [robots.txt for AI Agents](/docs/discovery/robots-txt) for how the two interact and which crawlers do which job.
+
+A sitemap is a file listing every page on your site and when it last changed, so an agent can find the current version of something instead of a page that moved two years ago. Pair it with redirects when pages do move: a broken link is a dead end most agents won't try twice.
+
+Identity matters more than it might sound like it should. An agent trying to work out who runs a business checks whether the company name, domain, and contact details agree across the site, and looks for the basics: an About page, a Contact page, a Privacy page. Structured data, small blocks of machine-readable information embedded in a page, commonly in a format called JSON-LD, gives the agent something firmer to check than prose copy. This is also what keeps an agent from confusing your business with a similarly named competitor, or treating a copycat as the genuine article.
+
+For product and technical documentation specifically, `llms.txt` is worth knowing about: a short index file, again plain text, listing your most important pages with a one-line description of each. Its real use is narrower than the name suggests. Coding tools and technical agents fetch it while checking whether your product can do a particular job; general search engines and most consumer-facing assistants largely skip it. See [llms.txt](/docs/discovery/llms-txt) for where it pays off and where it doesn't.
+
+## Where to start
+
+Ask whoever runs the website three questions. Is crawler access set on purpose, or left at the hosting platform's default? Does the sitemap cover every page and update when content changes? Does the site state, consistently and checkably, who runs the business? Those three items, covered by [robots.txt](/docs/discovery/robots-txt), a working sitemap, and a consistent identity, are the foundation everything else builds on. Right behind them: public documentation that explains what the product does and what it takes to set up, before asking anyone to create an account. An agent evaluating a purchase on a customer's behalf can't get past a login wall to check.
+
+## How to tell it's working
+
+Ask an assistant a few of the questions a real prospect would ask: your company name directly, then a description of the problem you solve without naming you, and see whether you show up and whether the facts it states back are accurate. Check your server logs for requests from the named retrieval bots, kept separate from ordinary human traffic, to see whether agents are visiting and which pages they land on.
+
+If a customer or colleague mentions that an AI tool gave them wrong information about your business, that's usually a discoverability gap showing up as a trust problem, and it's worth tracing back to the page the agent read rather than arguing with the assistant that produced it.
+
+Once agents can reliably find and verify the business, the next question is whether the pages they land on explain the product well enough for a customer to act on.

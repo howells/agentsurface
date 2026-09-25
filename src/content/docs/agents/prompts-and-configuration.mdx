@@ -44,11 +44,11 @@ If no tool fits, call \`search_tools\` with a short query.
 
 Compose from typed sections (identity, safety, tool routing, formatting) rather than one long template literal once the prompt grows - each section becomes independently testable and reusable across prompt variants.
 
+Drafting the first version of a prompt is itself a task a model can help with: describe the task, the tools available, and the constraints, and ask the model to produce a first draft to edit rather than starting from a blank page. Treat the result as a draft to test and revise, not as a finished prompt.
+
 ## Examples: Zero-, One- and Few-Shot
 
 A prompt with no examples (zero-shot) relies entirely on the instruction being unambiguous, and works fine for simple, well-understood tasks. Add one example (one-shot) when the output format is non-obvious - a specific structure, tone, or level of detail the instruction alone under-specifies. Add several examples (few-shot) when the task has edge cases that a single example would not cover, or when outputs have been inconsistent in testing and a small set of examples narrows the range. Do not default to few-shot: each example costs tokens on every call, and an instruction that is actually clear does not need one. Start at zero-shot, add examples only when testing shows the model needs them, and drop an example if a clearer instruction would do the same job.
-
-Drafting the first version of a prompt is itself a task a model can help with: describe the task, the tools available, and the constraints, and ask the model to produce a first draft to edit rather than starting from a blank page. Treat the result as a draft to test and revise, not as a finished prompt.
 
 ## Formatting: Tags vs Markdown
 
@@ -56,7 +56,7 @@ Whether a prompt reads more reliably with XML-style tags (`<context>...</context
 
 ## Prompt Caching
 
-Providers that support prompt caching charge less, and respond faster, for the portion of a prompt that repeats unchanged across calls. Structure the prompt so static content - system instructions, safety rules, few-shot examples - sits in a stable prefix, and put the request-specific, variable content last. A prompt that interleaves static and variable content defeats caching, because any change earlier in the prompt invalidates everything after it.
+Providers that support prompt caching charge less, and respond faster, for the portion of a prompt that repeats unchanged across calls. Structure the prompt so static content - system instructions, safety rules, few-shot examples - sits in a stable prefix, and put the request-specific, variable content last. A prompt that interleaves static and variable content defeats caching, because any change earlier in the prompt invalidates everything after it. Caching applies only above a provider's minimum prefix length, and some providers charge extra for the first call that writes the cache, so check the thresholds before counting on savings for short prompts.
 
 ## Safety And Confirmation Vocabulary
 
@@ -101,7 +101,7 @@ This trades away predictability: a statically configured agent behaves the same 
 
 ## Structured Output
 
-When a step's job is to produce data that fits a fixed schema rather than free text - classification, extraction, a form of fixed fields - constrain the model to return exactly that shape rather than parsing prose after the fact. Schema-constrained output removes a whole class of parsing failures, and because the task is narrow and well-specified, it is often a good job to hand to a cheaper model rather than the one handling open-ended reasoning elsewhere in the same agent.
+When a step's job is to produce data that fits a fixed schema rather than free text - classification, extraction, a form with fixed fields - constrain the model to return exactly that shape rather than parsing prose after the fact. Schema-constrained output removes a whole class of parsing failures, and because the task is narrow and well-specified, it is often a good job to hand to a cheaper model rather than the one handling open-ended reasoning elsewhere in the same agent.
 
 ## Versioning And Testing
 

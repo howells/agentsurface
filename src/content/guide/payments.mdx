@@ -1,0 +1,35 @@
+---
+title: Agents can pay for a purchase, within limits you set
+description: Checkout, spending permission, and pay-per-use payment so an agent can complete a purchase a customer authorized.
+area: payments
+---
+
+A customer asks their shopping agent to reorder printer cartridges whenever the price drops below $40, up to a monthly cap of $200. Weeks later, the price dips. The agent finds your product page, builds a cart, and tries to pay. If your checkout has no way for an automated buyer to present proof of that $200 authorization, one of two things happens. Either the purchase fails and you lose a sale you would have happily taken from a person at the till, or your checkout accepts whatever payment credential the agent hands it and processes the charge anyway, with no way to confirm the customer actually approved it. Neither outcome is one your finance or support team wants to discover after the fact.
+
+That is the shape of the payments problem in agent commerce: separating an agent that can prepare a purchase from one that is allowed to complete it, before money moves.
+
+## Why this matters now
+
+Most businesses spend their effort publishing catalogs and prices for a browser and a checkout form. Agent-initiated purchases are a commerce channel most businesses have not built for yet, and the two ways to get it wrong both cost money. Block agent purchases entirely and you lose sales from customers who wanted exactly this. Let any agent through to your existing checkout without verifying its spending authority and you risk processing a charge nobody approved, which lands as a dispute or a chargeback instead of a sale.
+
+The underlying discipline is familiar: a corporate card with a spending limit, a purchase order with an approval threshold, expressed as something a computer can check automatically rather than a policy a person reads.
+
+## What good looks like
+
+Three things need to be true for an agent to complete a purchase cleanly.
+
+Your checkout needs to speak a protocol an agent can use. A checkout protocol is a standard way of exposing your cart, your prices, and your order confirmation as calls an agent can make directly, rather than a form built only for someone clicking through a page. Two are in use today: UCP, from Google and Shopify, and ACP, from OpenAI and Stripe, though ACP has narrowed since it launched. If you sell through a platform like Shopify, this may already be arriving as a feature you switch on rather than something you build yourself. See [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) for how the two compare and which has more live merchant integrations today.
+
+The agent needs to prove it is allowed to spend as well as show a cart to check out. This is where the spending limit lives, in what the industry calls a mandate: a signed, time-limited authorization naming the amount, the currency, the merchant, and an expiry, so your checkout can verify permission before it takes payment. Preparing a cart on a customer's behalf grants no authority to pay for it. The mandate is the separate, checkable fact that the customer agreed to this specific purchase, at this specific limit.
+
+AP2 is the standard taking shape for that authorization, alongside payment-specific approaches from Stripe and the card networks. None of this is fully settled yet - AP2 has real governance backing but only thin production deployment so far, and the card-network schemes are worth watching rather than building against today. That is ordinary for a standard this early, and it does not change the underlying practice worth adopting now: check a stated limit before you take money from an agent, the same way you would check authority from a person spending on someone else's behalf. More on how spending authority connects to the party presenting it in [Payments](/docs/agentic-commerce/payments).
+
+A narrower case applies if you charge for access rather than sell a product: metered APIs, paid content, or compute billed per call. Here the relevant pattern is pay-per-use over plain web requests, where your server names a price for a resource and the agent pays for exactly that request before getting the content back, with a receipt it can check if delivery fails or a request gets retried. MPP and x402 are the protocols doing this work, and x402 already runs in production at providers including Cloudflare and AWS.
+
+## Where to start
+
+Most businesses should treat checkout and spending permission as the foundation, in that order: get a checkout agents can complete, then require proof of a spending limit before you take payment through it. The pay-per-use path only applies if you charge for something metered rather than sell a product, so treat it as the case that fits your business rather than a universal requirement. Once payment is working, it is worth a look at how you tell a legitimate shopping agent apart from a scraper before either one reaches checkout, which sits under trust and risk.
+
+## How to tell it's working
+
+Watch two failure modes side by side. If agents are abandoning carts at the payment step, your checkout protocol or mandate verification is likely rejecting purchases a customer authorized. If a payment goes through and a customer later disputes it, your checkout accepted a purchase without properly checking the spending limit behind it. A system that is working shows neither: purchases within an authorized limit complete without a hitch, and a purchase that exceeds one is declined before money moves, with a reason your customer and your support team can both see.

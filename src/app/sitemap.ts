@@ -1,3 +1,4 @@
+import { guideSource } from "@/lib/guide-source";
 import { source } from "@/lib/source";
 import type { MetadataRoute } from "next";
 
@@ -13,10 +14,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     url: `${BASE_URL}${page.url}`,
   }));
 
+  const guide = guideSource.getPages().map((page) => ({
+    lastModified: page.data.lastModified ? new Date(page.data.lastModified) : new Date(),
+    url: `${BASE_URL}${page.url}`,
+  }));
+
   const staticPages = STATIC_PAGES.map((path) => ({
     lastModified: new Date(),
     url: `${BASE_URL}${path}`,
   }));
 
-  return [{ lastModified: new Date(), url: BASE_URL }, ...staticPages, ...docs];
+  return [{ lastModified: new Date(), url: BASE_URL }, ...staticPages, ...guide, ...docs];
 }

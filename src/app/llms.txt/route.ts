@@ -1,4 +1,5 @@
 import { estimateTokens } from "@/lib/markdown";
+import { guideSource } from "@/lib/guide-source";
 import { docsLlms } from "@/lib/source";
 import { NextResponse } from "next/server";
 
@@ -49,6 +50,14 @@ export async function GET() {
   // title, summary, and entry points above the page tree.
   const pages = (await docsLlms.index()).replace(/^#[^\n]*\n+/, "");
 
+  // Only essays that have actually been written land here; the other writer
+  // finishes them one at a time, so this list can be a subset of the eight areas.
+  const guidePages = guideSource
+    .getPages()
+    .map((page) => `- [${page.data.title}](${SITE_ORIGIN}${page.url}.md): ${page.data.description}`)
+    .join("\n");
+  const guideSection = guidePages ? ["## Guide", "", guidePages].join("\n") : "";
+
   const content = [
     "# Agent Surface",
     "",
@@ -59,6 +68,8 @@ export async function GET() {
     "## Agent-readable entry points",
     "",
     ENTRY_POINTS.join("\n"),
+    "",
+    guideSection,
     "",
     pages,
   ].join("\n");

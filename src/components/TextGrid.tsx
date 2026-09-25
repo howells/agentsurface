@@ -40,7 +40,8 @@ export function TextGrid({ items, numbered = false, size = "large", className }:
         const inlineNumber = !large && !item.eyebrow ? number : undefined;
         const eyebrow = item.eyebrow || (number && !inlineNumber);
         return (
-          <li key={item.href} className="border-t border-fd-border">
+          // Several entries can point at the same page, so the position keeps keys unique.
+          <li key={`${index}-${item.href}`} className="border-t border-fd-border">
             <Link
               href={item.href}
               className={cn(

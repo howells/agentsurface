@@ -1,0 +1,39 @@
+---
+title: Give agents something to plug into
+description: An agent can only act on your product through a real connection point - an API, an MCP server, a CLI, or an SDK - and most products still don't have one.
+area: connections
+---
+
+Picture someone's assistant trying to reschedule a delivery, pull last quarter's invoices, or check whether a part is in stock. If your product has a documented way for that agent to make the request - send the right data, get a real answer back - the task finishes in seconds. If it doesn't, the agent is stuck doing what a person would do: opening your website, guessing at button labels, filling in a form field by field, and hoping the layout doesn't change tomorrow. That second path is slow, breaks constantly, and often fails outright, because screens are built for eyes and cursors.
+
+This is the practical question behind "Connections": can an agent reach your product directly, without operating your interface like a person would? Everything else in this guide - how understandable your product is, how it proves who's asking - matters more once a connection exists. Without one, an agent has nothing to hold on to.
+
+## Why this is a business problem
+
+Customers are starting to route tasks through agents: assistants that manage calendars, handle expenses, or research purchases on someone's behalf. When your product has no direct connection, those agents fall back to clicking through your site, and that shows up as failed automations, abandoned tasks, and support tickets from customers who can't work out why "my AI assistant couldn't do it." When a connection exists, the same task succeeds quietly, with your business logic and permissions still enforced, because the agent is calling your systems the way your own front end does, not working around them.
+
+There's an adoption angle too. Developers building on your product will use a connection you provide before they build their own scraper or workaround, and they'll trust it more once it's there. Treat this as a growth channel that currently converts at close to zero if the connection isn't there to find.
+
+## What a real connection looks like
+
+A few terms cover most of the ground, and none of them are exotic once translated out of jargon.
+
+An **API** (application programming interface) is a documented set of requests your product accepts - "create an order," "look up a customer" - each with defined inputs and outputs, enforcing the same rules a human user would hit on your website. It's the foundation: almost every other connection type is a layer on top of one.
+
+**MCP** (Model Context Protocol) is a standard way for an AI assistant to connect to a product's tools, the way a browser is a standard way for a person to reach a website. Ship an MCP server and any compatible agent client - the ones your customers already use day to day - can see what your product offers and call it, without your team building a custom integration for each one.
+
+A **CLI** (command-line tool) is a program developers and coding agents run from a terminal instead of clicking through a screen; useful mainly for developer-facing products, where an agent can script your product like any other build step.
+
+An **SDK** (software development kit) is a packaged, tested library in a given programming language that wraps your API so a developer - or a coding agent writing on their behalf - doesn't have to construct raw requests by hand.
+
+**WebMCP** is an emerging browser capability that lets a compatible agent call a tool defined directly on a web page, rather than clicking through it - useful when the task depends on what's currently on screen, like a configurator or an authenticated account view.
+
+**A2A** (Agent2Agent) is a protocol for handing work to another agent rather than calling a function - relevant once your product runs an agent of its own that other agents need to delegate multi-step tasks to, tracking progress and collecting results as the work completes.
+
+## Where to start
+
+If agents need to do more than read a page, start with the API: get the operations right, with the same permissions and business rules your product enforces everywhere else. Then add an MCP server on top, because it's the connection type most customer-facing agent clients already expect and can use without custom work on your side. CLI, SDK, WebMCP, and delegation each matter for a narrower set of products - developer tools, code-first customers, in-page interactions, and agent services respectively - and are worth adding once the foundation holds. Details on describing what each API operation does live under [API Surface](/docs/api-surface); the client-facing side of exposing those same operations through MCP is covered in [MCP Servers](/docs/mcp-servers).
+
+## How to tell it's working
+
+Test the connection the way an agent would use it: send a real request through the API or MCP server and confirm the response is complete, correctly typed, and matches what the interface shows for the same action. Watch for agents reaching the connection in your logs, rather than hitting your web pages for tasks a tool should have handled. If credentials or permissions are part of what's blocking agents today, that's the next area to look at, covered separately in this guide's identity and access material.

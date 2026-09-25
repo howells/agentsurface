@@ -1,0 +1,35 @@
+---
+title: Explain your business the way an agent reads
+description: An agent has to work out what you sell, what it costs, and who it is for before it can recommend you - and it won't ask.
+area: understandability
+---
+
+An agent is trying to answer a customer's question: does this product do the job, and what will it cost. It fetches your homepage and finds a hero image, a slogan, and a "Get Started" button. The pricing sits behind a "Contact Sales" form. The feature list is a row of icons with one-word captions. The agent cannot confirm what the product does, who it suits, or what a customer would pay, so it either declines to recommend you or guesses - and a wrong guess reads to the customer as a wrong recommendation, with your name on it.
+
+Compare that with a page that states, in a plain paragraph near the top, who the product is for and which few tasks it handles, along with what it does not do. A pricing page states the currency, the billing unit, what is included, and the cancellation terms. The agent can match the product to the task, quote an accurate price, and flag where it falls short before the customer finds out the hard way. One business gets recommended for the jobs it is good at. The other gets skipped, or recommended for the wrong job and blamed when it doesn't fit.
+
+This matters commercially. Search engines have run on roughly this logic for two decades, but an agent's failure mode is worse than a low ranking: it delivers a confidently wrong answer to a customer who trusted it. Vague copy, pricing behind a form, numbers shown only as a screenshot - none of this creates ambiguity that resolves in your favor. It creates a gap the agent fills with its best guess, frequently wrong and never in your control.
+
+## What "understandable" means to a machine reader
+
+Agents don't read your site the way a person does, scrolling and using judgment about what an image probably says. Many work from the HTML that comes back from the server, before your JavaScript has run, and weight what they read early on a page more heavily than what comes later. A fact buried in paragraph seven, rendered only after a script executes, or shown only as an infographic functionally does not exist for a lot of the agents evaluating your product right now.
+
+A few terms are worth knowing, since your team will hear them and shouldn't be put off by the jargon. HTML is the plain markup a browser renders a page from - serving content "in HTML" means text an agent can read directly, not something locked inside an image or a script. JSON-LD is a block of structured, labeled data - product name, price, organization, FAQ - sitting alongside your content, telling a machine reader which fact is which, rather than leaving it to infer that "$49" belongs to "Pro plan" from proximity on the page.
+
+Markdown is the lightweight format behind a plain-text README; offering it alongside your HTML lets an agent read the same content for a fraction of the effort, since everything an agent reads has to fit in its limited working memory, called its context window. OpenAPI is a machine-readable menu of everything your API can do, its inputs and expected responses, so whoever builds against it has the full specification instead of trial and error. AGENTS.md is a short instructions file at the root of a code repository telling a coding agent how the project is built and tested. MCP annotations are small tags on an agent-callable tool saying whether it merely reads data or changes something, so a client knows when to check with a human first.
+
+This is good writing, aimed at a reader who cannot infer tone, cannot see your screenshots, and takes your words literally.
+
+## Where to start
+
+Two things matter more than the rest, and they are the right first questions for your team.
+
+First, write down what the product does: the specific tasks it handles, who it's for, and where it stops being the right tool. An agent recommending your product is making a claim on your behalf, so give it a claim that's true, with enough detail to match the product to a real task instead of pattern-matching from a slogan.
+
+Second, make sure that explanation, and everything load-bearing around it, exists as text an agent can read without running your JavaScript. Check your key pages with a plain HTTP request rather than a browser, and see what comes back before any script fires. If numbers customers care about only appear in a chart image, add a sentence stating them in words.
+
+Everything else in this guide - pricing terms, [structured data](/docs/discovery/structured-data) that labels a price as belonging to a specific offer, an API specification, a documented tool - sharpens an explanation that has to be true and legible to begin with. Getting found is a neighboring concern, covered separately; this is about what happens once an agent has arrived and is working out whether you're worth recommending.
+
+## Telling it's working
+
+Fetch your key pages as an agent would - plain text, no rendering - and check whether the purpose, price, and limits are all there in the response. Ask a general-purpose AI assistant to describe your product and pricing from your public site alone, and see where it hedges, guesses, or gets it wrong. Wherever it hedges is usually exactly where a customer's agent will hedge too, and it tells you which fact to make explicit next.

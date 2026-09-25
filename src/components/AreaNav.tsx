@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface AreaLink {
-  count: number;
   id: string;
   name: string;
 }
@@ -56,9 +55,6 @@ export function AreaNav({ areas }: { areas: AreaLink[] }) {
                 )}
               >
                 {area.name}
-                <span className="type-small tabular-nums text-fd-muted-foreground">
-                  {area.count}
-                </span>
                 <span
                   aria-hidden="true"
                   className={cn(

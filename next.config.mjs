@@ -9,6 +9,7 @@ const config = {
     return [
       { source: "/docs.md", destination: "/llms.mdx/docs/content.md" },
       { source: "/docs/:slug*.md", destination: "/llms.mdx/docs/:slug*/content.md" },
+      { source: "/guide/:area.md", destination: "/llms.mdx/guide/:area/content.md" },
     ];
   },
   async headers() {
