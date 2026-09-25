@@ -10,6 +10,16 @@ These tools matter when provider routing, latency, modality, governance, or host
 
 Keep model choice behind a routing layer when possible. Prefer providers with strong tool calling, structured output, embeddings, or multimodal support.
 
+### Model-Choice Axes
+
+A handful of axes cover most model-selection decisions, independent of which provider you pick:
+
+- **Size tier** - a larger model trades cost and latency for accuracy; a smaller one trades accuracy for cost and speed. Match the tier to what the step needs.
+- **Context window size** - how much the model can hold at once; a task that needs to reason over a large document or long history needs a large window regardless of size tier.
+- **Reasoning models and effort** - some models support an explicit effort setting that trades latency for more deliberation before answering. Set it per call: raise it for hard steps and leave it low elsewhere.
+
+A practical sequencing: start with a hosted frontier model to prove the task is solvable at all and establish a quality baseline, then move down size tiers, or to open-weight models, once the task is well-understood, to cut cost while checking the evals still pass.
+
 | Tool                                                                      | Website                   | What it is for                                                                                                          | Tier        | Notes                                                                                                     |
 | ------------------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
 | [OpenAI](https://platform.openai.com/docs)                                | platform.openai.com       | Frontier models, Responses API, tools, embeddings, realtime, image, speech, and evals                                   | Core        | Core provider for agentic tool use, structured output, hosted tools, and OpenAI-native workflows.         |

@@ -259,6 +259,10 @@ Which is better? Respond with only "1", "2", or "tie".
 }
 ```
 
+## Prefer Binary or Categorical Labels
+
+A judge asked to rate on a 1-10 scale produces noisy, poorly calibrated numbers - the gap between a 6 and a 7 is rarely meaningful, and different judges (or the same judge on different days) drift across the scale inconsistently. A judge asked for a binary label (pass/fail) or a small set of named categories (correct / partially correct / incorrect) produces a more reproducible signal, because there is less room for the judge to invent its own scale. Reserve a numeric score for cases where the granularity genuinely matters and has been calibrated against human labels - see anchor datasets, above - rather than as the default output shape.
+
 ## Cost optimization
 
 LLM judges are expensive at scale. Strategies to reduce cost:

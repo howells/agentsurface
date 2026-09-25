@@ -28,6 +28,12 @@ Which guardrails you need is set by deployment shape and data sensitivity.
 
 Layer data sensitivity on top: regulated or personal data (PII, PHI, payment data) makes PII detection mandatory on both sides and it should run **fail-closed** - an unavailable detector must block, not leak. Public, low-stakes content can run moderation **fail-open** - a timeout should not take down the whole product.
 
+## The Lethal Trifecta
+
+Three properties combined make an agent exploitable regardless of how careful its prompt is: access to private data, exposure to untrusted content, and a channel to send data out. Any agent with all three can be steered by text injected into that untrusted content into exfiltrating the private data it has access to - the attacker only needs to get text in front of it.
+
+The fix is to remove one leg. In practice that is usually the outbound channel: an agent can hold private data and read untrusted content safely if it has no way to send data anywhere an attacker could receive it.
+
 ## Implementation Shape
 
 Model guardrails as an ordered pipeline with the agent loop in the middle:

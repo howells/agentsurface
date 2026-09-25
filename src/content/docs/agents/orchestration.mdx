@@ -29,11 +29,15 @@ The same input goes to multiple agents in parallel; results are merged through m
 
 Isolate failures per branch: catch errors inside each parallel step and return a typed success-or-failure result rather than letting one throw discard the branches that already finished. The fan-in stage can then merge from whatever succeeded and report the rest as partial, instead of the whole fan-out failing because one branch did.
 
+When subtasks can interact or contradict each other - two branches editing overlapping state, or two agents reasoning about the same fact and reaching different conclusions - prefer sequential over concurrent. It is cheaper to design the ordering upfront than to reconcile conflicting branch outputs at merge time, and a merge step cannot always tell which of two contradictory results is right.
+
 ## Handoff (Routing)
 
 A router evaluates input and transfers full control to exactly one specialist; the router does not see the result. Use it for clearly distinct domains (billing vs. technical support) where routing can be decided from the input alone. Cross-domain queries ("why was I charged for a broken feature") are the recurring failure - add an explicit fallback agent rather than forcing routing logic to resolve ambiguity it cannot see.
 
 OpenAI Agents SDK models this with a `handoffs` array; when the model decides to transfer, it calls `transfer_to_<agent_name>`. Python imports are `from agents import Agent, Runner` (not `openai.agents`); JS imports are `import { Agent, run } from '@openai/agents'`. LangGraph's swarm variant (below) uses `create_handoff_tool` for the same transfer-of-control primitive.
+
+On handback, pass the reasoning or trace that produced the result, not a one-line summary. A summary strips the context a downstream agent needs to stay consistent with decisions already made - why a candidate was rejected, what constraint ruled out an option - and the receiving agent either re-derives that reasoning at extra cost or silently contradicts it.
 
 ## Supervisor
 
@@ -63,6 +67,10 @@ Swarms cycle without protection: agent A hands to B, B hands back to A, indefini
 ## Reliable Default: Deterministic Backbone + AI At Decision Nodes
 
 Most steps in an agentic workflow are mechanical - schema validation, routing by a known field, checking a confidence threshold - and should not be delegated to a model. Reserve model calls for the steps that need language understanding or judgment: extracting intent, specialist synthesis, generating user-facing text. This has lower cost, faster execution, and more predictable failure modes than fully AI-driven orchestration, and it is how most production multi-agent systems are actually built regardless of which pattern above sits at the top.
+
+Design each workflow step as one model call with a meaningful input and output, rather than folding several judgment calls into a single step. A step that does one thing produces a trace that is readable: the input and output at each point in the workflow explain what happened, without needing to reconstruct intent from a long, multi-purpose call.
+
+When a sequence of steps must always run in the same order - and the agent should not be free to reorder, skip, or repeat them - wrap the whole sequence as a single tool the agent calls once, rather than exposing the individual steps as separate tools it assembles itself. This workflow-as-tool pattern gives the agent one decision (call this workflow or not) instead of several (which step next), and it is the deterministic-backbone idea applied at the level of tool design rather than orchestration pattern.
 
 ## Human Checkpoints
 

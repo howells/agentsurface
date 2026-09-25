@@ -16,6 +16,17 @@ The durable pattern is stable even as vendors and benchmarks move fast: combine 
 - **Graphs are a maintenance commitment** - add one only when relationships are explicit and queried often.
 - **Evaluate retrieval, not just generation** - recall, ranking quality, faithfulness, latency, and cost all need gates.
 
+## When Not to Build RAG
+
+A retrieval pipeline is a maintenance commitment - chunking, indexing, reranking, evals - and it is not always the simplest way to get an agent the knowledge it needs. Consider these before building one:
+
+- **Agentic search tools.** Let the agent call a search tool directly against the live source rather than pre-indexing it. Simpler to build and always current, at the cost of per-call latency and search quality depending on the tool.
+- **The whole corpus in context.** If the corpus is small enough to fit, skip retrieval entirely and put it directly in context. Weigh this against the [context-rot cost](/docs/agents/memory#context-failure-modes) of a large, mostly-irrelevant block sitting in every call.
+- **Code or filesystem search.** For structured or code-shaped content, let the agent search with grep-like tools or a filesystem interface instead of embeddings - exact-match retrieval a vector index is worse at.
+- **Entity and relationship extraction.** When what the agent needs is facts about specific entities rather than passages of text, extracting structured facts up front can answer the query directly without a retrieval step at all.
+
+Start with the simplest of these that could work, and reach for a full RAG pipeline only once it demonstrably is not enough.
+
 ## Pages
 
 <TextGrid>

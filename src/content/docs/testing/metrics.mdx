@@ -302,6 +302,14 @@ console.log(`p95: ${percentile(latencies, 95)}ms`);
 console.log(`p99: ${percentile(latencies, 99)}ms`);
 ```
 
+## Business Outcome Metrics
+
+Engineering metrics - pass@k, tool F1, schema conformance - answer whether the agent works. They sit below a second layer that answers whether it is worth running: a named business outcome metric (resolution rate, revenue per ticket, time saved) and, where one exists, a comparison against the human team currently doing the job. An agent that scores well on every engineering metric but loses to the human baseline on the outcome metric is not ready to replace that baseline, whatever the eval dashboard says.
+
+## The Improvement Loop
+
+A repeatable loop connects the [failure-mode taxonomy](/docs/testing/evaluation-framework#failure-mode-taxonomy) to what actually ships: domain experts classify failures against the taxonomy, product cross-references those classifications against the business outcome metric to pick which failure modes are worth fixing, engineering iterates against a failure-mode dataset built from that selection, and product validates the fix against the outcome metric before it ships. Skipping the cross-reference step is how engineering ends up fixing the failure mode that was easiest to reproduce rather than the one actually costing the business the most.
+
 ## When to measure what
 
 - **Capability evals** - use pass@k, F1, schema conformance to benchmark agent ability on new features

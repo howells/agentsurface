@@ -88,6 +88,28 @@ export const glossaryTerms: GlossaryTerm[] = [
     aliases: ["context window", "context windows"],
   },
   {
+    id: "structured-output",
+    acronym: "Structured Output",
+    name: "Structured Output",
+    category: "Foundation",
+    definition: "A model response constrained to a fixed schema instead of free text.",
+    detail:
+      "Structured output removes a class of parsing failures by having the model return exactly the shape a schema declares - useful for classification, extraction, or any step where the result needs to be consumed as data rather than read as prose. Because the task is narrow and well-specified, it's often a good fit for a cheaper model than the one handling open-ended reasoning elsewhere in the same agent.",
+    aliases: ["structured output", "structured outputs"],
+    href: "/docs/agents/prompts-and-configuration#structured-output",
+  },
+  {
+    id: "reasoning-effort",
+    acronym: "Reasoning Effort",
+    name: "Reasoning Effort",
+    category: "Foundation",
+    definition: "A per-call setting on reasoning models that trades latency for deliberation.",
+    detail:
+      "Raising effort makes a reasoning model spend more time deliberating before it answers, at the cost of latency; lowering it answers faster but with less deliberation. It's a per-call knob, not a global default - raise it for genuinely hard steps and leave it low elsewhere.",
+    aliases: ["reasoning effort", "effort setting"],
+    href: "/docs/tooling-catalog/model-providers-and-gateways#model-choice-axes",
+  },
+  {
     id: "prompt-engineering",
     acronym: "PE",
     name: "Prompt Engineering",
@@ -281,6 +303,18 @@ export const glossaryTerms: GlossaryTerm[] = [
       "Runtime guardrails are code, not model behaviour: input processors sanitise what goes in, output processors gate what comes out, before either reaches the user or a tool. Model refusals vary by prompt and drift across versions and cannot be audited, so enforcement belongs in a deterministic layer that runs every time, sequenced and budgeted for latency and cost.",
     aliases: ["guardrail", "guardrails", "runtime guardrails"],
     href: "/docs/agents/guardrails",
+  },
+  {
+    id: "lethal-trifecta",
+    acronym: "Trifecta",
+    name: "Lethal Trifecta",
+    category: "Ops & lifecycle",
+    definition:
+      "The combination of private-data access, untrusted-content exposure, and an outbound channel that makes an agent exploitable.",
+    detail:
+      "Any agent with all three properties at once - access to private data, exposure to untrusted content, and a way to send data out - can be steered by text injected into that untrusted content into exfiltrating the data it holds. The attacker never needs to compromise the model, only to get text in front of it. The fix is removing one leg, usually the outbound channel, rather than hardening all three.",
+    aliases: ["lethal trifecta"],
+    href: "/docs/agents/guardrails#the-lethal-trifecta",
   },
   {
     id: "prompt-injection",
@@ -1149,6 +1183,18 @@ export const glossaryTerms: GlossaryTerm[] = [
     href: "/docs/testing/red-teaming",
   },
   {
+    id: "failure-mode-taxonomy",
+    acronym: "Taxonomy",
+    name: "Failure-Mode Taxonomy",
+    category: "Ops & lifecycle",
+    definition:
+      "A named set of categories for why an agent fails, tracked as a first-class artefact.",
+    detail:
+      "Rather than treating failed eval cases as an undifferentiated pile, a failure-mode taxonomy classifies each one against categories such as extraction, reasoning, or rule application - so the classification itself becomes the input to prioritizing what to fix next, not a byproduct of triage.",
+    aliases: ["failure-mode taxonomy", "failure mode taxonomy"],
+    href: "/docs/testing/evaluation-framework#failure-mode-taxonomy",
+  },
+  {
     id: "owasp-llm-top-10",
     acronym: "OWASP LLM Top 10",
     name: "OWASP Top 10 for LLM Applications",
@@ -1242,6 +1288,29 @@ export const glossaryTerms: GlossaryTerm[] = [
       "Semantic recall lets an agent pull in a fact or a past conversation that's relevant to the current task without the user restating it, the same mechanism RAG uses for documents applied to an agent's own memory. It's what separates an agent that remembers a user's stated preference from one that starts fresh every session.",
     aliases: ["semantic recall"],
     href: "/docs/agents/memory#semantic-recall",
+  },
+  {
+    id: "context-rot",
+    acronym: "Context Rot",
+    name: "Context Rot",
+    category: "Memory & knowledge",
+    definition:
+      "Output quality falling as context grows, well before the model's advertised limit.",
+    detail:
+      "Context rot is measurable degradation, not a hard cutoff at the context window's stated size - a model can get noticeably worse partway through a window that technically still has room. It's one of five named context failure modes alongside poisoning, distraction, confusion, and clash, and it motivates keeping context lean by design rather than trusting the window's advertised size.",
+    aliases: ["context rot"],
+    href: "/docs/agents/memory#context-failure-modes",
+  },
+  {
+    id: "context-poisoning",
+    acronym: "Context Poisoning",
+    name: "Context Poisoning",
+    category: "Memory & knowledge",
+    definition: "An error that enters context and gets treated as true for the rest of the run.",
+    detail:
+      "Once a wrong fact or a hallucinated result lands in context, the model tends to build on it rather than question it, compounding into further wrong steps. It's one of five named context failure modes covered under memory - the others are distraction, confusion, clash, and rot.",
+    aliases: ["context poisoning"],
+    href: "/docs/agents/memory#context-failure-modes",
   },
   {
     id: "observational-memory",
@@ -1350,6 +1419,18 @@ export const glossaryTerms: GlossaryTerm[] = [
       "A cheap, fast model can handle simple classification or extraction steps while a stronger model is reserved for the steps that need real reasoning, cutting cost without lowering quality where it matters. This is a routing decision made by the orchestrator, not a property of any single model call.",
     aliases: ["model routing"],
     href: "/docs/agents/frameworks#model-routing",
+  },
+  {
+    id: "dynamic-agent",
+    acronym: "Dynamic Agent",
+    name: "Dynamic Agent (Runtime Configuration)",
+    category: "Agent infrastructure",
+    definition:
+      "An agent whose tool set, memory recall depth, and model choice are resolved from runtime context instead of hard-coded per segment.",
+    detail:
+      "Resolving configuration - not just prompt text - from context such as user role or plan tier at request time avoids maintaining a separate near-duplicate agent per segment, which tends to drift as each copy is patched independently. The trade-off is predictability: a statically configured agent behaves the same for everyone, which is easier to test and explain, while a dynamically configured one can behave differently for two users on the same request.",
+    aliases: ["dynamic agent", "dynamic agent configuration", "runtime configuration"],
+    href: "/docs/agents/prompts-and-configuration#dynamic-agent-configuration",
   },
   {
     id: "mid-run-steering",

@@ -42,6 +42,22 @@ The first four types store what the agent _knows_; procedural memory stores what
 
 **Risk.** This is the one memory type that changes behavior, so a wrongly promoted instruction compounds as a bad habit across every future run. Require multiple supporting runs before promotion, expire instructions that stop being reconfirmed, and keep the store small and human-auditable.
 
+## Context Failure Modes
+
+Five named failure modes describe how a growing context degrades an agent before it runs out of room:
+
+- **Poisoning** - an error enters context and gets treated as true for the rest of the run, compounding into further wrong steps.
+- **Distraction** - so much history has accumulated that the model over-relies on it instead of reasoning fresh from the current task.
+- **Confusion** - irrelevant tools or content in context steer the model toward the wrong action even though nothing in it is factually wrong.
+- **Clash** - contradictory information sits in context at once, and the model has to pick a side without being told which one is current.
+- **Rot** - output quality falls as context grows, measurably, well before the model's advertised context limit is reached.
+
+These motivate keeping context lean by design rather than trusting the window's advertised size: message trimming, working-memory scoping, and semantic recall (above) all exist partly to keep an agent from accumulating the volume of context that triggers these failure modes.
+
+## Memory Processors
+
+A memory processor is a pluggable filter that sits between the memory store and the context window that gets sent to the model - it runs after retrieval and before the prompt is built. Common processors: a token limiter that caps total memory content to a budget, and a tool-call stripper that drops old tool calls and their results once they are no longer relevant to the current turn. Processors let the same underlying memory store feed different context shapes to different calls, without changing what is actually persisted.
+
 ## Sharing Memory Across Agents
 
 Sharing requires explicit design; assuming a global memory store is the most common multi-agent memory mistake.

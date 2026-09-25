@@ -110,6 +110,8 @@ server.tool(
 
 Read-only tools can be called in parallel without coordination. Agents may call five read tools simultaneously without risk.
 
+This is model-initiated parallel tool calling - the model issues several tool calls within a single turn - distinct from the concurrent fan-out covered in [Orchestration](/docs/agents/orchestration), where the orchestrator, not the model, decides to run branches concurrently. A tool must be safe to run concurrently with itself and with the other tools in its set before it can be offered for parallel calling; if it is not, disable parallel calls for it rather than relying on the model to serialize its own calls correctly.
+
 ### Write Tools
 
 Tools that create, update, or mutate state:

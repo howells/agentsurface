@@ -12,6 +12,10 @@ MCP Servers covers protocol-specific implementation for exposing tools, resource
 - **Does not own:** general tool definition quality; see [Tool Design](/docs/tool-design). HTTP/OpenAPI design before wrapping it in MCP; see [API Surface](/docs/api-surface).
 - **Agent-ready means:** clients can connect, inspect capabilities, call tools with schemas, receive structured results/errors, and enforce auth and safety at the server boundary.
 
+## Client or Server
+
+A short decision rule for which side you're building: build an MCP client when your own agent needs to reach many third-party integrations and you want one protocol instead of one integration per vendor. Ship an MCP server when you want other agents - not just your own product's UI - to use your product's capabilities. The two are not mutually exclusive; a product can consume MCP servers as a client while also shipping its own.
+
 ## Start Here
 
 <TextGrid>

@@ -30,3 +30,7 @@ Traditional testing verifies deterministic behavior - given input X, does output
 - **CI integration** - `/docs/testing/ci-integration` - PR-gated evals, regression tests, statistical significance, budget guardrails
 
 Start with the evaluation framework, then pick a platform that fits your workflow. If you're running Vitest-based agents, use the Vitest harness. If you want managed experiment tracking, use Braintrust. For quick red-teaming, Promptfoo is the fastest path.
+
+## A/B Testing
+
+Evals answer whether a change passed against a dataset. A/B testing answers whether it performed better in front of real users, and complements evals: evals gate a merge cheaply before a change ever reaches traffic; A/B testing measures the thing evals can only approximate. It needs enough live traffic to reach statistical significance, so it becomes practical once volume is high enough to split without starving either arm - before that point, lean on offline and online evals instead.

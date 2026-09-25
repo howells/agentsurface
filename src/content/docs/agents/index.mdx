@@ -27,6 +27,20 @@ Each page states what good practice is right now and points at the tools and pla
 
 For vendor lists and comparison tables behind any of these topics, see the [tooling catalog](/docs/tooling-catalog).
 
+## Scoping Before Patterns
+
+Before picking an orchestration pattern, scope the work: list every capability the system needs, group the list by shared data source, shared actor, or shared task type, then map each group to a candidate agent boundary. Start with one agent. Split it only when a capability is genuinely separate - a different data source, a different actor, a different kind of task - not because the prompt has grown long. Add routing once there are two or more agents to route between; routing logic with only one destination is dead weight.
+
+## Autonomy Ladder
+
+Agent autonomy comes in degrees. Placing a system on this ladder before building it clarifies how much structure the loop needs and how much can be left to the model:
+
+- **Low** - the model picks between a fixed set of options; there is no open-ended tool loop.
+- **Medium** - the model calls tools in a loop, carrying memory forward between calls, until it reaches a stop condition.
+- **High** - the model plans multi-step work and delegates parts of it to other agents or workflows.
+
+Most production systems should sit at the lowest rung that satisfies the task. Reaching for "high" by default is how a system ends up with an unbounded loop and no clear owner for any one decision - see Bounded loops only, below.
+
 ## Design Defaults
 
 A handful of defaults apply regardless of which framework or platform a team picks. They come up on nearly every page below, so they are stated once here.

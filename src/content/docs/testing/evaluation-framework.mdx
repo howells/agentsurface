@@ -274,6 +274,22 @@ def passcaret_k(results: list[bool]) -> float:
     return 1.0 if all(results) else 0.0
 ```
 
+## Offline vs Online Evals
+
+Offline evals run against a fixed dataset before a change deploys - the pattern this page describes throughout. Online evals run against a sampled slice of live traffic after deployment, scored the same way, to catch what a fixed dataset cannot: real distribution shift, real user phrasing, real tool failures. Start with offline evals; they are cheaper to build and gate a merge deterministically. Add online evals once there is enough live traffic to sample meaningfully, set an explicit sampling rate rather than scoring every request, and treat the two as complementary layers rather than a replacement for one another.
+
+## Eval Types
+
+Beyond the three-layer framework above, name the shape of eval by what it checks:
+
+- **Classification and labelling accuracy** - does the agent assign the correct category or label, graded against a fixed answer.
+- **Multi-turn evals** - does the agent retain context across a conversation and recover correctly when a user contradicts or corrects an earlier turn, rather than only being scored on a single exchange.
+- **Prompt sensitivity** - does a non-adversarial rephrasing of the same request produce a materially different result. This is distinct from [red-teaming](/docs/testing/red-teaming), which tests adversarial input; prompt sensitivity tests ordinary variation a real user would produce without any intent to attack the system.
+
+## Failure-Mode Taxonomy
+
+Treat the classification of _why_ an agent fails as a first-class artifact. A failure-mode taxonomy names the recurring categories a failure falls into - extraction (the agent read the wrong value out of its input), reasoning (it read the right value but drew the wrong conclusion), rule application (it reasoned correctly but applied the wrong policy) - and every failed eval case gets tagged against it. The taxonomy is what turns a pile of failing cases into a prioritized list of what to fix next, and it is the shared vocabulary the [improvement loop](/docs/testing/metrics#the-improvement-loop) runs on.
+
 ## Capability Evals vs Regression Evals
 
 Capability evals measure what the agent can do. Regression evals detect when it stops doing something it did before.

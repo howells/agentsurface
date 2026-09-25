@@ -35,6 +35,26 @@ export function SiteFooter() {
             MCP Registry
           </a>
         </nav>
+        <p className="w-full">
+          For agents:{" "}
+          <Link
+            href="/llms.txt"
+            prefetch={false}
+            className="underline underline-offset-4 hover:text-fd-foreground focus-ring"
+          >
+            llms.txt
+          </Link>
+          , Markdown at{" "}
+          <Link
+            href="/index.md"
+            prefetch={false}
+            className="underline underline-offset-4 hover:text-fd-foreground focus-ring"
+          >
+            /index.md
+          </Link>{" "}
+          or any docs URL plus <code>.md</code>, and MCP at{" "}
+          <code>https://agentsurface.dev/mcp</code>.
+        </p>
       </div>
     </footer>
   );

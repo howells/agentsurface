@@ -44,6 +44,8 @@ function buildContent(): string {
     "",
     DESCRIPTION,
     "",
+    `For agents: start at [llms.txt](${SITE_ORIGIN}/llms.txt), add \`.md\` to any docs URL for Markdown, or connect an MCP client to ${SITE_ORIGIN}/mcp to search and read the docs.`,
+    "",
     guideStages.map(renderStage).join("\n\n"),
     "",
     "## Read more",
@@ -51,6 +53,7 @@ function buildContent(): string {
     `- [Documentation](${SITE_ORIGIN}/docs)`,
     `- [llms.txt](${SITE_ORIGIN}/llms.txt)`,
     `- [llms-full.txt](${SITE_ORIGIN}/llms-full.txt)`,
+    `- [MCP endpoint](${SITE_ORIGIN}/mcp)`,
     `- [Glossary](${SITE_ORIGIN}/glossary)`,
     "",
   ].join("\n");
