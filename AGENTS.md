@@ -1,25 +1,19 @@
-# Agent Surface
+# agentsurface
 
-A guide and implementation kit for making software legible to agents: a Fumadocs site plus a distributable skill, templates and specialist agent prompts. Don't narrow it to one framework - Mastra is one supported orchestration option, not the default answer.
+Documentation, specifications, decisions and outstanding work live in Linear (howells, AGE).
 
-Use the `/surface` skill for all guide, audit, score, scaffold, transform and generate work here rather than inventing parallel instructions.
+- [agentsurface — project documentation](https://linear.app/howells/document/agentsurface-project-documentation-8729bfeb67ab)
 
-## Layout
+```sh
+pnpm dev
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+pnpm prepush
+```
 
-- `src/content/docs/` is the published docs and the canonical place for explanations. Keep this file operational; positioning lives in `README.md`.
-- `skills/surface/SKILL.md` is the operative workflow, with `references/` and `agents/` beside it. `templates/` holds the starter files a consumer repo copies, `disciplines/` the cross-cutting notes.
-
-## Gates and constraints
-
-- `src/content/docs/reference-links/models.mdx` is the single allowlist for model ids used anywhere in docs, templates or skill references, enforced by `pnpm test`. Update that page first, then sweep the examples.
-- Fast-decay pages carry a `lastVerified: YYYY-MM-DD` stamp and go stale after 120 days. Bump it only on a real re-verification. `pnpm build` and `pnpm test` run integrity with `--no-freshness`, so a stale page shows up only in `pnpm audit:docs-freshness`, which is a report rather than a gate.
-- `postinstall` runs `fumadocs-mdx`, so `pnpm install` regenerates `.source/`. Generated Fumadocs output is never hand-edited.
-- Builds run on Apple Silicon, so `next.config.mjs` drops the macOS sharp binaries from file tracing and `deploy:prod:build` parks the local `.env` under `.vercel/` first. Without both, the Vercel builder traces files it then refuses to upload.
-- Never `npm publish` here.
-
-## Commands
-
-`pnpm dev` serves Fumadocs on port 3900. `pnpm prepush` is the whole gate: typecheck, lint, then `test` for docs integrity. Production deploys are `deploy:prod:pull`, `:stamp`, `:build`, `:verify`, `:publish` in order.
+Read the linked operating rules and domain definitions before editing. Keep one writer per checkout; preserve existing work. Put plans, handoffs and evidence on the owning Linear issue. Do not add local documentation or task reports. Instruments and Ground are the documentation exceptions.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
