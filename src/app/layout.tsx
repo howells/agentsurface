@@ -41,11 +41,7 @@ const jsonLd = {
         priceCurrency: "USD",
       },
       operatingSystem: "Any",
-      sameAs: [
-        "https://github.com/howells/agentsurface",
-        "https://github.com/howells",
-        "https://danielhowells.com",
-      ],
+      sameAs: ["https://github.com/howells/agentsurface"],
       url: BASE_URL,
     },
     {
@@ -89,6 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html className={inter.variable} lang="en" suppressHydrationWarning>
       <head>
+        <link rel="describedby" href="/llms.txt" type="text/plain" />
         <link rel="service-desc" href="/openapi.json" type="application/vnd.oai.openapi+json" />
         <link rel="ard" href="/.well-known/ard.json" />
         <link rel="ai-catalog" href="/.well-known/ai-catalog.json" />

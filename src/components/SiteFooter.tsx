@@ -8,7 +8,7 @@ const links = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-fd-border">
+    <footer data-markdown-ignore className="border-t border-fd-border">
       <div className="page-column flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-8 type-small text-fd-muted-foreground">
         <span>
           Agent Surface by{" "}

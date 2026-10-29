@@ -10,19 +10,22 @@ const STATIC_PAGES = ["/glossary", "/patterns", "/about", "/contact", "/privacy"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const docs = source.getPages().map((page) => ({
-    lastModified: page.data.lastModified ? new Date(page.data.lastModified) : new Date(),
+    ...(page.data.lastVerified
+      ? { lastModified: new Date(page.data.lastVerified) }
+      : page.data.lastModified
+        ? { lastModified: new Date(page.data.lastModified) }
+        : {}),
     url: `${BASE_URL}${page.url}`,
   }));
 
   const guide = guideSource.getPages().map((page) => ({
-    lastModified: page.data.lastModified ? new Date(page.data.lastModified) : new Date(),
+    ...(page.data.lastModified ? { lastModified: new Date(page.data.lastModified) } : {}),
     url: `${BASE_URL}${page.url}`,
   }));
 
   const staticPages = STATIC_PAGES.map((path) => ({
-    lastModified: new Date(),
     url: `${BASE_URL}${path}`,
   }));
 
-  return [{ lastModified: new Date(), url: BASE_URL }, ...staticPages, ...guide, ...docs];
+  return [{ url: BASE_URL }, ...staticPages, ...guide, ...docs];
 }

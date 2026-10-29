@@ -10,6 +10,7 @@ interface SiteHeaderProps {
 export function SiteHeader({ wide = false }: SiteHeaderProps) {
   return (
     <header
+      data-markdown-ignore
       className={cn(
         "sticky top-0 z-30 w-full border-b border-fd-border bg-fd-background/80 backdrop-blur-lg",
         wide && "max-md:static",

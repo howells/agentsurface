@@ -49,6 +49,7 @@ export function DocsPager({ previous, next }: DocsPagerProps) {
   }
   return (
     <nav
+      data-markdown-ignore
       aria-label="Previous and next pages"
       className="mt-16 grid gap-x-10 gap-y-2 sm:grid-cols-2"
     >

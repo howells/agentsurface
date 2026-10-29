@@ -31,7 +31,13 @@ function breadcrumbListItems(url: string) {
       url: item.url,
     })),
   ];
-  return items.filter((item, index) => index === 0 || item.url !== items[index - 1]?.url);
+  const sections = url.split("/").slice(0, -1);
+  return items
+    .map((item, index) => ({
+      ...item,
+      url: item.url ?? sections.slice(0, index + 2).join("/"),
+    }))
+    .filter((item, index, all) => index === 0 || item.url !== all[index - 1]?.url);
 }
 
 export default async function Page(props: { params: Promise<{ slug?: string[] }> }) {
@@ -106,7 +112,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
         title={page.data.title}
         meta={lastVerified ? `Last verified ${lastVerified}` : undefined}
         actions={
-          <div className="flex items-center gap-2">
+          <div data-markdown-ignore className="flex items-center gap-2">
             <MarkdownCopyButton markdownUrl={markdownUrl} />
             <ViewOptionsPopover markdownUrl={markdownUrl} githubUrl={githubUrl} />
           </div>

@@ -21,9 +21,9 @@
     {
       "identifier": "urn:air:agentsurface.dev:api:openapi",
       "displayName": "Agent Surface documentation API",
-      "type": "application/ai-registry+json",
+      "type": "application/json",
       "url": "https://agentsurface.dev/openapi.json",
-      "description": "Public, read-only OpenAPI registry of operations for documentation search and Markdown retrieval.",
+      "description": "Public, read-only OpenAPI specification of operations for documentation search and Markdown retrieval.",
       "tags": ["openapi", "rest-api"],
       "representativeQueries": [
         "fetch a documentation page as markdown",
@@ -33,7 +33,7 @@
     {
       "identifier": "urn:air:agentsurface.dev:skill:surface",
       "displayName": "Surface skill",
-      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "type": "text/markdown",
       "url": "https://agentsurface.dev/skills/surface/SKILL.md",
       "description": "Agent skill for auditing, scaffolding, and transforming a codebase into agent-readable software.",
       "tags": ["skill", "agent-skills"],
