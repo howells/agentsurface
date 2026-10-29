@@ -15,7 +15,7 @@ function resolveSlug(segments: string[]): string[] {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string[] }> },
 ) {
   const { slug } = await params;
@@ -27,6 +27,7 @@ export async function GET(
       "PAGE_NOT_FOUND",
       "Documentation page not found",
       "Search /api/docs/search?query=discovery or use a slug from /llms.txt.",
+      new URL(request.url).pathname + new URL(request.url).search,
     );
   }
 

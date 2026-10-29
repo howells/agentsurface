@@ -1,3 +1,4 @@
+import { ranking, searchInput } from "@/lib/retrieval-contract";
 import { source } from "@/lib/source";
 import { createFromSource } from "fumadocs-core/search/server";
 
@@ -5,13 +6,25 @@ const BASE_URL = "https://agentsurface.dev";
 
 /**
  * Canonical search server built from the docs source. Indexes title,
- * description, headings, and body content via Orama. Exposes both a `GET`
+ * description, headings, and body content via Fumadocs ZBSearch. Exposes both a `GET`
  * route handler (consumed by the Fumadocs RootProvider search dialog at
  * `/api/search`) and a programmatic `search()` method used by `searchDocs`.
  */
-export const searchServer = createFromSource(source);
+export const searchServer = createFromSource(source, {
+  buildIndex: (page) => ({
+    id: page.url,
+    url: page.url,
+    title: page.data.title,
+    description: page.data.description,
+    structuredData: page.data.structuredData,
+    tag: page.slugs[0] ?? "root",
+  }),
+});
 
 export interface DocSearchResult {
+  id: string;
+  rank: number;
+  updated_at?: string;
   title: string;
   description: string;
   url: string;
@@ -35,13 +48,11 @@ function pagesByUrl(): Map<string, SourcePage> {
  * so terms that only appear in a page body are matched. Results preserve the
  * relevance order returned by the underlying Orama index.
  */
-export async function searchDocs(query: string, limit = 5): Promise<DocSearchResult[]> {
-  const trimmed = query.trim();
-  if (trimmed.length < 2) {
-    return [];
-  }
-
-  const sorted = await searchServer.search(trimmed);
+export async function retrieveDocs(input: { query: string; limit?: number; section?: string }) {
+  const { query, limit, section } = searchInput.parse(input);
+  // Fumadocs emits one page record plus up to eight chunk hits per group.
+  // Reserve room for limit + 1 complete page groups to determine has_more.
+  const sorted = await searchServer.search(query, { limit: (limit + 1) * 9, tag: section });
   const pages = pagesByUrl();
 
   // Group hits by their base page URL (stripping heading hashes),
@@ -62,7 +73,7 @@ export async function searchDocs(query: string, limit = 5): Promise<DocSearchRes
   const results: DocSearchResult[] = [];
   for (const baseUrl of order) {
     const page = pages.get(baseUrl);
-    if (!page) {
+    if (!page || (section && page.slugs[0] !== section)) {
       continue;
     }
 
@@ -72,17 +83,26 @@ export async function searchDocs(query: string, limit = 5): Promise<DocSearchRes
     const snippet = snippetHit?.content ?? page.data.description ?? "";
 
     results.push({
+      id: page.url,
+      rank: results.length + 1,
+      ...(page.data.lastModified || page.data.lastVerified
+        ? {
+            updated_at: page.data.lastModified
+              ? new Date(page.data.lastModified).toISOString()
+              : page.data.lastVerified,
+          }
+        : {}),
       description: page.data.description ?? "",
       slug: page.slugs.join("/") || "index",
-      snippet,
+      snippet: snippet.slice(0, 600),
       title: page.data.title,
       url: `${BASE_URL}${page.url}`,
     });
 
-    if (results.length >= limit) {
+    if (results.length > limit) {
       break;
     }
   }
 
-  return results;
+  return { results: results.slice(0, limit), has_more: results.length > limit, ranking };
 }

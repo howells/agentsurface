@@ -1,32 +1,32 @@
-import { searchServer } from "@/lib/search";
+import { createDocsMcpServer } from "@/lib/docs-mcp";
+import { retrieveDocs } from "@/lib/search";
 import { docsLlms, source } from "@/lib/source";
-import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
-import { registerSearchTool, registerSourceTools } from "fumadocs-core/mcp";
+import { createMcpHandler } from "@modelcontextprotocol/server";
 import packageJson from "../../../package.json";
 
-const handler = createMcpHandler(() => {
-  const mcp = new McpServer(
-    { name: "agentsurface-docs", version: packageJson.version },
+const handler = createMcpHandler(() =>
+  createDocsMcpServer(
     {
-      instructions:
-        "Search and read Agent Surface documentation about making software legible to AI agents. Call search first to find relevant pages by keyword, or list_pages to browse the full index, then get_page with a page's URL (from either tool's results) to read it as Markdown.",
+      pages: () => source.getPages(),
+      markdown: async (page) => {
+        const original = source.getPage(page.slugs);
+        if (!original) {
+          throw new Error(`Documentation source changed: ${page.url}`);
+        }
+        return docsLlms.page(original);
+      },
+      search: retrieveDocs,
     },
-  );
-
-  registerSourceTools(mcp, source, docsLlms);
-  registerSearchTool(mcp, searchServer);
-
-  return mcp;
-});
+    packageJson.version,
+  ),
+);
 
 export async function GET(request: Request): Promise<Response> {
   return handler.fetch(request);
 }
-
 export async function POST(request: Request): Promise<Response> {
   return handler.fetch(request);
 }
-
 export async function DELETE(request: Request): Promise<Response> {
   return handler.fetch(request);
 }

@@ -1,35 +1,38 @@
 import { apiError } from "@/lib/api-error";
-import { searchDocs } from "@/lib/search";
+import { searchInput } from "@/lib/retrieval-contract";
+import { retrieveDocs } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const params = new URL(request.url).searchParams;
-  const query = params.get("query")?.trim() ?? "";
+  const url = new URL(request.url);
+  const params = url.searchParams;
   const rawLimit = params.get("limit") ?? "5";
-  const limit = Number(rawLimit);
-  if (
-    query.length < 2 ||
-    query.length > 500 ||
-    !/^\d+$/.test(rawLimit) ||
-    limit < 1 ||
-    limit > 20
-  ) {
+  const input = searchInput.safeParse({
+    query: params.get("query") ?? "",
+    limit: /^\d+$/.test(rawLimit) ? Number(rawLimit) : Number.NaN,
+    section: params.get("section") ?? undefined,
+  });
+  const instance = url.pathname + url.search;
+  if (!input.success) {
     return apiError(
       400,
       "INVALID_SEARCH",
       "Invalid search parameters",
-      "Use query with 2–500 characters and an integer limit from 1 to 20.",
+      "Use query with 2 to 500 characters, an integer limit from 1 to 20 and an optional section such as discovery.",
+      instance,
     );
   }
   try {
-    return Response.json({ results: await searchDocs(query, limit) });
+    return Response.json(await retrieveDocs(input.data));
   } catch {
     return apiError(
       500,
       "SEARCH_FAILED",
       "Search is temporarily unavailable",
-      "Retry later or read /llms.txt to find documentation pages.",
+      "Retry later or read https://agentsurface.dev/llms.txt to find documentation pages.",
+      instance,
+      true,
     );
   }
 }
