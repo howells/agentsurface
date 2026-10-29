@@ -1,5 +1,5 @@
 /**
- * MCP Test Harness — Property-based testing for MCP servers
+ * MCP Test Harness - Property-based testing for MCP servers
  *
  * **What it is:** Vitest-based harness that spawns any MCP server (stdio or HTTP),
  * enumerates tools via `tools/list`, synthesizes valid inputs (via Zod + fast-check),
@@ -23,23 +23,20 @@
  * - [ ] Run in CI: `vitest run mcp-test-harness.ts`
  *
  * **Environment variables:**
- * - `MCP_SERVER_COMMAND` — How to spawn your server (e.g., node bin/server.js)
- * - `MCP_TRANSPORT` — stdio (default) or http
- * - `MCP_ENDPOINT` — HTTP endpoint if using http transport
- * - `MAX_CALLS_PER_TOOL` — Property-based calls per tool (default: 10)
+ * - `MCP_SERVER_COMMAND` - How to spawn your server (e.g., node bin/server.js)
+ * - `MCP_TRANSPORT` - stdio (default) or http
+ * - `MCP_ENDPOINT` - HTTP endpoint if using http transport
+ * - `MAX_CALLS_PER_TOOL` - Property-based calls per tool (default: 10)
  *
  * **References:**
  * - MCP spec 2026-07-28: https://modelcontextprotocol.io/specification/2026-07-28
  * - fast-check: https://fast-check.dev/
- * - Testing & Evaluation: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+ * - Testing & Evaluation: https://www.anthropic.com/research/demystifying-evals-for-ai-agents
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import type { ChildProcess } from "node:child_process";
-import { spawn } from "node:child_process";
-import { z } from "zod";
 import fc from "fast-check";
 
 // Configuration
@@ -64,21 +61,16 @@ interface TestMetrics {
 }
 
 let client: Client;
-let serverProcess: ChildProcess | null = null;
 const metrics = new Map<string, TestMetrics>();
 
 /**
- * Start MCP server (stdio transport)
+ * Spawn the server over stdio and connect a client to it.
  */
-async function startServer(): Promise<Client> {
-  serverProcess = spawn("sh", ["-c", MCP_SERVER_COMMAND], {
-    env: { ...process.env, MCP_DEBUG: "1" },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
+async function connect(): Promise<Client> {
   const transport = new StdioClientTransport({
     args: ["-c", MCP_SERVER_COMMAND],
     command: "sh",
+    env: { ...process.env, MCP_DEBUG: "1" } as Record<string, string>,
   });
 
   const newClient = new Client({
@@ -97,10 +89,25 @@ async function stopServer(): Promise<void> {
   if (client) {
     await client.close();
   }
-  if (serverProcess) {
-    serverProcess.kill();
+}
+
+/**
+ * Discover tools before Vitest collects the suite. Tests are registered while
+ * the file is collected, which happens before any beforeAll hook runs, so a
+ * list filled in a hook would still be empty when the per-tool tests are
+ * declared. Top-level await keeps one test block per tool.
+ */
+async function discoverTools(): Promise<ToolDefinition[]> {
+  const discoveryClient = await connect();
+  try {
+    const result = await discoveryClient.listTools();
+    return result.tools as ToolDefinition[];
+  } finally {
+    await discoveryClient.close();
   }
 }
+
+const tools = await discoverTools();
 
 /**
  * Validate response against tool's output schema (if available)
@@ -155,7 +162,7 @@ function generateToolInputArbitrary(toolDef: ToolDefinition): fc.Arbitrary<Recor
  */
 describe("MCP server test suite", () => {
   beforeAll(async () => {
-    client = await startServer();
+    client = await connect();
   }, 30_000);
 
   afterAll(async () => {
@@ -174,14 +181,7 @@ describe("MCP server test suite", () => {
   });
 
   describe("tool schema compliance", () => {
-    let tools: ToolDefinition[];
-
-    beforeAll(async () => {
-      const result = await client.listTools();
-      tools = result.tools as ToolDefinition[];
-    });
-
-    tools?.forEach((tool) => {
+    tools.forEach((tool) => {
       describe(`tool: ${tool.name}`, () => {
         it("has description", () => {
           expect(tool.description).toBeTruthy();
@@ -195,7 +195,7 @@ describe("MCP server test suite", () => {
 
         // <CUSTOMISE>: Add tool-specific property tests
         it("handles valid inputs", { timeout: 60_000 }, async () => {
-          const metrics: TestMetrics = {
+          const toolMetrics: TestMetrics = {
             avg_latency_ms: 0,
             failed_calls: 0,
             max_latency_ms: 0,
@@ -208,61 +208,55 @@ describe("MCP server test suite", () => {
           const latencies: number[] = [];
           const arbitrary = generateToolInputArbitrary(tool);
 
-          // Run property-based tests
-          await new Promise<void>((resolve, reject) => {
-            fc.assert(
-              fc.asyncProperty(arbitrary, async (input) => {
-                metrics.total_calls++;
+          // Run property-based tests (fc.assert returns a promise for async properties)
+          await fc.assert(
+            fc.asyncProperty(arbitrary, async (input) => {
+              toolMetrics.total_calls++;
 
-                try {
-                  const startTime = Date.now();
-                  const result = await client.callTool(tool.name, input);
-                  const latency = Date.now() - startTime;
-                  latencies.push(latency);
+              try {
+                const startTime = Date.now();
+                const result = await client.callTool({ arguments: input, name: tool.name });
+                const latency = Date.now() - startTime;
+                latencies.push(latency);
 
-                  if (result.isError) {
-                    metrics.failed_calls++;
-                  } else {
-                    metrics.successful_calls++;
+                if (result.isError) {
+                  toolMetrics.failed_calls++;
+                } else {
+                  toolMetrics.successful_calls++;
 
-                    // Validate response schema
-                    const validation = validateResponse(result, tool.name);
-                    if (!validation.valid) {
-                      metrics.schema_violations++;
-                    }
+                  // Validate response schema
+                  const validation = validateResponse(result, tool.name);
+                  if (!validation.valid) {
+                    toolMetrics.schema_violations++;
                   }
-                } catch (error) {
-                  metrics.failed_calls++;
-                  throw error;
                 }
-              }),
-              { numRuns: MAX_CALLS_PER_TOOL },
-            )
-              .then(() => {
-                resolve();
-              })
-              .catch(reject);
-          });
+              } catch (error) {
+                toolMetrics.failed_calls++;
+                throw error;
+              }
+            }),
+            { numRuns: MAX_CALLS_PER_TOOL },
+          );
 
           // Compute metrics
-          metrics.avg_latency_ms =
+          toolMetrics.avg_latency_ms =
             latencies.length > 0 ? latencies.reduce((a, b) => a + b) / latencies.length : 0;
-          metrics.max_latency_ms = latencies.length > 0 ? Math.max(...latencies) : 0;
+          toolMetrics.max_latency_ms = latencies.length > 0 ? Math.max(...latencies) : 0;
 
           // Assertions
-          expect(metrics.successful_calls).toBeGreaterThan(0);
-          expect(metrics.schema_violations).toBe(0);
-          expect(metrics.avg_latency_ms).toBeLessThan(5000); // < 5s avg
+          expect(toolMetrics.successful_calls).toBeGreaterThan(0);
+          expect(toolMetrics.schema_violations).toBe(0);
+          expect(toolMetrics.avg_latency_ms).toBeLessThan(5000); // < 5s avg
 
           // Store metrics for summary
-          MCPTestHarness.metrics.set(tool.name, metrics);
+          MCPTestHarness.metrics.set(tool.name, toolMetrics);
 
           console.log(`\n${tool.name}:`);
           console.log(
-            `  Calls: ${metrics.total_calls}, Success: ${metrics.successful_calls}, Failed: ${metrics.failed_calls}`,
+            `  Calls: ${toolMetrics.total_calls}, Success: ${toolMetrics.successful_calls}, Failed: ${toolMetrics.failed_calls}`,
           );
           console.log(
-            `  Latency: avg ${metrics.avg_latency_ms.toFixed(1)}ms, max ${metrics.max_latency_ms}ms`,
+            `  Latency: avg ${toolMetrics.avg_latency_ms.toFixed(1)}ms, max ${toolMetrics.max_latency_ms}ms`,
           );
         });
       });
@@ -313,23 +307,18 @@ class MCPTestHarness {
 }
 
 /**
- * Example MCP server (src/server.js):
+ * Example MCP server (src/server.ts, compiled to src/server.js):
  *
  * ```typescript
  * import { McpServer } from '@modelcontextprotocol/server';
  * import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+ * import { z } from 'zod';
  *
  * const server = new McpServer({ name: 'test-mcp', version: '1.0.0' });
  *
  * server.registerTool('search_docs', {
  *   description: 'Search documentation',
- *   inputSchema: {
- *     type: 'object',
- *     properties: {
- *       query: { type: 'string', description: 'Search query' },
- *     },
- *     required: ['query'],
- *   },
+ *   inputSchema: z.object({ query: z.string().describe('Search query') }),
  * }, async (args) => {
  *   // Simulate search
  *   return { content: [{ type: 'text', text: `Results for ${args.query}` }] };

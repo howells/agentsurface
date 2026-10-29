@@ -1,5 +1,5 @@
 /*
- * content-negotiation.ts — Next.js App Router middleware for agent content negotiation.
+ * content-negotiation.ts - Next.js 16 proxy (formerly middleware) for agent content negotiation.
  *
  * What: Route handler that detects Accept headers and User-Agent, returning either HTML or
  * markdown-formatted responses. Allows agents to get optimized content for their context windows.
@@ -18,8 +18,9 @@
  * - MIME type text/markdown: https://www.iana.org/assignments/media-types/media-types.xhtml
  * - Agent discovery: https://agents.md
  *
- * Usage in Next.js:
- * 1. Place this file at app/middleware.ts (Next.js standard location)
+ * Usage in Next.js 16:
+ * 1. Save this file as proxy.ts in the project root (or src/ if you use it). Next.js 16
+ *    renamed the middleware.ts convention to proxy.ts and the exported function to `proxy`.
  * 2. Add matcher config to specify which routes this applies to
  * 3. Test: curl -H "Accept: text/markdown" https://localhost:3000/docs/api
  */
@@ -55,11 +56,37 @@ const TOKEN_BUDGETS = {
 } as const;
 
 /**
- * Detect if request prefers markdown.
+ * Quality of the most specific Accept range that matches `type`
+ * (exact, then type/*, then *\/*). A range with q=0 means "not acceptable".
+ */
+function qualityFor(accept: string, type: string): number {
+  const [main] = type.split("/");
+  let best = { specificity: -1, q: 0 };
+
+  for (const part of accept.toLowerCase().split(",")) {
+    const [range, ...params] = part.split(";").map((piece) => piece.trim());
+    const specificity = range === type ? 2 : range === `${main}/*` ? 1 : range === "*/*" ? 0 : -1;
+    if (specificity <= best.specificity) {
+      continue;
+    }
+
+    const qParam = params.find((param) => param.startsWith("q="));
+    const q = qParam === undefined ? 1 : Number.parseFloat(qParam.slice(2));
+    best = { specificity, q: Number.isNaN(q) ? 0 : q };
+  }
+
+  return best.q;
+}
+
+/**
+ * Detect if request prefers markdown: acceptable (q > 0) and ranked above HTML.
+ * Do not use accept.includes("text/markdown") - it ignores q=0 and relative weights.
+ * A bare "*\/*" ranks both equally, so those clients still get HTML.
  */
 function prefersMarkdown(request: NextRequest): boolean {
   const accept = request.headers.get("accept") || "";
-  return accept.includes("text/markdown");
+  const markdown = qualityFor(accept, "text/markdown");
+  return markdown > 0 && markdown > qualityFor(accept, "text/html");
 }
 
 /**
@@ -144,9 +171,9 @@ function getTokenBudget(pathname: string): number {
 }
 
 /**
- * Main middleware function.
+ * Main proxy function (Next.js 16; was `middleware` before the rename).
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isDocPath = DOCUMENTATION_PATHS.test(pathname) || API_PATHS.test(pathname);
 
@@ -195,7 +222,7 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Configure which routes this middleware applies to.
+ * Configure which routes this proxy applies to.
  */
 export const config = {
   matcher: [
@@ -209,18 +236,19 @@ export const config = {
 
 /**
  * Example: Next.js route handler (app/docs/[slug]/route.ts) that uses this logic.
+ * In Next.js 16 route handler `params` is a promise. Reuse the q-value-aware
+ * prefersMarkdown logic above rather than a substring check on the Accept header.
  *
  * ```typescript
  * import { NextRequest, NextResponse } from 'next/server';
  *
  * export async function GET(
  *   request: NextRequest,
- *   { params }: { params: { slug: string } }
+ *   { params }: { params: Promise<{ slug: string }> }
  * ) {
- *   const { slug } = params;
- *   const accept = request.headers.get('accept') || '';
+ *   const { slug } = await params;
  *
- *   if (accept.includes('text/markdown')) {
+ *   if (prefersMarkdown(request)) {
  *     // Fetch markdown content for this slug
  *     const markdown = await loadMarkdownDoc(slug);
  *     return new NextResponse(markdown, {

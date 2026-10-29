@@ -29,8 +29,8 @@
 ## Discovery
 
 - [AGENTS.md](https://example.com/AGENTS.md) - Project conventions, commands, boundaries.
-- [robots.txt (AI)](https://example.com/robots-ai.txt) - Crawler policy for AI training bots.
-- [Agent card (A2A)](https://example.com/.well-known/agent.json) - Advertise as A2A v1.0 agent.
+- [robots.txt](https://example.com/robots.txt) - Crawler policy for AI search, user-fetch and training bots.
+- [Agent card (A2A)](https://example.com/.well-known/agent-card.json) - Advertise as A2A v1.0 agent.
 
 ## Advanced
 

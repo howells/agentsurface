@@ -1,7 +1,7 @@
 ---
 title: Agent Discovery Checklist
 description: A tiered checklist for making your site and API discoverable and consumable by AI agents
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -32,7 +32,7 @@ These items cost little to implement and make later discovery work easier to ver
 - [ ] Retrieval bots allowed: `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `Googlebot` are not blocked
 - [ ] Search, Agent, and Training access are decided as three separate questions, not one blanket toggle - if the host is Cloudflare, its three-way classification and Bot Preference Sync are configured; otherwise the equivalent per-bot rules are hand-maintained
 - [ ] `Sitemap:` directive points to your primary sitemap
-- [ ] `/robots.txt` is tested with [Google Search Console's robots.txt report](https://support.google.com/webmasters/answer/6062598)
+- [ ] `/robots.txt` is tested with [Google Search Console's robots.txt report](https://support.google.com/webmasters/answer/6062598?hl=en)
 
 See [robots.txt for AI Agents](./robots-txt).
 
@@ -165,6 +165,8 @@ Machine-readable capability declarations at standard paths.
 
 ### /.well-known/ai
 
+This is an individual Internet-Draft (`draft-aiendpoint-ai-discovery`), not a registered well-known name or a widely implemented requirement. Publish it only if you know a consumer that reads it.
+
 - [ ] `/.well-known/ai` exists and is valid JSON
 - [ ] `capabilities` array accurately reflects what you support
 - [ ] `api.spec` points to a valid OpenAPI JSON file
@@ -193,10 +195,12 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 
 - [ ] `agent-card.json` published if your service can be delegated to by other agents
 - [ ] `skills` array describes what the agent can do with realistic `examples`
-- [ ] `authentication` specifies how to obtain credentials
+- [ ] `securitySchemes` and `securityRequirements` specify how to obtain credentials (v0.3 cards call the second field `security`; the older `authentication` object is obsolete)
 - [ ] `capabilities.streaming` accurately reflects whether you support streaming
 
 ### MCP Server Card
+
+Server Cards are an optional MCP extension (SEP-2127, Final 2026-10-06; extension details still draft). The extension recommends `<streamable-http-url>/server-card` and a `/.well-known/ai-catalog.json` entry rather than `/.well-known/mcp/server-card.json`. Check that a client you care about reads them before relying on them.
 
 - [ ] `/.well-known/mcp/server-card.json` published if you run an HTTP MCP server
 - [ ] `transport` correctly specifies `streamable-http` or `stdio`
@@ -206,8 +210,10 @@ See [Well-Known Discovery Endpoints](./well-known-endpoints).
 
 ### Agent Skills Index
 
+The hosted discovery index is a proposal, separate from the stable `SKILL.md` format. The schema host it references (`schemas.agentskills.io`) does not currently resolve, so there is nothing to validate the index against yet.
+
 - [ ] `/.well-known/agent-skills/index.json` exists when your site teaches task-specific agent workflows
-- [ ] Index declares the Agent Skills discovery v0.2 schema
+- [ ] Index follows the proposal's shape (`name`, `type`, `description`, `url`, `digest`) and does not depend on an unresolvable `$schema`
 - [ ] Every entry has `name`, `type`, activation-oriented `description`, canonical `url`, and `sha256:` `digest`
 - [ ] Each skill is narrow, procedural, and linked as a separate `SKILL.md`
 - [ ] Linked skills follow the Agent Skills format: required `name` and `description`, optional `scripts/`, `references/`, and `assets/`
@@ -289,9 +295,9 @@ High-investment items for teams deeply committed to agent discoverability.
 
 ### NLWeb /ask Endpoint
 
-- [ ] `/ask` endpoint returns direct answers to natural-language questions
+- [ ] `/ask` endpoint accepts a `query` parameter and returns results for natural-language questions (a ranked list by default; summaries or generated answers only in `summarize` or `generate` mode)
 - [ ] Endpoint accessible as both HTTP GET and as an MCP server
-- [ ] Response includes `sources` array with URLs and excerpts
+- [ ] Each result includes the source `url` and `name`, so an agent can cite where it came from
 - [ ] Indexed against current documentation content (not stale snapshots)
 
 See [Well-Known Discovery Endpoints](./well-known-endpoints).

@@ -1,12 +1,12 @@
 ---
 title: OpenAPI Extensions
 description: OpenAPI extensions, semantic taxonomies, and tooling for enriching your API with agent-specific behavioral hints
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-OpenAPI extensions like x-action and x-category add semantic metadata to operations. The AgenticAPI ACTION taxonomy classifies operations into six categories: Acquire (read), Compute (transform), Transact (create/modify), Integrate (sync), Orchestrate (multi-step), and Notify (communicate). This enables agents to make safer routing decisions.
+OpenAPI extensions like x-action and x-category add semantic metadata to operations. The ACTION taxonomy used on this page is a house classification, not an OpenAPI standard: it sorts operations into six categories - Acquire (read), Compute (transform), Transact (create/modify), Integrate (sync), Orchestrate (multi-step), and Notify (communicate). Used consistently, it lets agents make safer routing decisions.
 
 ```
 ┌──────────┬─────────────────────────────────┐
@@ -23,9 +23,13 @@ OpenAPI extensions like x-action and x-category add semantic metadata to operati
 
 Standard OpenAPI covers what your API does. Extensions tell agents how to behave when using it - which operations need confirmation before execution, which are safe to retry, which are destructive, and what category each operation belongs to. This page covers the extension ecosystem and the tooling built on top of it.
 
-## The AgenticAPI ACTION Taxonomy
+Extension names are legal anywhere OpenAPI allows `x-` fields, but the OpenAPI Initiative doesn't standardize their meaning. Nothing reads `x-agent-*` or `x-category` unless your gateway, generator or agent adapter implements it, and nothing converts them to MCP hints automatically. Treat them as metadata your own tooling enforces, not portable approval enforcement.
 
-The AgenticAPI project defines six action categories (the ACTION taxonomy) for classifying API operations by what kind of effect they have. These categories help agents reason about risk, sequencing, and reversibility without reading the full operation description.
+For keeping this enrichment out of the canonical spec, use an [Overlay](https://spec.openapis.org/overlay/v1.2.0.html). Overlay 1.2.0 (2026-09-22) applies update, remove and copy actions to a source description, so a separate agent-facing overlay can add `x-agent-*` fields and rewrite descriptions without editing the file the rest of the organization owns. See [OpenAPI for Agents](./openapi-for-agents) for where that fits in the workflow.
+
+## The ACTION Taxonomy
+
+The ACTION taxonomy classifies API operations by what kind of effect they have. It is a convention this site uses, with no canonical specification behind it, so define the categories in your own docs if you adopt it. The categories help agents reason about risk, sequencing, and reversibility without reading the full operation description.
 
 | Category    | Code | Description                           | Examples                                                |
 | ----------- | ---- | ------------------------------------- | ------------------------------------------------------- |
@@ -78,13 +82,13 @@ paths:
       summary: Send a push notification to a user
 ```
 
-Agent frameworks that understand the ACTION taxonomy can apply category-level policies: for example, requiring human confirmation for all `Transact` and `Orchestrate` operations, or rate-limiting `Notify` operations to prevent spam.
+Agent frameworks or adapters that you configure to understand the taxonomy can apply category-level policies: for example, requiring human confirmation for all `Transact` and `Orchestrate` operations, or rate-limiting `Notify` operations to prevent spam.
 
 ## Agent Behavioral Extensions
 
 ### `x-agent-requires-confirmation`
 
-Marks operations that should pause for human approval before the agent executes them. This is framework-independent - any agent framework that respects this extension will surface a confirmation prompt.
+Marks operations that should pause for human approval before the agent executes them. The field is framework-independent in form, but nothing enforces it by default: an adapter you control has to read it and surface the confirmation prompt, and the server should still check authorization when the call arrives.
 
 ```yaml
 paths:
@@ -109,7 +113,7 @@ paths:
 
 ### `x-agent-idempotent`
 
-Signals that the operation can be called multiple times with the same inputs and will produce the same result. Agents use this to decide whether retrying a failed call is safe.
+Signals that the operation can be called multiple times with the same inputs and leave the same server-side state (the responses may differ, as in [HTTP idempotency](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)). Agents use this to decide whether retrying a failed call is safe.
 
 ```yaml
 paths:
@@ -154,6 +158,13 @@ paths:
 ## Speakeasy MCP Extension
 
 Speakeasy provides `x-speakeasy-mcp` for customizing how MCP tool generation treats individual operations.
+
+<Callout type="warn">
+  The configuration keys in this section (`tool-name`, `ignored`, operation and root `scopes`,
+  parameter description overrides) could not be confirmed against Speakeasy's current public
+  documentation on 2026-10-29; its docs have been reorganized. Treat them as illustrative, and check
+  the keys against the Speakeasy version you generate with before relying on them.
+</Callout>
 
 ### Tool Name Override
 
@@ -313,9 +324,9 @@ paths:
 
 ## LAPIS Format
 
-[LAPIS](https://github.com/cr0hn/LAPIS) (Lightweight API Specification for Intelligent Systems) is a compact representation format for OpenAPI specs, designed for LLM context windows. Benchmarked against five production API specs (including GitHub and Twilio), it averages an 85.5% token reduction compared to standard OpenAPI YAML while retaining the information agents need to select and call operations.
+[LAPIS](https://github.com/cr0hn/LAPIS) (Lightweight API Specification for Intelligent Systems) is a compact representation format for OpenAPI specs, designed for LLM context windows. The project's README claims up to 80% fewer tokens than standard OpenAPI YAML (a 70-80% design target) while keeping the information agents need to select and call operations. That is the project's own estimate; measure it with your model's tokenizer on your spec before relying on it.
 
-A full OpenAPI spec in YAML might be 50,000 tokens. The same spec in LAPIS format is typically well under 10,000 tokens. This matters when you are stuffing tool definitions into a model context window.
+As an illustration, a large OpenAPI spec in YAML can run to tens of thousands of tokens, and a compact format cuts that substantially. This matters when you are stuffing tool definitions into a model context window.
 
 ```
 create_order POST /orders

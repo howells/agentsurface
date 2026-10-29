@@ -101,7 +101,7 @@ If production access, authentication, or mutation risk prevents capability testi
 - Content Signals in `robots.txt` or response headers (`Content-Signal: search=yes, ai-input=yes, ai-train=no`)
 - Sitemap (`sitemap.xml`) with accurate `<lastmod>` timestamps
 - JSON-LD blocks in HTML (grep `application/ld+json` in layout / page templates)
-- `.well-known/` directory: `api-catalog`, `mcp/server-card.json`, `mcp.json`, `agent-skills/index.json`, `agent.json`, `agent-card.json`, `oauth-protected-resource`, `oauth-authorization-server`, `http-message-signatures-directory`
+- `.well-known/` directory: `api-catalog`, `mcp/server-card.json`, `mcp.json`, `agent-skills/index.json`, `agent-card.json`, `oauth-protected-resource`, `oauth-authorization-server`, `http-message-signatures-directory`
 - Server middleware supporting content negotiation (`Accept: text/markdown` → markdown response)
 - `Vary: Accept` header in HTTP responses
 - `x-markdown-tokens` header on markdown responses (token budget hints)
@@ -160,7 +160,7 @@ Example structure:
 
 **Specification:** https://agents.md - contributed to the Agentic AI Foundation under the Linux Foundation.
 
-**Adoption:** Treat AGENTS.md as the single project instruction file - Claude Code (v2.1.277+), Cursor, and Copilot all read it directly, so most repos need nothing else. Add a tool-specific file such as `CLAUDE.md`, Cursor rules, or Copilot instructions only when that tool needs something AGENTS.md can't give it, and layer it on top rather than duplicate it: a `CLAUDE.md` must start with a literal `@AGENTS.md` import or Claude Code stops reading AGENTS.md entirely.
+**Adoption:** Treat AGENTS.md as the single project instruction file - Claude Code (v2.1.277+), Cursor, and Copilot all read it directly, so most repos need nothing else. Add a tool-specific file such as `CLAUDE.md`, Cursor rules, or Copilot instructions only when that tool needs something AGENTS.md can't give it, and layer it on top rather than duplicate it: a `CLAUDE.md` should import `@AGENTS.md` (first line by house recommendation; an import works anywhere in the file), because by default Claude Code reads a `CLAUDE.md` instead of AGENTS.md unless it imports it or the `claude-md-and-agents-md` setting is on.
 
 **Format:** Plain markdown. No strict schema. Recommended structure:
 
@@ -282,25 +282,40 @@ export default function RootLayout({ children }) {
 
 **Cloudflare option:** Cloudflare Markdown for Agents can convert HTML origin responses to Markdown at the edge when enabled. It is useful when changing the origin is impractical. Prefer origin-served Markdown when you control the docs pipeline; use edge conversion for legacy or hosted sites. Cloudflare documents a 2 MB HTML-origin response limit and alternatives such as Workers AI `AI.toMarkdown()` and Browser Run Markdown extraction for other conversion needs.
 
-**Next.js middleware example:**
+**Next.js proxy example** (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`; the function is `proxy`). Parse `Accept` with quality weights - a substring test would treat `text/markdown;q=0` as a request for Markdown - and send `Vary: Accept` on both variants:
 
 ```typescript
-// middleware.ts
+// proxy.ts
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+// Quality of the most specific range matching `type` (exact, then type/*, then */*).
+function qualityFor(accept: string, type: string): number {
+  const [main] = type.split("/");
+  let best = { specificity: -1, q: 0 };
+  for (const part of accept.toLowerCase().split(",")) {
+    const [range, ...params] = part.split(";").map((piece) => piece.trim());
+    const specificity = range === type ? 2 : range === `${main}/*` ? 1 : range === "*/*" ? 0 : -1;
+    if (specificity <= best.specificity) continue;
+    const qParam = params.find((param) => param.startsWith("q="));
+    const q = qParam === undefined ? 1 : Number.parseFloat(qParam.slice(2));
+    best = { specificity, q: Number.isNaN(q) ? 0 : q };
+  }
+  return best.q;
+}
+
+function prefersMarkdown(accept: string): boolean {
+  const markdown = qualityFor(accept, "text/markdown");
+  return markdown > 0 && markdown > qualityFor(accept, "text/html");
+}
+
+export function proxy(request: NextRequest) {
   const accept = request.headers.get("accept") || "";
 
-  if (accept.includes("text/markdown")) {
-    // Only for docs pages
-    if (request.nextUrl.pathname.startsWith("/docs/")) {
-      return NextResponse.rewrite(new URL(`${request.nextUrl.pathname}.md`, request.url), {
-        headers: {
-          "Content-Type": "text/markdown; charset=utf-8",
-          Vary: "Accept",
-        },
-      });
-    }
+  // Only for docs pages
+  if (prefersMarkdown(accept) && request.nextUrl.pathname.startsWith("/docs/")) {
+    const response = NextResponse.rewrite(new URL(`${request.nextUrl.pathname}.md`, request.url));
+    response.headers.set("Vary", "Accept");
+    return response;
   }
 
   // Default HTML response
@@ -314,6 +329,10 @@ export const config = {
 };
 ```
 
+If you serve Markdown from a route handler, `params` is a promise in Next.js 16 (`{ params }: { params: Promise<{ slug: string[] }> }`, then `await params`). A folder named `_md` is a private folder and is not routable; use `%5Fmd` or a name without a leading underscore. llms.txt v2 allows `.md` appended to the page URL (`page.html.md`) or replacing the extension (`page.md`), and uses `rel="alternate" type="text/markdown"` and `rel="describedby"` links for discovery.
+
+Cloudflare's Markdown conversion (docs updated 2026-10-09) preserves an origin `Content-Signal` header and existing `Vary` dimensions. The roughly 80% token saving Cloudflare reports is illustrative and varies by page.
+
 **Stripe-style Instructions section:** Include a special block at the top of markdown responses:
 
 ```markdown
@@ -322,7 +341,7 @@ export const config = {
 
 **Agent-mode page view:** a distinct stripped view (e.g. `?mode=agent`) is a separate pattern from Markdown negotiation - build it only when the value is direct action links rather than prose, and keep its facts in sync with the canonical page. Ora's `agent-mode-view` check looks for this by name; there's no formal spec.
 
-**Locale negotiation:** `Accept-Language` (RFC 7231 §5.3.5) picks a language the same way `Accept` picks a format. Keep `hreflang` alternates, the locale segment in Markdown route paths, and per-locale `llms.txt` files in agreement.
+**Locale negotiation:** `Accept-Language` (RFC 9110 §12.5.4) picks a language the same way `Accept` picks a format. Keep `hreflang` alternates, the locale segment in Markdown route paths, and per-locale `llms.txt` files in agreement.
 
 ---
 
@@ -436,14 +455,14 @@ Audit for consistency. A common bad state is `robots.txt` allowing retrieval bot
 
 **MCP discovery:**
 
-- `/.well-known/mcp/server-card.json` - MCP Server Card describing tools, transport, auth, and connection metadata
+- `<streamable-http-url>/server-card` (listed in `/.well-known/ai-catalog.json`) - MCP Server Card describing identity and remote connection metadata, not tools; `/.well-known/mcp/server-card.json` is the older compatibility path
 - `/.well-known/mcp.json` - older/emerging MCP metadata path; treat as compatibility, not the only discovery path
 
 **Agent discovery endpoints:**
 
 - `/.well-known/agent-skills/index.json` - index of reusable Agent Skills available for this site or service
-- `/.well-known/agent.json` - A2A v1.0 RC agent card (canonical endpoint)
-- `/.well-known/agent-card.json` - alternative name (accepted by most tools)
+- `/.well-known/agent-card.json` - A2A agent card (IANA-registered name)
+- `/.well-known/agent.json` - pre-1.0 fallback name; some older clients still look for it
 
 **Bot identity:**
 
@@ -453,24 +472,40 @@ Audit for consistency. A common bad state is `robots.txt` allowing retrieval bot
 
 - `/.well-known/ai-plugin.json` - ChatGPT plugin manifest. **REMOVED Jan 2025.** Do not implement.
 
-**A2A agent card example** (`/.well-known/agent.json`):
+**A2A agent card example** (`/.well-known/agent-card.json`, A2A v1.0 shape). Declare credentials with `securitySchemes` and `securityRequirements` (v0.3 cards call the second field `security`); the old `authentication` object is obsolete:
 
 ```json
 {
   "name": "Your Service Agent",
   "description": "Brief description of agent capabilities.",
-  "homepage": "https://example.com",
-  "rpc_endpoint": {
-    "url": "https://example.com/rpc",
-    "protocol": "json-rpc-2.0"
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    { "url": "https://example.com/a2a", "protocolBinding": "JSONRPC", "protocolVersion": "1.0" }
+  ],
+  "capabilities": { "streaming": false, "pushNotifications": false },
+  "securitySchemes": {
+    "oauth": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://example.com/oauth/token",
+            "scopes": { "tasks": "Run tasks" }
+          }
+        }
+      }
+    }
   },
-  "auth": {
-    "type": "oauth2",
-    "grant_type": "client_credentials",
-    "token_endpoint": "https://example.com/oauth/token"
-  },
-  "capabilities": ["task_execution", "message_routing"],
-  "version": "1.0.0"
+  "securityRequirements": [{ "schemes": { "oauth": { "list": ["tasks"] } } }],
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "skills": [
+    {
+      "id": "run-task",
+      "name": "Run task",
+      "description": "Runs a documented task and returns the result.",
+      "tags": ["tasks"]
+    }
+  ]
 }
 ```
 
@@ -520,9 +555,11 @@ Link: </.well-known/api-catalog>; rel="api-catalog"
 
 ### MCP Server Card
 
-Publish an MCP Server Card when the project exposes MCP over HTTP. It gives agents transport, tool, and auth metadata before they connect.
+Publish an MCP Server Card when the project exposes MCP over HTTP. It gives agents identity and remote transport metadata before they connect. SEP-2127 (Final, 2026-10-06) charters the `io.modelcontextprotocol/server-card` extension; the card format itself is still draft in the extension repository, and the card should omit tools (clients read those at runtime via `server/discover`).
 
-Preferred path:
+Recommended location (extension draft): `<streamable-http-url>/server-card`, advertised in `/.well-known/ai-catalog.json` with entry type `application/mcp-server-card+json`. The extension advises against `/.well-known/mcp/server-card`; the older path below is what many early publishers used, so keep it only as a compatibility copy.
+
+Earlier proposal path and shape:
 
 ```
 /.well-known/mcp/server-card.json
@@ -559,7 +596,7 @@ Publish an Agent Skills index when a site can teach agents how to complete domai
 
 Use the public Agent Skills format for linked skills: a folder containing `SKILL.md`, required `name` and `description` frontmatter, and optional `scripts/`, `references/`, and `assets/` directories. The discovery index is only the catalog; the full skill is loaded later through progressive disclosure.
 
-Use the Agent Skills discovery v0.2 schema. A `skill-md` entry points directly to a `SKILL.md` artifact and publishes the SHA-256 of the exact response bytes. Recompute the digest whenever the served artifact changes.
+The hosted discovery index is a proposal, separate from the stable `SKILL.md` format at agentskills.io/specification. Its draft schema URL (`schemas.agentskills.io/discovery/0.2.0/schema.json`) does not resolve, so omit `$schema` and validate the fields your target consumer needs. A `skill-md` entry points directly to a `SKILL.md` artifact and publishes the SHA-256 of the exact response bytes. Recompute the digest whenever the served artifact changes.
 
 Preferred path:
 
@@ -571,7 +608,6 @@ Minimal shape:
 
 ```json
 {
-  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
       "name": "create-api-token",
@@ -680,11 +716,11 @@ No scanner checks these; all three have real primary-source or practical backing
 
 ## OpenAI Apps SDK / ChatGPT Directory
 
-**Submission:** https://developers.openai.com/apps-sdk
+**Submission:** https://developers.openai.com/plugins
 
 Built on MCP. Apps use MCP servers as transport layer for agent interaction. Complement your MCP server with:
 
-1. `/.well-known/mcp/server-card.json` and `/.well-known/mcp.json` only as a compatibility pointer when needed
+1. The MCP Server Card at `<streamable-http-url>/server-card`, with `/.well-known/mcp/server-card.json` and `/.well-known/mcp.json` only as compatibility pointers when needed
 2. Clear AGENTS.md with OpenAI-specific notes
 3. OAuth 2.1 client credentials for agent authentication
 
@@ -714,11 +750,11 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 
 - `/templates/discovery/llms.txt` - starter structure with sections
 - `/templates/discovery/llms-full.txt` - full docs template with token comment
-- `/templates/discovery/robots-ai.txt` - pre-filled robots.txt allowing major AI bots
+- `/templates/discovery/robots-ai.txt` - pre-filled robots.txt content for major AI bots (publish it as `/robots.txt`)
 - `/templates/discovery/AGENTS.md` - hand-curated baseline structure
 - `/templates/discovery/json-ld-softwareapp.ts` - SoftwareApplication schema helper (Next.js)
 - `/templates/discovery/content-negotiation.ts` - markdown negotiation middleware (Next.js)
-- `/templates/mcp-and-api/agent-card.json` - A2A v1.0 RC card scaffold
+- `/templates/mcp-and-api/agent-card.json` - A2A v1.0 AgentCard scaffold (`supportedInterfaces`, `securitySchemes`, `securityRequirements`)
 - `/templates/discovery/api-catalog.json` - RFC 9727 API catalog scaffold
 - `/templates/mcp-and-api/mcp-server-card.json` - MCP Server Card scaffold
 - `/templates/discovery/agent-skills-index.json` - Agent Skills discovery index
@@ -745,8 +781,8 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - https://is-agentic.com/docs - Is Agentic report API, CLI, MCP, and skill surfaces
 - https://www.rfc-editor.org/rfc/rfc8414.html - OAuth 2.0 Authorization Server Metadata
 - https://www.rfc-editor.org/rfc/rfc9457.html - Problem Details for HTTP APIs
-- https://developers.openai.com/apps-sdk - OpenAI Apps SDK (MCP-based)
-- https://docs.cloud.google.com/agent-builder/agent-engine/overview - Google Vertex AI Agent Engine discovery
+- https://developers.openai.com/plugins - OpenAI plugins and apps (MCP-based)
+- https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale - Google Agent Engine (Gemini Enterprise Agent Platform)
 - https://blog.cloudflare.com/agent-readiness/ - Agent Readiness scoring model and measured standards
 - https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/ - Markdown for Agents and token hints
 - https://developers.cloudflare.com/ai-crawl-control/ - AI crawler visibility and access controls

@@ -1,7 +1,7 @@
 ---
 title: RAG Patterns
 description: The retrieval pipeline from chunking through reranking to agentic and graph-augmented RAG - condensed current practice
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 RAG comes in many shapes. Treat each named variant below as a design move; most production systems combine several: hybrid retrieval, reranking, contextual chunks, and evaluation.
@@ -11,7 +11,7 @@ RAG comes in many shapes. Treat each named variant below as a design move; most 
 1. Ingest with stable document IDs, metadata, permissions, and source hashes.
 2. Chunk semantically (512–1,024 tokens, 10–30% overlap is a reasonable starting default); add contextual chunk descriptions where ambiguity is common.
 3. Retrieve with hybrid search: dense embeddings plus a sparse (BM25 or full-text) index, fused with Reciprocal Rank Fusion or a database-native hybrid query.
-4. Rerank the top 50–100 candidates down to 5–10.
+4. Rerank the top 50–100 candidates down to 5–10. Rerankers are separate models; Cohere Rerank 5 (released 2026-10-21) is one dated example, with `rerank-v5.0-pro` at $0.05 per 1M tokens and `rerank-v5.0-fast` at $0.02, per the announcement. It is an option, not a required component.
 5. Enforce metadata and authorization filters during retrieval.
 6. Generate with citations back to source chunks.
 7. Evaluate recall, ranking quality, faithfulness, latency, and cost - see [Retrieval Evals](/docs/agent-retrieval/retrieval-evals).
@@ -68,7 +68,7 @@ Use agentic retrieval (query planning, multi-hop iteration, tool selection) for 
 ## See also
 
 - [Original RAG paper](https://arxiv.org/abs/2005.11401)
-- [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/research/contextual-retrieval)
 - [RAPTOR paper](https://arxiv.org/abs/2401.18059)
 - [Self-RAG paper](https://arxiv.org/abs/2310.11511)
 - [Corrective RAG paper](https://arxiv.org/abs/2401.15884)

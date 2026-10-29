@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 10 scores whether a project measures agent behavior beyond demos. Agent testing is layered: deterministic unit tests (tool logic), schema/routing tests (correct tool selection), multi-step trajectory tests (step order), outcome evals (final artifact quality), and red-team adversarial tests. Scores 0–3 based on test presence, coverage breadth, statistical rigor (pass@k metrics), CI integration, and eval-driven development practices.
+Dimension 9 scores whether a project measures agent behavior beyond demos. Agent testing is layered: deterministic unit tests (tool logic), schema/routing tests (correct tool selection), multi-step trajectory tests (step order), outcome evals (final artifact quality), and red-team adversarial tests. Scores 0–3 based on test presence, coverage breadth, statistical rigor (pass@k metrics), CI integration, and eval-driven development practices.
 
 - **Layer 1**: Deterministic unit tests (tool handlers in isolation)
 - **Layer 2**: Schema & routing tests (correct tool + parameters)
@@ -27,10 +27,10 @@ Agent testing is the intersection of software testing (deterministic) and statis
 ## Evidence to gather
 
 - Test files named with `agent`, `tool`, `mcp`, `eval` in path or filename
-- Eval framework imports: `@braintrust/eval`, `promptfoo.yaml`, `langsmith`, `arize-phoenix`, `autoevals`, `@mastra/eval`, `llamaindex-eval`
+- Eval framework imports: `braintrust`, `promptfoo.yaml`, `langsmith`, `arize-phoenix`, `autoevals`, `@mastra/eval`, `llamaindex-eval`
 - CI workflows running evals (`github/workflows/*.yml` with `pnpm eval`, `npm run eval`, `pytest evals/`)
 - Statistical metrics reported: `pass@k`, `pass^k`, trajectory correctness, parameter correctness, tool F1
-- MCP tests using `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk`
+- MCP tests using `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/server` (v2; `@modelcontextprotocol/sdk` in v1 code)
 - Fixture datasets (20–50+ production traces) with labelled success criteria
 - Regression baselines (previous eval results tracked per commit)
 - OpenTelemetry GenAI semantic conventions in instrumentation code
@@ -43,7 +43,7 @@ Agent testing is the intersection of software testing (deterministic) and statis
 Agents require layered testing strategies. Build from deterministic at the base to statistical at the top.
 
 1. **Deterministic unit tests** - tool handler logic in isolation. Plain Vitest/Jest. Fast, 100% reproducible.
-2. **Schema & routing tests** - given this prompt, does the agent invoke this tool with correct arguments? Rule-based or LLM-as-judge (with temperature 0).
+2. **Schema & routing tests** - given this prompt, does the agent invoke this tool with correct arguments? Rule-based, or LLM-as-judge with a binary rubric. Run several trials; do not rely on a sampling setting for repeatability.
 3. **Multi-step trajectory tests** - did the 5-step plan execute in the right order? Traces + custom graders. Debugging focus.
 4. **Outcome evals** - did the final artifact (code, file, summary) match success criteria? Code-based + model-based graders. Gates in CI.
 5. **Red-team / adversarial** - does the agent resist prompt injection, data exfiltration loops, resource exhaustion? Promptfoo suite or custom attack templates.
@@ -52,7 +52,7 @@ Agents require layered testing strategies. Build from deterministic at the base 
 
 Agents often discover valid solutions evaluators didn't anticipate. Agents that take 7 steps to solve a 3-step problem may still deliver correct output. This is a feature, not a bug.
 
-Reserve trajectory evals for post-mortem debugging ("why did it fail?"), not gating ("must take exactly 4 steps"). Grade outcomes. Cite [Anthropic's demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents).
+Reserve trajectory evals for post-mortem debugging ("why did it fail?"), not gating ("must take exactly 4 steps"). Grade outcomes. Cite [Anthropic's demystifying evals](https://www.anthropic.com/research/demystifying-evals-for-ai-agents).
 
 ### Metrics
 
@@ -89,58 +89,54 @@ Cite [Eugene Yan's evaluation guide](https://eugeneyan.com/writing/llm-evaluator
 - **Position bias** - randomise A/B order; don't always present candidate first.
 - **Length bias** - normalise output length or control in prompt.
 - **Self-preference** - don't let the tested model be its own judge; separate judge model.
-- **Calibrate against human labels** - run judge on 20–30 human-annotated examples, measure agreement (Cohen's kappa), tune prompt/temperature.
+- **Calibrate against human labels** - run judge on 20–30 human-annotated examples, measure agreement (Cohen's kappa), tune the judge prompt.
 - **Use structured judges** - `{"score": 1-5, "reasoning": "...", "suggestions": ["..."]}`; parse and store for trend analysis.
 
 ### MCP testing (TypeScript)
 
-The canonical pattern: `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk`.
+The canonical pattern: `InMemoryTransport.createLinkedPair()`. In the v2 TypeScript SDK, `Client` comes from `@modelcontextprotocol/client` and `InMemoryTransport` from `@modelcontextprotocol/server` (v1 imported both from `@modelcontextprotocol/sdk`). See `/docs/mcp-servers/testing` for the full pattern.
 
 ```typescript
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { Client, Server } from "@modelcontextprotocol/sdk/client/index.js";
-import { MyMCPServer } from "./my-mcp-server.js";
+import { Client } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
+import { createServer } from "./server.js";
 
 describe("MCP server", () => {
-  it("should list tools correctly", async () => {
+  let client: Client;
+
+  beforeEach(async () => {
+    const server = createServer({ databaseUrl: ":memory:" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = new MyMCPServer();
-    server.connect(serverTransport);
 
-    const client = new Client({
-      name: "test-client",
-      version: "1.0.0",
-    });
+    client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities: {} });
+    await server.connect(serverTransport);
     await client.connect(clientTransport);
+  });
 
-    const tools = await client.listTools();
-    expect(tools.tools).toHaveLength(3);
-    expect(tools.tools[0].name).toBe("search_docs");
+  afterEach(async () => {
+    await client.close();
+  });
+
+  it("should list tools correctly", async () => {
+    const { tools } = await client.listTools();
+    expect(tools).toHaveLength(3);
+    expect(tools[0].name).toBe("search_docs");
   });
 
   it("should handle tool errors gracefully", async () => {
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const server = new MyMCPServer();
-    server.connect(serverTransport);
-
-    const client = new Client({
-      name: "test-client",
-      version: "1.0.0",
-    });
-    await client.connect(clientTransport);
-
-    const result = await client.callTool("search_docs", { query: "" });
+    const result = await client.callTool({ name: "search_docs", arguments: { query: "" } });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("query is required");
+    const message = (result.content as Array<{ text: string }>)[0]?.text;
+    expect(message).toContain("query is required");
   });
 });
 ```
 
-For integration tests, spawn server over stdio or HTTP and invoke via client SDK.
+For integration tests, spawn server over stdio or HTTP and invoke via client SDK. Pin imports and assertions to the SDK generation and protocol revision you target.
 
 ### Tool routing tests
 
-Verify the agent selects the correct tool for a given prompt. Use temperature 0 for reproducibility.
+Verify the agent selects the correct tool for a given prompt. Claude API version `2026-10-21` removes `temperature`, `top_p` and `top_k`, so get repeatability from a fixed dataset, repeated trials and code-based graders.
 
 ```typescript
 // Pseudocode
@@ -149,7 +145,6 @@ describe("agent tool routing", () => {
     const agent = new Agent({
       model: "claude-opus-5-5",
       tools: [docSearch, codeSearch, webSearch],
-      temperature: 0, // Deterministic routing
     });
 
     const transcript = await agent.run({
@@ -164,7 +159,6 @@ describe("agent tool routing", () => {
     const agent = new Agent({
       model: "claude-opus-5-5",
       tools: [deleteUser, archiveFile],
-      temperature: 0,
     });
 
     const transcript = await agent.run({
@@ -181,30 +175,26 @@ describe("agent tool routing", () => {
 
 Traces are the source of truth for debugging failures. Instrument with OpenTelemetry GenAI semantic conventions.
 
-**Key attributes** (cite https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+**Key attributes** (cite https://github.com/open-telemetry/semantic-conventions-genai; the conventions are Development status and unversioned, so pin a commit):
 
-- `gen_ai.provider.name` - "anthropic", "openai", "google"
-- `gen_ai.request.model` - "claude-opus-5-5"
-- `gen_ai.input.messages` - full conversation (serialized)
-- `gen_ai.output.messages` - model response
-- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`
-- `gen_ai.system_instructions` - system prompt hash or summary
+- `gen_ai.operation.name` - required, e.g. "chat", "invoke_agent", "execute_tool"
+- `gen_ai.provider.name` - required: "anthropic", "openai", "google"
+- `gen_ai.request.model` - conditionally required, e.g. "claude-opus-5-5"
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` - recommended
+- `gen_ai.input.messages` / `gen_ai.output.messages` / `gen_ai.system_instructions` - opt-in structured content (role + parts); omit when sensitive
 - `gen_ai.data_source.id` - RAG corpus ID if applicable
 
-**Tool spans** - child spans named `tool.{tool_name}`:
+**Span names:** model calls `chat {model}` (`{gen_ai.operation.name} {gen_ai.request.model}`), agents `invoke_agent {agent name}`, tool execution `execute_tool {tool name}` with `gen_ai.tool.name`, `gen_ai.tool.call.id` and opt-in `gen_ai.tool.call.arguments` / `gen_ai.tool.call.result`.
 
-- `tool.search_docs`
-- `tool.execute_code`
-
-Auto-instrument with [Traceloop SDK](https://www.traceloop.com/) or [OpenLLMetry](https://github.com/traceloop/openllmetry). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
+Auto-instrument with [Traceloop](https://www.traceloop.com/) (`@traceloop/node-server-sdk`) or [OpenLLMetry](https://github.com/traceloop/openllmetry). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
 
 ### Eval platforms
 
-- **Braintrust** ([braintrust.dev](https://www.braintrust.dev/)) - end-to-end eval loop, dataset management, prompt versioning, human review, traces. Recommended for TypeScript teams. Zero egress.
+- **Braintrust** ([braintrust.dev](https://www.braintrust.dev/)) - end-to-end eval loop, dataset management, prompt versioning, human review, traces. A good fit for TypeScript teams.
 - **LangSmith** - LangChain-native evals and tracing. Strong if using LangChain agent framework.
 - **Arize Phoenix** ([arize.com/phoenix](https://arize.com/phoenix)) - OSS, OTEL-native, self-hostable. No vendor lock-in.
 - **Langfuse** ([langfuse.com](https://langfuse.com/)) - OSS backend + managed cloud. OTEL support, trace UI, eval API.
-- **Promptfoo** ([promptfoo.dev](https://www.promptfoo.dev/)) - CLI + YAML test configs, strong red-teaming, now part of OpenAI ecosystem (acquired 2025).
+- **Promptfoo** ([promptfoo.dev](https://www.promptfoo.dev/)) - CLI + YAML test configs, strong red-teaming, OpenAI agreed to acquire it (announced 2026-03-09).
 - **OpenAI Evals** ([platform.openai.com/evals](https://platform.openai.com/evals)) - tight Agents SDK integration, trace dashboard.
 - **Vertex AI Gen AI Evaluation** ([cloud.google.com/generative-ai-studio](https://cloud.google.com/generative-ai-studio)) - Google-side, autoraters (GROUNDING, SAFETY, TOOL_USE_QUALITY).
 
@@ -220,7 +210,7 @@ Auto-instrument with [Traceloop SDK](https://www.traceloop.com/) or [OpenLLMetry
 
 LLMs are stochastic. A single eval run is noise.
 
-- **Tool routing / structured outputs:** Set `temperature: 0` for reproducibility.
+- **Tool routing / structured outputs:** Run several trials per case and gate on a pass rate. Do not rely on a sampling setting: Claude API version `2026-10-21` removes `temperature`, `top_p` and `top_k`.
 - **Open-ended generation (summary, design):** Run N trials per test (e.g., N=5), report mean + std dev.
 - **Transcript storage:** Save all N transcripts for post-hoc analysis. Useful for detecting if model occasionally hallucinates tool names.
 
@@ -275,7 +265,7 @@ Cite Simon Willison + [arxiv 2506.08837](https://arxiv.org/abs/2506.08837) on de
 
 - **Vibes-based iteration.** "It feels more accurate after my prompt rewrite." Ship evals first; measure before/after.
 - **Only testing happy path.** 70% of prod failures are edge cases. Slice evals by scenario.
-- **LLM judge without calibration.** "GPT-5.6 Sol will grade my agent's outputs." LLM judges are biased and gamable. Validate on 20–30 human labels first.
+- **LLM judge without calibration.** "GPT-6 Astra will grade my agent's outputs." LLM judges are biased and gamable. Validate on 20–30 human labels first.
 - **No regression gating.** Evals pass but metrics decline silently. CI gates prevent replay.
 - **Testing tool calls, not outcomes.** "Agent called delete_file." Did the file actually get deleted? Test outcomes.
 - **Ignoring variance.** "1 run passed, ship it." 5 runs pass 60% of the time; you need consistent performance.
@@ -294,12 +284,12 @@ See `/templates/` in the surface skill:
 
 ## Citations
 
-- [Anthropic: Demystifying Evals for AI Agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
+- [Anthropic: Demystifying Evals for AI Agents](https://www.anthropic.com/research/demystifying-evals-for-ai-agents)
 - [Eugene Yan: Evaluating the Effectiveness of LLM-Evaluators](https://eugeneyan.com/writing/llm-evaluators/)
 - [Eugene Yan: An LLM-as-Judge Won't Save The Product - Fixing Your Process Will](https://eugeneyan.com/writing/eval-process/)
 - [Chip Huyen: AI Engineering (O'Reilly, 2025)](https://www.oreilly.com/library/view/ai-engineering/9781098166298/)
-- [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
-- [Simon Willison: Prompt Injection Resistance](https://simonwillison.net/2024/Oct/28/prompt-injection/) and [arxiv 2506.08837](https://arxiv.org/abs/2506.08837)
+- [OpenTelemetry GenAI Semantic Conventions](https://github.com/open-telemetry/semantic-conventions-genai)
+- [OWASP LLM01 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) and [arxiv 2506.08837](https://arxiv.org/abs/2506.08837)
 - [Braintrust Eval Docs](https://braintrust.dev/docs)
 - [Arize Phoenix](https://arize.com/phoenix)
 - [Langfuse](https://langfuse.com/)

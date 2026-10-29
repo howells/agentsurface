@@ -25,7 +25,7 @@ Agent tool quality is the single highest-leverage investment in an agent applica
 
 ## Evidence to gather
 
-- **Tool definition locations:** MCP `server.tool(...)`, Vercel AI SDK `tools: {...}`, OpenAI Agents SDK `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`.
+- **Tool definition locations:** MCP `server.registerTool(...)` (legacy v1 `server.tool(...)`), Vercel AI SDK `tools: {...}`, OpenAI Agents SDK `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`.
 - **Description quality:** Grep for descriptions <20 words (red flag). Scan for "Use when..." and "Do not use for..." patterns.
 - **Schema annotations:** `.describe()` or `description` field on every parameter; `additionalProperties: false` on objects.
 - **Tool count:** >20 tools on a single agent is a red flag; agent struggles to reason over large tool sets.
@@ -43,11 +43,11 @@ Keep provider abbreviations, cache choices and connectivity checks inside applic
 
 Match public registration keys and tool IDs. Update executable references together when renaming, and preserve historical records. Keep filenames and language-native variable names in the repository's normal style.
 
-The canonical explanation and current primary sources are in [Naming and Descriptions](../../../src/content/docs/tool-design/naming-and-descriptions.mdx), verified 2026-09-07.
+The canonical explanation and current primary sources are in [Naming and Descriptions](../../../src/content/docs/tool-design/naming-and-descriptions.mdx), verified 2026-10-29.
 
 ### Descriptions: the single biggest lever
 
-([Anthropic writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents))
+([Anthropic writing-tools-for-agents](https://www.anthropic.com/research/writing-tools-for-agents))
 
 Write descriptions as if onboarding a new engineer. Include four elements:
 
@@ -78,7 +78,7 @@ Anthropic's research shows that even tiny refinements to descriptions yield larg
 
 ### Schemas: flat, typed, annotated
 
-**Flat structure preferred.** Avoid deep nesting; one or two levels maximum. Deeply nested objects are harder for agents to reason about and may be rejected by OpenAI's strict mode.
+**Flat structure preferred.** Avoid deep nesting; one or two levels maximum (house advice). Deeply nested objects are harder for agents to reason about; OpenAI strict mode allows nesting up to 10 levels and 5,000 properties in total.
 
 **Every field must have a description.** Use `.describe()` in Zod:
 
@@ -114,7 +114,7 @@ query: z.string()
   .describe('Search query. Examples: "status:Open", "assignee:alice@company.com", "label:bug"'),
 ```
 
-**`additionalProperties: false` for strict OpenAI mode.** Required when compiling to OpenAI Agents SDK:
+**`additionalProperties: false` for strict OpenAI mode.** Required when strict mode is on (the OpenAI Agents SDK enables it by default for schema-validated tools; the API also supports `strict: false`). In strict mode every property must also be listed in `required`, with optional values made nullable:
 
 ```typescript
 .strict() // Zod
@@ -159,7 +159,7 @@ response_format: z.enum(['concise', 'detailed'])
 }
 ```
 
-**Anthropic `toModelOutput` for large payloads:** Compress responses by returning a summary string + structured refs. For example, a large search result list becomes:
+**Compressing large payloads (`toModelOutput` in the AI SDK):** The AI SDK's `tool()` accepts a `toModelOutput` function that maps the full tool result to a smaller value shown to the model; with other stacks, do the same compression in your own `tool_result`. Return a summary string + structured refs. For example, a large search result list becomes:
 
 ```typescript
 // Instead of returning 50 full objects:
@@ -180,12 +180,22 @@ response_format: z.enum(['concise', 'detailed'])
 Every tool should declare its access level and side effects:
 
 ```typescript
-server.tool("create_issue", "Create a new issue in the tracker", schema, handler, {
-  destructiveHint: true, // Mutates external state
-  idempotentHint: true, // Safe to retry (upsert semantics)
-  openWorldHint: false, // No side effects outside this API
-});
+server.registerTool(
+  "create_issue",
+  {
+    description: "Create a new issue in the tracker",
+    inputSchema: schema,
+    annotations: {
+      destructiveHint: true, // Mutates external state
+      idempotentHint: true, // Safe to retry (upsert semantics)
+      openWorldHint: false, // No side effects outside this API
+    },
+  },
+  handler,
+);
 ```
+
+`registerTool` is the TypeScript SDK v2 form (`@modelcontextprotocol/server`); the v1 positional `server.tool()` is removed in v2. Annotations are hints a client may use, not an authorization boundary.
 
 - `readOnlyHint: true` - Query-only, no side effects.
 - `destructiveHint: true` - Mutates or deletes data; requires careful use.
@@ -214,7 +224,7 @@ search_docs_batch(queries: string[]) // Batch
 
 ### Error design
 
-Errors must be returned in the tool output, not thrown. Include recovery hints:
+Errors must be returned in the tool output, not thrown (`isError: true` on MCP results; other SDKs have their own error handlers or exception-to-result conversion). `is_retriable` means the same call is safe to repeat unchanged, so validation errors are `false`. Include recovery hints:
 
 ```typescript
 {
@@ -248,23 +258,24 @@ export const issueSearchTool = {
 };
 
 // Export framework-specific adapters:
-export const toMCP = (tool) =>
-  server.tool(tool.name, tool.description, tool.schema, tool.handler, { readOnlyHint: true });
+export const toMCP = (server, t) =>
+  server.registerTool(
+    t.name,
+    { description: t.description, inputSchema: t.schema, annotations: { readOnlyHint: true } },
+    async (input) => {
+      const data = await t.handler(input);
+      return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
+    },
+  );
 
-export const toVercelAI = (tool) =>
-  tool({
-    name: tool.name,
-    description: tool.description,
-    parameters: toJSON(tool.schema),
-    execute: tool.handler,
-  });
-
-export const toOpenAIAgents = (tool) => ({
-  name: tool.name,
-  description: tool.description,
-  parameters: toJSON(tool.schema),
-  execute: tool.handler,
+// AI SDK 7: tools are a record keyed by name; the schema goes in `inputSchema`
+export const toVercelAI = (t) => ({
+  [t.name]: tool({ description: t.description, inputSchema: t.schema, execute: t.handler }),
 });
+
+// OpenAI Agents SDK (JS): `tool()` with the Zod schema as `parameters`
+export const toOpenAIAgents = (t) =>
+  tool({ name: t.name, description: t.description, parameters: t.schema, execute: t.handler });
 ```
 
 This pattern keeps tool logic centralized and ensures consistency across frameworks.
@@ -274,8 +285,10 @@ This pattern keeps tool logic centralized and ensures consistency across framewo
 Tool descriptions count toward every agent request. Trim aggressively:
 
 - Use references (`doc_uri`) for longer docs rather than inlining.
-- MCP SDK supports **lazy loading**: define tool names and schemas once, load full metadata on demand.
-- Anthropic supports **tool-search**: with many tools, agent can search for matching tools rather than loading all.
+- MCP has no built-in per-tool lazy loading: `tools/list` returns full definitions. Deferred loading is provider- or client-side.
+- Anthropic and OpenAI both support **tool search** (`defer_loading: true` plus a search tool; `deferLoading` / `toolSearchTool()` in OpenAI Agents JS): with many tools, the model searches for matching tools rather than loading all. Only loaded definitions count as input tokens. Claude's inline tool definitions (beta, `inline-tools-2026-09-15`) add a tool mid-conversation without breaking the cached prefix.
+- **Programmatic tool calling** (Claude `code_execution_20260120` or later with `allowed_callers`; OpenAI Agents JS `programmaticToolCallingTool()` with `allowedCallers`) keeps intermediate tool results out of the model's context.
+- **Claude forced tool choice:** Opus 5.5, Sonnet 5.5 and Fable 5.1 reject `tool_choice` `any` and `tool` (400); use `auto` plus `strict: true` or structured outputs.
 - **Gemini 3 thought signatures:** Preserve exact tool-call arguments across conversation turns; do not mutate them in logs.
 - **OpenAI strict mode:** First request parses and caches schema; use single request for multiple calls to amortize.
 
@@ -353,22 +366,28 @@ Do not use this for general knowledge (use web search instead) or to create new 
 **MCP adapter (tools/mcp.ts):**
 
 ```typescript
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { searchDocsTool } from "./registry";
 
-const server = new Server({
+const server = new McpServer({
   name: "docs-mcp",
   version: "1.0.0",
 });
 
-server.tool(
+// MCP needs a CallToolResult, so wrap the handler's plain data
+server.registerTool(
   searchDocsTool.name,
-  searchDocsTool.description,
-  searchDocsTool.schema,
-  searchDocsTool.handler,
   {
-    readOnlyHint: true,
-    openWorldHint: true,
+    description: searchDocsTool.description,
+    inputSchema: searchDocsTool.schema,
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (input) => {
+    const data = await searchDocsTool.handler(input);
+    return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
   },
 );
 
@@ -379,12 +398,13 @@ export default server;
 
 ```typescript
 import { tool } from "ai";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { searchDocsTool } from "./registry";
 
+// AI SDK 7: pass the Zod schema as `inputSchema`; use the result as a record entry,
+// e.g. generateText({ model, tools: { search_docs: searchDocsVercel }, prompt })
 export const searchDocsVercel = tool({
   description: searchDocsTool.description,
-  parameters: zodToJsonSchema(searchDocsTool.schema),
+  inputSchema: searchDocsTool.schema,
   execute: searchDocsTool.handler,
 });
 ```
@@ -392,44 +412,44 @@ export const searchDocsVercel = tool({
 **OpenAI Agents SDK adapter (tools/openai-agents.ts):**
 
 ```typescript
-import { Tool } from "@openai/agents";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { tool } from "@openai/agents";
 import { searchDocsTool } from "./registry";
 
-export const searchDocsOpenAI = new Tool({
+// `tool()` creates the function tool; run it with run(agent, input)
+export const searchDocsOpenAI = tool({
   name: searchDocsTool.name,
   description: searchDocsTool.description,
-  parameters: zodToJsonSchema(searchDocsTool.schema),
+  parameters: searchDocsTool.schema,
   execute: searchDocsTool.handler,
 });
 ```
 
-All three adapters wrap the same handler and schema; only the frame changes.
+All three adapters wrap the same handler and schema; only the frame changes. Tool calling for GPT-6 models requires the OpenAI Responses API, and the open-source Agents SDK is a different product from the OpenAI Agents API (public beta since 2026-09-10).
 
 ## Cross-vendor capability table
 
-| Capability                           | Anthropic tool                         | MCP                                                  | OpenAI strict tool                                 | Gemini FunctionDeclaration      | Vercel AI SDK                   |
-| ------------------------------------ | -------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- | ------------------------------- | ------------------------------- |
-| Naming                               | `verb_noun` preferred                  | Yes                                                  | `verb_noun` + `strict:true`                        | Yes                             | Yes                             |
-| Descriptions                         | Full prose; first paragraph critical   | Yes                                                  | Full prose; <500 tokens per tool                   | Yes                             | Yes                             |
-| Schema validation                    | Zod `.parse()` on input                | Zod or JSON Schema                                   | JSON Schema; `additionalProperties:false` required | JSON Schema                     | Zod native                      |
-| Field descriptions                   | `.describe()` on every field           | Required                                             | `description` on every property                    | Required                        | `.describe()` on every field    |
-| Examples                             | Input examples in description or param | Supported                                            | Via `examples` array in schema                     | Via `example` in property       | Via `.describe()`               |
-| Enums                                | Enforced at parse                      | Enforced                                             | Tokens masked at decode time (CFG)                 | Yes                             | Enforced at parse               |
-| Pagination                           | Explicit `next_cursor`, `has_more`     | Supported                                            | Supported                                          | Supported                       | Supported                       |
-| toModelOutput / response compression | Yes (collapses large payloads)         | Not native                                           | Not native                                         | Not native                      | Not native                      |
-| Annotations                          | None (Claude-specific)                 | `readOnly`, `destructive`, `idempotent`, `openWorld` | None                                               | None                            | None                            |
-| Thought signature preservation       | N/A                                    | N/A                                                  | N/A                                                | Required (pass back in history) | N/A                             |
-| Lazy loading                         | Tool search pattern                    | SDK-native `defer_loading`                           | Not native                                         | Not native                      | Not native                      |
-| Error output                         | Structured; returned not thrown        | Structured; isError pattern                          | Structured in tool_result                          | Structured                      | Structured; returned not thrown |
+| Capability                           | Anthropic tool                           | MCP                                                  | OpenAI strict tool                                 | Gemini FunctionDeclaration      | Vercel AI SDK                   |
+| ------------------------------------ | ---------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- | ------------------------------- | ------------------------------- |
+| Naming                               | `verb_noun` preferred                    | Yes                                                  | `verb_noun` + `strict:true`                        | Yes                             | Yes                             |
+| Descriptions                         | Full prose; first paragraph critical     | Yes                                                  | Full prose; <500 tokens per tool                   | Yes                             | Yes                             |
+| Schema validation                    | Zod `.parse()` on input                  | Zod or JSON Schema                                   | JSON Schema; `additionalProperties:false` required | JSON Schema                     | Zod native                      |
+| Field descriptions                   | `.describe()` on every field             | Required                                             | `description` on every property                    | Required                        | `.describe()` on every field    |
+| Examples                             | Input examples in description or param   | Supported                                            | Via `examples` array in schema                     | Via `example` in property       | Via `.describe()`               |
+| Enums                                | Enforced at parse                        | Enforced                                             | Tokens masked at decode time (CFG)                 | Yes                             | Enforced at parse               |
+| Pagination                           | Explicit `next_cursor`, `has_more`       | Supported                                            | Supported                                          | Supported                       | Supported                       |
+| toModelOutput / response compression | Not native (compress in the tool_result) | Not native                                           | Not native                                         | Not native                      | `toModelOutput` on `tool()`     |
+| Annotations                          | None (Claude-specific)                   | `readOnly`, `destructive`, `idempotent`, `openWorld` | None                                               | None                            | None                            |
+| Thought signature preservation       | N/A                                      | N/A                                                  | N/A                                                | Required (pass back in history) | N/A                             |
+| Lazy loading                         | Tool search (`defer_loading`)            | Not native (`tools/list` returns everything)         | Tool search (`defer_loading`, Responses API)       | Not native                      | Not native                      |
+| Error output                         | Structured; returned not thrown          | Structured; isError pattern                          | Structured in tool_result                          | Structured                      | Structured; returned not thrown |
 
 ## Anti-patterns to avoid
 
 - **Terse descriptions** ("Creates a thing"). Takes no effort to write, compounds agent confusion.
 - **More than 20 tools on one agent.** Under 10 tools in a single agent context is the target; past 20 is a red flag, and at 30 or more accuracy drops sharply.
 - **Opaque IDs in response without lookup tool.** If a tool returns `user_id: 123`, agent must have a `lookup_user` tool to resolve it.
-- **Nested union types** (e.g., `result: { type: 'success'; data: X } | { type: 'error'; message: string }`). OpenAI strict mode rejects these. Use flat discriminated unions or separate fields.
-- **Nullable parameters** (e.g., `assignee?: string | null`). OpenAI requires explicit omission; Anthropic handles both. Prefer optional fields without null.
+- **Unconstrained or root-level unions** (e.g., a `z.any()` branch inside `result`, or a root `anyOf`). OpenAI strict mode supports nested `anyOf` when every branch is in the supported subset, but rejects a root-level `anyOf` and unbounded `any`. Use constrained shapes, flat fields or separate tools.
+- **Optional fields under OpenAI strict mode.** Strict mode requires every property in `required`, so express "optional" as nullable (`assignee: z.string().nullable()`) and have the caller pass `null`. Anthropic strict tool use supports genuinely optional properties.
 - **Inconsistent naming across tools.** Use `user_id` everywhere, not `user_id` in one tool and `userId` in another.
 - **Side-effectful tools that throw errors instead of returning.** Always return errors in the response body so the agent can reason about recovery.
 - **Destructive tools without annotations.** Any tool that mutates state must carry `destructiveHint: true` (MCP) or be called out in the description.
@@ -441,16 +461,16 @@ All three adapters wrap the same handler and schema; only the frame changes.
 - `/templates/tools/tool-registry.ts` - Registry pattern for managing >10 tools
 - **Libraries:**
   - `zod` - Type-safe schema definition
-  - `zod-to-json-schema` - Compile Zod to JSON Schema for OpenAI
-  - `@modelcontextprotocol/sdk` - MCP server + client
+  - `zod` 4 `z.toJSONSchema()` - Compile Zod to JSON Schema natively (the third-party `zod-to-json-schema` is no longer actively maintained and only supports Zod 3 schemas)
+  - `@modelcontextprotocol/server` and `@modelcontextprotocol/client` - MCP SDK v2 (the monolithic `@modelcontextprotocol/sdk` 1.x is maintained for compatibility)
   - `@openai/agents` - OpenAI Agents SDK (TS)
   - `ai` (Vercel) - Vercel AI SDK
 
 ## Citations
 
-- ([Anthropic writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([Anthropic writing-tools-for-agents](https://www.anthropic.com/research/writing-tools-for-agents))
 - ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) - current revision
-- ([OpenAI function calling](https://platform.openai.com/docs/guides/function-calling))
+- ([OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling))
 - ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
 - ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))
 - ([Vercel AI SDK tools](https://ai-sdk.dev/docs/reference/ai-sdk-core/))

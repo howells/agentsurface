@@ -8,9 +8,10 @@ Add CLAUDE.md only when Claude Code needs instructions no other tool should see:
 skills, subagents or slash commands to use here, or hooks and MCP servers that
 change how Claude should work.
 
-If you add it, keep the `@AGENTS.md` import on the first line. Without it,
-Claude Code reads this file instead of AGENTS.md and never loads AGENTS.md.
-A sentence such as "see AGENTS.md" doesn't load the file.
+If you add it, import `@AGENTS.md` - we keep it on the first line, though Claude
+Code accepts an import anywhere. Without an import, Claude Code reads this file
+instead of AGENTS.md (unless its "Project instructions" setting is
+claude-md-and-agents-md). A sentence such as "see AGENTS.md" doesn't load the file.
 
 Keep out of this file:
 - Anything true for every agent (commands, conventions, boundaries): AGENTS.md

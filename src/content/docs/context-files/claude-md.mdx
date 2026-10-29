@@ -1,7 +1,7 @@
 ---
 title: CLAUDE.md
 description: Claude Code reads AGENTS.md on its own, so most repositories no longer need a CLAUDE.md. When one still helps, and how to write it so it doesn't hide AGENTS.md
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -9,8 +9,8 @@ lastVerified: 2026-09-25
 From v2.1.277 (18 September 2026), Claude Code reads `AGENTS.md` as project instructions on its own. A repository with a good `AGENTS.md` doesn't need a `CLAUDE.md`, an import, or a setting. Write `AGENTS.md` for every coding agent and stop there unless Claude Code needs something no other tool should see.
 
 - **Default: no `CLAUDE.md`.** Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` in the working directory or above it
-- **A `CLAUDE.md` hides `AGENTS.md`.** If any of those three files exists, Claude Code reads it instead and skips `AGENTS.md`, unless the file imports it with `@AGENTS.md`
-- **If you add one, start it with `@AGENTS.md`** and put only Claude-only instructions below the import
+- **A `CLAUDE.md` hides `AGENTS.md`.** If any of those three files exists, Claude Code reads it instead and skips `AGENTS.md`, unless the file imports it with `@AGENTS.md` or the `claude-md-and-agents-md` setting loads both files
+- **If you add one, import `@AGENTS.md`** (this site recommends the first line, though an import works anywhere in the file) and put only Claude-only instructions below the import
 - **Enforced rules go in settings.** Tool allow and deny rules and the default permission mode belong in `.claude/settings.json`. Instruction files are context Claude weighs, not configuration it enforces
 - **Old workarounds can go**: a `CLAUDE.md` that only imports `AGENTS.md`, a `CLAUDE.md` symlink, or a `SessionStart` hook that prints `AGENTS.md`
 
@@ -34,7 +34,7 @@ The details that change outcomes:
 - **What isn't read.** `AGENTS.local.md`, `AGENTS.override.md`, and anything under `.agents/`.
 - **`CLAUDE.local.md` counts.** A developer who adds one for personal notes in an `AGENTS.md`-only repository stops Claude Code reading `AGENTS.md` for themselves, with no warning. Start the local file with `@AGENTS.md`, or set **Project instructions** to `claude-md-and-agents-md`.
 - **The setting is per person.** **Project instructions** (in `/config`) takes `claude-md-or-agents-md` (the default), `claude-md-and-agents-md`, `claude-md`, or `managed-only`. It can be set in user or managed settings, but Claude Code ignores it in a project's settings files, so a repository can't choose it for contributors. Write the repository for the default.
-- **Checking what loaded.** `/memory` lists the instruction files Claude read.
+- **Checking what loaded.** Run `/context` and check the list under **Memory files**. `/memory` manages memory files and auto-memory settings rather than confirming what loaded. On versions before v2.1.280, neither lists an `AGENTS.md` that Claude read directly. From v2.1.283, `/doctor prompt-audit` audits your instruction files for outdated, missing or contradictory content and proposes edits without changing anything until you ask.
 
 See [Claude Code's memory docs](https://code.claude.com/docs/en/memory#agents-md) for the full rules.
 
@@ -44,7 +44,7 @@ In these sessions Claude Code reads `CLAUDE.md` files only:
 
 - Claude Code before v2.1.277
 - Before v2.1.281 (23 September 2026), some sessions such as Amazon Bedrock or with telemetry disabled
-- The built-in `agents-md` plugin disabled in `/plugin`
+- The built-in AGENTS.md plugin disabled in `/plugin`. From v2.1.285 its ID is `cc-plugin-agents-md@builtin`; earlier versions used `agents-md@builtin`, and v2.1.285 and later accepts settings under either ID
 - Sometimes, the first session after upgrading from v2.1.276 or earlier
 
 If contributors or automation run in any of these, keep a `CLAUDE.md` that contains `@AGENTS.md`. On newer versions the import never loads `AGENTS.md` twice.
@@ -66,7 +66,7 @@ Keep out of it:
 
 ## Writing one
 
-Put the import on the first line and only Claude-only lines under it:
+Put the import on the first line and only Claude-only lines under it. The first line is this site's house recommendation, not a technical requirement; Claude Code accepts `@path` imports anywhere in `CLAUDE.md`:
 
 ```markdown
 @AGENTS.md
@@ -113,7 +113,7 @@ Instruction files are context. Claude Code doesn't enforce a sentence saying "ne
 
 ## Monorepos
 
-Each package keeps its own `AGENTS.md`, and Claude Code picks it up when it reads a file in that package. A package-level `CLAUDE.md` hides that package's `AGENTS.md` just as a root one does, so if a package needs one, start it with `@AGENTS.md`. See [Monorepos](/docs/context-files/monorepos) for how other tools resolve nested files.
+Each package keeps its own `AGENTS.md`, and Claude Code picks it up when it reads a file in that package. A package-level `CLAUDE.md` hides that package's `AGENTS.md` just as a root one does, so if a package needs one, import `@AGENTS.md` (first line, by the house recommendation above). See [Monorepos](/docs/context-files/monorepos) for how other tools resolve nested files.
 
 ## Auto memory and rules
 

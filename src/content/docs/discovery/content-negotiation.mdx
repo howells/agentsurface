@@ -1,12 +1,12 @@
 ---
 title: Serving Markdown to Agents
 description: Content negotiation patterns for returning Markdown instead of HTML to AI agents
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-HTML consumes 5-6x more tokens than Markdown for the same content. Content negotiation via Accept headers lets agents request Markdown, reducing their token budget by ~80%. An agent that reads five Markdown pages reads one HTML page for the same cost. Implementation varies by framework (Next.js middleware, Flask, etc.), but the pattern is consistent: check Accept header and return the best match.
+HTML typically consumes several times more tokens than Markdown for the same content. Content negotiation via Accept headers lets agents request Markdown instead. Cloudflare's measurement of its Markdown conversion shows a reduction of about 80%, but that figure is illustrative: it varies with the page, the converter and the tokenizer. Implementation varies by framework (Next.js proxy, Flask, etc.), but the pattern is consistent: parse the Accept header, including quality weights, and return the best match.
 
 - Markdown: ~3 tokens for "## Authentication", HTML: ~15 tokens
 - HTTP Accept header: "Accept: text/markdown" vs "Accept: text/html"
@@ -14,9 +14,9 @@ HTML consumes 5-6x more tokens than Markdown for the same content. Content negot
 - Not all agents send Accept headers yet (optional optimization)
 - Biggest impact on documentation-heavy systems
 
-HTML costs tokens. A heading in HTML is `<h2 class="text-2xl font-bold mt-8 mb-4">Authentication</h2>` - roughly 15 tokens. The same heading in Markdown is `## Authentication` - 3 tokens. Across a full documentation page, the reduction is consistent: serving Markdown instead of HTML cuts token consumption by approximately 80%.
+HTML costs tokens. A heading in HTML is `<h2 class="text-2xl font-bold mt-8 mb-4">Authentication</h2>` - roughly 15 tokens. The same heading in Markdown is `## Authentication` - 3 tokens. Across a full documentation page, the reduction is large: Cloudflare's [Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) measurement is about 80% fewer tokens. Treat that as an illustrative figure, not a constant - measure your own pages with your own tokenizer.
 
-For agents operating within context window budgets, this matters. An agent that can read five pages in Markdown reads one page in HTML for the same cost.
+For agents operating within context window budgets, this matters. At a five-to-one ratio, an agent that can read five pages in Markdown reads one page in HTML for the same cost.
 
 ## How Content Negotiation Works
 
@@ -32,31 +32,70 @@ An agent that prefers Markdown sends:
 Accept: text/markdown, text/plain;q=0.9, */*;q=0.8
 ```
 
-Your server reads the `Accept` header and returns the format with the highest priority that it can serve. If no matching format is available, it falls back to HTML.
+Your server reads the `Accept` header and returns the format with the highest quality weight that it can serve. A range with `q=0` means "not acceptable", so `Accept: text/markdown;q=0` must never select Markdown. If no matching format is available, it falls back to HTML.
 
 Not all agents send `Accept: text/markdown` today. Many still accept `*/*` and receive HTML. Content negotiation is an opt-in optimization - pages that serve it benefit agents that request it; all other clients receive HTML as before.
 
 ## Next.js App Router Implementation
 
-The cleanest approach in Next.js is a middleware rewrite that intercepts requests with `Accept: text/markdown` and routes them to a dedicated handler.
+The cleanest approach in Next.js is a proxy rewrite that intercepts requests preferring `text/markdown` and routes them to a dedicated handler. Next.js 16 renamed the `middleware.ts` file convention to `proxy.ts`, and the exported function from `middleware` to `proxy`.
 
-### Middleware
+### Accept parsing
+
+Do not match `text/markdown` with a substring test. That ignores `q=0` and relative preferences. Parse the media ranges and compare quality weights:
 
 ```typescript
-// middleware.ts
-import { NextRequest, NextResponse } from "next/server";
+// lib/accept.ts
+// Quality of the most specific range that matches `type` (exact, then type/*, then */*).
+function qualityFor(accept: string, type: string): number {
+  const [main] = type.split("/");
+  let best = { specificity: -1, q: 0 };
 
-export function middleware(request: NextRequest) {
+  for (const part of accept.toLowerCase().split(",")) {
+    const [range, ...params] = part.split(";").map((piece) => piece.trim());
+    const specificity = range === type ? 2 : range === `${main}/*` ? 1 : range === "*/*" ? 0 : -1;
+    if (specificity <= best.specificity) continue;
+
+    const qParam = params.find((param) => param.startsWith("q="));
+    const q = qParam === undefined ? 1 : Number.parseFloat(qParam.slice(2));
+    best = { specificity, q: Number.isNaN(q) ? 0 : q };
+  }
+
+  return best.q;
+}
+
+// Markdown wins only when it is acceptable (q > 0) and ranked above HTML.
+// `*/*` alone ranks both equally, so those clients still get HTML.
+export function prefersMarkdown(accept: string): boolean {
+  const markdown = qualityFor(accept, "text/markdown");
+  return markdown > 0 && markdown > qualityFor(accept, "text/html");
+}
+```
+
+### Proxy
+
+Send `Vary: Accept` on both variants, the HTML response as well as the Markdown one. A shared cache that only sees `Vary` on the Markdown response can still serve it to a browser.
+
+```typescript
+// proxy.ts
+import { NextRequest, NextResponse } from "next/server";
+import { prefersMarkdown } from "@/lib/accept";
+
+export function proxy(request: NextRequest) {
   const accept = request.headers.get("accept") ?? "";
 
-  if (accept.includes("text/markdown")) {
+  if (prefersMarkdown(accept)) {
     const url = request.nextUrl.clone();
     // Route to a markdown handler at /_md/[path]
     url.pathname = `/_md${request.nextUrl.pathname}`;
-    return NextResponse.rewrite(url);
+    const response = NextResponse.rewrite(url);
+    response.headers.set("Vary", "Accept");
+    return response;
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set("Vary", "Accept");
+  return response;
 }
 
 export const config = {
@@ -66,13 +105,16 @@ export const config = {
 
 ### Markdown Route Handler
 
+A folder that starts with an underscore is a private folder and is excluded from routing, so `app/_md/...` would never receive the rewrite. Prefix the folder with `%5F` (the URL-encoded underscore) to get a routable `/_md` segment, or pick a segment name without a leading underscore. In Next.js 16, route handler `params` is a promise:
+
 ```typescript
-// app/_md/docs/[...slug]/route.ts
+// app/%5Fmd/docs/[...slug]/route.ts - serves /_md/docs/...
 import { source } from "@/lib/source";
 import { notFound } from "next/navigation";
 
-export async function GET(_request: Request, { params }: { params: { slug: string[] } }) {
-  const page = source.getPage(params.slug);
+export async function GET(_request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params;
+  const page = source.getPage(slug);
 
   if (!page) {
     notFound();
@@ -105,18 +147,19 @@ function estimateTokens(text: string): number {
 
 ### Alternative: .md URL Suffix
 
-A simpler approach that avoids middleware complexity: serve Markdown at `.md`-suffixed URLs. This is the convention used by `llms.txt` link lists.
+A simpler approach that avoids proxy complexity: serve Markdown at `.md`-suffixed URLs. This is the convention used by `llms.txt` link lists. llms.txt v2 names two forms: append `.md` to the page URL (`/docs/authentication.html.md`), or replace the extension (`/docs/authentication.md`). It also uses standard link relations for discovery: `rel="alternate" type="text/markdown"` points to a page's Markdown version, and `rel="describedby"` points to the `llms.txt` file that covers the page, as an HTML `<link>` or an HTTP `Link` header (see the `Link` header section below). See [llms.txt](./llms-txt).
 
 ```typescript
 // app/docs/[...slug]/route.ts - handles /docs/authentication.md
-export async function GET(request: Request, { params }: { params: { slug: string[] } }) {
-  const lastSegment = params.slug[params.slug.length - 1];
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug: segments } = await params;
+  const lastSegment = segments[segments.length - 1];
 
   if (!lastSegment.endsWith(".md")) {
     return new Response("Not found", { status: 404 });
   }
 
-  const slug = [...params.slug.slice(0, -1), lastSegment.slice(0, -3)];
+  const slug = [...segments.slice(0, -1), lastSegment.slice(0, -3)];
 
   const page = source.getPage(slug);
 
@@ -138,6 +181,7 @@ export async function GET(request: Request, { params }: { params: { slug: string
 ```typescript
 import express from "express";
 import { readDocPage } from "./docs";
+import { prefersMarkdown } from "./accept"; // the q-value-aware parser shown above
 
 const app = express();
 
@@ -150,7 +194,7 @@ app.get("/docs/:slug", async (req, res) => {
 
   const accept = req.headers.accept ?? "";
 
-  if (accept.includes("text/markdown")) {
+  if (prefersMarkdown(accept)) {
     const markdown = page.markdown;
     const tokenCount = Math.ceil(markdown.length / 4);
 
@@ -164,7 +208,7 @@ app.get("/docs/:slug", async (req, res) => {
       .send(markdown);
   }
 
-  return res.status(200).send(page.html);
+  return res.status(200).set({ Vary: "Accept" }).send(page.html);
 });
 ```
 
@@ -172,7 +216,7 @@ app.get("/docs/:slug", async (req, res) => {
 
 **`Content-Type: text/markdown; charset=utf-8`** - Identifies the response as Markdown. Use the registered MIME type. Do not use `text/plain` for Markdown responses - it loses semantic meaning.
 
-**`Vary: Accept`** - Required for correct CDN caching. Without this header, a CDN may cache the Markdown response and serve it to browsers requesting HTML (or vice versa). `Vary: Accept` tells the CDN to cache separate copies for different `Accept` values.
+**`Vary: Accept`** - Required for correct CDN caching, on both the Markdown and the HTML response. Without this header, a CDN may cache the Markdown response and serve it to browsers requesting HTML (or vice versa). `Vary: Accept` tells the CDN to cache separate copies for different `Accept` values.
 
 **`x-markdown-tokens`** - An informal header carrying the estimated token count. Not standardized, but useful for agents that want to budget their context window before fetching. Omit if you do not compute it.
 
@@ -202,7 +246,7 @@ Without a canonical link, a Markdown mirror looks like a duplicate page rather t
 
 ## Locale and language negotiation
 
-The same negotiation mechanics that pick a format also pick a language. `Accept-Language` (RFC 7231 §5.3.5) works exactly like `Accept` - a client sends its preferred locales with weights, and your server returns the closest match:
+The same negotiation mechanics that pick a format also pick a language. `Accept-Language` ([RFC 9110 §12.5.4](https://www.rfc-editor.org/rfc/rfc9110.html#section-12.5.4)) works exactly like `Accept` - a client sends its preferred locales with weights, and your server returns the closest match:
 
 ```
 Accept-Language: fr-CA, fr;q=0.9, en;q=0.5
@@ -222,7 +266,7 @@ Cloudflare's "Markdown for Agents" feature performs automatic HTML-to-Markdown c
 
 This requires no changes to your origin server. Enable it in AI Crawl Control for the zone, or via the Cloudflare API by setting `content_converter` to `on`.
 
-The response should include `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and a `Content-Signal` header. Cloudflare's default converted responses currently signal `ai-train=yes, search=yes, ai-input=yes`; override content-use policy where the platform allows it.
+The response should include `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and a `Content-Signal` header. Cloudflare's default converted responses currently signal `ai-train=yes, search=yes, ai-input=yes`; override content-use policy where the platform allows it. As of its 2026-10-09 documentation update, the conversion preserves a `Content-Signal` header your origin already sends, and the origin value is authoritative over that default. It also preserves any `Vary` dimensions the origin response already carries.
 
 It only converts HTML origin responses, and Cloudflare documents a 2 MB origin response limit. Origin-served Markdown is preferable when you control the stack. Use edge conversion when modifying the origin is impractical. For arbitrary document conversion or dynamic pages, consider Workers AI `AI.toMarkdown()` or Browser Run's Markdown endpoint.
 

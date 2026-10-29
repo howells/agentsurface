@@ -11,7 +11,7 @@ Transform CLIs into agent-consumable tools with deterministic machine-readable o
 
 - Envelope format: { success, data|error, trace_id, timestamp }
 - `--format=json|ndjson` on all commands; NDJSON for streams
-- Semantic exit codes (0=ok, 2=usage, 3=notfound, 4=perm, 5=conflict)
+- Documented exit codes (this contract: 0=ok, 1=failure, 2=usage, 3=notfound, 4=perm, 5=conflict; only 0 and non-zero are universal)
 - `--schema` to introspect all commands, parameters, constraints
 - Input validation rejects path traversal, control chars, percent-encoded
 - TTY detection + NO_COLOR respect + NO_INTERACTIVE mode
@@ -35,27 +35,29 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - Human-readable text is stderr only
 
 2. **Implement envelope format**:
+
    ```typescript
    interface CommandResponse {
-     success: boolean;           // true=success, false=error
-     data?: unknown;             // Returned on success
+     success: boolean; // true=success, false=error
+     data?: unknown; // Returned on success
      error?: {
-       code: string;             // e.g. "INVALID_INPUT", "NOT_FOUND"
-       message: string;          // Human summary
-       details?: Record<string, unknown>;  // Field-level errors
+       code: string; // e.g. "INVALID_INPUT", "NOT_FOUND"
+       message: string; // Human summary
+       details?: Record<string, unknown>; // Field-level errors
      };
-     trace_id: string;           // UUID for debugging
-     timestamp: string;          // ISO 8601
+     trace_id: string; // UUID for debugging
+     timestamp: string; // ISO 8601
    }
    ```
 
 3. **TTY detection and defaults**:
-   - Detect: `const isTTY = process.stdout.isTTY && process.stderr.isTTY`
+   - Detect output with `process.stdout.isTTY` (stdout is what gets parsed); check `process.stdin.isTTY` separately before prompting or reading piped input
    - Non-TTY: suppress spinners, colors, interactive prompts; default to --format=json
    - Respect `NO_COLOR` env var (never output ANSI codes)
    - Respect `NO_INTERACTIVE` env var (fail fast if input needed)
 
-4. **Semantic exit codes** (POSIX convention):
+4. **Semantic exit codes** (a per-CLI contract, not a POSIX standard; publish it in `--help --json` and the skill file, since tools such as `gh` use different meanings for 2-5):
+
    ```
    0 — success
    1 — general failure (undefined error)
@@ -80,10 +82,13 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - Include `"dry_run": true` in data
 
 7. **Schema introspection** (new command):
+
    ```bash
    cli-tool schema  # or --schema
    ```
+
    Output all commands, parameters, constraints, scopes:
+
    ```json
    {
      "commands": {
@@ -103,7 +108,7 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    ```
 
 8. **Input hardening** (all params):
-   - Reject path traversal: `../`, `..\\`, absolute paths (unless intentional)
+   - Reject path traversal: resolve the real path (`fs.realpath` on the nearest existing ancestor) and reject anything outside the allowed directory, so symlinks cannot escape; also reject `../`, `..\\`, absolute paths (unless intentional)
    - Reject control characters: ASCII < 0x20
    - Reject percent-encoding tricks: `%2e`, `%2f`, `%00`
    - Reject embedded query params: `?`, `#` in resource IDs
@@ -139,7 +144,7 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
 
 ## Spec References
 
-- POSIX Exit Codes: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_08_02
+- POSIX exit status (only 0 = success and non-zero = failure are standard; the 0-5 meanings are this contract): https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_08_02
 - NDJSON: http://ndjson.org/
 - NO_COLOR: https://no-color.org/
 - Path Traversal Prevention: `/skills/surface/references/input-validation.md`

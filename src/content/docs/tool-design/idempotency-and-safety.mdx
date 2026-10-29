@@ -1,14 +1,14 @@
 ---
 title: Idempotency and Safety
 description: Designing tools to be safely retryable and clearly annotated as read or write
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Design tools to be safely retryable given network timeouts, rate limits, and model stochasticity. Idempotent tools produce identical results when called multiple times with the same inputs. Patterns: upsert instead of create+update, tag systems with idempotency keys, dry-run modes before mutations, clear read vs. write classification. Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint in MCP) enable downstream safety reasoning. Avoid hidden state changes; minimize side effects.
+Design tools to be safely retryable given network timeouts, rate limits, and model stochasticity. Idempotent tools leave the same server-side effect when called multiple times with the same inputs (the response body can differ). Patterns: upsert instead of create+update, tag systems with idempotency keys, dry-run modes before mutations, clear read vs. write classification. Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint in MCP) enable downstream safety reasoning. Avoid hidden state changes; minimize side effects.
 
-- **Idempotency**: Same inputs → same results on retry
+- **Idempotency**: Same inputs → same intended effect on retry
 - **Upsert pattern**: Single operation instead of create + update
 - **Idempotency keys**: Client-provided UUID for deduplication
 - **Dry-run modes**: Test mutations before execution
@@ -21,7 +21,7 @@ Agents are not deterministic. Network timeouts, rate limits, and model stochasti
 
 ## Idempotency
 
-An idempotent tool produces the same result when called multiple times with identical inputs. Retries then return the same outcome instead of duplicating the side effect.
+An idempotent tool has the same intended effect on the server whether it is called once or many times with identical inputs, so a retry doesn't duplicate the side effect. This is about effect, not response bodies: a repeated `DELETE` may return 404 after the first succeeds, and a read may return newer data ([RFC 9110, section 9.2.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)). A deduplication-key contract (below) can separately promise to replay the original result.
 
 ### Patterns
 
@@ -40,7 +40,7 @@ upsert_user(
 )
 ```
 
-The agent calls `upsert_user` once. If the call succeeds, the user exists with the provided data. If the call fails and the agent retries, the result is identical.
+The agent calls `upsert_user` once. If the call succeeds, the user exists with the provided data. If the call fails and the agent retries, the user ends up in the same state.
 
 **Idempotency keys:**
 
@@ -62,18 +62,18 @@ The handler looks the key up before executing and returns the existing result on
 
 **For read-only tools:**
 
-All read tools are idempotent by definition. Calling `search_issues` ten times with the same query returns the same result set (ignoring time-series changes). No special handling needed.
+Read tools are safe to retry: a repeated call changes nothing on the server. Calling `search_issues` ten times with the same query may return different results if the data changed in between, and independent snapshots aren't guaranteed to be consistent. Concurrent calls can also share a rate limit. No special retry handling is needed beyond that.
 
 ### When to Mark as Idempotent
 
 Use the MCP `idempotentHint` annotation:
 
 ```typescript
-server.tool(
+server.registerTool(
   "upsert_user",
-  "Creates a user or updates if exists. Idempotent.",
-  schema,
   {
+    description: "Creates a user or updates if exists. Idempotent.",
+    inputSchema: schema,
     annotations: {
       idempotentHint: true, // Safe to retry
       destructiveHint: false, // Does not delete
@@ -92,11 +92,11 @@ Every tool must be clearly classified as read-only or write (mutating).
 Tools that query without side effects:
 
 ```typescript
-server.tool(
+server.registerTool(
   "search_issues",
-  "Search for existing issues...",
-  searchSchema,
   {
+    description: "Search for existing issues...",
+    inputSchema: searchSchema,
     annotations: {
       readOnlyHint: true, // No mutations
       destructiveHint: false, // Nothing deleted
@@ -117,11 +117,11 @@ This is model-initiated parallel tool calling - the model issues several tool ca
 Tools that create, update, or mutate state:
 
 ```typescript
-server.tool(
+server.registerTool(
   "create_invoice",
-  "Creates a new invoice...",
-  createSchema,
   {
+    description: "Creates a new invoice...",
+    inputSchema: createSchema,
     annotations: {
       readOnlyHint: false, // Mutates database
       destructiveHint: false, // Does not delete (can be reversed)
@@ -140,15 +140,15 @@ Write tools should typically be called sequentially or in known dependency order
 Tools that delete, void, or irreversibly modify data:
 
 ```typescript
-server.tool(
+server.registerTool(
   "delete_invoice",
-  "Permanently deletes an invoice. This cannot be undone...",
-  deleteSchema,
   {
+    description: "Permanently deletes an invoice. This cannot be undone...",
+    inputSchema: deleteSchema,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true, // Irreversible mutation
-      idempotentHint: false, // Not safe to retry (second call will fail)
+      idempotentHint: false, // Conservative: a retry returns "not found" rather than succeeding again
       openWorldHint: false,
     },
   },
@@ -164,11 +164,13 @@ For risky operations, expose a preview tool that describes what would happen wit
 
 ```typescript
 // Preview tool
-server.tool(
+server.registerTool(
   "preview_migration",
-  "Shows what tables and columns would change without executing...",
-  migrationSchema,
-  { annotations: { readOnlyHint: true } },
+  {
+    description: "Shows what tables and columns would change without executing...",
+    inputSchema: migrationSchema,
+    annotations: { readOnlyHint: true },
+  },
   async (params) => {
     const plan = await generateMigrationPlan(params.migration_id);
     return {
@@ -183,11 +185,13 @@ server.tool(
 );
 
 // Execution tool (called only after preview approved)
-server.tool(
+server.registerTool(
   "execute_migration",
-  "Executes the migration. Call preview_migration first to review changes...",
-  migrationSchema,
-  { annotations: { destructiveHint: true, idempotentHint: false } },
+  {
+    description: "Executes the migration. Call preview_migration first to review changes...",
+    inputSchema: migrationSchema,
+    annotations: { destructiveHint: true, idempotentHint: false },
+  },
   async (params) => {
     const result = await runMigration(params.migration_id);
     return { content: [{ type: "text", text: `Migration ${params.migration_id} applied.` }] };
@@ -272,20 +276,24 @@ Never expose a direct-send or direct-delete tool to the model unprompted. Split 
 
 ```typescript
 // Step 1: safe and idempotent: returns a preview, does not send
-server.tool(
+server.registerTool(
   "invoice_create_draft",
-  "Create a draft invoice. Does not send.",
-  draftSchema,
-  { annotations: WRITE },
+  {
+    description: "Create a draft invoice. Does not send.",
+    inputSchema: draftSchema,
+    annotations: WRITE,
+  },
   handler,
 );
 
 // Step 2: irreversible: only called after the human has seen the preview and confirmed
-server.tool(
+server.registerTool(
   "invoice_confirm_and_send",
-  "Send a draft invoice. Irreversible.",
-  confirmSchema,
-  { annotations: DESTRUCTIVE },
+  {
+    description: "Send a draft invoice. Irreversible.",
+    inputSchema: confirmSchema,
+    annotations: DESTRUCTIVE,
+  },
   handler,
 );
 ```
@@ -302,21 +310,24 @@ In descriptions, explicitly state:
 4. **Rate limits** - "Max 10 calls per minute"
 
 ```typescript
-server.tool(
+server.registerTool(
   "send_invoice_email",
-  "Sends the invoice to the customer via email. Idempotent: calling twice " +
-    "on the same invoice does not send duplicate emails. The customer receives " +
-    "the hosted payment link in the email body. This can be reverted by calling " +
-    "`revoke_sent_invoice` if sent in error.",
-  schema,
-  { annotations: { idempotentHint: true } },
+  {
+    description:
+      "Sends the invoice to the customer via email. Idempotent: calling twice " +
+      "on the same invoice does not send duplicate emails. The customer receives " +
+      "the hosted payment link in the email body. This can be reverted by calling " +
+      "`revoke_sent_invoice` if sent in error.",
+    inputSchema: schema,
+    annotations: { idempotentHint: true },
+  },
   handler,
 );
 ```
 
 ## Error Handling for Destructive Operations
 
-See `/docs/error-handling/idempotency` for structured error patterns. For destructive operations, always return structured errors rather than throwing:
+See `/docs/error-handling/idempotency` for structured error patterns. For destructive operations, always return structured errors rather than throwing (the `isError: true` result is the MCP convention). Validation failures like these are not retriable as-is. If your error shape carries an `is_retriable` flag, it means the same call is safe to repeat unchanged, so set it to `false` for these and say what to change instead:
 
 ```typescript
 async (params) => {
@@ -368,4 +379,4 @@ The MCP `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`
 - [Human Approval](/docs/tool-design/human-approval) - the surface contract for suspending a call on human sign-off and resuming it
 - `/docs/error-handling/idempotency` - retry logic and recovery patterns
 - ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - current annotation semantics
-- ([Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system))
+- ([Anthropic multi-agent research system](https://www.anthropic.com/research/multi-agent-research-system))

@@ -1,7 +1,7 @@
 ---
 title: Arazzo Workflows
 description: Using the OpenAPI Arazzo specification to define multi-step agent workflows with explicit sequencing, control flow, and runtime expressions
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -34,7 +34,7 @@ A workflow definition includes:
 
 ## Core Structure
 
-An Arazzo document has five top-level fields: `arazzo`, `info`, `sourceDescriptions`, `workflows`, and `components`.
+The example below uses five top-level fields: `arazzo`, `info`, `sourceDescriptions`, `workflows`, and `components`. The root object can also carry `$self` and specification extensions.
 
 ```yaml
 arazzo: "1.1.0"
@@ -75,7 +75,7 @@ workflows:
           $ref: "#/components/inputs/PassengerDetails"
     steps:
       - stepId: search-flights
-        operationId: $sourceDescriptions.flights-api#search_flights
+        operationId: $sourceDescriptions.flights-api.search_flights
         parameters:
           - name: origin
             in: query
@@ -88,7 +88,7 @@ workflows:
             value: $inputs.departure_date
         successCriteria:
           - condition: $statusCode == 200
-          - condition: $response.body#/flights/length > 0
+          - condition: $[?count(@.flights) > 0]
             context: $response.body
             type: jsonpath
         onSuccess:
@@ -100,13 +100,14 @@ workflows:
             type: end
         outputs:
           flights: $response.body#/flights
+          first_flight_id: $response.body#/flights/0/id
 
       - stepId: select-flight
-        operationId: $sourceDescriptions.flights-api#hold_flight
+        operationId: $sourceDescriptions.flights-api.hold_flight
         requestBody:
           contentType: application/json
           payload:
-            flight_id: $steps.search-flights.outputs.flights[0].id
+            flight_id: $steps.search-flights.outputs.first_flight_id
             passenger_count: 1
         successCriteria:
           - condition: $statusCode == 200
@@ -120,7 +121,7 @@ workflows:
           currency: $response.body#/currency
 
       - stepId: process-payment
-        operationId: $sourceDescriptions.payments-api#charge_card
+        operationId: $sourceDescriptions.payments-api.charge_card
         requestBody:
           contentType: application/json
           payload:
@@ -141,7 +142,7 @@ workflows:
           payment_id: $response.body#/payment_id
 
       - stepId: confirm-booking
-        operationId: $sourceDescriptions.flights-api#confirm_flight_booking
+        operationId: $sourceDescriptions.flights-api.confirm_flight_booking
         requestBody:
           contentType: application/json
           payload:
@@ -158,7 +159,7 @@ workflows:
           booking_id: $response.body#/id
 
       - stepId: release-hold
-        operationId: $sourceDescriptions.flights-api#cancel_flight_hold
+        operationId: $sourceDescriptions.flights-api.cancel_flight_hold
         parameters:
           - name: hold_id
             in: path
@@ -185,7 +186,7 @@ components:
           format: date
 ```
 
-Each `sourceDescriptions` entry's `type` is `openapi`, `asyncapi`, or `arazzo` (a nested reference to another Arazzo document). The `asyncapi` type, added in 1.1.0, lets a workflow step bind to an AsyncAPI operation - orchestrating a publish/subscribe or messaging step alongside REST steps in the same workflow, using the same `$sourceDescriptions.<name>#<operationId>` reference syntax.
+Each `sourceDescriptions` entry's `type` is `openapi`, `asyncapi`, or `arazzo` (a nested reference to another Arazzo document). The `asyncapi` type, added in 1.1.0, lets a workflow step bind to an AsyncAPI operation - orchestrating a publish/subscribe or messaging step alongside REST steps in the same workflow, using the same `$sourceDescriptions.<name>.<operationId>` reference syntax.
 
 ## Runtime Expressions
 
@@ -222,6 +223,8 @@ steps:
 ```
 
 Downstream steps then reference `$steps.create-order.outputs.order_id` rather than navigating the raw response body repeatedly.
+
+Runtime expressions are not JavaScript: they don't evaluate property access or array indexing such as `outputs.flights[0].id`. Extract the value into a named output first (`$response.body#/flights/0/id`, or a Selector Object), then reference that output.
 
 ### Selector Object (Arazzo 1.1.0)
 
@@ -287,13 +290,13 @@ onFailure:
 
 ### Success Criteria
 
-`successCriteria` defines what constitutes a successful step. Default is `$statusCode == 200`. You can add additional conditions:
+`successCriteria` defines what constitutes a successful step. Arazzo 1.1.0 doesn't define a default HTTP success criterion such as `$statusCode == 200`, so state the intended status codes explicitly and add further conditions as needed. Array length can't be read with a JSON Pointer (`/items/length` addresses a property named `length`); use a JSONPath condition, which passes when the query returns a non-empty nodelist:
 
 ```yaml
 successCriteria:
   - condition: $statusCode == 200
   - condition: $response.body#/status == 'confirmed'
-  - condition: $response.body#/items/length > 0
+  - condition: $[?count(@.items) > 0]
     context: $response.body
     type: jsonpath
 ```
@@ -320,29 +323,30 @@ Step `operationId` references are then prefixed with the source description name
 ```yaml
 steps:
   - stepId: check-stock
-    operationId: $sourceDescriptions.inventory-api#check_inventory
+    operationId: $sourceDescriptions.inventory-api.check_inventory
   - stepId: create-invoice
-    operationId: $sourceDescriptions.billing-api#create_invoice
+    operationId: $sourceDescriptions.billing-api.create_invoice
   - stepId: notify-customer
-    operationId: $sourceDescriptions.notification-api#send_email
+    operationId: $sourceDescriptions.notification-api.send_email
 ```
 
 This enables workflows that span service boundaries within a single definition, rather than requiring each service to implement cross-service coordination logic.
 
 ## Reusable Components
 
-Repeat parameters and input schemas can be extracted into `components` for reuse across workflows:
+Repeat parameters and input schemas can be extracted into `components` for reuse across workflows. `components.parameters` maps a name to a single Parameter Object, not to an array of them:
 
 ```yaml
 components:
   parameters:
-    PaginationParameters:
-      - name: page
-        in: query
-        value: $inputs.page
-      - name: limit
-        in: query
-        value: $inputs.limit
+    page:
+      name: page
+      in: query
+      value: $inputs.page
+    limit:
+      name: limit
+      in: query
+      value: $inputs.limit
 
   inputs:
     DateRangeInput:
@@ -357,14 +361,15 @@ components:
           format: date
 ```
 
-Reference them in workflows:
+Reference them from a step's `parameters` array with a Reusable Object, whose `reference` is a runtime expression (not a `$ref`):
 
 ```yaml
 steps:
   - stepId: list-transactions
     operationId: list_transactions
     parameters:
-      $ref: "#/components/parameters/PaginationParameters"
+      - reference: $components.parameters.page
+      - reference: $components.parameters.limit
 ```
 
 ## How Arazzo Complements MCP
@@ -377,7 +382,7 @@ MCP tools expose individual operations. Arazzo describes how those operations co
 | Business workflows    | Arazzo    | Multi-step sequences with control flow |
 | Orchestration         | Agent     | High-level task completion             |
 
-When you generate MCP tools from an API, generate tools for both individual endpoints and Arazzo workflows. An agent exposed to a `book_flight` workflow tool can invoke the complete booking sequence as a single atomic operation, rather than being responsible for sequencing search → hold → pay → confirm itself.
+When you generate MCP tools from an API, generate tools for both individual endpoints and Arazzo workflows. An agent exposed to a `book_flight` workflow tool can invoke the complete booking sequence as a single composite tool call, rather than being responsible for sequencing search → hold → pay → confirm itself. Arazzo does not make that sequence transactional: there is no automatic rollback across services, so define compensation steps (like `release-hold` above) and the partial-failure outcomes the tool reports.
 
 ```json
 // MCP tool generated from an Arazzo workflow
@@ -424,10 +429,10 @@ The workflow tool's description comes from the Arazzo `workflow.description` fie
 
 ### Validation
 
-Validate Arazzo documents with the `@jentic/arazzo-validator` package before generating tools:
+Validate Arazzo documents before generating tools. The `@jentic/arazzo-validator` package takes the file directly, but its README lists support for Arazzo 1.0.0 and 1.0.1 only (latest npm tag `1.0.0-alpha.32`, observed 2026-10-29), so it can't validate this page's 1.1.0 examples. Use it against 1.0.x documents, or check 1.1.0 documents against the schema published at [spec.openapis.org/arazzo](https://spec.openapis.org/arazzo/):
 
 ```bash
-npx @jentic/arazzo-validator validate booking-workflows.arazzo.yaml
+npx @jentic/arazzo-validator booking-workflows.arazzo.yaml
 ```
 
 ### Version Alongside OpenAPI

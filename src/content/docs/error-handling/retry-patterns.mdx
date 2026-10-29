@@ -1,7 +1,7 @@
 ---
 title: Retry and Recovery Patterns
 description: Exponential backoff, circuit breakers, and idempotency for resilient agent-driven workflows
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -222,9 +222,12 @@ async function withRateLimitHandling(fn: () => Promise<Response>): Promise<Respo
     const retryAfter = response.headers.get("Retry-After");
 
     if (retryAfter) {
-      const waitSeconds = parseInt(retryAfter, 10);
-      if (!isNaN(waitSeconds)) {
-        await sleep(waitSeconds * 1000);
+      // Retry-After is either delay-seconds or an HTTP-date
+      const waitMs = /^\d+$/.test(retryAfter)
+        ? Number(retryAfter) * 1000
+        : Date.parse(retryAfter) - Date.now();
+      if (!Number.isNaN(waitMs)) {
+        await sleep(Math.max(0, waitMs));
         return fn(); // Single retry after the specified wait
       }
     }
@@ -327,13 +330,13 @@ Not all errors should be retried. Retrying a 400 Validation Error or a 403 Forbi
 ```typescript
 function isRetriable(err: unknown): boolean {
   if (err instanceof ApiError) {
-    // These are never retriable
-    if ([400, 401, 403, 404, 410, 422].includes(err.status)) {
-      return false;
+    // The server's explicit flag wins over the status heuristic
+    if (typeof err.problem?.is_retriable === "boolean") {
+      return err.problem.is_retriable;
     }
 
-    // Check the problem body's explicit flag
-    if (err.problem?.is_retriable === false) {
+    // Without a flag, these never succeed if resent unchanged
+    if ([400, 401, 403, 404, 410, 422].includes(err.status)) {
       return false;
     }
 
@@ -352,7 +355,7 @@ function isRetriable(err: unknown): boolean {
 }
 ```
 
-The `is_retriable` field in the RFC 9457 Problem Details body takes precedence over the status code heuristic. A 422 with `is_retriable: true` indicates the server believes the request could succeed after modification. A 503 with `is_retriable: false` means the service is permanently unavailable (decommissioned, not transient).
+The `is_retriable` extension in the Problem Details body takes precedence over the status code heuristic. It isn't defined by RFC 9457; it is this guide's convention, and it means "safe to retry unchanged". A 409 with `is_retriable: true` means the same request should succeed once a conflicting operation finishes. A 503 with `is_retriable: false` means the service is permanently unavailable (decommissioned, not transient). A request that could succeed after modification is a different signal: say so with `invalid_fields` or `suggestions`, and set `is_retriable: false`.
 
 ## Checklist
 

@@ -1,33 +1,33 @@
 ---
 title: Tool Definitions from API Operations
 description: Mapping OpenAPI operations to agent tool definitions; universal tool-design guidance lives in Tool Design
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Every generated tool has three fields - `name`, `description`, and input `schema` - and each maps mechanically from one OpenAPI operation. This page covers only that mapping: how an operation's `operationId`, `summary`, parameters, request body, and responses become a tool definition. The portable rules for _writing_ good names, descriptions, schemas, and curated tool sets are not API-specific and live in the [Tool Design](/docs/tool-design) section - this page links there rather than repeating them.
+Every generated tool has three fields - `name`, `description`, and input `schema` - and each can be derived from one OpenAPI operation. The mapping below is the suggested adapter design, not a contract every generator follows: generators differ in naming overrides, parameter nesting and collision handling, request-body merging, response selection, and whether they emit output schemas. Check the generator and version you use. This page covers only that mapping: how an operation's `operationId`, `summary`, parameters, request body, and responses become a tool definition. The portable rules for _writing_ good names, descriptions, schemas, and curated tool sets are not API-specific and live in the [Tool Design](/docs/tool-design) section - this page links there rather than repeating them.
 
 - `operationId` → tool `name`
 - `summary` / `description` → tool `description`
 - `parameters` + `requestBody` schema → input `schema`
 - `2xx` response schema → output schema
-- `x-agent-*` extensions → MCP annotations
+- `x-agent-*` extensions → MCP annotations (only if your adapter implements this)
 
 ## Operation-to-Tool Mapping
 
-When a framework ingests your OpenAPI spec, it generates one tool per operation using this mapping:
+When a framework or adapter that follows this design ingests your OpenAPI spec, it generates one tool per operation using this mapping:
 
-| OpenAPI element           | Tool field    | Notes                                                                  |
-| ------------------------- | ------------- | ---------------------------------------------------------------------- |
-| `operationId`             | `name`        | Must be globally unique and `verb_noun` - it becomes the function name |
-| `summary` + `description` | `description` | The agent's routing prompt; write it as trigger conditions, not docs   |
-| path/query `parameters`   | input schema  | Flattened into the schema's `properties`                               |
-| `requestBody` schema      | input schema  | Merged with parameters into one flat object                            |
-| `2xx` response schema     | output schema | Enables downstream tools to reason over typed results                  |
-| `x-agent-*` extensions    | annotations   | Confirmation, idempotency, destructive hints                           |
+| OpenAPI element           | Tool field    | Notes                                                                |
+| ------------------------- | ------------- | -------------------------------------------------------------------- |
+| `operationId`             | `name`        | Unique, `verb_noun` by house convention - becomes the function name  |
+| `summary` + `description` | `description` | The agent's routing prompt; write it as trigger conditions, not docs |
+| path/query `parameters`   | input schema  | Flattened into the schema's `properties`                             |
+| `requestBody` schema      | input schema  | Merged with parameters into one flat object                          |
+| `2xx` response schema     | output schema | Enables downstream tools to reason over typed results                |
+| `x-agent-*` extensions    | annotations   | Confirmation, idempotency, destructive hints                         |
 
-Because the generated `name` and `description` come straight from `operationId`, `summary`, and `description`, spec quality is tool quality. A vague `summary` or `description` becomes a vague routing prompt; a missing `operationId` breaks tool generation entirely. See [OpenAPI for Agents](./openapi-for-agents) for the spec-authoring rules that make this mapping produce good tools.
+Because the generated `name` and `description` come straight from `operationId`, `summary`, and `description`, spec quality is tool quality. A vague `summary` or `description` becomes a vague routing prompt; a missing `operationId` leaves the generator to derive a name from the path and method, which is unstable. See [OpenAPI for Agents](./openapi-for-agents) for the spec-authoring rules that make this mapping produce good tools.
 
 ## Worked Example
 
@@ -80,7 +80,7 @@ Generates this tool definition:
 
 ## Extensions and Annotations
 
-Agent-facing behavior that has no native OpenAPI field is carried by `x-agent-*` extensions on the operation and translated into MCP annotations (`readOnlyHint`, `idempotentHint`, `destructiveHint`) at generation time. The extension-to-annotation table lives in [OpenAPI Extensions](./openapi-extensions); the semantics of the annotations themselves are covered in [Tool Design: Idempotency and Safety](/docs/tool-design/idempotency-and-safety).
+Agent-facing behavior that has no native OpenAPI field can be carried by `x-agent-*` extensions on the operation and translated into MCP annotations (`readOnlyHint`, `idempotentHint`, `destructiveHint`) at generation time. There is no standard OpenAPI-to-MCP mapping for these custom fields: the translation exists only if your generator or adapter implements it, and you should document which one does. MCP annotations are [hints](https://modelcontextprotocol.io/specification/2026-07-28/server/tools), not an approval or authorization guarantee. The extension-to-annotation table lives in [OpenAPI Extensions](./openapi-extensions); the semantics of the annotations themselves are covered in [Tool Design: Idempotency and Safety](/docs/tool-design/idempotency-and-safety).
 
 ## Generating the Tools
 

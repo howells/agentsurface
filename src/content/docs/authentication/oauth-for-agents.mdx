@@ -1,7 +1,7 @@
 ---
 title: OAuth 2.1 for Agents
 description: Client Credentials grant, PKCE, token caching, and JWT validation for M2M auth
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -49,14 +49,13 @@ No `refresh_token`. When the token expires, request a new one using the same cre
 Short-lived tokens (1–4 hours) are cheap to issue and validate. Cache them and reuse for their lifetime. Refresh proactively before expiry with a buffer (typically 5 minutes).
 
 ```typescript
-import { jwtDecode } from "jose";
-
-interface TokenCache {
+interface CachedToken {
   accessToken: string;
   expiresAt: number; // Unix timestamp
 }
 
-let cache: TokenCache | null = null;
+// One entry per security context: never hand a read token to a write request
+const cache = new Map<string, CachedToken>();
 
 async function getAccessToken(config: {
   clientId: string;
@@ -66,10 +65,12 @@ async function getAccessToken(config: {
 }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const bufferSeconds = 5 * 60;
+  const key = [config.tokenUrl, config.clientId, [...config.scopes].sort().join(" ")].join("|");
 
   // Return cached token if valid (with 5-minute buffer)
-  if (cache && cache.expiresAt - now > bufferSeconds) {
-    return cache.accessToken;
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt - now > bufferSeconds) {
+    return cached.accessToken;
   }
 
   const form = new URLSearchParams({
@@ -92,10 +93,10 @@ async function getAccessToken(config: {
 
   const { access_token, expires_in } = await res.json();
 
-  cache = {
+  cache.set(key, {
     accessToken: access_token,
     expiresAt: now + expires_in,
-  };
+  });
 
   return access_token;
 }
@@ -147,7 +148,7 @@ For multi-step workflows where scope requirements vary, use Token Exchange (RFC 
 
 ## JWT Validation
 
-Tokens from OAuth servers are JWTs. Validate before trusting any claim inside. Use `jose`:
+OAuth doesn't require JWT access tokens; many servers issue opaque tokens, which you validate through the issuer's introspection endpoint instead. When your authorization server does issue JWT access tokens, validate before trusting any claim inside. Use `jose`:
 
 ```typescript
 import { jwtVerify, createRemoteJWKSet } from "jose";

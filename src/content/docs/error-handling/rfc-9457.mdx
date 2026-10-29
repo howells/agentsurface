@@ -1,7 +1,7 @@
 ---
 title: RFC 9457 Problem Details
 description: The current standard for structured HTTP error responses that agents can parse and act on
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -80,12 +80,11 @@ Agents should never branch on the `title` or `detail` fields - those are prose f
 
 ## RFC 9457 vs RFC 7807
 
-RFC 9457 retains full backward compatibility with RFC 7807 while adding:
+RFC 9457 retains full backward compatibility with RFC 7807. Its Appendix D lists three changes:
 
 - **Formal type registration**: The [IANA HTTP Problem Types registry](https://www.iana.org/assignments/http-problem-types) gives `type` URIs a place to be registered and documented. It covers the `type` values themselves, not extension member names like `is_retriable` or `trace_id` - there is no registry for those; document them in your own API reference.
-- **Internationalization support**: Extensions may include language tags and localized explanations.
-- **Security clarifications**: Explicit guidance on preventing information disclosure (no stack traces, internal error codes sanitized).
-- **Instance URI semantics**: Clearer definition of when `instance` should be a server-relative URI vs absolute URI.
+- **Multiple problems**: Clarified guidance on representing more than one problem in a response.
+- **Non-dereferenceable type URIs**: Guidance for `type` URIs that aren't meant to be fetched, including the use of tag URIs.
 
 For practical purposes, both standards share the core five fields and the extension mechanism. Use RFC 9457 as the baseline for new APIs.
 
@@ -188,7 +187,7 @@ A correlation ID linking this error to a specific request in the service's obser
 
 ### `errors`
 
-RFC 9457 allows aggregating multiple problems under an `errors` array - useful for batch operations or multi-field validation. Each element follows the same Problem Details schema, so an agent can recurse into it to recover per item:
+RFC 9457 allows extension members, and its own validation example aggregates multiple problems under an `errors` array - useful for batch operations or multi-field validation. The RFC doesn't require the elements to be Problem Details; this guide recommends nesting full Problem objects as its own API contract, so an agent can recurse into each one to recover per item:
 
 ```json
 {
@@ -219,7 +218,9 @@ A single schema keeps error responses consistent across API handlers and CLI out
 import { z } from "zod";
 
 const ProblemDetails = z.object({
-  type: z.string().url().optional().default("about:blank"),
+  // RFC 9457 allows any URI reference here, including relative ones
+  type: z.string().optional().default("about:blank"),
+  // title, status and detail are optional in the RFC; this profile requires them
   title: z.string(),
   status: z.number().int().min(400).max(599),
   detail: z.string(),
@@ -274,7 +275,7 @@ async function callTool(tool: string, params: Record<string, unknown>): Promise<
 
 ## Batch Error Aggregation
 
-When processing multiple items, return partial success with per-item errors under the `errors` array rather than failing the whole batch:
+When processing multiple items, report per-item errors rather than failing the whole batch. A partly successful batch is a success at the HTTP level, so return `200` with a documented batch envelope; reserve a Problem Details response for when every item fails:
 
 ```typescript
 async function batchCreateInvoices(invoices: InvoiceData[]): Promise<Response> {
@@ -291,25 +292,26 @@ async function batchCreateInvoices(invoices: InvoiceData[]): Promise<Response> {
         status: 422,
         detail: `Item ${i}: ${err.message}`,
         instance: `batch-item-${i}`,
-        is_retriable: true,
+        is_retriable: false, // fix the item before resending it
       });
     }
   }
 
-  if (errors.length > 0) {
+  if (results.length === 0 && errors.length > 0) {
     return Response.json(
       {
         type: "https://example.com/errors/batch-failure",
-        title: "Batch operation partially failed",
-        status: 207, // Multi-status
-        detail: `${results.length} succeeded, ${errors.length} failed`,
+        title: "Batch operation failed",
+        status: 422,
+        detail: `All ${errors.length} items failed`,
         errors,
       },
-      { status: 207 },
+      { status: 422, headers: { "Content-Type": "application/problem+json" } },
     );
   }
 
-  return Response.json(results);
+  // Partial or full success: a batch envelope, not a problem document
+  return Response.json({ results, errors });
 }
 ```
 

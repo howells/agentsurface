@@ -1,12 +1,12 @@
 ---
 title: The Agent DX CLI Scale
 description: A seven-axis scoring framework for evaluating how well a CLI supports AI agent operation
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-The Agent DX CLI Scale scores CLIs on seven axes (0-3 each, 0-21 total): machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, and agent knowledge packaging. The score maps to readiness tiers from Human-only (0-5) to Agent-first (16-21). This framework quantifies gaps and helps prioritize work.
+The Agent DX CLI Scale scores CLIs on seven axes (0-3 each, 0-21 total): machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, and agent knowledge packaging. The score maps to readiness tiers from Human-only (0-5) to Agent-first (16-21). This framework quantifies gaps and helps prioritize work. It is a local evaluation rubric, not a cross-vendor CLI standard, and the scores are author judgement.
 
 ```
 Axis 1: Machine-Readable Output    (0-3)
@@ -95,12 +95,12 @@ See [Input Hardening](./input-hardening) for implementation guidance.
 
 Can agents validate before acting, and are responses sanitized against prompt injection?
 
-| Score | Criteria                                                                                                                                                                                                                      |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No dry-run mode. No response sanitization.                                                                                                                                                                                    |
-| 1     | `--dry-run` exists for some mutating commands.                                                                                                                                                                                |
-| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                                                                                                      |
-| 3     | Dry-run plus response screening (for example, running API responses through a screening service such as Google Cloud Model Armor) to catch prompt injection embedded in API data. The full request→response loop is defended. |
+| Score | Criteria                                                                                                                                                                                                                          |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No dry-run mode. No response sanitization.                                                                                                                                                                                        |
+| 1     | `--dry-run` exists for some mutating commands.                                                                                                                                                                                    |
+| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                                                                                                          |
+| 3     | Dry-run plus response screening (for example, running API responses through a screening service such as Google Cloud Model Armor) to catch prompt injection embedded in API data. The request→response loop has layered defenses. |
 
 See [Safety Rails](./safety-rails) for implementation guidance.
 
@@ -132,9 +132,9 @@ Not scored, but note whether the CLI exposes multiple agent surfaces from the sa
 
 - **MCP (stdio JSON-RPC)** - typed tool invocation without shell escaping; agents treat the CLI as a native tool rather than a subprocess
 - **Extension / plugin install** - the agent can install the CLI as a capability within its tool ecosystem, rather than shelling out to it
-- **Headless auth** - environment variables for all credentials, with no browser redirect or interactive setup required
+- **Headless auth** - environment variables for credentials, with no browser redirect or interactive setup required where the credential type allows it
 
-A CLI that scores 18/21 but requires browser-based OAuth for authentication is still unusable in headless agent environments. Multi-surface readiness is the difference between "can be used by agents with careful setup" and "works in any agent deployment context."
+A CLI that scores 18/21 but requires browser-based OAuth for authentication is still unusable in headless agent environments. Environment variables help, but they don't guarantee deployability everywhere: it depends on the credential type, its scope and your policy, and a secure browser or device flow can provision a later headless session. Stripe's non-interactive login, for example, returns a browser URL and a follow-up command to complete it. Multi-surface readiness is the difference between "can be used by agents with careful setup" and "works in the deployment contexts you have tested." State which contexts you tested.
 
 ## How to Evaluate Your Own CLI
 
@@ -172,22 +172,22 @@ Score what you observe, not what the documentation claims.
 
 The Stripe CLI (`stripe`) is a widely-used API CLI that scores well on several axes and illustrates the tradeoffs. Stripe has shipped dedicated agent tooling, which moves three of the seven axes.
 
-| Axis                      | Score  | Notes                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Machine-Readable Output   | 2      | `stripe login --non-interactive` auto-activates and prints JSON once stdin isn't a terminal; `post`/`get`/`delete` return the Stripe API's native JSON by default; `pay` requires `--agent`/`--json` for scripted use. NDJSON streaming for paginated list output is not documented, so this stops short of a 3.                                                           |
-| Raw Payload Input         | 3      | `stripe post /v1/customers -d 'param=value'` maps directly to API params; raw flag-based API access with full API schema parity                                                                                                                                                                                                                                            |
-| Schema Introspection      | 1      | `stripe completion` for shell completions; no `--help --json` or structured describe output                                                                                                                                                                                                                                                                                |
-| Context Window Discipline | 1      | No `--fields` flag; returns full API objects; some pagination support                                                                                                                                                                                                                                                                                                      |
-| Input Hardening           | 1      | Basic type validation; no explicit control-character or path-traversal defense documented                                                                                                                                                                                                                                                                                  |
-| Safety Rails              | 1      | `--dry-run` exists on `stripe pay` (the money-moving command) with a `confirmation_required` JSON contract gating `--yes`, so an agent can validate a transfer before it sends money; the generic `post`/`delete` mutation commands have no `--dry-run`, only an interactive confirm prompt (`--confirm` to skip it) - coverage is one command, not all mutating commands. |
-| Agent Knowledge Packaging | 2      | `stripe agent setup` detects Claude Code, Codex, and Cursor and installs a Stripe plugin, skills, and an MCP server; `stripe projects init` and `stripe projects llm-context` generate a project `AGENTS.md`.                                                                                                                                                              |
-| **Total**                 | **11** | **Agent-ready**                                                                                                                                                                                                                                                                                                                                                            |
+| Axis                      | Score | Notes                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Machine-Readable Output   | 2     | `stripe login --non-interactive` auto-activates and prints JSON once stdin isn't a terminal; `post`/`get`/`delete` return the Stripe API's native JSON by default; `pay` requires `--agent`/`--json` for scripted use. NDJSON streaming for paginated list output is not documented, so this stops short of a 3.                                                           |
+| Raw Payload Input         | 1     | `stripe post /v1/customers -d 'param=value'` maps form-style flags to API params, which is not raw JSON input. The `stripe tools` public-preview plugin (CLI 1.43.5+) accepts `--body <json>` with named-flag overrides, but only for its own account operations, so JSON payloads cover some commands and most still require flags.                                       |
+| Schema Introspection      | 1     | `stripe completion` for shell completions; `stripe tools search` finds operations by keyword and `<operation> --help` shows parameters, but there is no documented `--help --json` or structured describe output                                                                                                                                                           |
+| Context Window Discipline | 1     | No `--fields` flag; returns full API objects; some pagination support                                                                                                                                                                                                                                                                                                      |
+| Input Hardening           | 1     | Basic type validation; no explicit control-character or path-traversal defense documented                                                                                                                                                                                                                                                                                  |
+| Safety Rails              | 1     | `--dry-run` exists on `stripe pay` (the money-moving command) with a `confirmation_required` JSON contract gating `--yes`, so an agent can validate a transfer before it sends money; the generic `post`/`delete` mutation commands have no `--dry-run`, only an interactive confirm prompt (`--confirm` to skip it) - coverage is one command, not all mutating commands. |
+| Agent Knowledge Packaging | 2     | `stripe agent setup` detects Claude Code, Codex, and Cursor and installs a Stripe plugin, skills, and an MCP server; `stripe projects init` and `stripe projects llm-context` generate a project `AGENTS.md`.                                                                                                                                                              |
+| **Total**                 | **9** | **Agent-tolerant**                                                                                                                                                                                                                                                                                                                                                         |
 
-Source for the current behavior: https://docs.stripe.com/stripe-cli/reference (fetched 2026-09-25).
+Source for the current behavior: [Stripe CLI reference](https://docs.stripe.com/cli) (observed 2026-10-29). `stripe pay` and `stripe tools` are preview plugins with eligibility or version constraints (`pay` is for eligible US and UK businesses; `tools` needs CLI 1.43.5 or later), so check your installed version before scoring your own use.
 
-Score of 11 means: an agent can use the Stripe CLI with structured output and packaged agent knowledge already in place, but still cannot do runtime schema discovery, still gets full API objects with no field-selection flag, and only the highest-stakes mutating command (`pay`) has a validate-before-acting path.
+Score of 9 means: an agent can use the Stripe CLI with structured output and packaged agent knowledge already in place, but still sends form-style flags rather than raw JSON outside the `stripe tools` preview, cannot do runtime schema discovery, gets full API objects with no field-selection flag, and only the highest-stakes mutating command (`pay`) has a validate-before-acting path.
 
-Reaching Agent-first (16+) would require: runtime schema resolution (Schema Introspection), a `--fields` flag on read commands (Context Window Discipline), comprehensive input hardening, and `--dry-run` extended from `pay` to the generic `post`/`delete` mutation commands.
+Reaching Agent-first (16+) would require: raw JSON payloads across mutating commands (Raw Payload Input), runtime schema resolution (Schema Introspection), a `--fields` flag on read commands (Context Window Discipline), comprehensive input hardening, and `--dry-run` extended from `pay` to the generic `post`/`delete` mutation commands.
 
 ## Using the Scale to Prioritize Work
 

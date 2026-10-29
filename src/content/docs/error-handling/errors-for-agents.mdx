@@ -1,7 +1,7 @@
 ---
 title: Designing Errors for Agent Recovery
 description: Structuring error responses so agents can diagnose failures and recover without human intervention
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -45,7 +45,7 @@ Your error responses should make clear which pattern applies:
 {
   "type": "https://api.example.com/errors/validation-error",
   "status": 422,
-  "is_retriable": true,
+  "is_retriable": false,
   "suggestions": [
     "The 'due_date' field must be a future date",
     "Change 'due_date' to a date after today"
@@ -121,7 +121,7 @@ Per-field errors use JSON Pointer paths to identify the failing field within the
   "title": "Validation failed",
   "status": 422,
   "detail": "The request body contains 3 validation errors.",
-  "is_retriable": true,
+  "is_retriable": false,
   "invalid_fields": [
     {
       "field": "/amount",
@@ -138,13 +138,13 @@ Per-field errors use JSON Pointer paths to identify the failing field within the
       "field": "/due_date",
       "reason": "Must be a future date",
       "received": "2025-01-01",
-      "expected": "ISO 8601 date string for a date after today (2026-09-24)"
+      "expected": "ISO 8601 date string for a date after today"
     }
   ],
   "suggestions": [
     "Add an 'amount' field with a positive integer (e.g., 5000 for $50.00)",
     "Change 'currency' from 'dollars' to 'USD'",
-    "Change 'due_date' to a date after 2026-09-24"
+    "Change 'due_date' to a date after today"
   ]
 }
 ```
@@ -310,7 +310,7 @@ function toApiError(err: unknown): ProblemDetails {
       type: "https://api.example.com/errors/validation-error",
       title: "Validation failed",
       status: 422,
-      is_retriable: true,
+      is_retriable: false,
       invalid_fields: err.fields,
     };
   }

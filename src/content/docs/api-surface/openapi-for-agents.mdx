@@ -1,20 +1,20 @@
 ---
 title: OpenAPI for Agents
 description: Writing OpenAPI specifications that AI agents can use as executable contracts
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-OpenAPI specs are executable contracts when agents consume them. This document explains how spec semantics - operationId, descriptions, schema constraints - directly shape agent behavior at runtime. Vague descriptions become routing failures. Missing operationId values break tool generation.
+OpenAPI specs are executable contracts when agents consume them. This document explains how spec semantics - operationId, descriptions, schema constraints - directly shape agent behavior at runtime. Vague descriptions become routing failures. Missing operationId values leave tool generators to invent names.
 
-- operationId must be globally unique, verb-first, and in one consistent case
+- operationId is optional in OpenAPI, but must be unique when present; make it verb-first and in one consistent case for agents
 - Descriptions are prompts, not documentation - be precise and specific
-- Schema constraints are enforced strictly by agents
+- Schema constraints are only as strong as the runtime that enforces them - validate on the server too
 - Ambiguous descriptions lead to silent failures and misrouting
 - Token-heavy prose degrades LLM routing accuracy
 
-When an agent framework ingests your spec to generate tool definitions, every field becomes executable instructions. A vague description is a bug. A missing `operationId` is a build failure. This page covers what makes an OpenAPI spec agent-ready.
+When an agent framework ingests your spec to generate tool definitions, every field becomes executable instructions. A vague description is a bug. A missing `operationId` means the generator picks a name from the path and method, and the tool name becomes unstable. This page covers what makes an OpenAPI spec agent-ready.
 
 ## Specs as Agent Contracts
 
@@ -26,17 +26,17 @@ The practical consequences:
 
 - **Ambiguity compounds.** If a description could be interpreted two ways, the agent will pick one, and you will not know which until a user reports a bug.
 - **Descriptions are prompts.** The LLM generating tool calls reads your `description` as part of its context window. Token-heavy, prose-heavy descriptions degrade routing accuracy.
-- **Schema constraints are enforced, not suggested.** Unlike a human who reads "string, max 100 chars" and uses judgment, an agent runtime validates strictly and rejects calls that violate the schema.
+- **Schema constraints are only as strong as the runtime that enforces them.** A human reads "string, max 100 chars" and uses judgment; an agent runtime may validate strictly, loosely or not at all. Provider schema subsets, strict-mode settings (OpenAI [permits `strict: false`](https://developers.openai.com/api/docs/guides/function-calling)), adapter transformations and your own server-side validation decide what is actually enforced. Write constraints as if they will be enforced, and still validate on the server.
 
 ## Key Fields
 
 ### `operationId`
 
-`operationId` is the function name in every generated client, SDK, and tool definition. It must be:
+`operationId` is optional in OpenAPI, and when present it must be unique among all operations in the document. Generators MAY use it as the function name in a client, SDK or tool definition, and many do by default (name overrides exist, so check yours). For agent-facing specs, set it on every operation and follow this house contract:
 
-- **Globally unique** across your entire spec
-- **Verb-noun format** that unambiguously describes the action and resource
-- **Snake_case or camelCase** - pick one and be consistent
+- **Globally unique** across your entire spec (the OpenAPI requirement)
+- **Verb-noun format** that unambiguously describes the action and resource (house advice)
+- **Snake_case or camelCase** - pick one and be consistent (house advice)
 
 ```yaml
 # Bad - no operationId, frameworks generate names from path + method
@@ -154,7 +154,7 @@ requestBody:
 
 ### Format Keywords
 
-Use `format` to constrain string inputs. This allows validators to enforce constraints and gives agents semantic information without requiring description prose.
+Use `format` to describe string inputs. In the OpenAPI JSON Schema dialect `format` is an [annotation by default](https://spec.openapis.org/oas/v3.2.1.html#non-validating-constraint-keywords), so it gives agents semantic information without description prose, but declaring `format: email` does not enforce anything unless the validator is configured to assert formats. Check formats on the server as well.
 
 ```yaml
 properties:
@@ -352,6 +352,12 @@ responses:
 
 `$self` allows a spec to reference its own root document by identity, enabling cleaner multi-document compositions without fragile relative path references. This matters for large APIs split across multiple spec files that get merged for agent consumption.
 
+### Overlays for Agent-Facing Edits
+
+Keep the canonical spec written for everyone, and put agent-specific descriptions and `x-` fields in an [OpenAPI Overlay](https://spec.openapis.org/overlay/v1.2.0.html) applied at build time. Overlay 1.2.0 (2026-09-22) supports update, remove and copy actions, so the agent-facing description can differ from the human-facing one without a fork of the source. See [OpenAPI Extensions](./openapi-extensions).
+
+The examples on this page declare `openapi: 3.1.0`, which is still a valid, published line (3.1.2 is its latest patch); 3.2.1 is the current publication.
+
 ## Full Well-Formed Operation Example
 
 ```yaml
@@ -423,7 +429,7 @@ paths:
 
 Before treating a spec as agent-ready:
 
-- [ ] Every operation has a unique `operationId` in verb_noun format
+- [ ] Every operation has a unique `operationId` in verb_noun format (optional in OpenAPI, required by this checklist)
 - [ ] Every operation description answers when to call it and when not to
 - [ ] Similar operations explicitly disambiguate from each other
 - [ ] All enum values are listed with semantic descriptions
@@ -431,7 +437,7 @@ Before treating a spec as agent-ready:
 - [ ] All error responses are documented with status codes
 - [ ] Descriptions fall inside the [Length Guidelines](/docs/tool-design/naming-and-descriptions#length-guidelines) ranges
 - [ ] Response schemas include a concrete `example`
-- [ ] `format` keywords are used on string fields wherever applicable
+- [ ] `format` keywords are used on string fields wherever applicable, with server-side checks behind them
 
 ## Publishing SDKs and Removing Onboarding Friction
 

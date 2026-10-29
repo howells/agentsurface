@@ -1,23 +1,23 @@
 ---
 title: Vector Databases
 description: Pinecone, Qdrant, Weaviate, pgvector, and when to pick each - condensed current practice
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Vector databases store and search high-dimensional embeddings via approximate nearest-neighbor algorithms (HNSW, DiskANN, and similar). Choose by operations burden, filtering needs, scale, and whether you already operate Postgres.
 
 ## Selection matrix
 
-| Database                 | Self-host    | Native hybrid                            | Best for                                                     | Pricing model                                                |
-| ------------------------ | ------------ | ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Pinecone (serverless)    | No           | Yes (+ rerank)                           | Managed, variable workloads                                  | $16/1M read units, $4/1M write units, $0.33/GB/month storage |
-| pgvector + pgvectorscale | Yes          | No (pair with Postgres full-text search) | Cost-sensitive teams already running Postgres                | Infrastructure cost only                                     |
-| Qdrant                   | Yes or cloud | Sparse + dense                           | Fine-grained control, quantization                           | Self-host: infra cost. Cloud: usage-based                    |
-| Weaviate                 | Yes or cloud | Yes (native BM25 + dense)                | Hybrid search without a DIY fusion layer                     | Usage-based                                                  |
-| LanceDB                  | Yes          | Yes (native BM25 + dense, RRF)           | Multi-vector (ColBERT-style), TypeScript-native              | Free (OSS)                                                   |
-| Turbopuffer              | No           | Vector + BM25 in one substrate           | Very large or long-tail corpora, cost-sensitive cold storage | Serverless usage-based                                       |
+| Database                 | Self-host    | Native hybrid                            | Best for                                                       | Pricing model                                                                                                                   |
+| ------------------------ | ------------ | ---------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Pinecone (serverless)    | No           | Yes (+ rerank)                           | Managed, variable workloads                                    | Standard: $16-18/1M reads and $4-4.50/1M writes by cloud and region, $0.33/GB/month, $50/month minimum. Builder tier: $20/month |
+| pgvector + pgvectorscale | Yes          | No (pair with Postgres full-text search) | Cost-sensitive teams already running Postgres                  | Infrastructure cost only                                                                                                        |
+| Qdrant                   | Yes or cloud | Sparse + dense                           | Fine-grained control, quantization                             | Self-host: infra cost. Cloud: usage-based                                                                                       |
+| Weaviate                 | Yes or cloud | Yes (native BM25 + dense)                | Hybrid search without a DIY fusion layer                       | Usage-based                                                                                                                     |
+| LanceDB                  | Yes          | Yes (native BM25 + dense, RRF)           | Multi-vector (ColBERT-style); Python, TypeScript and Rust APIs | Free (OSS)                                                                                                                      |
+| Turbopuffer              | No           | Vector + BM25 in one substrate           | Very large or long-tail corpora, cost-sensitive cold storage   | Serverless usage-based                                                                                                          |
 
-Verify current pricing before a procurement decision - vector database pricing changes faster than the underlying algorithms. An independent benchmark from Timescale reported pgvector + pgvectorscale beating Pinecone's s1 tier on both p95 latency and self-hosted cost at 50M vectors; treat any single benchmark as a starting point for your own load test.
+Verify current pricing before a procurement decision - vector database pricing changes faster than the underlying algorithms. The Pinecone figures are Standard-plan rates from [pinecone.io/pricing](https://www.pinecone.io/pricing/) (accessed 2026-10-29), not universal prices; Enterprise lists higher unit rates and a $500 minimum. A vendor benchmark from Timescale, which makes pgvectorscale, reported pgvector + pgvectorscale beating Pinecone's s1 tier on both p95 latency and self-hosted cost at 50M vectors. It is vendor-authored, not independent. Treat any single benchmark as a starting point for your own load test, and note its date, hardware and Pinecone tier.
 
 ## Pinecone serverless
 

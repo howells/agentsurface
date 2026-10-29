@@ -10,7 +10,7 @@ tools: Read, Glob, Grep, Write, Bash
 Emit agent onboarding context files: AGENTS.md (universal, Linux Foundation format), an optional CLAUDE.md (Claude Code specific, only when needed), monorepo topology docs, .cursor/rules for Cursor AI, and VS Code Copilot instructions. All under strict line limits, no secrets, three-tier permission boundaries.
 
 - AGENTS.md: cross-tool Markdown context (commands, stack, conventions, boundaries; authoring target ~150 lines ideal, <300 max)
-- CLAUDE.md: optional overlay, only when Claude Code needs instructions no other tool should see (MCP servers, workflows, tips); starts with a literal `@AGENTS.md` import
+- CLAUDE.md: optional overlay, only when Claude Code needs instructions no other tool should see (MCP servers, workflows, tips); imports `@AGENTS.md` (first line by house recommendation)
 - Monorepo docs: workspace hierarchy, build order, cross-package dependencies
 - .cursor/rules: alwaysApply base rules + framework/glob patterns
 - Copilot instructions: agent constraints (e.g., no destructive ops without approval)
@@ -58,7 +58,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      - **Language:** TypeScript (strict mode)
      - **Validation:** Zod
      - **Auth:** OAuth 2.1 + PKCE
-     - **API Communication:** Vercel AI SDK + @modelcontextprotocol/sdk
+     - **API Communication:** Vercel AI SDK + @modelcontextprotocol/server and @modelcontextprotocol/client (v2)
      - **Testing:** Vitest
 
      (Omit obvious tooling: npm, git, etc.)
@@ -75,16 +75,20 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      });
 
      // MCP tools: Include all four annotations
-     server.registerTool({
-       name: "delete_user",
-       annotations: {
-         type: ["DESTRUCTIVE"],
-         requiresConfirmation: true,
-         idempotent: false,
-         openWorld: false,
+     server.registerTool(
+       "delete_user",
+       {
+         description: "Permanently delete a user account. Cannot be undone.",
+         inputSchema: z.object({ user_id: z.string().uuid() }),
+         annotations: {
+           readOnlyHint: false,
+           destructiveHint: true,
+           idempotentHint: false,
+           openWorldHint: false,
+         },
        },
-       // ...
-     });
+       handler,
+     );
      ```
      ````
 
@@ -171,7 +175,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 2. **Create CLAUDE.md** (Claude Code specific; authoring target <150 lines):
    - Location: project root
    - Only when Claude Code needs instructions no other tool should see - MCP servers, custom slash commands, or workflows specific to Claude Code. If nothing Claude-only applies, skip this file; AGENTS.md alone is enough (Claude Code v2.1.277+ reads it directly).
-   - The file must start with a literal `@AGENTS.md` import on its own line - a prose "see AGENTS.md" reference does not load it, and without the import Claude Code stops reading AGENTS.md entirely.
+   - Import `@AGENTS.md` on its own line, first by house recommendation (Claude Code accepts imports anywhere in the file). A prose "see AGENTS.md" reference does not load it, and by default Claude Code reads CLAUDE.md instead of AGENTS.md unless the file imports it or the `claude-md-and-agents-md` setting is on.
    - Enforced tool rules and permission mode belong in `.claude/settings.json` (`permissions.allow/ask/deny`, `permissions.defaultMode`), never in CLAUDE.md prose.
    - Content:
 
@@ -283,8 +287,8 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      - Validate with Zod before rendering
      ```
 
-5. **Create Copilot instructions** (VS Code):
-   - Location: `.vscode/copilot-instructions.md`
+5. **Create Copilot instructions** (GitHub Copilot):
+   - Location: `.github/copilot-instructions.md`
    - Content:
 
      ```markdown
@@ -331,14 +335,14 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 - `CLAUDE.md` (optional; only if Claude Code needs instructions no other tool should see)
 - `docs/monorepo.md` (if monorepo)
 - `.cursor/rules/*.mdc` (if Cursor used)
-- `.vscode/copilot-instructions.md` (if VS Code used)
+- `.github/copilot-instructions.md` (if Copilot used)
 
 ## Spec References
 
 - AGENTS.md: https://agents.md
 - Next.js App Router: https://nextjs.org/docs/app
 - Zod Documentation: https://zod.dev/
-- Cursor Rules: https://docs.cursor.com/context/rules
+- Cursor Rules: https://cursor.com/docs/rules
 
 ## Style Rules
 

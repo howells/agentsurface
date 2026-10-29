@@ -1,268 +1,104 @@
 {
-  "protocolVersion": "1.0.0",
   "name": "Example Agent API",
-  "description": "A production-grade agent that manages agents and runs workflows. Demonstrates A2A v1.0 with OAuth 2.1, DPoP, and structured task execution.",
-  "url": "https://api.example.com",
-  "documentationUrl": "https://docs.example.com/agents",
+  "description": "Creates, configures and runs AI agents on behalf of callers, and reports on their executions. A2A v1.0 AgentCard with OAuth 2.0 client credentials.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://api.example.com/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
   "provider": {
-    "name": "Example Corp",
-    "url": "https://example.com",
-    "contactEmail": "support@example.com"
+    "organization": "Example Corp",
+    "url": "https://example.com"
   },
+  "documentationUrl": "https://docs.example.com/agents",
   "capabilities": {
     "streaming": true,
     "pushNotifications": true,
     "extendedAgentCard": false
   },
+  "securitySchemes": {
+    "exampleOAuth": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.example.com/oauth/token",
+            "scopes": {
+              "agents:read": "Read agent metadata and configuration",
+              "agents:write": "Create and modify agents",
+              "agents:execute": "Execute agents and monitor runs",
+              "agents:delete": "Delete agents (requires confirmation)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "securityRequirements": [{ "schemes": { "exampleOAuth": { "list": ["agents:read"] } } }],
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["application/json", "text/plain"],
   "skills": [
     {
       "id": "create-agent",
       "name": "Create Agent",
-      "description": "Create a new AI agent with specified configuration, model, and tools",
+      "description": "Create a new AI agent with a specified configuration, model and tools.",
+      "tags": ["agents", "create", "configuration"],
       "examples": [
-        {
-          "prompt": "Create an agent named 'Support Analyzer' using Claude Opus to analyze support tickets",
-          "parameters": {
-            "name": "Support Analyzer",
-            "model": "claude-opus-5-5",
-            "description": "Analyzes support tickets for priority and sentiment"
-          }
-        },
-        {
-          "prompt": "Create a lightweight agent using Haiku for quick customer inquiries",
-          "parameters": {
-            "name": "Quick Responder",
-            "model": "claude-haiku-4-5-20251001",
-            "max_steps": 10
-          }
-        }
-      ]
+        "Create an agent named 'Support Analyzer' to analyze support tickets for priority and sentiment",
+        "Create a lightweight agent for quick customer inquiries with a maximum of 10 steps"
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"]
     },
     {
       "id": "list-agents",
       "name": "List Agents",
-      "description": "Retrieve a paginated list of agents with filtering and sorting",
+      "description": "Retrieve a paginated list of agents with filtering and sorting.",
+      "tags": ["agents", "list", "search"],
       "examples": [
-        {
-          "prompt": "Show me all active agents"
-        },
-        {
-          "prompt": "List agents created in the last 7 days, starting with the most recent",
-          "parameters": {
-            "status": "active",
-            "created_after": "2026-04-10"
-          }
-        }
-      ]
+        "Show me all active agents",
+        "List agents created in the last 7 days, starting with the most recent"
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"]
     },
     {
       "id": "run-agent",
       "name": "Run Agent",
-      "description": "Execute an agent with input data and monitor execution progress",
+      "description": "Execute an agent with input data and stream its progress until it finishes.",
+      "tags": ["agents", "execute", "tasks"],
       "examples": [
-        {
-          "prompt": "Run the Support Analyzer agent on ticket SUP-12345",
-          "parameters": {
-            "agent_id": "550e8400-e29b-41d4-a716-446655440000",
-            "input": {
-              "ticket_id": "SUP-12345"
-            },
-            "timeout_seconds": 300
-          }
-        },
-        {
-          "prompt": "Execute the Quick Responder with a customer message and wait up to 2 minutes",
-          "parameters": {
-            "input": {
-              "message": "What are your business hours?",
-              "customer_id": "CUST-789"
-            },
-            "timeout_seconds": 120
-          }
-        }
-      ]
+        "Run the Support Analyzer agent on ticket SUP-12345",
+        "Execute the Quick Responder with a customer message and wait up to 2 minutes"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json", "text/plain"]
     },
     {
       "id": "monitor-execution",
       "name": "Monitor Execution",
-      "description": "Check the status of an agent execution and retrieve results when complete",
+      "description": "Check the status of an agent execution and retrieve its results when complete.",
+      "tags": ["agents", "status", "results"],
       "examples": [
-        {
-          "prompt": "Check the status of execution abc123"
-        },
-        {
-          "prompt": "Get the results of the last run of the Support Analyzer"
-        }
-      ]
+        "Check the status of execution abc123",
+        "Get the results of the last run of the Support Analyzer"
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"]
     },
     {
       "id": "update-agent",
       "name": "Update Agent",
-      "description": "Modify an agent's configuration, name, tools, or settings",
+      "description": "Modify an agent's configuration, name, tools or settings.",
+      "tags": ["agents", "update", "configuration"],
       "examples": [
-        {
-          "prompt": "Update the Support Analyzer agent to use Claude Sonnet instead of Opus"
-        },
-        {
-          "prompt": "Add the 'email_send' tool to the Support Analyzer and increase max_steps to 25"
-        }
-      ]
+        "Update the Support Analyzer agent to use a smaller model",
+        "Add the 'email_send' tool to the Support Analyzer and increase max_steps to 25"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
     }
-  ],
-  "defaultInputModes": [
-    {
-      "type": "text",
-      "description": "Plain text prompts and structured JSON parameters"
-    },
-    {
-      "type": "message",
-      "description": "Multi-turn conversation with context preservation"
-    }
-  ],
-  "defaultOutputModes": [
-    {
-      "type": "text",
-      "description": "Structured JSON results with execution metadata"
-    },
-    {
-      "type": "stream",
-      "description": "Server-Sent Events (SSE) for long-running tasks"
-    }
-  ],
-  "apiSpecification": {
-    "type": "OpenAPI",
-    "url": "https://api.example.com/v1/openapi.json",
-    "version": "3.2.1"
-  },
-  "workflowSpecifications": [
-    {
-      "type": "Arazzo",
-      "url": "https://api.example.com/v1/workflows/arazzo.yaml",
-      "version": "1.1.0"
-    }
-  ],
-  "rateLimits": {
-    "createAgent": {
-      "requests": 10,
-      "period": "minute"
-    },
-    "runAgent": {
-      "requests": 50,
-      "period": "minute"
-    },
-    "listAgents": {
-      "requests": 100,
-      "period": "minute"
-    }
-  },
-  "supportedLanguages": ["en", "es", "fr", "de", "zh"],
-  "securitySchemes": {
-    "OAuth2": {
-      "type": "oauth2",
-      "flows": {
-        "clientCredentials": {
-          "tokenUrl": "https://auth.example.com/oauth/token",
-          "scopes": {
-            "agents:read": "Read agent metadata and configuration",
-            "agents:write": "Create and modify agents",
-            "agents:execute": "Execute agents and monitor runs",
-            "agents:delete": "Delete agents (requires confirmation)"
-          }
-        }
-      }
-    },
-    "DPoP": {
-      "type": "dpop",
-      "description": "Demonstrating Proof-of-Possession (RFC 9449) for token binding",
-      "signingAlgorithms": ["RS256", "ES256"],
-      "required": true
-    }
-  },
-  "security": [{ "OAuth2": ["agents:read"], "DPoP": [] }],
-  "modelSupport": [
-    {
-      "provider": "Anthropic",
-      "models": ["claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
-    },
-    {
-      "provider": "OpenAI",
-      "models": ["gpt-5.6-sol", "gpt-5.6-luna"]
-    },
-    {
-      "provider": "Google",
-      "models": ["gemini-3.1-pro-preview", "gemini-3.7-flash"]
-    }
-  ],
-  "taskManagement": {
-    "asyncSupported": true,
-    "progressTracking": true,
-    "cancellation": true,
-    "retryPolicy": {
-      "maxAttempts": 3,
-      "backoffMultiplier": 2,
-      "initialDelaySeconds": 1
-    }
-  },
-  "errorHandling": {
-    "format": "application/problem+json",
-    "specification": "https://www.rfc-editor.org/rfc/rfc9457.html",
-    "commonErrors": [
-      {
-        "code": "validation_failed",
-        "statusCode": 400,
-        "description": "Request validation failed"
-      },
-      {
-        "code": "unauthorized",
-        "statusCode": 401,
-        "description": "Missing or invalid authentication"
-      },
-      {
-        "code": "forbidden",
-        "statusCode": 403,
-        "description": "Insufficient permissions"
-      },
-      {
-        "code": "not_found",
-        "statusCode": 404,
-        "description": "Resource not found"
-      },
-      {
-        "code": "conflict",
-        "statusCode": 409,
-        "description": "Resource conflict (e.g., duplicate)"
-      },
-      {
-        "code": "rate_limit",
-        "statusCode": 429,
-        "description": "Rate limit exceeded"
-      },
-      {
-        "code": "internal_error",
-        "statusCode": 500,
-        "description": "Server error"
-      }
-    ]
-  },
-  "compliance": {
-    "gdpr": true,
-    "ccpa": true,
-    "hipaa": false,
-    "soc2": true
-  },
-  "observability": {
-    "traceIdHeader": "X-Trace-ID",
-    "loggingSupported": true,
-    "metricsEndpoint": "https://api.example.com/metrics",
-    "healthEndpoint": "https://api.example.com/health"
-  },
-  "changelog": "https://docs.example.com/changelog",
-  "supportUrl": "https://support.example.com",
-  "statusPageUrl": "https://status.example.com",
-  "metadata": {
-    "version": "1.0.0",
-    "releaseDate": "2026-04-17",
-    "tags": ["agent-management", "workflow-orchestration", "ai-powered", "production"],
-    "certifications": ["A2A-Compliant-1.0.0", "OpenAPI-3.2.1", "RFC9457-ErrorHandling"]
-  }
+  ]
 }

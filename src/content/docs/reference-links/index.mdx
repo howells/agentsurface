@@ -1,7 +1,7 @@
 ---
 title: Reference Links
 description: Canonical standards, docs, specs, and source links for agent-readable software surfaces.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 This is the single source index for standards, specs, and official docs that Agent Surface tracks. Use it when you want the primary source rather than the curated tooling view.
@@ -15,7 +15,7 @@ This is the single source index for standards, specs, and official docs that Age
 | [Is Agentic](https://is-agentic.com/)                                                                        | Vercel public-site readiness reports powered by Ora                                                  | Inspecting evidence for public discovery, access, comprehension, and use.                         |
 | [Is Agentic developer docs](https://is-agentic.com/docs)                                                     | Read-only report API, CLI, remote MCP server, and agent skill                                        | Retrieving and integrating completed public-site reports.                                         |
 | [Lighthouse Agentic Browsing scoring](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) | Local, experimental Lighthouse category for WebMCP, agent accessibility, and discovery signals       | Running an offline agent-readiness check, including on pre-release or authenticated environments. |
-| [AgentReady](https://agentready.org)                                                                         | MIT-licensed, vendor-neutral spec of stable-ID requirements for agent find/read/act                  | Grounding requirements against a named identifier before trusting a scanner's opinion of it.      |
+| [AgentReady](https://www.agentready.org/)                                                                    | MIT-licensed, vendor-neutral spec of stable-ID requirements for agent find/read/act                  | Grounding requirements against a named identifier before trusting a scanner's opinion of it.      |
 | [Shopify Product-Page Audit](https://www.shopify.com/agentic-readiness)                                      | Commerce-specific structured-data check for a single product page                                    | Spot-checking a storefront product page ahead of Agentic Storefronts.                             |
 | [WebMCP specification](https://webmachinelearning.github.io/webmcp/)                                         | Page-scoped JavaScript tools through `document.modelContext`                                         | Implementing the current browser-native tools proposal.                                           |
 | [webmcp.dev](https://webmcp.dev/)                                                                            | Earlier `@jason.today/webmcp` JavaScript library                                                     | Maintaining or evaluating that distinct legacy implementation.                                    |
@@ -37,14 +37,14 @@ This is the single source index for standards, specs, and official docs that Age
 
 ## MCP
 
-| Reference                                                                                            | What It Covers                                                     | Use It For                                                 |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
-| [MCP Introduction](https://modelcontextprotocol.io/docs/getting-started/intro)                       | MCP as the standard connector between AI apps and external systems | Grounding protocol decisions.                              |
-| [MCP Architecture](https://modelcontextprotocol.io/docs/concepts/architecture)                       | Clients, servers, hosts, and capability flow                       | Designing where MCP belongs in an agent system.            |
-| [Build an MCP Server](https://modelcontextprotocol.io/docs/develop/build-server)                     | Server implementation basics                                       | Exposing tools, resources, and prompts to agents.          |
-| [Connect to Remote MCP Servers](https://modelcontextprotocol.io/docs/develop/connect-remote-servers) | Remote server connection model                                     | Publishing MCP over network transport.                     |
-| [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)                                | Interactive server inspection and debugging                        | Testing tool definitions, schemas, prompts, and resources. |
-| [MCP Registry](https://registry.modelcontextprotocol.io/)                                            | Public MCP server discovery                                        | Finding and distributing MCP servers.                      |
+| Reference                                                                                                       | What It Covers                                                     | Use It For                                                 |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| [MCP Introduction](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro)                       | MCP as the standard connector between AI apps and external systems | Grounding protocol decisions.                              |
+| [MCP Architecture](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture)                          | Clients, servers, hosts, and capability flow                       | Designing where MCP belongs in an agent system.            |
+| [Build an MCP Server](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server)                     | Server implementation basics                                       | Exposing tools, resources, and prompts to agents.          |
+| [Connect to Remote MCP Servers](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-remote-servers) | Remote server connection model                                     | Publishing MCP over network transport.                     |
+| [MCP Inspector](https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector)                                | Interactive server inspection and debugging                        | Testing tool definitions, schemas, prompts, and resources. |
+| [MCP Registry](https://registry.modelcontextprotocol.io/)                                                       | Public MCP server discovery                                        | Finding and distributing MCP servers.                      |
 
 ## Auth And Identity
 
@@ -59,22 +59,22 @@ This is the single source index for standards, specs, and official docs that Age
 
 ## Agent Runtimes And Tooling Docs
 
-| Reference                                                                | What It Covers                                                                                    | Use It For                                                   |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [Mastra Docs](https://mastra.ai/docs)                                    | TypeScript agents, tools, workflows, memory, RAG, MCP, evals, and voice                           | Default local TypeScript agent scaffolding.                  |
-| [Vercel AI SDK](https://ai-sdk.dev/docs)                                 | Model calls, tools, structured output, streaming, and UI                                          | TypeScript AI app foundations.                               |
-| [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk)  | Agents, tools, handoffs, guardrails, tracing, and evals                                           | OpenAI-native agent systems.                                 |
-| [OpenRouter Docs](https://openrouter.ai/docs)                            | Model routing, structured outputs, plugins, and hosted tools                                      | Provider optionality and first-party model-call tools.       |
-| [Cloudflare Agents](https://developers.cloudflare.com/agents/)           | Durable Object-backed agents, state, scheduling, tools, MCP, and browser access                   | Workers-native agent systems.                                |
-| [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/)   | Gateway observability, caching, rate limits, guardrails, retries, and routing                     | Governed model access across providers.                      |
-| [Cloudflare Browser Run](https://developers.cloudflare.com/browser-run/) | Managed browser automation, screenshots, PDFs, Markdown extraction, crawling, Playwright, and MCP | Browser access for agents.                                   |
-| [Cloudflare Sandbox](https://developers.cloudflare.com/sandbox/)         | Isolated code execution for agents and applications                                               | Running untrusted or generated code outside the app process. |
+| Reference                                                                 | What It Covers                                                                                    | Use It For                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Mastra Docs](https://mastra.ai/docs)                                     | TypeScript agents, tools, workflows, memory, RAG, MCP, evals, and voice                           | Default local TypeScript agent scaffolding.                  |
+| [Vercel AI SDK](https://ai-sdk.dev/docs/introduction)                     | Model calls, tools, structured output, streaming, and UI                                          | TypeScript AI app foundations.                               |
+| [OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents) | Agents, tools, handoffs, guardrails, tracing, and evals                                           | OpenAI-native agent systems.                                 |
+| [OpenRouter Docs](https://openrouter.ai/docs/quickstart)                  | Model routing, structured outputs, plugins, and hosted tools                                      | Provider optionality and first-party model-call tools.       |
+| [Cloudflare Agents](https://developers.cloudflare.com/agents/)            | Durable Object-backed agents, state, scheduling, tools, MCP, and browser access                   | Workers-native agent systems.                                |
+| [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/)    | Gateway observability, caching, rate limits, guardrails, retries, and routing                     | Governed model access across providers.                      |
+| [Cloudflare Browser Run](https://developers.cloudflare.com/browser-run/)  | Managed browser automation, screenshots, PDFs, Markdown extraction, crawling, Playwright, and MCP | Browser access for agents.                                   |
+| [Cloudflare Sandbox](https://developers.cloudflare.com/sandbox/)          | Isolated code execution for agents and applications                                               | Running untrusted or generated code outside the app process. |
 
 ## Commerce And Payments
 
 | Reference                                                     | What It Covers                              | Use It For                                               |
 | ------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
-| [x402](https://www.x402.org/)                                 | HTTP-native machine payments                | Pay-to-access resources and APIs.                        |
+| [x402](https://x402.org/)                                     | HTTP-native machine payments                | Pay-to-access resources and APIs.                        |
 | [Universal Commerce Protocol](https://ucp.dev/)               | Commerce discovery and transaction protocol | Agent-driven ecommerce surfaces.                         |
 | [Agentic Commerce Protocol](https://www.agenticcommerce.dev/) | Agent-mediated purchasing flows             | Agent-initiated buying with explicit payment boundaries. |
 

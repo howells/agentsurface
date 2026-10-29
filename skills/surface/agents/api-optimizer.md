@@ -11,7 +11,7 @@ Transform OpenAPI specifications for optimal AI agent consumption. Rewrite every
 
 - RFC 9457 error schemas with agent recovery guidance
 - OpenAPI 3.1 parameter optimization (flat, enumerated, exemplified)
-- Idempotency headers (RFC 9110) on all mutations
+- Idempotency keys on non-idempotent mutations (RFC 9110 defines idempotent methods; the `Idempotency-Key` header is an IETF draft)
 - Arazzo workflow overlays for multi-step agent patterns
 - Semantic tool annotations (readOnlyHint, destructiveHint, idempotentHint)
 
@@ -28,7 +28,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 
 ## Process
 
-1. **Convert to OpenAPI 3.1** if needed (3.0 has weaker schema composition)
+1. **Convert to OpenAPI 3.1 or later** if needed (3.0 uses its own schema dialect, not JSON Schema 2020-12). 3.2.1 is current; 3.1 is the safe compatibility target for generators and validators. Keep `operationId` unique on every operation (optional in the spec, required here)
 
 2. **Standardize operationIds** to verb_noun format:
    - CRUD: createUser, listUsers, getUser, updateUser, deleteUser
@@ -51,6 +51,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
    - Default values for optional params
 
 5. **Define error responses** in RFC 9457 format (all endpoints):
+
    ```yaml
    responses:
      "400":
@@ -70,24 +71,25 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
                trace_id: { type: string, format: uuid }
    ```
 
-6. **Add idempotency headers** (RFC 9110) on POST/PATCH/DELETE:
-   - Require `Idempotency-Key: <uuid>` header
-   - Return `Idempotency-Replayed: true` if replaying
-   - Document 3-minute replay window
+6. **Add idempotency keys** on POST/PATCH (PUT and DELETE are idempotent by method definition, RFC 9110):
+   - Accept an `Idempotency-Key: <uuid>` header (IETF draft, widely used by payment APIs)
+   - Return a replay marker such as `Idempotency-Replayed: true` (a convention, not a standard)
+   - Document the key retention window you choose
 
 7. **Add semantic extensions**:
+
    ```yaml
-   x-agent-requires-confirmation: true   # Destructive ops only
-   x-agent-idempotent: true              # Safe to retry
-   x-agent-scopes: [read, write]         # OAuth/auth scopes
-   x-speakeasy-mcp:
+   x-agent-requires-confirmation: true # Destructive ops only
+   x-agent-idempotent: true # Safe to retry
+   x-agent-scopes: [read, write] # OAuth/auth scopes
+   x-speakeasy-mcp: # Speakeasy-specific; confirm keys against your generator version
      description: "Agent-optimized variant"
    ```
 
 8. **Create Arazzo workflow** (if multi-step patterns exist):
    - Document tool sequencing (e.g. list before delete)
    - Include guard conditions (check before mutate)
-   - Cite step operationIds by name
+   - Cite step operationIds by name through `$sourceDescriptions.<name>.<operationId>`; declare `successCriteria` on each step (Arazzo has no default HTTP success criterion) and list `workflows` as an array with `workflowId`
 
 9. **Quality checks**:
    - Every operationId is verb_noun
@@ -107,7 +109,9 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 
 ## Spec References
 
+- OpenAPI 3.2.1 (current): https://spec.openapis.org/oas/v3.2.1.html
 - OpenAPI 3.1.0: https://spec.openapis.org/oas/v3.1.0
+- Overlay 1.2.0 (patch a spec without editing it): https://spec.openapis.org/overlay/v1.2.0.html
 - RFC 9457 (Problem Details): https://datatracker.ietf.org/doc/html/rfc9457
 - RFC 9110 (HTTP Semantics, Idempotency): https://datatracker.ietf.org/doc/html/rfc9110
 - Arazzo 1.1.0 (Workflows): https://spec.openapis.org/arazzo/latest.html

@@ -1,7 +1,7 @@
 ---
 title: Code Execution as a Consumption Model
 description: How an agent consumes your MCP server by writing code against it instead of chaining tool calls, and what that implies for server design.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -17,7 +17,7 @@ A discrete tool call is a full round-trip through the model's context: every too
 
 Instead of exposing each MCP tool as something the model calls directly on every turn, generate a typed library from your tool definitions and let the agent write a script that imports it. The script does its own filtering, joining, and looping in ordinary code; the runtime executes it; the model sees only what the script printed or returned. Cloudflare ("Code Mode"), Anthropic (code execution with MCP), and Mastra (code mode) each arrived at this shape independently - the pattern is vendor-neutral.
 
-An MCP server already describes its tools with names, schemas, and descriptions, so this mapping is direct: MCP tools become importable functions the script calls, rather than model-visible tools the model selects between one at a time. Cloudflare reports a representative multi-call task falling from roughly 1.17 million tokens to about 1,000 when the agent wrote one script instead of chaining the equivalent tool calls - a vendor benchmark on a specific broad, loop-heavy workload, not a general result. A task that makes two calls and returns a small payload sees little benefit.
+An MCP server already describes its tools with names, schemas, and descriptions, so this mapping is direct: MCP tools become importable functions the script calls, rather than model-visible tools the model selects between one at a time. Cloudflare reports a representative multi-call task falling from roughly 1.17 million tokens to about 1,000 when the agent wrote one script instead of chaining the equivalent tool calls ([Cloudflare's Code Mode post](https://blog.cloudflare.com/code-mode/)) - a vendor benchmark on a specific broad, loop-heavy workload, not a general result, and the figures were not independently re-verified in the October 2026 review. A task that makes two calls and returns a small payload sees little benefit.
 
 ## When It Wins
 

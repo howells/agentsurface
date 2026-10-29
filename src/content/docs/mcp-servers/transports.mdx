@@ -1,7 +1,7 @@
 ---
 title: Transport Selection
 description: Choosing and configuring the right transport for your MCP server deployment
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -23,7 +23,7 @@ Stdio is the simplest transport. The client launches your server as a subprocess
 
 ```typescript
 // cli.ts
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { createServer } from "./server.js";
 
 const server = createServer({
@@ -90,8 +90,10 @@ await server.sendLoggingMessage({
 
 Streamable HTTP is the correct transport for servers deployed as cloud services. It exposes a single HTTP endpoint (conventionally `/mcp`) that accepts POST requests. Responses can be single JSON objects or SSE streams, depending on whether the operation requires streaming.
 
+The example below is the sessionful `2025-11-25` pattern on the v1 SDK (`@modelcontextprotocol/sdk` 1.x, kept maintained for compatibility). Use it only for clients that still need it; for new servers use the stateless handler in the next section.
+
 ```typescript
-// src/http-server.ts
+// src/http-server.ts (SDK v1, 2025-11-25 sessionful compatibility)
 import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "./server.js";
@@ -159,51 +161,69 @@ app.listen(3000);
   has nothing left to terminate. Cross-call state moves to explicit server-minted handles that the
   client passes back as ordinary tool arguments. POSTs also gain two required headers, `Mcp-Method`
   and `Mcp-Name` (SEP-2243), with custom headers namespaced under `x-mcp-header`. The code above is
-  the correct shape for `2025-11-25` and the SDKs deployed today; the stateless pattern in the next
-  section is the one that survives the migration, so prefer it for new servers.
+  the correct shape for `2025-11-25` and the v1 SDK; the stateless pattern in the next section is
+  the one that matches the current revision, so prefer it for new servers.
 </Callout>
 
 ## Stateless Mode for Horizontal Scaling
 
-The stateful session map above does not scale horizontally - sessions created on one instance are not visible to another. For serverless deployments and horizontally scaled services, use stateless mode by setting `sessionIdGenerator: undefined`:
+The stateful session map above does not scale horizontally - sessions created on one instance are not visible to another. `2026-07-28` removes sessions from the protocol, so the current TypeScript SDK (v2, `@modelcontextprotocol/server`) serves each request independently with `createMcpHandler`. It takes a factory that builds a server for each request, answers 2026-07-28 traffic on the modern path, and by default serves 2025-era clients through a stateless legacy fallback. Setting `sessionIdGenerator: undefined` on a v1 transport only disables session tracking in v1 code; it does not make that code speak the 2026 protocol.
 
 ```typescript
-const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: undefined, // Disable session tracking
-});
+// src/http-handler.ts
+import { createMcpHandler } from "@modelcontextprotocol/server";
+import { createServer } from "./server.js";
+
+const handler = createMcpHandler(() => createServer(loadConfig()));
+
+// Any Web-standard host: Request in, Response out.
+export default {
+  fetch: (request: Request) => handler.fetch(request),
+};
 ```
 
-In stateless mode, every request is independent. The server processes the request and the transport object is discarded. This maps cleanly to serverless functions where each invocation is a new process - and it is the model `2026-07-28` requires.
+The handler does no Origin or Host validation and no token verification. Mount the SDK's host and origin validation middleware, and your bearer-token check, in front of it (see [MCP Authentication](./authentication)). To keep serving legacy sessionful clients from an existing deployment, route them in your own code with `isLegacyRequest` in front of a `legacy: "reject"` handler.
 
-For operations that require state across calls - maintaining context between tool invocations in a multi-turn conversation - store state externally in Redis or another shared store, keyed on an identifier the client provides. The example below reads it from a request header; under `2026-07-28` the same state is keyed on a server-minted handle the client passes back as an ordinary tool argument, which works on both revisions and does not depend on transport-level session tracking:
+In a stateless server every request is independent, which maps cleanly to serverless functions - and it is the model `2026-07-28` requires. For operations that need state across calls - maintaining context between tool invocations in a multi-turn conversation - store state in Redis or another shared store and key it on a server-minted handle that the client passes back as an ordinary tool argument. That works on both revisions and does not depend on transport-level session tracking. There is no `setSessionState` on `McpServer`; keep application state in your own code behind explicit tools:
 
 ```typescript
-app.post("/mcp", async (req, res) => {
-  const sessionId = req.headers["x-session-id"] as string;
+server.registerTool(
+  "workspace_open",
+  { description: "Opens a workspace and returns its workspace_id.", inputSchema: z.object({}) },
+  async () => {
+    const workspaceId = crypto.randomUUID();
+    await redis.set(`mcp:workspace:${workspaceId}`, JSON.stringify({ items: [] }), "EX", 3600);
+    return { content: [{ type: "text", text: JSON.stringify({ workspace_id: workspaceId }) }] };
+  },
+);
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-
-  const server = createServer(loadConfig());
-
-  // Inject session state from Redis before processing
-  if (sessionId) {
-    const sessionState = await redis.get(`mcp:session:${sessionId}`);
-    if (sessionState) {
-      server.setSessionState(JSON.parse(sessionState));
+server.registerTool(
+  "workspace_add_item",
+  {
+    description: "Adds an item to a workspace opened with workspace_open.",
+    inputSchema: z.object({ workspace_id: z.string().uuid(), item: z.string().max(200) }),
+  },
+  async ({ workspace_id, item }) => {
+    const raw = await redis.get(`mcp:workspace:${workspace_id}`);
+    if (!raw) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Workspace ${workspace_id} not found or expired. Call workspace_open to start a new one.`,
+          },
+        ],
+      };
     }
-  }
-
-  server.onSessionStateChanged = async (state) => {
-    if (sessionId) {
-      await redis.set(`mcp:session:${sessionId}`, JSON.stringify(state), "EX", 3600);
-    }
-  };
-
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-});
+    const state = JSON.parse(raw) as { items: string[] };
+    state.items.push(item);
+    await redis.set(`mcp:workspace:${workspace_id}`, JSON.stringify(state), "EX", 3600);
+    return {
+      content: [{ type: "text", text: `Workspace now holds ${state.items.length} items.` }],
+    };
+  },
+);
 ```
 
 ## SSE as a Standalone Transport
@@ -218,8 +238,9 @@ Deployment context                     Transport
 Developer's local machine              Stdio
 CI/CD runner, scripted automation      Stdio
 Serverless function (Vercel, Lambda)   Streamable HTTP (stateless)
-Long-running container (single)        Streamable HTTP (stateful)
+Long-running container (single)        Streamable HTTP (stateless; state in your own store)
 Horizontally scaled service            Streamable HTTP (stateless + Redis)
+Legacy 2025-11-25 clients only          Streamable HTTP (stateful, SDK v1)
 Embedded in CLI tool                   Stdio
 Shared public service (multiple users) Streamable HTTP + OAuth
 ```
@@ -228,26 +249,30 @@ Shared public service (multiple users) Streamable HTTP + OAuth
 
 Vercel's serverless platform requires specific configuration for MCP servers due to request duration limits and streaming behavior.
 
-**Route handler for Next.js App Router:**
+**Route handler for Next.js App Router** (`mcp-handler` 2.x, which requires `@modelcontextprotocol/server` ^2 and Zod 4):
 
 ```typescript
 // app/mcp/route.ts
 import { createMcpHandler } from "mcp-handler";
-import { createServer } from "@/lib/billing-mcp/server";
+import { registerCreateInvoice } from "@/lib/billing-mcp/tools/create-invoice";
 
+const config = {
+  stripeApiKey: process.env.STRIPE_API_KEY!,
+  databaseUrl: process.env.DATABASE_URL!,
+};
+
+// The first argument receives the MCP server to register tools on; the second is one options object.
 const handler = createMcpHandler(
-  createServer({
-    stripeApiKey: process.env.STRIPE_API_KEY!,
-    databaseUrl: process.env.DATABASE_URL!,
-  }),
-  {
-    basePath: "/mcp",
+  (server) => {
+    registerCreateInvoice(server, config);
+    // ...register the remaining tools, resources, and prompts
   },
+  { serverInfo: { name: "billing-mcp", version: "1.0.0" } },
 );
 
 export const maxDuration = 300; // seconds - the Hobby default and maximum under Fluid Compute
 
-export { handler as GET, handler as POST, handler as DELETE };
+export { handler as GET, handler as POST };
 ```
 
 Vercel Functions run on Fluid Compute by default, which lets one function instance serve concurrent requests instead of blocking on a single SSE stream. You do not need to opt in.
@@ -260,7 +285,7 @@ Vercel Functions run on Fluid Compute by default, which lets one function instan
   a streaming response to heartbeat the connection while work proceeds.
 </Callout>
 
-**The `mcp-handler` package** handles transport setup, session management, and the GET/POST/DELETE routing automatically. The `basePath` option tells the adapter which path prefix to strip when constructing client-facing URLs.
+**The `mcp-handler` package** (2.3.0, 2026-10-07) serves the sessionless `2026-07-28` revision with a legacy stateless fallback, and returns a Web-standard handler that ignores the pathname, so you mount it at whatever route you want. Version 2 removed `basePath`, the SSE and streamable-endpoint options, `redisUrl`, `maxDuration`, and `sessionIdGenerator`, and GET/DELETE session requests now return `405`. If you stay on SDK v1, pin `mcp-handler` 1.x and its v1 options deliberately instead of installing the latest.
 
 ## Using mcp-handler with Dynamic Transport Selection
 
@@ -270,15 +295,15 @@ For servers that need to support both stdio (local) and HTTP (deployed), expose 
 // src/main.ts
 import { createServer } from "./server.js";
 
-const server = createServer(loadConfig());
-
 // If invoked via node cli.js, use stdio
 // If invoked via HTTP (detected by PORT env var), use HTTP
 if (process.env.PORT) {
   const { startHttpServer } = await import("./http-server.js");
-  await startHttpServer(server, Number(process.env.PORT));
+  // The HTTP path takes a factory so each request gets its own server
+  await startHttpServer(() => createServer(loadConfig()), Number(process.env.PORT));
 } else {
-  const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+  const { StdioServerTransport } = await import("@modelcontextprotocol/server/stdio");
+  const server = createServer(loadConfig());
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
@@ -287,7 +312,9 @@ if (process.env.PORT) {
 This pattern avoids bundling HTTP server dependencies into the stdio binary and vice versa - each transport path imports its dependencies lazily.
 
 <Callout type="warn">
-  Never use the same `McpServer` instance across multiple transport connections. The server
-  maintains state about the connected client. Create a new server instance per connection when using
-  the Streamable HTTP transport.
+  On the v1 SDK's sessionful Streamable HTTP transport, never use the same `McpServer` instance
+  across multiple transport connections; create a new server instance per connection. With the
+  current per-request handlers (`createMcpHandler` in SDK v2, `mcp-handler` 2.x), the factory or
+  registration callback you pass is what builds the server for each request, so follow that adapter
+  rather than deriving instance lifetime from the removed session model.
 </Callout>

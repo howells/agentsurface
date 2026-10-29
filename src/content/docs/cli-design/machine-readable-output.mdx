@@ -1,12 +1,12 @@
 ---
 title: Machine-Readable Output
 description: Structuring CLI output so agents can parse it without heuristics, regex, or guesswork
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Agents cannot parse color codes, spinner characters, or variable-width tables. Machine-readable output requires a clear separation: stdout carries data as deterministic JSON, stderr carries everything else (spinners, progress, warnings). This dual-stream approach is required for agent-readable CLIs and prevents regex brittleness that breaks on the next release.
+Agents handle color codes, spinner characters, and variable-width tables unreliably. Machine-readable output requires a clear separation: stdout carries data as deterministic JSON, stderr carries everything else (spinners, progress, warnings). This dual-stream approach is the baseline for agent-readable CLIs and prevents regex brittleness that breaks on the next release. Automatic JSON for non-TTY output and `null` for absent optional fields, below, are design contracts you adopt and document, not behavior every CLI already has.
 
 - Separate data (stdout) from noise (stderr, progress, spinners)
 - Return consistent, typed JSON for every command

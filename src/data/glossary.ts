@@ -1083,20 +1083,20 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       "A draft protocol for peer-to-peer agent identity and communication using decentralized identifiers.",
     detail:
-      "ANP proposes self-sovereign agent identity via DIDs and end-to-end encrypted, agent-to-agent messaging without a shared platform. It remains a draft and is one to watch rather than depend on.",
+      "ANP proposes self-sovereign agent identity via DIDs and end-to-end encrypted, agent-to-agent messaging without a shared platform. Its identity, naming, description, and discovery components are labeled released v1.2, while authorization and some messaging profiles remain draft; it is one to watch rather than depend on.",
     aliases: ["ANP", "Agent Network Protocol"],
     href: "/docs/protocols/comparison",
   },
   {
     id: "oasf",
     acronym: "OASF",
-    name: "Open Agent Schema Framework",
+    name: "Open Agentic Schema Framework",
     category: "Agent infrastructure",
     definition:
       "A normalized schema for describing agent and tool capabilities, aimed at package-registry-style discovery.",
     detail:
       "OASF is AGNTCY's discovery component: it standardizes how an agent or tool describes what it does, so a consumer can search by capability rather than by publisher. The schemas have not converged on a stable version and the surrounding registry tooling is still nascent.",
-    aliases: ["OASF", "Open Agent Schema Framework"],
+    aliases: ["OASF", "Open Agentic Schema Framework", "Open Agent Schema Framework"],
     href: "/docs/protocols/emerging-standards",
   },
   {

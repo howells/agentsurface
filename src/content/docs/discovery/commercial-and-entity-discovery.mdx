@@ -1,7 +1,7 @@
 ---
 title: Commercial and Entity Discovery
 description: Publish accurate pricing, identity, and task guidance without inventing external authority
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 An agent needs to establish what you sell, who operates it, when it fits a task, and what it costs. These facts should agree across visible pages, structured data, Markdown, repositories, and listings.
@@ -55,7 +55,7 @@ Agents that discover a product or tool through a registry expect the same identi
 | Directory                   | Covers                                                                         | URL                                                                          | Submission                                                                                                                                                                                                                                  |
 | --------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MCP Registry                | Canonical, namespace-verified list of MCP servers                              | [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io) | `mcp-publisher` CLI publishes a `server.json`; ownership is verified via GitHub OAuth/OIDC or DNS/HTTP. See the [publishing guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/quickstart.mdx). |
-| skills.sh                   | Agent skills ranked by install volume, browsable by topic and compatible agent | [skills.sh](https://skills.sh)                                               | Publish the skill as a GitHub repo, then register with `npx skills add <owner>/<repo>`                                                                                                                                                      |
+| skills.sh                   | Agent skills ranked by install volume, browsable by topic and compatible agent | [skills.sh](https://skills.sh)                                               | Publish the skill in a public GitHub repo. `npx skills add <owner>/<repo>` installs a skill into a user's environment - it is not a registration step; the directory ranks skills by installs                                               |
 | ChatGPT app directory       | Apps a user can pull into a ChatGPT conversation by name                       | [chatgpt.com/apps](https://chatgpt.com/apps)                                 | Submit through the OpenAI Developer Platform, built on the Apps SDK / MCP; review covers connectivity, testing instructions, and directory metadata                                                                                         |
 | Claude Connectors Directory | Vetted remote MCP servers, desktop extensions, and MCP Apps for Claude         | listed inside Claude.ai                                                      | Submission portal in your organization's Claude.ai settings (Team or Enterprise, with Directory or Libraries permission); manual review. See the [submission guide](https://claude.com/docs/connectors/building/submission).                |
 

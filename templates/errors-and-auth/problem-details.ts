@@ -52,6 +52,7 @@ export const ProblemDetails = z
         "ERR_UNAVAILABLE",
         "ERR_TIMEOUT",
         "ERR_UNPROCESSABLE",
+        "ERR_INTERNAL",
       ])
       .optional()
       .describe("Machine-readable domain code"),
@@ -69,6 +70,9 @@ export const ProblemDetails = z
   .strict();
 
 export type ProblemDetailsType = z.infer<typeof ProblemDetails>;
+
+/** Machine-readable domain codes accepted in the `code` member. */
+export type ProblemCode = NonNullable<ProblemDetailsType["code"]>;
 
 /**
  * Helper to construct a ProblemDetails response

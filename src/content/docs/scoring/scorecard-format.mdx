@@ -1,7 +1,7 @@
 ---
 title: Scorecard Format
 description: JSON schema and TypeScript Zod schema for scorecards
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -185,7 +185,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
         {
           "type": "grep",
           "description": "MCP SDK imports",
-          "location": "grep -r '@modelcontextprotocol/sdk' .",
+          "location": "grep -rE '@modelcontextprotocol/(sdk|server|client)' .",
           "result": "0 matches"
         }
       ],
@@ -314,7 +314,7 @@ export type Scorecard = z.infer<typeof Scorecard>;
         {
           "type": "grep",
           "description": "CLAUDE.md imports AGENTS.md",
-          "location": "grep -c '^@AGENTS.md' CLAUDE.md",
+          "location": "grep -c '@AGENTS\\.md' CLAUDE.md",
           "result": "No CLAUDE.md present - not required for a top score"
         },
         {
@@ -386,9 +386,9 @@ export type Scorecard = z.infer<typeof Scorecard>;
         },
         {
           "id": "mcp-not-implemented",
-          "what": "mcp-server: 0 files matching **/.mcp.json (no MCP server exists)",
+          "what": "mcp-server: no MCP SDK imports and 0 files matching **/.mcp.json (no MCP server found)",
           "why": "Agents consume MCP servers to discover tools. Without MCP, agents must rely on API docs or CLI help.",
-          "fix": "Create .mcp.json and MCP server implementation. Expose 6 existing tools via MCP. Use InMemoryTransport for testing.",
+          "fix": "Implement an MCP server and register it for clients (for example in .mcp.json). Expose 6 existing tools via MCP. Use InMemoryTransport for testing.",
           "dimension": "mcp-server",
           "currentScore": 0,
           "targetScore": 2,

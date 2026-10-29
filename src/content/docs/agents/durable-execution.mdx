@@ -1,7 +1,7 @@
 ---
 title: Durable Execution
 description: "Running non-deterministic agent loops inside durable workflow engines: model calls as replay-safe steps, checkpointing partial state, suspend/resume for approvals, and mid-run steering."
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -72,12 +72,12 @@ A workflow run completes; a task is dispatched and closed; an objective outlives
 
 Each engine solves the same problem with its own primitives.
 
-- **Temporal** - activities are the recorded, memoized unit; Signals inject mid-run input; Queries read live state; heartbeats keep long activities alive. Standalone Activities reached GA in v1.32.0 (2026-09-11): a single durable step records without authoring a full workflow around it, with delayed starts and operator APIs for pausing, resuming, and batch-managing them - convenient for wrapping one expensive model call.
+- **Temporal** - activities are the recorded, memoized unit; Signals inject mid-run input; Queries read live state; heartbeats keep long activities alive. Standalone Activities were reported GA in server v1.32.0 (2026-09-11; not re-confirmed against the server release notes on 2026-10-29, and the Python SDK version is separate from the server version): a single durable step records without authoring a full workflow around it, with delayed starts and operator APIs for pausing, resuming, and batch-managing them - convenient for wrapping one expensive model call.
 - **Inngest** - `step.run()` memoizes each step's result; replay skips completed steps and resumes at the first incomplete one; `step.waitForEvent()` suspends for approvals or steering.
 - **Cloudflare Workflows** - steps are durable and retried independently; an instance can sleep or wait for an event across restarts, running close to the model at the edge.
 - **AWS (LangGraph + DynamoDB)** - the framework-native pattern: LangGraph drives the graph, a DynamoDB checkpointer persists state after each node, and the run resumes from the last checkpoint.
 
-Frameworks also layer durable execution over an agent loop directly, built on step-memoization primitives like Inngest's, as one convenient default rather than the only shape.
+Frameworks also layer durable execution over an agent loop directly, built on step-memoization primitives like Inngest's, as one convenient default rather than the only shape. The AI SDK's `WorkflowAgent` on Workflow 5 is one example, and Workflow 5 docs still direct users to it.
 
 ## Failure Modes
 

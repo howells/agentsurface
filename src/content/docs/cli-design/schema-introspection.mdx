@@ -1,7 +1,7 @@
 ---
 title: Schema Introspection
 description: Enabling agents to discover CLI commands, parameters, and types at runtime without pre-loaded documentation
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -197,15 +197,17 @@ Static embedded schemas have the same staleness problem as pre-loaded documentat
 
 ```bash
 $ mytool user create --help --json
-# The CLI fetches the current spec from the API's /openapi.json,
+# The CLI fetches the spec for its negotiated API version,
 # extracts the schema for POST /users, and returns it as the flag schema.
-# This always reflects the installed API version, not a bundled snapshot.
+# This tracks the live API, not a bundled snapshot.
 ```
+
+An unversioned live `/openapi.json` reflects whatever the server serves right now, which may differ from the API version the CLI pins in its requests or the version its flag parser was generated against. Bind schema discovery to the negotiated API version (the version header or URL the CLI sends) and report the schema's version or freshness in the output, so an agent can see when the two diverge. Date-based API versioning makes this concrete: Claude API version `2026-10-21` removed sampling parameters, so a CLI pinned to an older version needs the older schema ([migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21)).
 
 ```typescript
 async function getCommandSchema(command: string): Promise<CommandSchema> {
-  // Fetch live spec from the backing API
-  const spec = await fetchOpenAPISpec(api.baseURL + "/openapi.json");
+  // Fetch the spec for the version this CLI sends in its requests
+  const spec = await fetchOpenAPISpec(`${api.baseURL}/openapi.json`, { version: api.version });
 
   // Find the operation matching this command
   const operation = findOperation(spec, command);
@@ -264,6 +266,7 @@ The base `SKILL.md` folder shape - YAML frontmatter plus a Markdown body - is co
 ```yaml
 ---
 name: mytool
+description: Manage users, DNS records and billing through the mytool CLI. Use when the task involves the Example Platform API.
 version: 2.4.1
 schema_command: mytool describe --json
 auth:
@@ -277,7 +280,7 @@ capabilities:
 ---
 ```
 
-`schema_command` tells the agent exactly how to fetch the full runtime schema for any command, rather than relying on a description that can drift from the installed version. `auth` and `capabilities` are CLI-specific extensions, not part of the public Agent Skills base fields - treat them as additive metadata a CLI skill carries on top of `name` and `description`.
+`schema_command` tells the agent exactly how to fetch the full runtime schema for any command, rather than relying on a description that can drift from the installed version. `schema_command`, `auth`, `capabilities` and `version` are CLI-specific extensions, not part of the public Agent Skills base fields - treat them as additive metadata a CLI skill carries on top of the required `name` and `description` (the base format requires a `description`, so a `SKILL.md` without one doesn't satisfy it). A client only acts on the extensions if it implements a contract for them; for portability, put them in the standard `metadata` map, which takes string values, or document them for the clients that consume them ([specification](https://agentskills.io/specification#frontmatter)).
 
 Auto-generate or validate CLI skill metadata from your CLI's describe output as part of your release pipeline:
 

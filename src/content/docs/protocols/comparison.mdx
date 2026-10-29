@@ -1,35 +1,35 @@
 ---
 title: Protocol Comparison
 description: When to use MCP, A2A, Arazzo, ANP, and OASF - the full agent-to-agent and agent-to-tool protocol landscape
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Six protocols on this page address different needs: MCP (tools/data), A2A (agent-to-agent), OpenAPI 3.1 (service APIs), Arazzo (multi-step workflows), ANP (decentralized identity), OASF (capability discovery). Commerce protocols (UCP, ACP) have their own section - see [Agentic Commerce](/docs/agentic-commerce). Most systems layer MCP + A2A. Choose based on your architecture: vertical (tools), horizontal (peer agents), or workflow choreography.
+Six protocols on this page address different needs: MCP (tools/data), A2A (agent-to-agent), OpenAPI 3.2.1 (service APIs), Arazzo (multi-step workflows), ANP (decentralized identity), OASF (capability discovery). Commerce protocols (UCP, ACP) have their own section - see [Agentic Commerce](/docs/agentic-commerce). MCP and A2A are commonly layered. Choose based on your architecture: vertical (tools), horizontal (peer agents), or workflow choreography.
 
 | Protocol       | Purpose                | Maturity   | When                          |
 | -------------- | ---------------------- | ---------- | ----------------------------- |
 | MCP 2026-07-28 | Agent → tools/data     | Production | Every agent needs tools       |
 | A2A v1.0.1     | Agent → agent          | Production | Multi-agent delegation        |
-| OpenAPI 3.1    | Service APIs           | Production | Traditional API description   |
+| OpenAPI 3.2.1  | Service APIs           | Production | Traditional API description   |
 | Arazzo 1.1.0   | Workflow sequences     | Mature     | Multi-step API choreography   |
 | ANP (draft)    | Decentralized identity | Draft      | Self-sovereign agent identity |
 
-Six protocols on this page have emerged to address different coordination problems in multi-agent systems, alongside commerce (UCP, ACP) covered separately. Most production systems use several simultaneously. Understanding what each one is for determines which combination your system needs.
+Six protocols on this page have emerged to address different coordination problems in multi-agent systems, alongside commerce (UCP, ACP) covered separately. Many systems use several of them together. Understanding what each one is for determines which combination your system needs.
 
 ## The Full Landscape
 
-| Protocol           | Purpose                       | Topology           | Transport                       | Auth                            | Discovery                              | Maturity   |
-| ------------------ | ----------------------------- | ------------------ | ------------------------------- | ------------------------------- | -------------------------------------- | ---------- |
-| **MCP 2026-07-28** | Agent-to-tool / agent-to-data | Vertical (down)    | stdio, Streamable HTTP          | OAuth 2.1 (HTTP only)           | Optional `server/discover`, SDK config | Production |
-| **A2A v1.0.1**     | Agent-to-agent delegation     | Horizontal (peers) | JSON-RPC, gRPC, HTTP+JSON       | OAuth 2.1 + DPoP                | `/.well-known/agent-card.json`         | Production |
-| **OpenAPI 3.1**    | Service API description       | Vertical (down)    | HTTPS REST / gRPC               | Flexible (OAuth, API key, etc.) | OpenAPI document                       | Production |
-| **Arazzo 1.1.0**   | Multi-step workflow spec      | Vertical (down)    | HTTPS REST                      | Via OpenAPI binding             | Arazzo document                        | Mature     |
-| **ANP (draft)**    | Decentralized agent identity  | Any                | Any (via DID service endpoints) | End-to-end encryption via DID   | DID resolution                         | Draft      |
-| **OASF (AGNTCY)**  | Capability schema & discovery | Any                | Any (schema-agnostic)           | Flexible                        | Registry/marketplace                   | Early      |
+| Protocol           | Purpose                       | Topology           | Transport                       | Auth                            | Discovery                      | Maturity   |
+| ------------------ | ----------------------------- | ------------------ | ------------------------------- | ------------------------------- | ------------------------------ | ---------- |
+| **MCP 2026-07-28** | Agent-to-tool / agent-to-data | Vertical (down)    | stdio, Streamable HTTP          | OAuth 2.1 (HTTP only)           | `server/discover`, SDK config  | Production |
+| **A2A v1.0.1**     | Agent-to-agent delegation     | Horizontal (peers) | JSON-RPC, gRPC, HTTP+JSON       | Declared in the AgentCard       | `/.well-known/agent-card.json` | Production |
+| **OpenAPI 3.2.1**  | Service API description       | Vertical (down)    | HTTPS REST / gRPC               | Flexible (OAuth, API key, etc.) | OpenAPI document               | Production |
+| **Arazzo 1.1.0**   | Multi-step workflow spec      | Vertical (down)    | HTTPS REST                      | Via OpenAPI binding             | Arazzo document                | Mature     |
+| **ANP (draft)**    | Decentralized agent identity  | Any                | Any (via DID service endpoints) | End-to-end encryption via DID   | DID resolution                 | Draft      |
+| **OASF (AGNTCY)**  | Capability schema & discovery | Any                | Any (schema-agnostic)           | Flexible                        | Registry/marketplace           | Early      |
 
-Commerce protocols (UCP, ACP) are horizontal, agent-to-merchant protocols with their own auth (bearer tokens, mandates) and discovery (`/.well-known/ucp`, `/.well-known/acp.json`) conventions - see [Agentic Commerce](/docs/agentic-commerce) for the full treatment, including the "ACP" acronym-collision disambiguation this page used to carry.
+Commerce protocols (UCP, ACP) are horizontal, agent-to-merchant protocols with their own auth (bearer tokens, mandates) and discovery (`/.well-known/ucp` for UCP; ACP's released spec defines no discovery document) conventions - see [Agentic Commerce](/docs/agentic-commerce) for the full treatment, including the "ACP" acronym-collision disambiguation this page used to carry.
 
 ## What Each Protocol Is For
 
@@ -61,7 +61,7 @@ A2A and MCP cover different directions. An orchestrator agent might use A2A to d
 
 ### Commerce (UCP, ACP) - Buy This Thing on Behalf of the User
 
-Agent-initiated purchases are a session-based commerce layer on top of the protocols above, not a variant of them - covered in full at [Agentic Commerce](/docs/agentic-commerce), including UCP (most live merchant integrations), ACP (Beta, narrowing), and how each relates to MCP and A2A.
+Agent-initiated purchases are a session-based commerce layer on top of the protocols above, not a variant of them - covered in full at [Agentic Commerce](/docs/agentic-commerce), including UCP (release `2026-08-25`), ACP (Beta, snapshot `2026-04-17`), and how each relates to MCP and A2A.
 
 ### Arazzo - Here Is the Workflow Sequence
 
@@ -77,15 +77,15 @@ Arazzo complements MCP: MCP exposes individual tools; Arazzo describes how those
 
 ### ANP - Decentralized Web Agent Identity
 
-ANP (W3C AI Agent Protocol Community Group) answers the question: how does an agent prove its identity without a central authority? It uses Decentralized Identifiers (DIDs) for agent identity, JSON-LD for metadata, and end-to-end encryption for communication.
+ANP (Agent Network Protocol) answers the question: how does an agent prove its identity without a central authority? It uses Decentralized Identifiers (DIDs) for agent identity, JSON-LD for metadata, and end-to-end encryption for communication.
 
-ANP is a draft specification. It addresses identity and trust in scenarios where agents from different organizations need to interact without a shared trust anchor. The practical maturity is low - production deployments should monitor the spec but not depend on it.
+ANP is a mixed-status suite rather than a single draft: its [README](https://github.com/agent-network-protocol/AgentNetworkProtocol) labels DID authentication, the `did:wba` method, naming, agent description, and discovery Released v1.2 (a document number, not a wire version), while DID-based authorization and some messaging profiles remain draft or candidate. [AgentConnect](https://github.com/agent-network-protocol/AgentConnect) is a multi-language SDK and reference implementation, and AWiki has open client and server code. It addresses identity and trust in scenarios where agents from different organizations need to interact without a shared trust anchor. Independent production adoption has not been shown, so monitor the spec before depending on it.
 
 ### OASF - Capability Schemas and Marketplaces
 
-OASF (Open Agent Schema Framework) answers the question: how do I describe what an agent or tool can do in a way that enables discovery and composition? It provides standardized schemas for capability description, enabling capability marketplaces where agents can search for tools by what they do rather than by who publishes them.
+OASF (Open Agentic Schema Framework) answers the question: how do I describe what an agent or tool can do in a way that enables discovery and composition? It provides standardized schemas for capability description, enabling capability marketplaces where agents can search for tools by what they do rather than by who publishes them.
 
-OASF is the discovery component of AGNTCY, a Linux Foundation multi-agent infrastructure project with Cisco, Dell, Google Cloud, Oracle, and Red Hat as formative members. The schema (v1.2.0) has not converged on a stable version and the marketplace tooling is not mature, but real multi-vendor governance sits behind it. It is worth tracking for teams building capability discovery infrastructure - see [Emerging Standards](/docs/protocols/emerging-standards) for the full AGNTCY treatment.
+OASF is the discovery component of AGNTCY, a Linux Foundation multi-agent infrastructure project with Cisco, Dell, Google Cloud, Oracle, and Red Hat as formative members. The latest release is v1.1.0 (2026-07-10), the schema has not converged on a stable version and the marketplace tooling is not mature, but real multi-vendor governance sits behind it. It is worth tracking for teams building capability discovery infrastructure - see [Emerging Standards](/docs/protocols/emerging-standards) for the full AGNTCY treatment.
 
 ## Decision Guide
 
@@ -137,13 +137,13 @@ The orchestrator uses MCP directly for its own data needs. It delegates speciali
 
 ## Maturity Considerations
 
-| Protocol         | Use in production? | Notes                                                                             |
-| ---------------- | ------------------ | --------------------------------------------------------------------------------- |
-| MCP `2026-07-28` | Yes                | Current revision; all Tier 1 SDKs support it (see [MCP](/docs/protocols/mcp))     |
-| A2A `v1.0.1`     | Yes                | Production-grade - 150+ organizations, SDKs in five languages, multi-transport    |
-| Arazzo `1.1`     | Yes, with caveats  | Spec stable, tooling still maturing                                               |
-| ANP              | No                 | Draft spec, no production implementations                                         |
-| OASF             | No                 | Discovery component of AGNTCY (Linux Foundation); schema v1.2.0, still not stable |
+| Protocol         | Use in production? | Notes                                                                                             |
+| ---------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
+| MCP `2026-07-28` | Yes                | Current revision; all Tier 1 SDKs support it (see [MCP](/docs/protocols/mcp))                     |
+| A2A `v1.0.1`     | Yes                | Production-grade - 150+ organizations, SDKs in five languages, multi-transport                    |
+| Arazzo `1.1`     | Yes, with caveats  | Spec stable, tooling still maturing                                                               |
+| ANP              | No                 | Mixed status (parts Released v1.2, authorization draft); no independent production adoption shown |
+| OASF             | No                 | Discovery component of AGNTCY (Linux Foundation); latest release v1.1.0, still not stable         |
 
 When evaluating a protocol for production use, the spec stability matters less than SDK and tooling support. A stable spec with no SDKs requires you to implement the wire format yourself. MCP and A2A both have mature, actively maintained SDKs across multiple languages.
 
@@ -160,7 +160,7 @@ When evaluating a protocol for production use, the spec stability matters less t
 
 - [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) and [release summary](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
 - [A2A v1.0.1](https://a2a-protocol.org/latest/specification/)
-- [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0)
+- [OpenAPI 3.2.1](https://spec.openapis.org/oas/v3.2.1.html) (published 2026-09-10); 3.1 remains a valid compatibility target for tooling that has not moved
 - [Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html)
 
 ## Related Pages

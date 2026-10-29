@@ -1,7 +1,7 @@
 ---
 title: Retrieval and Job Contracts
 description: Document pagination, asynchronous jobs, bulk operations, GraphQL failures, and schema coverage
-lastVerified: 2026-09-10
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -20,6 +20,8 @@ Return a durable operation identifier and a documented way to retrieve status wh
 
 Verify the final result and terminal error as well as initial acceptance. State retention time, ownership, authorization, and whether an interrupted request may already have started work.
 
+Model providers now offer their own long-running tool controls, which don't replace a durable job contract on your API. OpenAI added async tool calling, mid-turn steering and reasoning-effort changes for GPT-6 Astra on [2026-09-03](https://developers.openai.com/api/docs/changelog), and the Agents API public beta (2026-09-10) is a managed, durable-session service that handles orchestration, compaction and recovery. It is a different product from the open-source Agents SDK, so don't use the names interchangeably.
+
 ## Bulk operations
 
 Define maximum items and payload size, atomicity, ordering, item identifiers, and per-item errors. Verify mixed success, duplicate submissions, invalid items, and permission checks on each resource. The GraphQL spec does not require servers to accept an array of requests, so batch support is a product decision; document whether yours accepts it. See [idempotency](/docs/error-handling/idempotency).
@@ -34,4 +36,4 @@ Explain field deprecation, replacement, and removal policy. Describe fields, arg
 
 For REST, specify success and error schemas for every documented status and media type, including pagination and job envelopes. Compare representative real responses with the contract. Keep [versioning policy](/docs/api-surface/api-versioning) and SDK examples aligned with deployed behavior.
 
-For function-calling adapters, exercise the generated tool schema with the intended provider and runtime. Recursive schemas, broad unions, deeply nested objects, and huge enums may require a narrower operation view. Describe any transformation, retain server validation, and do not claim all providers accept the same schema subset. See [tool schemas](/docs/tool-design/schemas).
+For function-calling adapters, exercise the generated tool schema with the intended provider and runtime. Recursive schemas, broad unions, deeply nested objects, and huge enums may require a narrower operation view. Describe any transformation, retain server validation, and do not claim all providers accept the same schema subset. Provider endpoints matter too: tool calling for GPT-6 models requires the Responses API, so a Chat Completions-only adapter needs model scoping. See [tool schemas](/docs/tool-design/schemas).

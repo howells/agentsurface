@@ -11,8 +11,8 @@ Transform error handling into structured agent recovery guidance. Implement RFC 
 
 - RFC 9457 Problem Details (Content-Type: application/problem+json)
 - Agent extensions: is_retriable, retry_after_ms, suggestions[], errors[], trace_id, doc_uri
-- Idempotency middleware (RFC 9110 Idempotency-Key header)
-- Rate-limit headers on all responses (X-RateLimit-*, Retry-After)
+- Idempotency middleware (Idempotency-Key header, IETF draft-ietf-httpapi-idempotency-key-header, not yet an RFC)
+- Rate-limit headers on all responses (X-RateLimit-\*, Retry-After)
 - Semantic exit codes (CLI): 0=ok, 2=usage, 3=notfound, 4=perm, 5=conflict
 - No stack traces, internal paths, or sensitive data in responses
 
@@ -29,105 +29,105 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 ## Process
 
 1. **Define error schema** (RFC 9457 + agent extensions):
+
    ```typescript
    interface ProblemDetails {
      // RFC 9457 standard (required)
-     type: string;          // URI identifying error type (e.g., https://example.com/errors/invalid-user)
-     title: string;         // Short summary (e.g., "User Not Found")
-     status: number;        // HTTP status code (400, 404, 429, etc.)
-     detail: string;        // Specific explanation with context
+     type: string; // URI identifying error type (e.g., https://example.com/errors/invalid-user)
+     title: string; // Short summary (e.g., "User Not Found")
+     status: number; // HTTP status code (400, 404, 429, etc.)
+     detail: string; // Specific explanation with context
 
      // Optional RFC 9457
-     instance?: string;     // URI of specific occurrence (for logging)
+     instance?: string; // URI of specific occurrence (for logging)
 
      // Agent extensions (required for agent-facing errors)
-     is_retriable: boolean;        // Should agent retry?
-     retry_after_ms?: number;      // When to retry (milliseconds)
-     suggestions: string[];        // Concrete recovery steps
-     errors?: Array<{              // Field-level errors
-       path: string;               // JSON path: "users[0].email"
+     is_retriable: boolean; // Should agent retry?
+     retry_after_ms?: number; // When to retry (milliseconds)
+     suggestions: string[]; // Concrete recovery steps
+     errors?: Array<{
+       // Field-level errors
+       path: string; // JSON path: "users[0].email"
        message: string;
-       constraint?: string;        // "format:email", "length:1-100"
+       constraint?: string; // "format:email", "length:1-100"
      }>;
-     doc_uri?: string;             // Link to error docs
-     trace_id: string;             // UUID for support + correlation
-     code?: string;                // Domain-specific code (e.g., "USER_NOT_FOUND")
+     doc_uri?: string; // Link to error docs
+     trace_id: string; // UUID for support + correlation
+     code?: string; // Domain-specific code (e.g., "USER_NOT_FOUND")
    }
    ```
 
 2. **Create error middleware** (centralized handler):
+
    ```typescript
-   import { z } from 'zod';
+   import { z } from "zod";
 
    export function createErrorMiddleware() {
      return async (req: Request, res: Response, err: unknown, next: NextFunction) => {
        const traceId = res.locals.traceId || generateUUID();
-       
+
        let problem: ProblemDetails;
-       
+
        if (err instanceof z.ZodError) {
          problem = {
-           type: 'https://example.com/errors/validation-failed',
-           title: 'Validation Failed',
+           type: "https://example.com/errors/validation-failed",
+           title: "Validation Failed",
            status: 400,
-           detail: 'Request did not match schema',
+           detail: "Request did not match schema",
            is_retriable: false,
            suggestions: [
-             'Check field types against schema',
-             'See error details for per-field constraints'
+             "Check field types against schema",
+             "See error details for per-field constraints",
            ],
-           errors: err.issues.map(i => ({
-             path: i.path.join('.'),
+           errors: err.issues.map((i) => ({
+             path: i.path.join("."),
              message: i.message,
              constraint: i.code,
            })),
-           doc_uri: 'https://docs.example.com/api/validation',
+           doc_uri: "https://docs.example.com/api/validation",
            trace_id: traceId,
          };
-       } else if (err.name === 'NotFoundError') {
+       } else if (err.name === "NotFoundError") {
          problem = {
-           type: 'https://example.com/errors/not-found',
-           title: 'Resource Not Found',
+           type: "https://example.com/errors/not-found",
+           title: "Resource Not Found",
            status: 404,
            detail: `${err.resource} with id ${err.id} not found`,
            is_retriable: false,
            suggestions: [
-             'Use list endpoint to find valid IDs',
-             'Check resource has not been deleted'
+             "Use list endpoint to find valid IDs",
+             "Check resource has not been deleted",
            ],
-           doc_uri: 'https://docs.example.com/api/not-found',
+           doc_uri: "https://docs.example.com/api/not-found",
            trace_id: traceId,
          };
-       } else if (err.code === 'RATE_LIMITED') {
+       } else if (err.code === "RATE_LIMITED") {
          problem = {
-           type: 'https://example.com/errors/rate-limited',
-           title: 'Rate Limit Exceeded',
+           type: "https://example.com/errors/rate-limited",
+           title: "Rate Limit Exceeded",
            status: 429,
            detail: `Too many requests. Retry after ${err.retryAfter}ms`,
            is_retriable: true,
            retry_after_ms: err.retryAfter,
-           suggestions: [
-             `Wait ${err.retryAfter}ms and retry`,
-             'Reduce request frequency'
-           ],
-           doc_uri: 'https://docs.example.com/api/rate-limiting',
+           suggestions: [`Wait ${err.retryAfter}ms and retry`, "Reduce request frequency"],
+           doc_uri: "https://docs.example.com/api/rate-limiting",
            trace_id: traceId,
-           code: 'RATE_LIMITED',
+           code: "RATE_LIMITED",
          };
        } else {
          // Fallback: 500 with no details
          problem = {
-           type: 'https://example.com/errors/internal-error',
-           title: 'Internal Server Error',
+           type: "https://example.com/errors/internal-error",
+           title: "Internal Server Error",
            status: 500,
-           detail: 'An unexpected error occurred',
+           detail: "An unexpected error occurred",
            is_retriable: false,
-           suggestions: ['Retry after 60 seconds', 'Contact support with trace_id'],
+           suggestions: ["Retry after 60 seconds", "Contact support with trace_id"],
            trace_id: traceId,
          };
        }
-       
-       res.status(problem.status).setHeader('Content-Type', 'application/problem+json');
+
+       res.status(problem.status).setHeader("Content-Type", "application/problem+json");
        res.json(problem);
      };
    }
@@ -149,42 +149,45 @@ Make every error actionable for agents. Each error is a prompt containing the ag
    - Agents use Retry-After to know when safe to retry
 
 4. **Implement idempotency middleware** (prevent duplicate side effects):
-   - Accept `Idempotency-Key: <uuid>` header on all mutations
-   - Store mapping: `idempotency_key → response` in cache (3 min TTL)
-   - If same key seen again: return cached response + `Idempotency-Replayed: true` header
-   - Example:
+   - Accept `Idempotency-Key: "<uuid>"` header on all mutations (quoted per the draft; accept unquoted too)
+   - Reserve the key atomically before running the handler, namespaced by authenticated principal and operation
+   - Store the response with a request-body fingerprint for a published retention window (24h is common)
+   - Same key, same body: return cached response + `Idempotency-Replayed: true`. Same key, different body: `422`. Still in flight: `409`
+   - Production version: `/templates/errors-and-auth/idempotency-middleware.ts`
+   - Minimal sketch (no atomic reservation or fingerprint; use the template in production):
+
      ```typescript
      export async function idempotencyMiddleware(req, res, next) {
-       if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+       if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
          return next();
        }
-       
-       const key = req.headers['idempotency-key'];
+
+       const key = req.headers["idempotency-key"];
        if (!key) {
          return res.status(400).json({
-           type: 'https://example.com/errors/missing-idempotency-key',
-           title: 'Missing Idempotency Key',
+           type: "https://example.com/errors/missing-idempotency-key",
+           title: "Missing Idempotency Key",
            status: 400,
-           detail: 'Mutation requires Idempotency-Key header',
+           detail: "Mutation requires Idempotency-Key header",
            is_retriable: false,
-           suggestions: ['Add Idempotency-Key header (UUID v4)'],
+           suggestions: ["Add Idempotency-Key header (UUID v4)"],
            trace_id: res.locals.traceId,
          });
        }
-       
+
        const cached = await cache.get(`idempotency:${key}`);
        if (cached) {
-         res.setHeader('Idempotency-Replayed', 'true');
+         res.setHeader("Idempotency-Replayed", "true");
          return res.status(cached.status).json(cached.body);
        }
-       
+
        // Wrap response to cache
        const originalJson = res.json.bind(res);
-       res.json = function(data) {
-         cache.set(`idempotency:${key}`, { status: res.statusCode, body: data }, 180);
+       res.json = function (data) {
+         cache.set(`idempotency:${key}`, { status: res.statusCode, body: data }, 86400);
          return originalJson(data);
        };
-       
+
        next();
      }
      ```
@@ -218,30 +221,35 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 
 7. **Error documentation** (emit catalog):
    - Generate `docs/error-codes.md` with all error types:
-     ```markdown
+
+     ````markdown
      ## Validation Failed
-     
+
      **Type:** `https://example.com/errors/validation-failed`
      **Status:** 400
      **Retriable:** No
-     
+
      Occurs when request body/params don't match schema.
-     
+
      **Suggestions:**
+
      - Check field types (see errors[] for details)
      - Validate against schema: /api/schema
-     
+
      **Example:**
+
      ```json
      {
        "type": "https://example.com/errors/validation-failed",
        "title": "Validation Failed",
        "status": 400,
-       "errors": [
-         { "path": "email", "message": "Invalid email format" }
-       ]
+       "errors": [{ "path": "email", "message": "Invalid email format" }]
      }
      ```
+     ````
+
+     ```
+
      ```
 
 8. **Quality checks**:

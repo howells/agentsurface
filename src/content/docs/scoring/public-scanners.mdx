@@ -1,12 +1,12 @@
 ---
 title: Public Readiness Scanners
 description: Hosted and local scanners that check a deployed site's agent readiness from the outside, and how to use them alongside a Surface audit
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Public scanners answer a narrower question than a repository audit: what can an outside agent observe from the deployed site right now? Use them as smoke tests for crawl access, machine-readable content, discovery documents, public APIs, and callable surfaces. They cannot see an unpublished contract, an authenticated flow they cannot enter, or the source-level reason a check failed.
 
-Only well-respected scanners with a published methodology or check catalog are named on this page. Pair an observed report with a [Surface audit](/docs/scoring), then trace failed signals back to code and deployment configuration. See [Evaluating Product Journeys](/docs/scoring/product-journeys) to interpret external findings in terms of a real task, source ownership, applicability, and verified outcomes.
+Scanners named on this page either publish a methodology or check catalog, or are clearly labelled as specialist tools with limited published methodology (Shopify's audit, below). Pair an observed report with a [Surface audit](/docs/scoring), then trace failed signals back to code and deployment configuration. See [Evaluating Product Journeys](/docs/scoring/product-journeys) to interpret external findings in terms of a real task, source ownership, applicability, and verified outcomes.
 
 ## Is Agentic
 
@@ -23,13 +23,13 @@ Only submit public URLs. Do not use an external scanner for private, authenticat
 
 ## Ora / orank scans
 
-[Ora](https://ora.ai/) - formerly at orank.ai, which now redirects to ora.ai - provides a public score and actionable findings across discovery, access, usability, and payments. Retrieve the cached result with `GET https://ora.ai/api/score/example.com`, or request a scan with `POST https://ora.ai/api/scan` and JSON body `{"url":"example.com"}`. See its [API reference](https://ora.ai/api/openapi.json) for caching and rate limits.
+[Ora](https://ora.ai/) - formerly at orank.ai, which now redirects to ora.ai - provides a public score and actionable findings across discovery, access, usability, and payments. Retrieve the cached result with `GET https://ora.ai/api/score/example.com`, or request a scan with `POST https://ora.ai/api/scan` and JSON body `{"url":"example.com"}`. See its [API reference](https://ora.ai/api/openapi.json) for caching and rate limits. That reference also lists journey-run endpoints (such as `POST /api/journey/runs`) alongside the static scan API, so Ora is not limited to static signals; this guide has not evaluated the journey runs.
 
 Treat each finding as evidence to investigate. A public documentation API benefits from OpenAPI and recoverable JSON errors; it does not need an OAuth authorization server when no protected resources exist. Wikipedia and Wikidata presence depend on independent evidence and eligibility, not configuration. Record the scan date and deployed version before comparing scores.
 
-Ora's [checks catalog](https://ora.ai/api/checks) is at contract 1.25.0 with 125 checks. Its August 2026 audit reweighted two of them: ARD catalog discovery (`ard-catalog`) dropped from 3 to 1 point while ecosystem adoption of the ARD standard is still early, and developer-resource discoverability (`agentic-search-specific`) dropped from 6 to 3 points because search-result categorization for that check is noisy.
+Ora's [checks catalog](https://ora.ai/api/checks) was at contract 1.38.0 with 132 checks when observed on 2026-10-29. Its August 2026 audit reweighted two of them: ARD catalog discovery (`ard-catalog`) dropped from 3 to 1 point while ecosystem adoption of the ARD standard is still early, and developer-resource discoverability (`agentic-search-specific`) dropped from 6 to 3 points because search-result categorization for that check is noisy.
 
-Ora also published [AgentReady](https://agentready.org), a vendor-neutral, MIT-licensed standard for agent readiness, developed together with Vercel, Mintlify, and Auth0 and reaching v1.0 in August 2026. Requirements carry stable IDs in three categories - `AR-FIND-*`, `AR-READ-*`, `AR-ACT-*` - each rated MUST, SHOULD, or MAY from traced agent runs and a controlled experiment. The spec deliberately defines no scoring, weights, or leaderboard; those are left to independent implementations, including Ora's own scanner, [Is Agentic](https://is-agentic.com/), and Mintlify's Agent Score. See the [spec](https://github.com/agentready-org/standard/blob/main/spec/spec.md) and [announcement](https://ora.ai/blog/agentready-open-standard).
+Ora also published [AgentReady](https://agentready.org), a vendor-neutral, MIT-licensed standard for agent readiness, developed together with Vercel, Mintlify, and Auth0 and reaching v1.0 in August 2026; the current specification is v2.0 (October 2026), written by Ora and Vercel. A major version is a breaking change to a normative requirement, so recheck any requirement you cite rather than carrying forward v1 text. Requirements carry stable IDs in three categories - `AR-FIND-*`, `AR-READ-*`, `AR-ACT-*` - each rated MUST, SHOULD, or MAY from traced agent runs and a controlled experiment. The spec deliberately defines no scoring, weights, or leaderboard; those are left to independent implementations, including Ora's own scanner, [Is Agentic](https://is-agentic.com/), and Mintlify's Agent Score. See the [spec](https://github.com/agentready-org/standard/blob/main/spec/spec.md) and [announcement](https://ora.ai/blog/agentready-launch).
 
 ## Cloudflare Agent Readiness
 
@@ -41,19 +41,19 @@ curl https://isitagentready.com/api/scan \
   --data '{"url":"https://example.com"}'
 ```
 
-First verified on 10 September 2026 and re-verified on **24 September 2026**, the comparison still found 22 available checks, unchanged; the website's default selection excludes A2A and AP2. Commerce is excluded from the displayed overall percentage, and neutral results do not count in its denominator. The API also returns a separate readiness level. Record the selected checks and scan time when comparing results.
+First verified on 10 September 2026 with 22 available checks. On **29 October 2026** the page's loaded script recognized 23 check IDs, including a new personal agent protocol check (`personalAgentProtocol`, Poppy), while the rendered form showed 22 checkboxes (AP2 is in the script but not rendered); the default selection still excludes A2A and AP2. Count the exact surface you use. Commerce is excluded from the displayed overall percentage, as is the personal agent protocol check, and neutral results do not count in its denominator. The API also returns a separate readiness level. Record the selected checks and scan time when comparing results.
 
 Its useful differences from [Ora's published catalog](https://ora.ai/api/checks) are:
 
-- **DNS-AID:** an additional DNS discovery check, absent from Ora contract 1.25.0's 125 checks. See [DNS Discovery](/docs/discovery/dns-discovery) for applicability and verification.
-- **Content Signals:** Cloudflare scores it as a standalone check, separate from crawler rules. Ora instead folds `ai-train=`/`search=` Content Signals directives into its single crawler-policy check (`robots-ai-policy-quality`) rather than scoring them on their own. Keep access and content use separate in your implementation even when a scanner combines their scores.
+- **DNS-AID:** an additional DNS discovery check, absent from Ora contract 1.38.0's 132 checks. See [DNS Discovery](/docs/discovery/dns-discovery) for applicability and verification.
+- **Content Signals:** Cloudflare scores it as a standalone check, separate from crawler rules. Ora's single crawler-policy check (`robots-ai-policy-quality`) now describes search-crawler access and says blocking training crawlers never lowers the score; its catalog does not describe scoring Content Signals directives, so confirm how it treats them before comparing. Keep access and content use separate in your implementation even when a scanner combines their scores.
 - **Discovery routes:** the catalog probe also tries DNS TXT and SRV records. A broader set of probes does not imply a new product requirement.
 
 Is Agentic uses Ora's checks, so it provides another interpretation of that evidence rather than an independent checklist. Most Cloudflare capabilities overlap Ora, with different acceptance criteria and weights. Use each report to investigate actual client failures; a scanner's preferred path or older API name is not a substitute for the current protocol specification.
 
 ## Google Lighthouse Agentic Browsing
 
-Lighthouse ships an `agentic-browsing` category in its default config, added in [Lighthouse 13.3.0](https://github.com/GoogleChrome/lighthouse/blob/main/changelog.md) (7 May 2026) and included by default since. It runs in both navigation and snapshot mode and is explicitly marked experimental: "This category is still under development and subject to change." Chrome's [scoring guide](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) says testing it needs Chrome 150 or later, and the WebMCP audits need the WebMCP origin trial. It scores as a pass fraction rather than 0-100.
+Lighthouse ships an `agentic-browsing` category in its default config, added in [Lighthouse 13.3.0](https://github.com/GoogleChrome/lighthouse/blob/main/changelog.md) (7 May 2026) and included by default since. The latest release at the last check, 13.6.0 (27 October 2026), keeps the same seven audits and adds multi-URL CLI auditing (`--url-file`, `--fail-fast`), which suits repeatable coverage. It runs in both navigation and snapshot mode and is explicitly marked experimental: "This category is still under development and subject to change." Chrome's [scoring guide](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring) says testing it needs Chrome 150 or later, and the WebMCP audits need the WebMCP origin trial. It scores as a pass fraction rather than 0-100.
 
 Seven audits make up the category, defined in [`agentic-browsing-config.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/config/agentic-browsing-config.js) and [`default-config.js`](https://github.com/GoogleChrome/lighthouse/blob/main/core/config/default-config.js):
 

@@ -1,7 +1,7 @@
 ---
 title: Knowledge Graphs
 description: When graph retrieval justifies its maintenance cost compared with vectors - condensed current practice
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Knowledge graphs represent entities and relationships as nodes and edges. They excel at multi-hop reasoning and schema-driven queries, and they are a maintenance commitment - add one only when relationships are explicit and queried often.
@@ -19,9 +19,9 @@ Knowledge graphs represent entities and relationships as nodes and edges. They e
 
 ## GraphRAG versus LightRAG
 
-GraphRAG builds entity communities and traverses them at query time; it is thorough and expensive - public benchmarks put it around 610K+ tokens per query. LightRAG indexes entities and relationships for more direct retrieval without full community-building, reporting query costs in the low hundreds of tokens in the same benchmarks - roughly three orders of magnitude cheaper, though the exact ratio depends on corpus and query mix. Verify current figures against the [LightRAG paper](https://arxiv.org/abs/2410.05779) before using them to justify a technology choice.
+GraphRAG builds entity communities and traverses them at query time; it is thorough and expensive. LightRAG indexes entities and relationships for more direct retrieval without full community-building. The [LightRAG paper](https://arxiv.org/abs/2410.05779) (October 2024) reports around 610K+ tokens per query for the GraphRAG baseline against low hundreds of tokens for LightRAG - roughly three orders of magnitude. That is one comparison, on the paper's datasets, models and query mode (community-summary search for GraphRAG), with its own accounting of what counts as a query token. It is not the cost of every graph retrieval path, and it does not compare against the current Microsoft GraphRAG release. Read the paper's table and rerun a comparison on your own corpus before using the ratio to justify a technology choice.
 
-Use GraphRAG when the domain has stable entities, multi-hop reasoning and global summarization across communities matter, and you can maintain entity resolution. Use LightRAG when graph structure helps but full community-building is too heavy, and update speed matters. Use neither when the corpus is mostly unstructured prose with weak entity relationships - hybrid vector retrieval will outperform both at a fraction of the engineering cost.
+Use GraphRAG when the domain has stable entities, multi-hop reasoning and global summarization across communities matter, and you can maintain entity resolution. Use LightRAG when graph structure helps but full community-building is too heavy, and update speed matters. Use neither first when the corpus is mostly unstructured prose with weak entity relationships - start with hybrid vector retrieval as a simpler baseline, and add a graph only if an eval shows it falls short.
 
 ## Implementation shape
 

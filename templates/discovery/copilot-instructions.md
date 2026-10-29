@@ -37,7 +37,7 @@ These instructions customize GitHub Copilot for Acme Agent Tools.
 
 Monorepo: pnpm workspaces (packages/sdk, packages/api, packages/dashboard).
 
-Node 20 LTS required (.nvmrc enforced).
+Node 24 LTS required (.nvmrc enforced).
 
 ---
 

@@ -1,21 +1,21 @@
 ---
 title: Protected Resource Metadata
 description: RFC 9728 resource server discovery for OAuth-protected APIs and MCP servers
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to validate tokens against the correct JWKS and learn which scopes you support. RFC 9728 does not standardize a DPoP-requirement field; if you require DPoP, advertise it separately (see the note below).
+Publish your resource server's metadata at `/.well-known/oauth-protected-resource` so that MCP clients, agents, and external services can discover your authorization requirements at runtime. Clients use this metadata to find the authorization servers that issue tokens for you and learn which scopes you support. RFC 9728 also defines standard fields for advertising a DPoP requirement.
 
 - `resource`: your API or MCP server's resource URI
 - `authorization_servers`: list of trusted identity providers
 - `scopes_supported`: all scopes your API recognizes
-- `jwks_uri`: public key endpoint for JWT validation
 - `bearer_methods_supported`: accepted bearer token transport methods
+- `dpop_bound_access_tokens_required` and `dpop_signing_alg_values_supported`: whether you require DPoP, and which proof algorithms you accept
 - Cache with `Cache-Control: max-age=3600`
 
-When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, and where to validate JWTs. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the authorization server metadata endpoint. RFC 9728 Protected Resource Metadata defines the metadata that a resource server exposes about itself.
+When an MCP client, external agent, or service needs to call your API, it must know: which authorization servers to trust, which scopes you support, and whether tokens must be sender-constrained. RFC 8414 OAuth 2.0 Authorization Server Metadata defines the authorization server metadata endpoint. RFC 9728 Protected Resource Metadata defines the metadata that a resource server exposes about itself.
 
 Publish this metadata at `/.well-known/oauth-protected-resource` to allow clients (including MCP) to discover your auth requirements and validate tokens correctly.
 
@@ -33,9 +33,9 @@ Publish this metadata at `/.well-known/oauth-protected-resource` to allow client
     "payments:read",
     "payments:write"
   ],
-  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
   "bearer_methods_supported": ["header"],
-  "resource_signing_alg_values_supported": ["RS256", "ES256"],
+  "dpop_bound_access_tokens_required": false,
+  "dpop_signing_alg_values_supported": ["ES256", "EdDSA"],
   "resource_name": "Example API"
 }
 ```
@@ -45,10 +45,11 @@ Key fields:
 - `resource` - your API's base URI or MCP endpoint resource identifier
 - `authorization_servers` - list of auth servers that can issue tokens you accept
 - `scopes_supported` - all scopes your API recognizes
-- `jwks_uri` - where to fetch public keys for JWT validation
 - `bearer_methods_supported` - accepted bearer token locations, usually `["header"]`
-- `resource_signing_alg_values_supported` - algorithms used when the resource signs responses or metadata
+- `dpop_bound_access_tokens_required` - `true` if every access token must be DPoP-bound (defaults to `false` when omitted)
+- `dpop_signing_alg_values_supported` - DPoP proof algorithms the resource accepts
 - `resource_name` - human-readable resource name for client UI
+- `jwks_uri` (optional, not shown) - the resource server's own public keys, for example for signed responses. It is not where clients or the resource find the keys that verify access tokens; those come from the authorization server's own metadata (RFC 8414 `jwks_uri`) or token introspection
 
 Authorization-server capabilities such as `grant_types_supported`, `response_types_supported`, token endpoints, and token endpoint auth methods belong in the authorization server metadata document, not the protected resource metadata document.
 
@@ -87,9 +88,9 @@ export async function GET() {
       "payments:read",
       "payments:write",
     ],
-    jwks_uri: "https://auth.example.com/.well-known/jwks.json",
     bearer_methods_supported: ["header"],
-    resource_signing_alg_values_supported: ["RS256", "ES256"],
+    dpop_bound_access_tokens_required: false,
+    dpop_signing_alg_values_supported: ["ES256", "EdDSA"],
     resource_name: "Example API",
   };
 
@@ -99,26 +100,26 @@ export async function GET() {
 }
 ```
 
-Serve it at `https://api.example.com/.well-known/oauth-protected-resource` (standard location) or `https://api.example.com/.well-known/oauth-protected-resource.json` (alternative).
+Serve it at `https://api.example.com/.well-known/oauth-protected-resource`. If the resource identifier has a path, RFC 9728 inserts the well-known segment before it: `https://api.example.com/.well-known/oauth-protected-resource/mcp` for a resource of `https://api.example.com/mcp`. Any other location (such as a `.json` suffix) is a custom endpoint that clients only find if you link it explicitly, for example from `WWW-Authenticate`.
 
 ## How MCP Uses This
 
-MCP clients (this metadata discovery has been part of the spec since the `2025-11-25` revision) fetch this metadata to:
+MCP servers have been required to publish this metadata since the `2025-06-18` revision. MCP clients fetch it to:
 
 1. Discover which authorization servers can issue tokens
-2. Validate tokens against the correct JWKS endpoint
-3. Learn which scopes the API supports
-4. Use the correct token endpoint for token exchange
+2. Learn which scopes the API supports
+3. Find each authorization server's own metadata (RFC 8414), which carries its token endpoint and signing keys
 
-DPoP is not part of this discovery flow in the ratified MCP spec - see [DPoP](/docs/authentication/dpop) for why. If your resource server independently requires DPoP (an OAuth-layer decision, not an MCP one), advertise it through a field you define and document in your own metadata, since RFC 9728 does not standardize one.
+DPoP is not part of this discovery flow in the ratified MCP spec - see [DPoP](/docs/authentication/dpop) for why. If your resource server independently requires DPoP (an OAuth-layer decision, not an MCP one), advertise it with RFC 9728's standard `dpop_bound_access_tokens_required` and `dpop_signing_alg_values_supported` fields rather than a private one.
 
-When an MCP server calls your resource server, it:
+When a client calls your resource server, it:
 
 1. Fetches `/.well-known/oauth-protected-resource`
-2. Validates the resource identifier matches
-3. Fetches the JWKS from the declared `jwks_uri`
-4. On every request, validates the JWT signature against JWKS and verifies `iss` and `aud` claims
-5. Includes a DPoP proof only if your resource server independently requires sender-constrained tokens
+2. Validates that the `resource` value matches the URL it is calling
+3. Fetches the listed authorization server's metadata and obtains a token for that resource
+4. Includes a DPoP proof only if `dpop_bound_access_tokens_required` is `true` (or the token is DPoP-bound)
+
+The resource server, not the client, validates each token: signature against the authorization server's keys (or introspection for opaque tokens), plus `iss` and `aud`.
 
 ```typescript
 // MCP client example (simplified)
@@ -128,23 +129,13 @@ async function callResourceServer(token: string, endpoint: string) {
     (r) => r.json(),
   );
 
-  // Fetch JWKS
-  const jwks = await fetch(metadata.jwks_uri).then((r) => r.json());
-
-  // Validate token before sending
-  // (server-side validation happens too)
-
-  // If DPoP is required by this resource or token, generate a proof
-  let dpopProof = null;
-  if (requiresDpop(metadata)) {
-    dpopProof = await generateDPopProof("GET", endpoint);
-  }
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-  };
-  if (dpopProof) {
-    headers["DPoP"] = dpopProof;
+  // If this resource requires sender-constrained tokens, send a DPoP proof
+  const headers: Record<string, string> = {};
+  if (metadata.dpop_bound_access_tokens_required) {
+    headers.Authorization = `DPoP ${token}`;
+    headers.DPoP = await generateDPopProof("GET", endpoint, token);
+  } else {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const res = await fetch(endpoint, { headers });
@@ -171,7 +162,6 @@ If you're not using DPoP or token exchange yet, a minimal metadata document is a
   "resource": "https://api.example.com",
   "authorization_servers": ["https://auth.example.com/"],
   "scopes_supported": ["read", "write"],
-  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
   "bearer_methods_supported": ["header"]
 }
 ```
@@ -209,7 +199,7 @@ paths:
 x-oauth-protected-resource: /.well-known/oauth-protected-resource
 ```
 
-This allows OpenAPI tools to automatically discover your OAuth requirements.
+`x-oauth-protected-resource` is a custom extension, not part of OpenAPI or RFC 9728. It helps tooling you control or document; don't expect general OpenAPI tools to act on it.
 
 ## Cache and Update Strategy
 
@@ -228,7 +218,8 @@ Clients typically cache metadata for 1 hour (specify `Cache-Control: max-age=360
 - [ ] `resource` matches your API's base URI or MCP endpoint resource identifier
 - [ ] `authorization_servers` includes all trusted identity providers
 - [ ] `scopes_supported` is exhaustive and matches your API's permission model
-- [ ] `jwks_uri` points to a valid JWKS endpoint with current public keys
+- [ ] DPoP requirements, if any, use `dpop_bound_access_tokens_required` and `dpop_signing_alg_values_supported`
+- [ ] Token-verification keys are published in the authorization server's metadata, not assumed from this document
 - [ ] `bearer_methods_supported` is explicit and does not permit query-string bearer tokens
 - [ ] Authorization server metadata advertises the grants and token endpoint methods clients can use
 - [ ] Response includes `Cache-Control` header with appropriate TTL

@@ -1,7 +1,7 @@
 ---
 title: Input Hardening
 description: Defending against the specific ways agents construct invalid or dangerous inputs, which differ from how humans make mistakes
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -59,9 +59,11 @@ function validateOutputPath(input: string, allowedBase: string): string {
   return resolved;
 }
 
-// Sandbox all output paths to CWD by default
+// Lexical check only: see Output Path Sandboxing below for symlink handling
 const safePath = validateOutputPath(flags.output, process.cwd());
 ```
+
+This check constrains the path as written, not the filesystem. A symlink inside the base directory can still point somewhere outside it, so the `resolve`/prefix comparison is not a complete sandbox on its own. The Output Path Sandboxing section below adds the real-path check.
 
 For resource IDs - user IDs, record IDs, slugs - that are used to construct API paths, validate that they contain no path components:
 
@@ -82,6 +84,8 @@ function validateResourceId(id: string, fieldName: string): string {
 ## Control Characters
 
 ASCII characters below `0x20` (space) have no valid place in resource identifiers, names, or most string inputs. They appear in agent outputs as hallucinated values when the model's sampling process produces tokens that include control characters, or when an agent attempts to inject terminal escape sequences.
+
+Apply this per field, not to every string. Resource identifiers and anything echoed to a terminal should reject control characters outright, but free-text fields in a raw JSON payload (a multiline description, for example) can legitimately contain tab, line feed and carriage return, so the function below allows those three. JSON itself requires control characters to be escaped inside strings ([RFC 8259, section 7](https://www.rfc-editor.org/rfc/rfc8259.html#section-7)), so a valid payload can still carry them after parsing.
 
 ```typescript
 function rejectControlCharacters(value: string, fieldName: string): string {
@@ -204,8 +208,7 @@ function rejectEmbeddedURLComponents(value: string, fieldName: string): string {
 When constructing API requests, the CLI must percent-encode path parameters at the HTTP layer - independently of any decoding done during input validation. This prevents double-encoding while ensuring that valid special characters in IDs (spaces, Unicode) are correctly transmitted.
 
 ```typescript
-import { encodeURIComponent } from "url";
-
+// encodeURIComponent is a JavaScript global; it is not exported by Node's "url" module
 function buildAPIPath(template: string, params: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
     const value = params[key];
@@ -226,28 +229,51 @@ const path = buildAPIPath("/users/{user_id}/records/{record_id}", {
 
 ## Output Path Sandboxing
 
-When a CLI writes output files - exports, downloads, generated files - sandbox all output paths to the current working directory. An agent that constructs an absolute path or escapes via `../` should receive a clear error, not silent redirection of the file.
+When a CLI writes output files - exports, downloads, generated files - consider sandboxing output paths to the current working directory. Confining exports to CWD is a product policy, not a general CLI requirement, but where you adopt it, an agent that constructs an absolute path or escapes via `../` should receive a clear error, not silent redirection of the file.
+
+A string-prefix check on the resolved path is not enough, because a symlink inside CWD can lead outside it. Resolve the real path of the nearest existing ancestor with [`fs.promises.realpath`](https://nodejs.org/api/fs.html#fspromisesrealpathpath-options) and compare that:
 
 ```typescript
-function sandboxOutputPath(input: string): string {
-  const cwd = process.cwd();
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
+async function sandboxOutputPath(input: string): Promise<string> {
+  const cwd = await fs.realpath(process.cwd());
   const resolved = path.resolve(cwd, input);
 
-  // Verify the resolved path is within CWD
-  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+  // The file may not exist yet, so resolve symlinks on the nearest existing ancestor
+  let existing = resolved;
+  const missing: string[] = [];
+  for (;;) {
+    try {
+      existing = await fs.realpath(existing);
+      break;
+    } catch (err) {
+      const parent = path.dirname(existing);
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT" || parent === existing) throw err;
+      missing.unshift(path.basename(existing));
+      existing = parent;
+    }
+  }
+  const real = path.join(existing, ...missing);
+
+  // Verify the real path is within CWD
+  if (!real.startsWith(cwd + path.sep) && real !== cwd) {
     exitWithError({
       error: "path_outside_sandbox",
       message: "Output path must be within the current working directory",
       received: input,
-      resolved: resolved,
+      resolved: real,
       sandbox: cwd,
       code: 2,
     });
   }
 
-  return resolved;
+  return real;
 }
 ```
+
+This still leaves a window between the check and the write, and it doesn't stop a symlink created in that window. Where that matters, open the file with no-follow semantics and rely on OS-level containment (a container, chroot or a sandboxed user) rather than path checks alone.
 
 Document this behavior in `--help --json` for any command that writes files:
 
@@ -270,7 +296,7 @@ Document this behavior in `--help --json` for any command that writes files:
 Combine these checks into a reusable validation pipeline that applies consistently across commands:
 
 ```typescript
-type ValidationRule = (value: string, field: string) => string;
+type ValidationRule = (value: string, field: string) => string | Promise<string>;
 
 const resourceIdRules: ValidationRule[] = [
   (v, f) => normalizeAndValidate(v, f), // decode and check traversals
@@ -285,13 +311,15 @@ const outputPathRules: ValidationRule[] = [
   (v, f) => sandboxOutputPath(v), // must stay within CWD
 ];
 
-function validate(value: string, field: string, rules: ValidationRule[]): string {
-  return rules.reduce((v, rule) => rule(v, field), value);
+async function validate(value: string, field: string, rules: ValidationRule[]): Promise<string> {
+  let current = value;
+  for (const rule of rules) current = await rule(current, field);
+  return current;
 }
 
 // Usage in command handler
-const userId = validate(flags.userId, "user_id", resourceIdRules);
-const outputFile = validate(flags.output, "output", outputPathRules);
+const userId = await validate(flags.userId, "user_id", resourceIdRules);
+const outputFile = await validate(flags.output, "output", outputPathRules);
 ```
 
 ## Structured Validation Errors
@@ -330,11 +358,11 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 ## Checklist
 
 - [ ] Path traversal sequences (`../`, `..\`) rejected in resource IDs and file paths
-- [ ] Control characters (ASCII < 0x20) rejected in all string inputs
+- [ ] Control characters (ASCII < 0x20) rejected in resource identifiers and terminal-bound fields (tab, LF and CR allowed only in free-text fields)
 - [ ] Percent-encoded inputs are decoded iteratively before validation
 - [ ] Double-encoded sequences (`%252e`) are detected and rejected
 - [ ] Embedded URL components (`?`, `#`, `&`) rejected in resource IDs
-- [ ] Output file paths sandboxed to CWD; absolute paths outside CWD rejected
+- [ ] Output file paths sandboxed to CWD by real path (symlinks resolved), with OS-level containment where required; absolute paths outside CWD rejected
 - [ ] HTTP path parameters are percent-encoded at the request layer independently
 - [ ] All validation failures return structured JSON with field-level detail
 - [ ] Security posture is documented: "The agent is not a trusted operator"

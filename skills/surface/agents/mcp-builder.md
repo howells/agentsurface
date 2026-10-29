@@ -36,7 +36,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - **Stdio only**: Local dev tool, no multi-client need
    - **Streamable HTTP only**: Cloud service, multi-tenant
    - **Both (recommended)**: Flexibility for deployment + local testing
-   - Use `@modelcontextprotocol/sdk` (1.30.x latest) with `StdioServerTransport` from `server/stdio.js` and `StreamableHTTPServerTransport` from `server/streamableHttp.js` (or `server/webStandardStreamableHttp.js` on web-standard runtimes)
+   - Use the TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23): `StdioServerTransport` from `@modelcontextprotocol/server/stdio` and `createMcpHandler` for per-request Streamable HTTP, registering with `registerTool`/`registerResource`/`registerPrompt`. The monolithic `@modelcontextprotocol/sdk` 1.x (1.32.2) is maintained for v1 compatibility
 
 2. **Tool curation** (domain-driven):
    - Do NOT expose every endpoint; max 15 tools per MCP server
@@ -46,20 +46,24 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Distinguish Tools (agent actions) vs Resources (context data)
 
 3. **Implement tool annotations**:
+
    ```typescript
-   server.registerTool({
-     name: 'delete_user',
-     description: 'Permanently delete a user account. Cannot be undone.',
-     inputSchema: z.object({
-       user_id: z.string().uuid().describe('UUID of user to delete'),
-     }),
-     annotations: {
-       readOnlyHint: false,
-       destructiveHint: true,
-       idempotentHint: false,
-       openWorldHint: false,
+   server.registerTool(
+     "delete_user",
+     {
+       description: "Permanently delete a user account. Cannot be undone.",
+       inputSchema: z.object({
+         user_id: z.string().uuid().describe("UUID of user to delete"),
+       }),
+       annotations: {
+         readOnlyHint: false,
+         destructiveHint: true,
+         idempotentHint: false,
+         openWorldHint: false,
+       },
      },
-   }, handler);
+     handler,
+   );
    ```
 
 4. **Structured descriptions** (What/When/Prerequisites/Returns/Errors):
@@ -84,8 +88,8 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
      ```typescript
      return {
        content: [
-         { type: 'text', text: 'Summary' },
-         { type: 'resource', resource: { uri: '...', mimeType: 'application/json', text: '...' } },
+         { type: "text", text: "Summary" },
+         { type: "resource", resource: { uri: "...", mimeType: "application/json", text: "..." } },
        ],
      };
      ```
@@ -98,38 +102,42 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Continue polling until terminal states such as `completed`, `failed`, or `cancelled`.
 
 8. **Error handling** (RFC 9457 + MCP):
+
    ```typescript
    return {
      isError: true,
-     content: [{
-       type: 'text',
-       text: JSON.stringify({
-         type: 'https://example.com/errors/invalid-user',
-         title: 'User Not Found',
-         status: 404,
-         detail: 'No user with ID abc-123',
-         is_retriable: false,
-         suggestions: ['Use list_users to find valid IDs'],
-         trace_id: 'uuid...',
-       }),
-     }],
+     content: [
+       {
+         type: "text",
+         text: JSON.stringify({
+           type: "https://example.com/errors/invalid-user",
+           title: "User Not Found",
+           status: 404,
+           detail: "No user with ID abc-123",
+           is_retriable: false,
+           suggestions: ["Use list_users to find valid IDs"],
+           trace_id: "uuid...",
+         }),
+       },
+     ],
    };
    ```
 
 9. **Testing** (InMemoryTransport):
-   ```typescript
-   import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-   import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-   const [ct, st] = InMemoryTransport.createLinkedPair();
-   await server.connect(st);
-   const client = new Client({ name: 'test', version: '1.0.0' });
-   await client.connect(ct);
+   ```typescript
+   import { InMemoryTransport } from "@modelcontextprotocol/server";
+   import { Client } from "@modelcontextprotocol/client";
+
+   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+   await server.connect(serverTransport);
+   const client = new Client({ name: "test", version: "1.0.0" });
+   await client.connect(clientTransport);
 
    const { tools } = await client.listTools();
    expect(tools.length).toBeGreaterThan(0);
-   tools.forEach(t => {
-     expect(t.annotations?.type).toBeDefined();
+   tools.forEach((t) => {
+     expect(t.annotations?.readOnlyHint).toBeDefined();
    });
    ```
 
@@ -166,7 +174,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 - Tool descriptions must teach the agent when/why to use them.
 - Error responses must include is_retriable + suggestions[].
 - Async tasks must negotiate and use the current Tasks extension semantics where supported.
-- Annotations are mandatory; never omit type, requiresConfirmation, etc.
+- Annotations are mandatory: set `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint` explicitly. They are hints, not authorization policy; do not invent other annotation fields.
 
 ## Anti-patterns
 

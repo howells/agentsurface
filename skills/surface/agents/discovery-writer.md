@@ -11,7 +11,7 @@ Emit agent-discoverable artifacts: llms.txt (curated index <5k tokens), AGENTS.m
 
 - llms.txt: <5k tokens, developer-search-driven categorization, high-signal summary
 - AGENTS.md: tool boundaries, command examples, permission tiers (Always/Ask/Never)
-- robots-ai.txt: explicit allow for LLM crawlers (ClaudeBot, GPTBot, etc.)
+- robots.txt AI groups: explicit rules for LLM crawlers (ClaudeBot, GPTBot, etc.) in the real `/robots.txt`
 - Content Signals: explicit `search`, `ai-input`, and `ai-train` preferences
 - JSON-LD: FAQPage, TechArticle, WebAPI, HowTo, SoftwareApplication
 - Content negotiation: Return Markdown + `Vary: Accept` + `x-markdown-tokens` on `Accept: text/markdown`, or expose `.md`/`index.md` fallbacks
@@ -34,26 +34,28 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 1. **Create llms.txt** (curated, <5k tokens):
    - Location: web root (`public/llms.txt` or `app/llms.txt` depending on framework)
    - Format strictly:
+
      ```markdown
      # [Product Name]
-     
+
      > [1-3 sentence summary with key info for understanding the product]
-     
+
      ## [Section: Developer Guides]
-     
+
      - [Getting Started](https://example.com/docs/start): Installation, setup, first API call
      - [API Reference](https://example.com/docs/api): Endpoint catalog with examples
-     
+
      ## [Section: Concepts]
-     
+
      - [Authentication](https://example.com/docs/auth): OAuth 2.1, scopes, token lifecycle
-     
+
      ## Instructions
-     
+
      ALWAYS use [preferred endpoint] over [legacy].
      NEVER [deprecated pattern].
      PREFER [modern pattern] over [legacy].
      ```
+
    - Rules:
      - H1 product name only
      - Blockquote: high-signal summary (assume agent reads nothing else)
@@ -72,44 +74,50 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 3. **Create AGENTS.md** (universal agent boundaries):
    - Location: project root or `/docs/AGENTS.md`
    - Structure:
+
      ```markdown
      # [Project] Agents & Automation
-     
+
      ## Commands
-     
+
      [Exact commands with flags for common tasks]
-     
+
      ## Stack
-     
+
      [Only non-obvious tooling; omit npm if using npm]
-     
+
      ## Conventions
-     
+
      [Code examples, not prose]
-     
+
      ## Boundaries
-     
+
      ### Always (no approval needed)
+
      - Read docs
      - List resources
-     
+
      ### Ask First
+
      - Create/update resources
      - Run long tests
-     
+
      ### Never
+
      - Delete production data
      - Modify auth config
      - Access secrets
-     
+
      ## Testing
-     
+
      [Exact test commands and expected output]
      ```
+
    - Authoring target: ~150 lines ideal, 300 hard maximum (the <370-line figure elsewhere is the audit tolerance for existing files, not a target to write to)
    - Test: "Can agent discover this from code? If yes, delete it."
 
 4. **Create/update robots.txt and Content Signals**:
+
    ```
    User-agent: *
    Content-Signal: search=yes, ai-input=yes, ai-train=no
@@ -127,30 +135,39 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 
    User-agent: ClaudeBot
    Disallow: /
-   
+
    Sitemap: https://example.com/sitemap.xml
    ```
+
    - Decide separately for search/retrieval (`search`, `ai-input`) and model training (`ai-train`)
    - For public developer docs, usually allow retrieval and search while blocking training
    - Reference sitemap and llms.txt
 
-5. **Create robots-ai.txt** (new AI-specific crawler config):
+5. **Add AI crawler groups to robots.txt** (RFC 9309 defines `/robots.txt` as the only location crawlers read; a separate `robots-ai.txt` is not a standard, so keep AI groups in the real file and use `templates/discovery/robots-ai.txt` as the starting content):
+
    ```
-   # AI and agent access control
-   
-   access: allow              # allow|deny|conditional
-   crawl_delay: 1             # seconds between requests
-   request_limit: 100         # requests per hour
-   
-   paths:
-     /docs: read-only
-     /api/v1: read|write
-     /admin: none
-   
-   discovery_files:
-     - /llms.txt
-     - /llms-full.txt
-     - /.well-known/openapi.json
+   User-agent: *
+   Content-Signal: search=yes, ai-input=yes, ai-train=no
+   Disallow: /admin/
+   Allow: /llms.txt
+   Allow: /llms-full.txt
+   Allow: /.well-known/
+
+   # Search and user-initiated fetchers: allowed. An empty Disallow allows everything,
+   # and consecutive User-agent lines share the rules after them.
+   User-agent: OAI-SearchBot
+   User-agent: Claude-SearchBot
+   User-agent: ChatGPT-User
+   User-agent: Claude-User
+   Disallow:
+
+   # Training crawlers: blocked by default
+   User-agent: GPTBot
+   User-agent: ClaudeBot
+   User-agent: Google-Extended
+   Disallow: /
+
+   Sitemap: https://example.com/sitemap.xml
    ```
 
 6. **Add JSON-LD structured data** (in page templates):
@@ -162,13 +179,13 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Example:
      ```html
      <script type="application/ld+json">
-     {
-       "@context": "https://schema.org",
-       "@type": "TechArticle",
-       "headline": "Getting Started",
-       "author": { "@type": "Organization", "name": "Example" },
-       "datePublished": "2026-04-17"
-     }
+       {
+         "@context": "https://schema.org",
+         "@type": "TechArticle",
+         "headline": "Getting Started",
+         "author": { "@type": "Organization", "name": "Example" },
+         "datePublished": "2026-04-17"
+       }
      </script>
      ```
    - Validate against schema.org; must match visible content
@@ -176,13 +193,13 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 7. **Implement content negotiation** (optional, for Next.js/Express):
    - Add middleware to handle `Accept: text/markdown`:
      ```typescript
-     app.get('/docs/*', (req, res) => {
-       if (req.headers.accept?.includes('text/markdown')) {
-        res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-        res.setHeader('Vary', 'Accept');
-        res.setHeader('x-markdown-tokens', '1234');
-        res.setHeader('Content-Signal', 'search=yes, ai-input=yes, ai-train=no');
-        res.send(markdownContent);
+     app.get("/docs/*", (req, res) => {
+       if (req.headers.accept?.includes("text/markdown")) {
+         res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+         res.setHeader("Vary", "Accept");
+         res.setHeader("x-markdown-tokens", "1234");
+         res.setHeader("Content-Signal", "search=yes, ai-input=yes, ai-train=no");
+         res.send(markdownContent);
        } else {
          // Return HTML
        }
@@ -194,7 +211,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 
 8. **Publish `.well-known` capability metadata** where applicable:
    - `/.well-known/api-catalog` for public APIs and OpenAPI specs
-   - `/.well-known/mcp/server-card.json` for HTTP MCP servers
+   - an MCP Server Card for HTTP MCP servers at `<streamable-http-url>/server-card` (SEP-2127; omit tools), listed in `/.well-known/ai-catalog.json`; keep `/.well-known/mcp/server-card.json` only as a compatibility copy
    - `/.well-known/agent-skills/index.json` for task-specific Agent Skills documents; use the discovery v0.2 schema with `type`, canonical `url`, and a `sha256:` digest of the exact linked artifact bytes
    - `/.well-known/oauth-protected-resource` for OAuth-protected APIs/resources
    - `/.well-known/http-message-signatures-directory` when the service sends signed Web Bot Auth requests
@@ -206,35 +223,36 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Do not add commerce manifests to non-commerce products just to pass a scanner
 
 10. **Validate applicable signals and all URLs**:
-   - Detect the activating surface before requiring API, MCP, OAuth, Agent Skills, WebMCP, commerce, or bot-identity metadata; record absent optional surfaces as not applicable
-   - Verify every link in llms.txt resolves to substantive documentation, not only 200 OK
-   - Check for redirects; prefer direct URLs
-   - Test from agent perspective (curl + User-Agent header)
-   - Reject HTML shells, login pages, placeholder JSON, and empty bodies returned from machine-readable URLs
-   - Parse OpenAPI, JSON-LD, OAuth metadata, API Catalogs, and `.well-known` JSON; verify their linked resources and claims
-   - For Agent Skills, fetch each linked artifact, compare its exact-byte SHA-256 with `digest`, parse the `SKILL.md` frontmatter, and require a description that explains when to use it
-   - For MCP, validate the advertised transport and safely inspect lists; if resources are advertised, sample `resources/read` results for non-empty content and accurate MIME types
+
+- Detect the activating surface before requiring API, MCP, OAuth, Agent Skills, WebMCP, commerce, or bot-identity metadata; record absent optional surfaces as not applicable
+- Verify every link in llms.txt resolves to substantive documentation, not only 200 OK
+- Check for redirects; prefer direct URLs
+- Test from agent perspective (curl + User-Agent header)
+- Reject HTML shells, login pages, placeholder JSON, and empty bodies returned from machine-readable URLs
+- Parse OpenAPI, JSON-LD, OAuth metadata, API Catalogs, and `.well-known` JSON; verify their linked resources and claims
+- For Agent Skills, fetch each linked artifact, compare its exact-byte SHA-256 with `digest`, parse the `SKILL.md` frontmatter, and require a description that explains when to use it
+- For MCP, validate the advertised transport and safely inspect lists; if resources are advertised, sample `resources/read` results for non-empty content and accurate MIME types
 
 11. **Quality checks**:
-   - llms.txt tokens: <5,000 (use tiktoken to verify)
-   - All URLs in discovery files resolve to the advertised content
-   - JSON-LD valid against schema.org validator
-   - robots.txt passes validator
-   - Content Signals are consistent with robots.txt allow/block policy
-   - `.well-known` files return parseable, semantically consistent JSON with correct `Content-Type`
-   - Agent Skills index matches discovery v0.2 and every published digest matches the served artifact
-   - Advertised MCP resources are readable, non-empty, and use accurate MIME types
-   - Content-Negotiation returns Vary header
-   - AGENTS.md is within the authoring target (~150 lines ideal, <300 max)
-   - No secrets, credentials, or internal IPs in any file
+
+- llms.txt tokens: <5,000 (use tiktoken to verify)
+- All URLs in discovery files resolve to the advertised content
+- JSON-LD valid against schema.org validator
+- robots.txt passes validator
+- Content Signals are consistent with robots.txt allow/block policy
+- `.well-known` files return parseable, semantically consistent JSON with correct `Content-Type`
+- Agent Skills index matches discovery v0.2 and every published digest matches the served artifact
+- Advertised MCP resources are readable, non-empty, and use accurate MIME types
+- Content-Negotiation returns Vary header
+- AGENTS.md is within the authoring target (~150 lines ideal, <300 max)
+- No secrets, credentials, or internal IPs in any file
 
 ## Outputs
 
 - `/public/llms.txt` or `/app/llms.txt`
 - `/public/llms-full.txt` (if applicable)
 - `/docs/AGENTS.md` or `/AGENTS.md`
-- `/public/robots.txt` (updated)
-- `/public/robots-ai.txt` (new)
+- `/public/robots.txt` (updated with AI crawler groups)
 - `.well-known` metadata files for API Catalog, MCP, Agent Skills, OAuth, or Web Bot Auth where applicable
 - Middleware for content negotiation (if Next.js/Express)
 - Layout template updates (JSON-LD <script> tags)
@@ -258,7 +276,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 - AGENTS.md: exact commands + flags; prose only for context.
 - JSON-LD: match visible page content exactly; no hidden metadata.
 - Vary header: non-negotiable for content negotiation (CDN correctness).
-- robots-ai.txt: explicit permissions; default-deny is safer.
+- robots.txt AI groups: explicit permissions; default-deny is safer. Do not ship a separate `robots-ai.txt` as if it were a standard.
 - .well-known files: only publish metadata for real capabilities that exist.
 
 ## Anti-patterns

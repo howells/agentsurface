@@ -1,29 +1,29 @@
 ---
 title: Vitest Evaluation Harness
-description: In-process evals for fast iteration; retry-on-flake, seed pinning, JUnit output
-lastVerified: 2026-09-25
+description: In-process evals for fast iteration; retry-on-flake, repeatability, JUnit output
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-In-process evaluation harness for fast local iteration and deterministic routing tests (no LLM-as-judge, temperature 0). Best for TypeScript projects already using Vitest. Produce JUnit output for CI integration. Allow breakpoints, state inspection, and seed pinning for reproducibility. Fastest feedback for quick iteration; not suitable for large-scale eval (1000+ cases) or open-ended grading requiring human review.
+In-process evaluation harness for fast local iteration and routing tests with code-based graders (no LLM-as-judge). Best for TypeScript projects already using Vitest. Produce JUnit output for CI integration. Allow breakpoints, state inspection, and repeated trials to measure reliability. Fastest feedback for quick iteration; not suitable for large-scale eval (1000+ cases) or open-ended grading requiring human review.
 
 - **Fast feedback**: 10-50 cases in seconds, no API latency
 - **Local debugging**: Breakpoints, state inspection, traces
-- **Deterministic routing**: Temperature 0, tool selection tests
+- **Routing tests**: Tool selection with code-based graders and mocked tools
 - **JUnit output**: CI integration, regression tracking
-- **Seed pinning**: Reproducible agent behavior
+- **Repeated trials**: Measure reliability rather than assuming repeatability
 - **Not suitable for**: Open-ended evals, 1000+ cases, human review needs
 
 ---
 
-Vitest evals run agents in-process within your test suite. They are faster for local iteration, produce JUnit output for CI, and allow seed pinning for reproducibility. Best for TypeScript projects already using Vitest.
+Vitest evals run agents in-process within your test suite. They are faster for local iteration, produce JUnit output for CI, and make repeated trials cheap. Best for TypeScript projects already using Vitest.
 
 ## When to use Vitest evals
 
 - **Fast feedback loop** - 10-50 test cases in seconds, no API latency to external platforms
 - **Local debugging** - set breakpoints, inspect state during agent execution
-- **Deterministic routing** - test tool selection (set temperature 0) without external eval infrastructure
+- **Routing tests** - test tool selection with code-based graders and mocked tools, without external eval infrastructure
 - **Regression tests** - catch regressions in CI before deploying
 
 Do NOT use for:
@@ -46,7 +46,7 @@ describe("Agent Evals", () => {
   beforeEach(() => {
     agent = new MyAgent({
       model: "claude-opus-5-5",
-      temperature: 0, // Deterministic for evals
+      // No temperature or top_p: Claude API version 2026-10-21 removes them
       maxRetries: 1,
     });
   });
@@ -89,11 +89,12 @@ npm run test -- agent.eval.ts
 
 ## Retry-on-flake pattern
 
-LLMs are stochastic. A single test failure might be noise. Retry a few times; pass if any succeeds:
+LLMs are stochastic. A single test failure might be noise. Retry a few times; pass if any succeeds. In current Vitest the options object goes before the callback (`it(name, options, fn)`):
 
 ```typescript
 it(
   "should handle ambiguous intent",
+  { retry: 2 }, // Retry up to 2 times; pass if any succeeds
   async () => {
     const result = await agent.run({
       prompt: "Find files related to auth",
@@ -104,24 +105,24 @@ it(
     const toolName = result.toolCalls[0].name;
     expect(["user_auth_search", "oauth_search", "docs_search"].includes(toolName)).toBe(true);
   },
-  { retry: 2 }, // Retry up to 2 times; pass if any succeeds
 );
 ```
 
-This handles non-determinism while keeping tests fast. Don't use retry for deterministic cases (set temperature 0 instead).
+This handles non-determinism while keeping tests fast, but it measures a different property from first-attempt reliability: a test that passes on its third try still hides a flaky route. Log the failed attempts and report them next to the result, and gate on a pass@k-style rate across repeated trials (see below) rather than on a single retried pass. Don't use retry for cases whose grader is code-based and whose tools are mocked; a failure there is a real regression.
 
-## Seed pinning
+## Repeatability
 
-For reproducibility, pin the LLM seed where the provider supports one. OpenAI accepts a best-effort `seed` parameter; Anthropic's Messages API has no equivalent, so rely on `temperature: 0` plus the retry-on-flake pattern above for Claude models instead:
+Temperature zero does not make an agent repeatable, and Claude no longer takes it: Claude API version `2026-10-21` removes `temperature`, `top_p` and `top_k`, and Claude Haiku 5.5 and Claude Sonnet 5.5 reject non-default values. Anthropic's Messages API has no `seed` either. For Claude models, get stable results from a fixed dataset, mocked tools, code-based graders and repeated trials, and record the model ID, prompt version and environment with each run.
+
+Some providers offer a seed or sampling controls on some models. Treat them as an optional, provider- and model-specific aid, check the provider's documentation for the exact model, and do not promise identical tool routing:
 
 ```typescript
 const agent = new MyAgent({
-  model: "gpt-5.6-terra",
-  seed: 12345, // Fixed seed for reproducible routing (OpenAI only)
-  temperature: 0,
+  model: "gpt-6.1-terra",
+  seed: 12345, // only if the provider and model document a seed parameter
 });
 
-it("should consistently route the same query", async () => {
+it("should route the same query consistently across trials", async () => {
   const runs = [];
   for (let i = 0; i < 3; i++) {
     const result = await agent.run({ prompt: "Search for docs" });
@@ -133,7 +134,7 @@ it("should consistently route the same query", async () => {
 });
 ```
 
-Note: even with seed, different model versions or parameter changes can affect routing. Seed is necessary but not sufficient for full reproducibility.
+Note: even with a seed, model versions, parameter changes or provider-side changes can alter routing. OpenAI, for example, documents that temperature is available on its GPT-6 models only when reasoning effort is `none`.
 
 ## JUnit output for CI
 
@@ -276,12 +277,11 @@ const agent = new MyAgent({
 });
 ```
 
-- **Use cheaper models for routing tests** - temperature 0 with Haiku instead of Opus:
+- **Use cheaper models for routing tests** - Haiku instead of Opus, after checking that it routes your cases as accurately (compare on your own dataset; a cheaper model is not automatically as good):
 
 ```typescript
 const agentRouting = new MyAgent({
-  model: "claude-haiku-4-5",
-  temperature: 0,
+  model: "claude-haiku-5-5",
 });
 
 const agentQuality = new MyAgent({
@@ -296,6 +296,7 @@ const agentQuality = new MyAgent({
 
 - Template: `/templates/cli-and-evals/eval-vitest-harness.ts` - full working example
 - Vitest docs: https://vitest.dev/
+- Purpose-built eval harnesses on top of Vitest exist if you outgrow hand-rolled loops: [vitest-evals](https://github.com/getsentry/vitest-evals) (maintained by Sentry, 0.17.0 as of 2026-09-10) and [evalite](https://evalite.dev/) (stable 0.19.0; a 1.0 beta is on a separate tag)
 - Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
 
 ## See also

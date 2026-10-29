@@ -54,7 +54,7 @@ Errors are the agent's feedback loop. If they're opaque, the agent can't recover
 
 ### RFC 9457 Problem Details
 
-**Canonical:** [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) (March 2024; obsoletes RFC 7807 from April 2015)
+**Canonical:** [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) (July 2023; obsoletes RFC 7807 from March 2016)
 
 **Media type:** `application/problem+json` (or `application/problem+xml` for XML responses)
 
@@ -332,11 +332,11 @@ Prefer returning errors as tool output so the agent can reason about recovery. T
 import { generateText } from 'ai';
 
 const result = await generateText({
-  model: openai('gpt-5.6-terra'),
+  model: openai('gpt-6.1-terra'),
   tools: {
     fetch_data: tool({
       description: 'Fetch data',
-      parameters: z.object({ id: z.string() }),
+      inputSchema: z.object({ id: z.string() }),
       execute: async ({ id }) => {
         if (!id) {
           return {
@@ -426,7 +426,7 @@ Parse `RateLimit-*` and `Retry-After` headers (delta-seconds and HTTP-date), com
 ## Citations
 
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html) - Canonical spec, obsoletes RFC 7807
-- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents) - Factor #9: compact errors into context
+- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/research/writing-tools-for-agents) - Factor #9: compact errors into context
 - [12-factor agents](https://github.com/humanlayer/12-factor-agents) - Factor #9 (errors) and tracing patterns
 - [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) - current error-code allocation policy
 - [Stripe API Error Handling](https://stripe.com/docs/api/errors) - Industry-standard error shape and Idempotency-Key

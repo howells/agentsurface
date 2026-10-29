@@ -1,7 +1,7 @@
 ---
 title: Agent Evaluation Framework
 description: A three-layer framework for measuring agent reasoning, action accuracy, and task completion
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -29,7 +29,7 @@ Agent evaluations need different metrics, different grading approaches, and a di
 
 ## Why Agent Evals Differ from LLM Evals
 
-LLM evals typically measure a single turn: given this input, does the model produce an output that matches a reference? MMLU, HumanEval, and HellaSwag all follow this pattern. The metric is accuracy against a fixed answer.
+LLM evals typically measure a single turn: given this input, does the model produce an output that matches a reference? MMLU and HellaSwag follow this pattern, scoring accuracy against a fixed answer. HumanEval is single-turn too but scores functional correctness by running tests and reports pass@k.
 
 Agent evals measure multi-step execution: given this task, does the agent reach a correct end state by making correct decisions at each step? Two agents might both fail to complete a task - one because it chose the wrong tool, one because it chose the right tool but passed wrong arguments. These failures require different fixes. A single binary success/failure metric obscures which layer broke.
 
@@ -46,7 +46,7 @@ Reasoning evals measure the quality of the agent's plan before it acts.
 | Plan quality   | Does the plan correctly identify the required tools and order?   |
 | Plan adherence | Does the agent execute the plan it produced, or does it deviate? |
 
-Plan quality requires a grader that understands what a correct plan looks like. For well-defined tasks, this can be rule-based: the correct plan for "send invoice inv_01 to the customer" always includes `get_invoice` followed by `send_invoice`. For open-ended tasks, model-based grading is required.
+Plan quality requires a grader that understands what a correct plan looks like. For well-defined tasks, this can be rule-based: the correct plan for "send invoice inv_01 to the customer" always includes `get_invoice` followed by `send_invoice`. For open-ended tasks where no deterministic check fits, model-based grading is one option for plan quality; human grading is another.
 
 ```python
 def grade_plan_quality(
@@ -212,7 +212,7 @@ Model-based graders use an LLM to evaluate outputs that cannot be graded by rule
 async def model_grade_plan(
     task: str,
     plan: list[str],
-    grader_model: str = "claude-sonnet-5"
+    grader_model: str = "claude-sonnet-5-5"
 ) -> GradeResult:
     prompt = f"""
 You are grading whether an agent produced a correct plan for a task.

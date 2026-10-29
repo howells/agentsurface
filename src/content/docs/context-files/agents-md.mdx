@@ -1,12 +1,12 @@
 ---
 title: AGENTS.md
 description: The baseline repository context file for coding agents
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Plain markdown (no YAML, no JSON), read by several coding agents and IDE tools. Structure: project purpose (1-3 sentences), quick-start commands (with exact invocations and timing), tech stack, testing expectations, permission boundaries (always/ask-first/never), gotchas, and links to detailed docs. Keep tight (~150 lines for root file), commands-first, use regex-parseable structure. Monorepos need per-package AGENTS.md with narrower scope.
+Plain markdown (no YAML, no JSON), read by several coding agents and IDE tools. Structure: project purpose (1-3 sentences), quick-start commands (with exact invocations and timing), tech stack, testing expectations, permission boundaries (always/ask-first/never), gotchas, and links to detailed docs. Keep tight (~150 lines for root file), commands-first, use a predictable structure. Monorepos need per-package AGENTS.md with narrower scope.
 
 ```
 # AGENTS.md
@@ -27,24 +27,24 @@ Never: Deploy prod
 
 ---
 
-AGENTS.md is documented at [agents.md](https://agents.md). It is plain markdown with no schema - no YAML frontmatter, no JSON. This simplicity is intentional: agents must parse it with regex and heuristics, so readability and structural consistency matter more than strict formats.
+AGENTS.md is documented at [agents.md](https://agents.md). It is ordinary Markdown with no mandated schema or parser, and headings and content are flexible. YAML frontmatter and JSON are not part of the format. This simplicity is intentional, so readability and structural consistency matter more than strict formats.
 
-AGENTS.md is read by multiple coding-agent and IDE tools, including Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, Aider, Jules, Zed, Warp, and RooCode.
+The format is stewarded by the Agentic AI Foundation (AAIF). The [agents.md](https://agents.md) site lists supporting tools including Codex, Jules, Factory, Aider, goose, opencode, Zed, Warp, Cursor, RooCode, Gemini CLI, Kilo Code, GitHub Copilot's coding agent and Windsurf, and Anthropic's documentation confirms Claude Code support. That is a compatibility list, not a promise that every tool discovers the file the same way; see [Cross-Tool Compatibility](#cross-tool-compatibility).
 
 ## Discovery and Precedence
 
-Agents discover `AGENTS.md` by walking up the directory tree from the current working directory to the repository root. When multiple files exist, the one closest to the working directory wins:
+Agents discover `AGENTS.md` by walking up the directory tree from the current working directory to the repository root. When multiple files exist, how they combine is tool-specific. Cursor combines nested files with their parents and gives the more specific instructions precedence on conflict; Claude Code loads ancestor files as well. Don't assume the nearest file replaces the rest:
 
 ```
 repo-root/
   AGENTS.md          ← applies to everything
   src/
-    AGENTS.md        ← overrides root for src/ and below
+    AGENTS.md        ← adds to root for src/ and below
     auth/
-      AGENTS.md      ← overrides src/ for auth/ and below
+      AGENTS.md      ← adds to src/ for auth/ and below
 ```
 
-This lets you set repository-wide defaults and override them for specific subsystems - the authentication module can carry stricter modification rules while test fixtures stay permissive. Keep nested files scoped to what genuinely differs; see [Monorepos](/docs/context-files/monorepos) for per-package patterns.
+This lets you set repository-wide defaults and override them where instructions conflict for specific subsystems - the authentication module can carry stricter modification rules while test fixtures stay permissive. Keep nested files scoped to what genuinely differs; see [Monorepos](/docs/context-files/monorepos) for per-package patterns.
 
 The [agents.md specification](https://agents.md) sets no maximum file size. Keep the root file tight anyway: large files consume more of an agent's context budget on every session, which is reason enough to push detail into nested files or linked docs.
 
@@ -332,9 +332,9 @@ This example is ~110 lines, command-first, boundary-explicit.
 
 Each tool reads AGENTS.md differently - treat it as several independent, all-or-nothing behaviors rather than one shared resolution order:
 
-- **Claude Code** (v2.1.277+) reads `AGENTS.md` directly as project instructions - no `CLAUDE.md`, import, or setting required, as long as no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the working directory or above it. If one of those CLAUDE files does exist, Claude Code reads that instead and skips `AGENTS.md`, unless the `CLAUDE.md` starts with a literal `@AGENTS.md` import. See [CLAUDE.md](/docs/context-files/claude-md) for the full behavior.
-- **Cursor** reads `AGENTS.md` natively - root and nested subdirectories, closest file wins - with `.cursor/rules/*.mdc` rules layered on top for glob-scoped detail.
-- **GitHub Copilot** reads the full file, plus path-scoped `.github/instructions/*.instructions.md` files with `applyTo` glob frontmatter; keep the root file concise since Copilot's context budget is smaller than Claude's or Cursor's. Copilot's coding agent and code review also read `AGENTS.md` directly (GA 2026).
+- **Claude Code** (v2.1.277+) reads `AGENTS.md` directly as project instructions - no `CLAUDE.md`, import, or setting required, as long as no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the working directory or above it. If one of those CLAUDE files does exist, Claude Code reads that instead and skips `AGENTS.md`, unless the `CLAUDE.md` imports it with `@AGENTS.md` (an import works anywhere in the file) or the `claude-md-and-agents-md` setting loads both files. See [CLAUDE.md](/docs/context-files/claude-md) for the full behavior.
+- **Cursor** reads `AGENTS.md` natively - root and nested subdirectories, where nested instructions are combined with their parents and the more specific ones win on conflict - with `.cursor/rules/*.mdc` rules layered on top for glob-scoped detail.
+- **GitHub Copilot** reads the full file, plus path-scoped `.github/instructions/*.instructions.md` files with `applyTo` glob frontmatter; keep the root file concise. Copilot's coding agent and code review also read `AGENTS.md` directly (GA 2026).
 - **Gemini CLI** reads context files by a configurable filename list (`context.fileName`), which defaults to `GEMINI.md` but can include `AGENTS.md`; it is not an automatic "GEMINI.md missing" fallback.
 
 ## See also

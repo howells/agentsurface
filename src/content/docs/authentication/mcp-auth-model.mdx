@@ -1,7 +1,7 @@
 ---
 title: MCP Authorization
 description: OAuth protected-resource metadata, client registration, and token handling for HTTP MCP servers
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -161,13 +161,13 @@ When a request lacks sufficient scope, the server should use normal OAuth error 
 - `403 Forbidden` when the token is valid but lacks required scope
 - `WWW-Authenticate` with `scope` and `resource_metadata` when the client needs to request additional scope
 
-Clients should treat a challenged scope as authoritative for satisfying that request. They should not assume it is always identical to the full `scopes_supported` list.
+Clients should treat a challenged scope as authoritative for that operation; it can have any relationship to `scopes_supported`. During step-up, request the union of the scopes already granted and the newly challenged ones. Clients acting for a user should attempt step-up; `client_credentials` clients may attempt it or abort. Track upgrade attempts and stop after a small number rather than looping.
 
 ## Current 2026-07-28 Requirements
 
 The current `2026-07-28` revision changes this model in six places. None of them break a correctly implemented `2025-11-25` client, but each closes a gap that a loose implementation leaves open.
 
-**Issuer validation (SEP-2468)** - clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer.
+**Issuer validation (SEP-2468)** - clients must validate the `iss` parameter returned on the authorization response against the issuer they discovered, per RFC 9207. This is the defense against a mix-up attack where a malicious authorization server induces a client to redeem a code at the wrong issuer. The rules: if the server's metadata advertises `iss` support, a response without `iss` is rejected; if it doesn't, a missing `iss` may proceed; a present `iss` must always match the recorded issuer, compared as exact strings with no URI normalisation. On a mismatch, don't act on or display any OAuth error fields from the response.
 
 **Credentials bound to their issuing authorization server (SEP-2352)** - client credentials must be stored keyed by issuer, used only with the authorization server that issued them, and re-registered when a server's issuer changes. A credential cached against an MCP server URL rather than an issuer is the bug this closes.
 

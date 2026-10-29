@@ -1,5 +1,5 @@
 /**
- * MCP Server (stdio) — Minimal canonical implementation
+ * MCP Server (stdio) - Minimal canonical implementation
  *
  * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
  * SDK: @modelcontextprotocol/server (v2, implements the 2026-07-28 spec)
@@ -7,10 +7,10 @@
  * Authentication: OS-level (trust delegated to host process)
  *
  * 2026-07-28 dropped the initialize/notifications/initialized handshake and
- * the Mcp-Session-Id concept everywhere, including stdio — every request now
- * carries its own protocol version in `_meta`, and servers MUST implement
- * `server/discover` so a client can probe supported versions up front or as
- * a compatibility check.
+ * the Mcp-Session-Id concept everywhere, including stdio - every request now
+ * carries its own protocol version in `_meta`. Servers must implement
+ * `server/discover` (McpServer answers it for you) so a client can probe
+ * supported versions up front; clients may skip calling it.
  *
  * When to use:
  * - Local development and testing
@@ -136,7 +136,7 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
       {
         relevance: 0.87,
         title: "Tool Design Best Practices",
-        url: "https://www.anthropic.com/engineering/writing-tools-for-agents",
+        url: "https://www.anthropic.com/research/writing-tools-for-agents",
       },
     ].slice(0, input.limit);
 
@@ -163,11 +163,12 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
 }
 
 /**
- * create_issue: Destructive tool with idempotency hint
+ * create_issue: Non-idempotent write tool
  *
  * Demonstrates:
  * - destructiveHint annotation
- * - idempotentHint (safe to retry)
+ * - idempotentHint: false (each call creates a new issue; only advertise
+ *   idempotentHint: true if the handler really deduplicates repeat calls)
  * - Validation before execution
  * - RFC 9457-style error payload
  */
@@ -323,7 +324,7 @@ server.registerTool(
     inputSchema: createIssueSchema,
     annotations: {
       destructiveHint: true,
-      idempotentHint: true,
+      idempotentHint: false,
     },
   },
   handleCreateIssue,
@@ -333,7 +334,7 @@ server.registerTool(
   "wait_for_build",
   {
     description:
-      "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout. This tool polls internally rather than using the io.modelcontextprotocol/tasks extension — reach for that extension instead when a client should be able to check progress independently.",
+      "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout. This tool polls internally rather than using the io.modelcontextprotocol/tasks extension - reach for that extension instead when a client should be able to check progress independently.",
     inputSchema: waitForBuildSchema,
     annotations: {
       openWorldHint: true,
@@ -348,8 +349,12 @@ server.registerTool(
  * Resources: Static data exposed via stable URIs.
  * Agents can query these without tool invocation.
  */
-server.resource("config://api-docs", "text/markdown", "API Documentation Overview", async () => {
-  const docs = `# API Documentation
+server.registerResource(
+  "api-docs",
+  "config://api-docs",
+  { description: "API Documentation Overview", mimeType: "text/markdown" },
+  async () => {
+    const docs = `# API Documentation
 
 ## Tools
 
@@ -364,31 +369,32 @@ Monitor CI/CD builds.
 
 ## Resources
 
-- config://api-docs — this document
-- config://schemas — JSON Schema definitions
+- config://api-docs - this document
+- config://schemas - JSON Schema definitions
 
 ## Prompts
 
-- analyze_thread — analyze a discussion thread
+- analyze_thread - analyze a discussion thread
 
 See https://modelcontextprotocol.io/specification/2026-07-28 for spec details.
 `;
 
-  return {
-    contents: [
-      {
-        mimeType: "text/markdown",
-        text: docs,
-        uri: "config://api-docs",
-      },
-    ],
-  };
-});
+    return {
+      contents: [
+        {
+          mimeType: "text/markdown",
+          text: docs,
+          uri: "config://api-docs",
+        },
+      ],
+    };
+  },
+);
 
-server.resource(
+server.registerResource(
+  "schemas",
   "config://schemas",
-  "application/ld+json",
-  "Tool Input Schemas (JSON-LD)",
+  { description: "Tool Input Schemas (JSON-LD)", mimeType: "application/ld+json" },
   async () => {
     const schemas = {
       "@context": "https://schema.org",
@@ -431,28 +437,23 @@ server.resource(
 /**
  * Prompts: Re-usable workflow templates parameterized by client.
  */
-server.prompt(
+server.registerPrompt(
   "analyze_thread",
-  "Analyze a discussion thread for sentiment, consensus, and action items. Use when you need to summarize multi-person conversations.",
-  [
-    {
-      description: "The unique identifier of the thread",
-      name: "thread_id",
-      required: true,
-    },
-    {
-      description: "Maximum messages to analyze (default 100)",
-      name: "max_messages",
-      required: false,
-    },
-  ],
+  {
+    description:
+      "Analyze a discussion thread for sentiment, consensus, and action items. Use when you need to summarize multi-person conversations.",
+    argsSchema: z.object({
+      max_messages: z.string().optional().describe("Maximum messages to analyze (default 100)"),
+      thread_id: z.string().describe("The unique identifier of the thread"),
+    }),
+  },
   async (args) => ({
     messages: [
       {
-        role: "user",
+        role: "user" as const,
         content: {
-          type: "text",
-          text: `Analyze thread ${args.thread_id} (up to ${args.max_messages || 100} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
+          type: "text" as const,
+          text: `Analyze thread ${args.thread_id} (up to ${args.max_messages ?? "100"} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
         },
       },
     ],

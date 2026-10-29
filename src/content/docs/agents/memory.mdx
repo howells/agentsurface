@@ -1,7 +1,7 @@
 ---
 title: Memory
 description: The distinct types of agent memory, what each solves, and what to share versus isolate in a multi-agent system.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -34,7 +34,7 @@ Background compression of aging message history: as messages age past a recency 
 
 ## Procedural Memory
 
-The first four types store what the agent _knows_; procedural memory stores what it has _learned to do_ - generalized instructions distilled from experience, not raw events. It is now an industry-converged category (Letta, Zep, Mem0, and LangMem each ship a distinct procedural or "instruction" store), and its file-based cousin is the skill library: a `SKILL.md`-style document that captures a repeatable procedure once and loads it on demand.
+The first four types store what the agent _knows_; procedural memory stores what it has _learned to do_ - generalized instructions distilled from experience, not raw events. It is a growing category - Zep v4's docs cover skill capture, learning and admission, restoration, and sharing, and other memory products offer comparable instruction stores, so check each product's own API before assuming one - and its file-based cousin is the skill library: a `SKILL.md`-style document that captures a repeatable procedure once and loads it on demand.
 
 **Write path.** Reflection, not direct capture: a background or end-of-task step reviews recent runs and promotes patterns that succeeded _repeatedly_ into standing instructions - deliberately slow and selective, since a single success should not become a rule.
 

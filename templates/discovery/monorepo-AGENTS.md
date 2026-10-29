@@ -12,8 +12,10 @@ What to customize:
 2. Per-package: Copy the pattern to each packages/X/AGENTS.md, customize per package
 3. Update package.json entries and filter examples to match your workspace
 
-Principle: "Nearest wins" - an agent reading packages/api/AGENTS.md will prioritize
-its commands over the root file. Avoid duplication; link from per-package back to root.
+Principle: "Nearest wins on conflict" - tools combine nested files with their parents
+(Cursor does; Claude Code loads ancestor files too), and the more specific
+instructions take precedence where the two disagree. Avoid duplication; link from
+per-package back to root.
 
 Citation: https://code.claude.com/docs/en/memory
 -->
@@ -21,7 +23,7 @@ Citation: https://code.claude.com/docs/en/memory
 # ROOT: packages/AGENTS.md
 
 ````markdown
-# Acme Agent Tools — Monorepo
+# Acme Agent Tools - Monorepo
 
 Pnpm workspaces. Three packages: @acme/sdk (client library), @acme/api (Fastify backend),
 @acme/dashboard (Next.js frontend).
@@ -70,7 +72,7 @@ Root AGENTS.md covers shared commands, monorepo conventions, turbo setup, change
 - Functions: camelCase
 - Monorepo tool: pnpm + Turbo
 - Version management: changesets (never hand-edit package.json versions)
-- Node: 20 LTS (.nvmrc enforced)
+- Node: 24 LTS (.nvmrc enforced; Node 20 reached end of life on 2026-04-30)
 
 ## Global commands
 
@@ -137,7 +139,7 @@ See `AGENTS.md` in repo root for global commands and boundaries.
 
 ## Setup
 
-Dependency: None. Requires Node 20+.
+Dependency: None. Requires Node 24+.
 
 ## Commands (SDK-specific)
 
@@ -243,7 +245,7 @@ See `AGENTS.md` in repo root for global commands and boundaries.
 
 ## Setup
 
-Requirements: Node 20, PostgreSQL 14+ (local dev: docker-compose up -d).
+Requirements: Node 24, PostgreSQL 14+ (local dev: docker-compose up -d).
 
 ```sh
 pnpm --filter=@acme/api install
@@ -392,7 +394,7 @@ app/
   __tests__/          # Vitest + React Testing Library
 public/
   llms.txt            # Agent discovery index
-  robots-ai.txt       # AI crawler policy
+  robots.txt          # AI crawler policy
 next.config.ts        # TypeScript, static export config
 ```
 
@@ -468,7 +470,7 @@ See `app/layout.tsx` for implementation pattern.
 
 ---
 
-# Precedence / "Nearest wins" rule
+# Precedence / "Nearest wins on conflict" rule
 
 When an agent reads a monorepo:
 

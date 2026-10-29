@@ -28,7 +28,7 @@ See llms-full-generator.ts (bottom of this file) for the script.
 
 ### Installation
 
-Acme Agent Tools runs on Node 20+ and pnpm.
+Acme Agent Tools runs on Node 24+ and pnpm.
 
 ```sh
 pnpm add @acme/sdk
@@ -102,7 +102,7 @@ const agent = new Agent({
   name: string;                    // Identifier (lowercase, hyphenated)
   description: string;             // One-liner for agent introspection
   tools: Tool[];                   // Array of Tool definitions
-  model?: 'claude-opus-5-5' | 'claude-sonnet-5';  // Default: claude-opus-5-5
+  model?: 'claude-opus-5-5' | 'claude-sonnet-5-5';  // Default: claude-opus-5-5
   systemPrompt?: string;           // Optional system instructions
   mcpServers?: MCPServerConfig[];  // Remote MCP servers
 });
@@ -394,26 +394,42 @@ See canonical spec: https://agents.md
 
 ### Agent card (A2A v1.0)
 
-If you run an MCP server or agent interface, advertise yourself at `/.well-known/agent.json`:
+If you run an MCP server or agent interface, advertise yourself at `/.well-known/agent-card.json`:
 
 ```json
-GET /.well-known/agent.json
+GET /.well-known/agent-card.json
 
 {
-  "name": "Acme Agent Tools",
-  "description": "API for agent-consumable services",
-  "homepage": "https://example.com",
-  "rpc_endpoint": {
-    "url": "https://example.com/rpc",
-    "protocol": "json-rpc-2.0"
+  "name": "Your Service Agent",
+  "description": "Brief description of agent capabilities.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    { "url": "https://example.com/a2a", "protocolBinding": "JSONRPC", "protocolVersion": "1.0" }
+  ],
+  "capabilities": { "streaming": false, "pushNotifications": false },
+  "securitySchemes": {
+    "oauth": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://example.com/oauth/token",
+            "scopes": { "tasks": "Run tasks" }
+          }
+        }
+      }
+    }
   },
-  "auth": {
-    "type": "oauth2",
-    "grant_type": "client_credentials",
-    "token_endpoint": "https://example.com/oauth/token"
-  },
-  "capabilities": ["task_execution", "message_routing"],
-  "version": "1.0.0"
+  "securityRequirements": [{ "schemes": { "oauth": { "list": ["tasks"] } } }],
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "skills": [
+    {
+      "id": "run-task",
+      "name": "Run task",
+      "description": "Runs a documented task and returns the result.",
+      "tags": ["tasks"]
+    }
+  ]
 }
 ```
 
@@ -551,7 +567,7 @@ Spec: https://www.rfc-editor.org/rfc/rfc9457.html
 ## Generate script
 
 ```typescript
-// scripts/generate-llms-full.ts — Run via: npx ts-node scripts/generate-llms-full.ts
+// scripts/generate-llms-full.ts - Run via: npx ts-node scripts/generate-llms-full.ts
 
 import fs from 'fs';
 import path from 'path';
@@ -560,7 +576,7 @@ import glob from 'glob';
 const docsDir = path.join(process.cwd(), 'docs');
 const files = glob.sync('**/*.md', { cwd: docsDir }).sort();
 
-let content = `# Acme Agent Tools — Full Documentation\n\n`;
+let content = `# Acme Agent Tools - Full Documentation\n\n`;
 content += `<!--- llms-full.txt auto-generated ${new Date().toISOString().split('T')[0]} from ${files.length} pages --->\n\n`;
 
 for (const file of files) {

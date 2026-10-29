@@ -1,7 +1,7 @@
 ---
 title: Resources and Prompts
 description: Exposing contextual data and reusable prompt templates through MCP
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -39,19 +39,17 @@ Creating a new record               Tool (create_customer)
 
 ## Static Resources
 
-Static resources have fixed URIs. They return the same content on every read (or content that changes only infrequently). Register them with `server.resource()`:
+Static resources have fixed URIs. They return the same content on every read (or content that changes only infrequently). Register them with `registerResource()` (the examples use the TypeScript SDK v2 package `@modelcontextprotocol/server`; the v1 positional `server.resource()` and `server.prompt()` methods are deprecated there and removed in v2):
 
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 export function registerInvoiceSchema(server: McpServer): void {
-  server.resource(
+  server.registerResource(
     "invoice-schema",
     "billing://schemas/invoice",
     {
-      name: "Invoice JSON Schema",
+      title: "Invoice JSON Schema",
       description:
         "The complete JSON Schema for invoice objects returned by billing tools. " +
         "Read this before calling billing_create_invoice to understand all required and optional fields.",
@@ -93,16 +91,16 @@ const INVOICE_SCHEMA = {
 Dynamic resources use URI templates to accept parameters. The template variables appear in the URI pattern and are extracted when a client reads the resource:
 
 ```typescript
-import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/server";
 
 export function registerInvoiceResource(server: McpServer, config: ServerConfig): void {
-  server.resource(
+  server.registerResource(
     "invoice",
     new ResourceTemplate("billing://invoices/{invoice_id}", {
       list: undefined, // Disable listing - too many invoices
     }),
     {
-      name: "Invoice",
+      title: "Invoice",
       description:
         "A single invoice record. URI format: billing://invoices/{invoice_id}. " +
         "Use billing_list_invoices to discover invoice IDs first.",
@@ -141,16 +139,18 @@ Read: billing://invoices/inv_01HX4NP8VQ3DGXQ7R8S6MNVF5T
 When your server declares `resources.subscribe: true` in its capabilities, clients can subscribe to specific resource URIs and receive notifications when those resources change. This is useful for resources that represent frequently-updated state - a build status, a queue depth, an active agent run.
 
 ```typescript
-const server = new McpServer({
-  name: "billing-mcp",
-  version: "1.0.0",
-  capabilities: {
-    resources: {
-      subscribe: true,
-      listChanged: true,
+// Legacy 2025-11-25 declaration: identity first, options (with capabilities) second.
+const server = new McpServer(
+  { name: "billing-mcp", version: "1.0.0" },
+  {
+    capabilities: {
+      resources: {
+        subscribe: true,
+        listChanged: true,
+      },
     },
   },
-});
+);
 ```
 
 Emit a subscription notification whenever a subscribed resource's content changes:
@@ -193,8 +193,9 @@ await server.notification({
   `io.modelcontextprotocol/subscriptionId`. The notifications you emit keep the same method names
   and payloads, so the server-side change is where the stream is established rather than what
   travels on it. List and read results also gain required `ttlMs` and `cacheScope` fields
-  (SEP-2549), which give clients a defensible reason to poll less. The code above is correct for
-  `2025-11-25` and today's SDKs.
+  (SEP-2549), which give clients a defensible reason to poll less. The subscription code above is a
+  `2025-11-25` compatibility example. The current TypeScript SDK v2 and the other Tier 1 SDKs
+  implement `2026-07-28`, so check your SDK's `subscriptions/listen` support before copying it.
 </Callout>
 
 ## When to Use Resources
@@ -216,22 +217,23 @@ Prompts are user-controlled, pre-built interaction patterns. They are not called
 A prompt definition specifies its arguments (which the client collects from the user) and returns a sequence of messages that seed the conversation:
 
 ```typescript
+import type { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
+
 export function registerBillingAssistant(server: McpServer): void {
-  server.prompt(
+  server.registerPrompt(
     "billing-monthly-review",
-    "Guides you through reviewing last month's billing activity, flagging anomalies, and generating a summary report.",
-    [
-      {
-        name: "month",
-        description: "The month to review in YYYY-MM format (e.g. '2025-01')",
-        required: true,
-      },
-      {
-        name: "customer_id",
-        description: "Limit the review to a specific customer UUID. Omit to review all customers.",
-        required: false,
-      },
-    ],
+    {
+      description:
+        "Guides you through reviewing last month's billing activity, flagging anomalies, and generating a summary report.",
+      argsSchema: z.object({
+        month: z.string().describe("The month to review in YYYY-MM format (e.g. '2025-01')"),
+        customer_id: z
+          .string()
+          .optional()
+          .describe("Limit the review to a specific customer UUID. Omit to review all customers."),
+      }),
+    },
     async (args) => {
       const scope = args.customer_id ? `for customer ${args.customer_id}` : "across all customers";
 
@@ -256,6 +258,10 @@ export function registerBillingAssistant(server: McpServer): void {
 ```
 
 The prompt arguments (`month`, `customer_id`) are collected by the client UI before the conversation begins. The user might see a dialog asking "Which month?" before the prompt is submitted. This makes prompts the right primitive for workflows that need structured user input before they can start - not for things the agent should do autonomously.
+
+## Skills Over MCP
+
+A server can also publish [Agent Skills](/docs/discovery/agent-skills) through the official Skills extension (`io.modelcontextprotocol/skills`, SEP-2640, Final 2026-09-13). The server declares the extension, implements `skills/list` and `skills/get`, and serves each skill's files as ordinary resources through `resources/read`. Reading a `SKILL.md` resource does not activate the skill; the host decides how to load it. The TypeScript SDK 2.4.0 ships the stable Skills API. Check the [client matrix](https://modelcontextprotocol.io/extensions/client-matrix) before relying on host support. See [Skills over MCP](https://modelcontextprotocol.io/extensions/skills/overview).
 
 ## Prompt vs Tool vs Resource Decision Matrix
 

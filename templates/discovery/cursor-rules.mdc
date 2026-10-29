@@ -19,8 +19,8 @@ What to customize:
 4. Add Cursor-specific hints (keyboard shortcuts, command palettes)
 5. Reference AGENTS.md for shared context
 
-Spec: https://docs.cursor.com/context/rules
-Cursor docs: https://docs.cursor.com
+Spec: https://cursor.com/docs/rules
+Cursor docs: https://cursor.com/docs
 
 Usage:
 1. Place at .cursor/rules/project.mdc
@@ -120,18 +120,18 @@ import { validateInput } from '../utils';
 import React from 'react';
 
 interface AgentDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function AgentDetailPage({ params }: AgentDetailPageProps) {
-  const { id } = params;
+export default async function AgentDetailPage({ params }: AgentDetailPageProps) {
+  const { id } = await params;
   return <AgentDetail agentId={id} />;
 }
 ```
 
 ### App Router
 
-- Use `generateMetadata()` for SEO + JSON-LD
+- Use `generateMetadata()` for title, description and Open Graph; render JSON-LD as a `<script type="application/ld+json">` element in the page or layout
 - `use client` at top of file if using hooks
 - Fetch data in server components where possible
 - Streaming: `Suspense` + loading UI
@@ -144,18 +144,19 @@ import { Metadata } from 'next';
 export const generateMetadata = async ({
   params,
 }: {
-  params: { slug: string };
-}): Promise<Metadata> => ({
-  title: `Docs: ${params.slug}`,
-  description: '...',
-});
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> => {
+  const { slug } = await params;
+  return { title: `Docs: ${slug}`, description: '...' };
+};
 
 export default async function DocsPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const doc = await fetchDoc(params.slug);
+  const { slug } = await params;
+  const doc = await fetchDoc(slug);
   if (!doc) notFound();
   return <article>{/* ... */}</article>;
 }
@@ -311,7 +312,7 @@ IDE debugging (breakpoints) also requires this.
 
 ## See also
 
-- [Cursor documentation](https://docs.cursor.com)
+- [Cursor documentation](https://cursor.com/docs)
 - [AGENTS.md](../../AGENTS.md) - Shared project context
 - [CLAUDE.md](../../CLAUDE.md) - Claude Code-specific rules (different tool, optional, if present)
 - `.github/copilot-instructions.md` - GitHub Copilot rules (different tool)

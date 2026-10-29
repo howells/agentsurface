@@ -183,11 +183,10 @@ export function getOAuthClient(opts?: {
   scopes?: string[];
 }): ClientCredentialsClient {
   if (!globalClient) {
-    globalClient = new ClientCredentialsClient(
-      opts || {
-        tokenEndpoint: process.env.OAUTH_TOKEN_URL || "https://auth.example.com/token",
-      },
-    );
+    globalClient = new ClientCredentialsClient({
+      tokenEndpoint: process.env.OAUTH_TOKEN_URL || "https://auth.example.com/token",
+      ...opts,
+    });
   }
   return globalClient;
 }

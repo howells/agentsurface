@@ -1,6 +1,6 @@
-# Arazzo 1.1.0 Workflow — Multi-step agent orchestration
+# Arazzo 1.1.0 Workflow - Multi-step agent orchestration
 #
-# Canonical spec: https://www.openapis.org/arazzo-specification
+# Canonical spec: https://spec.openapis.org/arazzo/v1.1.0.html
 # Aligned with: OpenAPI 3.2.x
 # Use case: Compose multi-step agent workflows (create → validate → notify)
 #
@@ -10,11 +10,21 @@
 # - Agent-discoverable workflows (agents understand successCriteria)
 # - Retry logic and conditional branching
 #
+# Structure notes (Arazzo 1.1.0):
+# - `workflows` is an array of Workflow Objects, each with a unique `workflowId`.
+# - `sourceDescriptions` entries need `name`, `url` and `type` (openapi or arazzo).
+# - Workflow `inputs` is a JSON Schema; read values with `$inputs.<name>`.
+# - Step `parameters` is an array of `{ name, in, value }` objects.
+# - Step and workflow `outputs` are maps from a name to a runtime expression. Declare a step
+#   output before another step or the workflow references it.
+# - Retry, goto and end behavior is declared with Success/Failure Action Objects
+#   (`type: retry | goto | end`) in `onSuccess` / `onFailure`.
+#
 # Customization checklist:
 # ✓ Update sourceDescriptions[] with your API spec URLs
 # ✓ Update workflow steps with actual operationIds from spec
 # ✓ Set successCriteria based on real response conditions
-# ✓ Configure retryPolicy for flaky operations
+# ✓ Configure retry actions for flaky operations
 # ✓ Add onFailure actions (rollback, notify, etc.)
 # ✓ Declare workflow outputs
 # ✓ Test against real API
@@ -33,36 +43,41 @@ info:
     - Failure actions with rollback
     - Structured workflow outputs
 
-    Spec: https://www.openapis.org/arazzo-specification
+    Spec: https://spec.openapis.org/arazzo/v1.1.0.html
 
 sourceDescriptions:
-  - url: https://api.example.com/v1/openapi.json
-    description: Main API specification
+  - name: agentApi
+    url: https://api.example.com/v1/openapi.json
+    type: openapi
 
 workflows:
-  agentOnboarding:
-    title: Create and Onboard New Agent
+  - workflowId: agentOnboarding
+    summary: Create and onboard a new agent
     description: |
       End-to-end workflow: create agent → validate config → trigger welcome notification.
 
       Demonstrates agent-ready workflow composition with explicit success/failure handling.
 
-    parameters:
-      - name: agent_name
-        description: Name of the new agent
-        required: true
-      - name: agent_model
-        description: Model to use (claude-opus-5-5 | claude-sonnet-5 | claude-haiku-4-5-20251001)
-        required: true
-      - name: admin_email
-        description: Email to notify of creation
-        required: true
+    inputs:
+      type: object
+      required: [agent_name, agent_model, admin_email]
+      properties:
+        agent_name:
+          type: string
+          description: Name of the new agent
+        agent_model:
+          type: string
+          description: Model to use (claude-opus-5-5 | claude-sonnet-5-5 | claude-haiku-5-5)
+        admin_email:
+          type: string
+          format: email
+          description: Email to notify of creation
 
     steps:
       # Step 1: Create the agent
       - stepId: create_agent
-        operationId: create_agent
         description: Create agent with specified configuration
+        operationId: $sourceDescriptions.agentApi.create_agent
         requestBody:
           contentType: application/json
           payload:
@@ -73,36 +88,42 @@ workflows:
             max_steps: 20
         successCriteria:
           # HTTP 201 indicates successful creation
-          - condition: "$response.statusCode == 201"
-            description: Agent created successfully
-          - condition: "$response.body.id != null"
-            description: Response contains agent ID
+          - condition: $statusCode == 201
+          - condition: $response.body#/id != null
+        outputs:
+          id: $response.body#/id
+          name: $response.body#/name
+          model: $response.body#/model
+          created_at: $response.body#/created_at
 
       # Step 2: Validate the agent configuration
       - stepId: validate_agent
         description: Validate that the new agent can be retrieved and is in active state
-        operationId: get_agent_by_id
+        operationId: $sourceDescriptions.agentApi.get_agent_by_id
         parameters:
-          agent_id: $steps.create_agent.outputs.id
+          - name: agent_id
+            in: path
+            value: $steps.create_agent.outputs.id
         successCriteria:
-          - condition: "$response.statusCode == 200"
-            description: Agent is retrievable
-          - condition: "$response.body.status == 'active'"
-            description: Agent is in active state
+          - condition: $statusCode == 200
+          - condition: $response.body#/status == 'active'
         onFailure:
-          - condition: "$response.statusCode == 404"
-            description: Agent not found (timing issue)
-            actions:
-              - type: retry
-                maxAttempts: 3
-                backoffMultiplier: 2
-                initialDelaySeconds: 1
-                description: Retry with exponential backoff (1s, 2s, 4s)
+          # Not found right after creation is usually a timing issue: retry with a delay
+          - name: retryWhileNotVisible
+            type: retry
+            retryAfter: 2
+            retryLimit: 3
+            criteria:
+              - condition: $statusCode == 404
+          # Anything else: roll back the creation, then stop the workflow
+          - name: rollbackAndStop
+            type: goto
+            stepId: rollback_agent
 
-      # Step 3: Send welcome notification
+      # Step 3: Send welcome notification (best effort: a failure here does not fail the workflow)
       - stepId: notify_admin
         description: Send notification email to admin
-        operationId: send_notification
+        operationId: $sourceDescriptions.agentApi.send_notification
         requestBody:
           contentType: application/json
           payload:
@@ -115,90 +136,82 @@ workflows:
               model: $steps.create_agent.outputs.model
               created_at: $steps.create_agent.outputs.created_at
         successCriteria:
-          - condition: "$response.statusCode >= 200 && $response.statusCode < 300"
-            description: Notification sent successfully
+          - condition: $statusCode >= 200 && $statusCode < 300
+        outputs:
+          delivered: $statusCode
+        onSuccess:
+          - name: done
+            type: end
+        onFailure:
+          - name: continueWithoutNotification
+            type: end
+
+      # Rollback target. Only reached through the goto action in validate_agent.
+      - stepId: rollback_agent
+        description: Validation failed - delete the created agent
+        operationId: $sourceDescriptions.agentApi.delete_agent
+        parameters:
+          - name: agent_id
+            in: path
+            value: $steps.create_agent.outputs.id
+        successCriteria:
+          - condition: $statusCode == 204
+        onSuccess:
+          - name: stopAfterRollback
+            type: end
 
     outputs:
-      agent_id:
-        description: Unique identifier of the created agent
-        value: $steps.create_agent.outputs.id
-      agent_name:
-        description: Name of the created agent
-        value: $steps.create_agent.outputs.name
-      agent_model:
-        description: Model used by the agent
-        value: $steps.create_agent.outputs.model
-      agent_url:
-        description: URL to access the agent in the UI
-        value: "https://app.example.com/agents/$steps.create_agent.outputs.id"
-      created_at:
-        description: Timestamp of creation
-        value: $steps.create_agent.outputs.created_at
-      notification_sent:
-        description: Whether admin notification was delivered
-        value: $steps.notify_admin.outputs.success
+      agent_id: $steps.create_agent.outputs.id
+      agent_name: $steps.create_agent.outputs.name
+      agent_model: $steps.create_agent.outputs.model
+      created_at: $steps.create_agent.outputs.created_at
+      notification_status: $steps.notify_admin.outputs.delivered
 
-    onFailure:
-      # If notification fails, don't fail the whole workflow (best-effort)
-      - condition: "$steps.notify_admin.statusCode >= 400"
-        description: Notification delivery failed but agent was created
-        actions:
-          - type: returnOutput
-            output: |
-              Agent created successfully but notification could not be delivered.
-              Notify admin separately: $inputs.admin_email
+  # Second workflow: read-only health check
+  - workflowId: agentHealthCheck
+    summary: Verify agent configuration and recent execution status
+    description: |
+      Steps run in the order listed; Arazzo does not define parallel steps. Independent steps can
+      be split into separate workflows and started concurrently by the orchestrator.
 
-      # If validation fails, rollback the creation
-      - condition: "$steps.validate_agent.statusCode != 200"
-        description: Agent validation failed - delete the created agent
-        actions:
-          - type: requestOperation
-            operationId: delete_agent
-            parameters:
-              agent_id: $steps.create_agent.outputs.id
-            description: Rollback agent creation
-          - type: returnError
-            statusCode: 500
-            message: "Agent creation succeeded but validation failed. Agent has been deleted."
+    inputs:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+          description: Agent ID to health-check
 
----
-# Alternative workflow: Parallel validation steps (optional)
-# Demonstrates concurrent execution and gather pattern
-agentHealthCheck:
-  title: Agent Health Check
-  description: Verify agent configuration and recent execution status in parallel
-  parameters:
-    - name: agent_id
-      description: Agent ID to health-check
-      required: true
+    steps:
+      # Step 1: Get agent metadata
+      - stepId: get_agent_config
+        operationId: $sourceDescriptions.agentApi.get_agent_by_id
+        parameters:
+          - name: agent_id
+            in: path
+            value: $inputs.agent_id
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          name: $response.body#/name
+          status: $response.body#/status
 
-  steps:
-    # Step 1: Get agent metadata
-    - stepId: get_agent_config
-      operationId: get_agent_by_id
-      parameters:
-        agent_id: $inputs.agent_id
-      successCriteria:
-        - condition: "$response.statusCode == 200"
+      # Step 2: Get recent executions
+      - stepId: get_recent_executions
+        operationId: $sourceDescriptions.agentApi.list_executions
+        parameters:
+          - name: agent_id
+            in: query
+            value: $inputs.agent_id
+          - name: limit
+            in: query
+            value: 5
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          executions: $response.body#/data
 
-    # Step 2: Get recent executions (parallel)
-    - stepId: get_recent_executions
-      operationId: list_executions
-      parameters:
-        agent_id: $inputs.agent_id
-        limit: 5
-      successCriteria:
-        - condition: "$response.statusCode == 200"
-
-  outputs:
-    agent_name:
-      value: $steps.get_agent_config.outputs.name
-    agent_status:
-      value: $steps.get_agent_config.outputs.status
-    recent_execution_count:
-      value: "$steps.get_recent_executions.outputs.data.length"
-    health_status:
-      value: |
-        $steps.get_agent_config.outputs.status == 'active'
-        && $steps.get_recent_executions.outputs.data.length > 0
-        ? 'healthy' : 'degraded'
+    outputs:
+      agent_name: $steps.get_agent_config.outputs.name
+      agent_status: $steps.get_agent_config.outputs.status
+      recent_executions: $steps.get_recent_executions.outputs.executions

@@ -1,7 +1,7 @@
 ---
 title: Retrieval Evals
 description: Metrics, CI gates, and common failure modes for retrieval quality - condensed current practice
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Retrieval quality fails silently - a bad chunking change or a stale embedding doesn't throw an error, it just returns worse results. Measure it explicitly rather than trusting that it still works.
@@ -79,4 +79,4 @@ Re-embed a stable document sample monthly or after a model change, and compare n
 ## See also
 
 - [RAGAS documentation](https://docs.ragas.io/)
-- [Anthropic Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)
+- [Anthropic Contextual Retrieval](https://www.anthropic.com/research/contextual-retrieval)

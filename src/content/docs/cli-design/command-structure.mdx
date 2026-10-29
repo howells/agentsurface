@@ -1,7 +1,7 @@
 ---
 title: Command Structure Best Practices
 description: Noun-verb grammar, exit code semantics, non-interactive defaults, and structured help output for agent-navigable CLIs
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -12,7 +12,8 @@ Command structure is the grammar of a CLI. Agents discover CLIs hierarchically a
 - Standard verbs: create, list, get, update, delete, archive
 - Non-interactive by default when piped (skip prompts)
 - Consistent flag naming: --yes, --dry-run, --json, --fields
-- Meaningful exit codes: 0 (success), 1 (failure), 2 (usage error), 3 (not found), 4 (permission denied), 5 (conflict)
+- Meaningful, documented exit codes - this page proposes 0 (success), 1 (failure), 2 (usage error), 3 (not found), 4 (permission denied), 5 (conflict) as one contract; only 0 and non-zero are universal
+- `--help --json` is a proposed interface for your CLI to implement, not an existing universal flag combination
 
 An agent exploring your CLI for the first time will attempt to discover its shape hierarchically - learning what nouns exist, what verbs apply to each noun, and how the flag namespace is organized. A consistent, predictable structure makes that discovery reliable. An inconsistent structure forces the agent to memorize exceptions.
 
@@ -149,7 +150,7 @@ This single call gives an agent the complete vocabulary of the CLI without requi
 
 Exit codes are the primary signal an agent uses to determine whether a command succeeded and what to do next. A CLI that returns 0 for all failures, or 1 for all errors regardless of cause, forces the agent to parse error text to understand what happened.
 
-Use these exit codes consistently:
+There is no universal meaning for codes 2 through 5 across CLIs. GitHub CLI, for example, uses 2 for cancellation and 4 for authentication, and tells callers to check each command's documentation ([gh exit codes](https://cli.github.com/manual/gh_help_exit-codes)). So an agent must read the contract of the CLI in front of it, and your CLI must publish its own. The table below is the contract this proposed `mytool` documents; adopt it, or choose your own, then use it consistently and list it in `--help --json` and your skill files:
 
 | Code | Meaning           | When to use                                                 |
 | ---- | ----------------- | ----------------------------------------------------------- |
@@ -350,7 +351,7 @@ When adding a new command or resource to your CLI, verify:
 - [ ] Verb is from the standard vocabulary (`create`, `list`, `get`, `update`, `delete`, `archive`, `restore`, `trigger`, `cancel`, `describe`)
 - [ ] Parent command lists the new subcommand when invoked with no arguments
 - [ ] `--help --json` returns complete structured schema for the new command
-- [ ] Exit codes follow the standard semantics (0, 1, 2, 3, 4, 5)
+- [ ] Exit codes follow your CLI's documented contract (the 0-5 table above, or your own) and are published in help output
 - [ ] Command runs without interactive prompts when all required flags are provided
 - [ ] Missing required flags in non-TTY return structured `missing_required_flags` error
 - [ ] `--dry-run` is implemented if the command mutates state

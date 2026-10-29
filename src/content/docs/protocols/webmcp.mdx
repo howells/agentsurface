@@ -1,7 +1,7 @@
 ---
 title: WebMCP
 description: Browser-native, page-scoped tools for agents, including the current W3C Community Group API and the older webmcp.dev library.
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -10,10 +10,10 @@ WebMCP lets a web page expose structured tools to an agent that is already visit
 
 WebMCP is not remote MCP in a browser. The specification deliberately does not prescribe the Model Context Protocol wire format: a browser may bridge page tools to MCP, function calling, or another agent runtime. Use remote MCP for server-side capabilities that must be callable without visiting a page; use WebMCP when the page's current DOM, session, and user-visible state are the useful execution context.
 
-- Current API: `document.modelContext.registerTool(...)`
+- Current API: `document.modelContext.registerTool(...)`, with `getTools()` and `executeTool()` for callers
 - Scope: tools exposed by the active page and permitted frames
 - Transport: browser-defined; the WebMCP specification does not require MCP JSON-RPC
-- Status: Draft Community Group Report, dated 2026-09-17
+- Status: Draft Community Group Report, dated 2026-10-27
 - Chrome: origin trial from Chrome 149; no cross-browser commitment yet
 
 ## Minimal Imperative Tool
@@ -59,6 +59,8 @@ await document.modelContext.registerTool(
 // Remove the capability when the page state no longer supports it.
 registration.abort();
 ```
+
+The tool annotations in the draft are `readOnlyHint`, `untrustedContentHint`, `consequentialHint` (the action has real-world consequences), and `debugging` (intended for developer tooling, not end users); all default to `false`. Callers enumerate and run tools with `await document.modelContext.getTools()` and `document.modelContext.executeTool(tool, input)`.
 
 Keep the registered tool set synchronized with the page state. A checkout tool should disappear when the cart is empty; a destructive tool should not remain registered merely because the component that created it unmounted incorrectly.
 
@@ -107,7 +109,7 @@ Treat every tool description and result as untrusted content. The draft calls ou
 - Enforce authorization and invariants in the application or server, even when the tool runs in the page.
 - Ask only for the minimum arguments. Derive account, tenant, and session context from the authenticated page where possible.
 - Use `AbortSignal` so cancelled agent work stops network and UI side effects.
-- Keep cross-origin frames opt-in. The `tools` Permissions Policy defaults to `self`; grant a frame access explicitly with `allow="tools"` only when you trust its origin and tools.
+- Keep cross-origin frames opt-in. The `tools` Permissions Policy defaults to `self`; grant a frame access explicitly with `allow="tools"` only when you trust its origin and tools. Policy delegation is only the first of three gates: the page that registers a tool must also list permitted caller origins (`exposedTo` in the `registerTool` options), and the caller must list the origins it wants tools from (`fromOrigins` in the `getTools` options).
 - Use annotations as hints for clients, never as the sole control on a write or destructive action.
 
 ## When to Use It
@@ -118,7 +120,7 @@ Prefer an HTTP API or remote MCP server when the capability should work headless
 
 ## Platform Adoption
 
-Shopify shipped WebMCP support for Liquid and Hydrogen storefronts on 2026-08-05, ahead of the Chrome origin trial's wider availability - a concrete data point that WebMCP is reaching production storefronts. See the [Shopify changelog](https://shopify.dev/changelog) for the current state of that support.
+Shopify has announced WebMCP support for Liquid and Hydrogen storefronts. A dated primary announcement could not be re-verified, so check the [Shopify changelog](https://shopify.dev/changelog) for the current state before relying on it. Chrome's documentation (updated 2026-10-07) still describes an origin trial from Chrome 149 and has not announced a cross-browser shipping commitment.
 
 ## `webmcp.dev` Is a Different Project
 

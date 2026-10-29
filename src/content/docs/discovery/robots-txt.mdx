@@ -1,7 +1,7 @@
 ---
 title: robots.txt for AI Agents
 description: Configuring robots.txt to control training crawler access while keeping retrieval bots enabled
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -18,7 +18,7 @@ Applebot-Extended       PerplexityBot (Perplexity)
 cohere-ai               Applebot, Spotlight, Siri
 ```
 
-`robots.txt` has a new dimension in the AI era: the distinction between bots that train models and bots that retrieve content at inference time. Blocking a training crawler prevents your content from influencing model weights. Blocking a retrieval crawler prevents agents from finding your content when answering questions. These are different decisions with different business implications.
+`robots.txt` has a new dimension in the AI era: the distinction between bots that train models and bots that retrieve content at inference time. Blocking a training crawler states a prospective preference: it does not remove content already collected, and it is not a guarantee about every source a model draws on. Blocking a retrieval crawler prevents agents from finding your content when answering questions. These are different decisions with different business implications.
 
 ## The Training vs Retrieval Split
 
@@ -34,11 +34,13 @@ Most AI companies run at least two retrieval bot types alongside their training 
 | `Claude-User`       | Anthropic  | User-initiated fetch | Yes - Anthropic states all three of its bots honor robots.txt                        |
 | `PerplexityBot`     | Perplexity | Search indexing      | Yes                                                                                  |
 | `Perplexity-User`   | Perplexity | User-initiated fetch | No - Perplexity states this fetcher "generally ignores robots.txt rules"             |
-| `Google-Extended`   | Google     | Training             | Yes                                                                                  |
+| `Google-Extended`   | Google     | Training + grounding | Yes                                                                                  |
 | `Googlebot`         | Google     | Search + retrieval   | Yes                                                                                  |
 | `Applebot-Extended` | Apple      | Training             | Yes                                                                                  |
 | `Applebot`          | Apple      | Search + retrieval   | Yes                                                                                  |
 | `cohere-ai`         | Cohere     | Training             | Yes                                                                                  |
+
+`Google-Extended` is a product token, not a separate crawler. Google documents it as controlling use of your content for Gemini training and for grounding in Gemini Apps and Grounding with Google Search on Vertex AI. It does not affect ordinary Search inclusion or ranking, so treat it as more than a training-only switch: blocking it can also affect grounding use.
 
 Blocking `GPTBot` does not prevent your content from appearing in ChatGPT - that is `OAI-SearchBot` (scheduled indexing) and `ChatGPT-User` (user-initiated). Blocking `ClaudeBot` does not prevent Claude from reading your docs - that is `Claude-SearchBot` and `Claude-User`. These are separate decisions that require separate entries.
 
@@ -216,12 +218,12 @@ Cloudflare replaced its old binary "block AI bots or don't" toggle with three in
 - **Agent** - automated action taken in real time on a person's behalf right now (`ChatGPT-User`, and browser-driving agents such as Claude or Gemini operating a real browser).
 - **Training** - crawlers that fold content into a model's weights permanently.
 
-**Bot Preference Sync**, rolled out from 21 August 2026, writes your dashboard settings for these three categories into your `robots.txt` automatically, prepending Cloudflare-managed directives ahead of your existing rules rather than replacing them. Enabled by default for new zones; existing zones are prompted to confirm before it activates.
+**Bot Preference Sync**, rolled out from 21 August 2026, writes your dashboard settings for these three categories into your `robots.txt`, prepending Cloudflare-managed directives ahead of your existing rules rather than replacing them. Enabled by default for new zones; existing zones are prompted to confirm before it activates. Cloudflare's documentation (updated 2026-10-22) says it only generates managed text when Bot Preference Sync is on and at least one Search, Agent or Training policy is set to Block, Block on pages with ads, or (for Training) Disallow. With every policy set to allow there is nothing to prepend and your `robots.txt` is served unchanged. The managed example now carries `Content-signal: search=yes, ai-train=no, use=reference`, where `use=reference` comes from `content-use`, an optional extension Cloudflare says it is testing ("index, excerpt, and link back").
 
 **From 15 September 2026**, new domains get a default that depends on monetization: ad-supported sites default Training to Disallow (blocking training-only crawlers from operators including Amazon, Anthropic, Meta, and OpenAI, on the reasoning that an AI answer built from training data replaces the visit that would have earned ad revenue); non-ad-monetized sites default Training to Allow. Search and Agent stay allowed by default in both cases.
 
-Disallowing training does not cost you search visibility: Apple and Google both state plainly that a `Disallow` rule for `Applebot-Extended` or `Google-Extended` in `robots.txt` has no effect on Search ranking or inclusion. Microsoft currently supports only the `NOARCHIVE` meta tag for this purpose - it has said it is building `robots.txt`-based support for a "no training" preference, targeted for early 2027, so a Microsoft-specific `Disallow` line has no effect yet.
+Disallowing training does not cost you search visibility: Apple and Google both state plainly that a `Disallow` rule for `Applebot-Extended` or `Google-Extended` in `robots.txt` has no effect on Search ranking or inclusion.
 
-**What to configure:** decide Search, Agent, and Training separately - they are different business decisions, not one setting. If you're on Cloudflare, use the three-way dashboard controls and turn on Bot Preference Sync so `robots.txt` reflects them automatically; otherwise hand-maintain the equivalent per-bot `Allow`/`Disallow` rules from the table above. Block Training without hesitation using the `Google-Extended`/`Applebot-Extended` pattern - it doesn't touch search ranking. Leave Search and Agent open unless you have a specific reason to exclude them: blocking Agent bots turns away a real person's in-flight task, not model training.
+**What to configure:** decide Search, Agent, and Training separately - they are different business decisions, not one setting. If you're on Cloudflare, use the three-way dashboard controls and turn on Bot Preference Sync so `robots.txt` reflects them (it only writes managed text once at least one category is set to block); otherwise hand-maintain the equivalent per-bot `Allow`/`Disallow` rules from the table above. Block Training using the `Google-Extended`/`Applebot-Extended` pattern - it doesn't touch search ranking, though `Google-Extended` also covers Gemini grounding. Leave Search and Agent open unless you have a specific reason to exclude them: blocking Agent bots turns away a real person's in-flight task, not model training.
 
 Cloudflare's Pay Per Crawl turns crawl access itself into a priced transaction: a request from a designated crawler gets HTTP `402 Payment Required` with a `crawler-price` header, the crawler replies with `crawler-max-price` (or `crawler-exact-price`) to indicate what it will pay, and a successful `200` response carries `crawler-charged` once payment clears. Crawlers authenticate with Web Bot Auth - Ed25519-signed `signature-agent`/`signature-input`/`signature` headers per RFC 9421 - so the price can't be evaded by spoofing a user-agent string. Cloudflare acts as merchant of record, billing crawlers and paying out publishers. Per crawler, choose Allow (free), Charge (a flat site-wide price), or Block. See [Payments](/docs/agentic-commerce/payments) for how the underlying 402 payment flow works.

@@ -1,12 +1,12 @@
 ---
 title: Agent Identity
 description: First-class agent principals, audit trails, and the actor chain
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Rather than running all agents under a shared service account, give each agent its own principal with a unique token encoding its name, task, and permission ceiling. Sub-agents cannot exceed their parent's scope via Token Exchange. Audit logs capture both agent_id and actor_chain for full traceability.
+Rather than running all agents under a shared service account, give each agent its own principal with a unique token encoding its name, task, and permission ceiling. Enforce, in your token-exchange policy, that sub-agents cannot exceed their parent's scope; RFC 8693 leaves that decision to the authorization server rather than guaranteeing it. Audit logs capture both agent_id and actor_chain for full traceability.
 
 ```
 Orchestrator (own credentials)
@@ -74,9 +74,9 @@ Trust identity claims in the JWT, not in custom headers. The token should includ
 }
 ```
 
-- `sub` - the calling agent identity
-- `act` - optional actor chain for nested delegation (agent → agent → service)
-- `agent_name` - human-readable agent identifier (for logs)
+- `sub` - the subject the request is made on behalf of (here, the orchestrator)
+- `act` - the current actor (`act.sub`, here the sub-agent); nested `act` claims record earlier actors and are informational only
+- `agent_name` - human-readable agent identifier (for logs); this and the task claims below are application conventions, not RFC 8693 claims
 - `task_id` - correlates all actions from this execution
 - `parent_task_id` - links to parent task in multi-agent chains
 - `org_id` - tenant isolation
@@ -85,7 +85,7 @@ The `act` claim is how you trace who actually made a request. If agent A delegat
 
 ## Audit Logging
 
-Log both `sub` (agent making the request) and `act` (if any) on every action:
+Log both `sub` (the subject the request is on behalf of) and `act` (the agent actually acting, if delegated) on every action:
 
 ```typescript
 // Walk the nested `act` chain (agent -> agent -> ... -> service) into a flat array
@@ -167,7 +167,7 @@ Request identity does not grant a user's application permissions. Keep OAuth, re
 
 Web Bot Auth answers "who sent this request." A separate, still-forming line of standards work answers "what workload is this agent running as, and how does it prove that to another service." The [MCP roadmap](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) (2026-08-22) names this directly: MCP authorization today assumes a human clicking through a browser consent screen, which doesn't fit an agent running unattended as a cloud workload. Its stated direction is to finalize DPoP and drive adoption (see [DPoP](/docs/authentication/dpop)), and to define an opinionated path for agent identity and delegation through **Workload Identity Federation**, building on the ID-JAG grant used in enterprise-managed authorization - with the explicit goal of engaging the IETF OAuth and WIMSE working groups rather than inventing an MCP-specific mechanism.
 
-WIMSE (Workload Identity in Multi-Service Environments) is the IETF working group this points to. Its [architecture draft](https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/) (-08, 2026-07-06) defines how workloads obtain and present identity credentials - X.509 certificates or JWTs - to authenticate to each other within a trust domain. A separate document, [draft-ni-wimse-ai-agent-identity](https://datatracker.ietf.org/doc/draft-ni-wimse-ai-agent-identity/), applies these ideas specifically to AI agents. It remains an individual submission with no working-group standing and has lapsed (last revision February 2026) - read it as a signal of where this is headed; don't build against it yet.
+WIMSE (Workload Identity in Multi-Service Environments) is the IETF working group this points to. Its [architecture draft](https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/) (-08, 2026-07-06) defines how workloads obtain and present identity credentials - X.509 certificates or JWTs - to authenticate to each other within a trust domain. A separate document, [draft-ni-wimse-ai-agent-identity](https://datatracker.ietf.org/doc/draft-ni-wimse-ai-agent-identity/), applies these ideas specifically to AI agents. It remains an individual submission with no working-group standing, though it is active again (-04, 2026-10-28) - read it as a signal of where this is headed; don't build against it yet.
 
 None of this is ready to implement today. The concrete, shippable pieces are DPoP (independent of MCP, see [DPoP](/docs/authentication/dpop)) and Token Exchange with actor-chain claims, both covered above. Track Workload Identity Federation and WIMSE-based agent identity; don't build on them yet.
 

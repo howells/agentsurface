@@ -1,5 +1,5 @@
 /**
- * CLI Schema Generator — Machine-readable CLI introspection
+ * CLI Schema Generator - Machine-readable CLI introspection
  *
  * **What it is:** `commander` or `yargs` helpers to emit a `--schema` flag that prints the
  * machine-readable command tree as JSON. Names, flags, types, defaults, descriptions.
@@ -20,14 +20,13 @@
  * - [ ] Version your schema (add `schema_version` field)
  *
  * **References:**
- * - zod-to-json-schema: https://github.com/StefanTerdell/zod-to-json-schema
+ * - Zod 4 JSON Schema: https://zod.dev/json-schema
  * - JSON Schema 2020-12: https://json-schema.org/
  * - OpenAPI 3.1: https://spec.openapis.org/oas/v3.1.0
  */
 
 import type { Command, Option } from "commander";
-import type { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 /**
  * Describes a single CLI command with input/output schemas
@@ -82,13 +81,13 @@ export function generateCLISchema(program: Command): {
       }
     });
 
-    cmd.arguments.forEach((arg) => {
+    cmd.registeredArguments.forEach((arg) => {
       properties[arg.name()] = {
         description: arg.description,
         type: "string",
       };
 
-      if (!arg.optional) {
+      if (arg.required) {
         required.push(arg.name());
       }
     });
@@ -188,9 +187,9 @@ export function generateZodCommandSchema(
 ): CommandSchema {
   return {
     description,
-    input: zodToJsonSchema(inputSchema) as any,
+    input: z.toJSONSchema(inputSchema) as CommandSchema["input"],
     name,
-    output: zodToJsonSchema(outputSchema) as any,
+    output: z.toJSONSchema(outputSchema) as CommandSchema["output"],
   };
 }
 

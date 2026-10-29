@@ -15,7 +15,7 @@
  * - Role-based filtering: select tools for a given user role
  * - allowedTools / deniedTools for runtime gating
  *
- * Citation: https://www.anthropic.com/engineering/writing-tools-for-agents
+ * Citation: https://www.anthropic.com/research/writing-tools-for-agents
  * OpenAI strict mode: https://platform.openai.com/docs/guides/function-calling
  * MCP lazy loading: https://modelcontextprotocol.io/specification/2026-07-28
  *
@@ -26,7 +26,6 @@
  */
 
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 // ============================================================================
 // TOOL DEFINITION TYPE
@@ -242,7 +241,7 @@ export class ToolRegistry {
     return tools.map((tool) => ({
       description: tool.description,
       name: tool.name,
-      parameters: zodToJsonSchema(tool.schema),
+      parameters: z.toJSONSchema(tool.schema),
     }));
   }
 

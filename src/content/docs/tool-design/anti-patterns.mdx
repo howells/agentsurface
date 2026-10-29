@@ -1,20 +1,20 @@
 ---
 title: Anti-Patterns
 description: Ten common tool design mistakes and short fixes
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Common tool design mistakes that cause routing errors, hallucinated parameters, and failed operations. Includes: terse descriptions (no "when to use"), >20 tools at once, opaque IDs (no semantic meaning), nested unions (OpenAI strict mode rejects), optional fields assumed to work everywhere (ambiguous under strict mode), inconsistent naming across tools, thrown errors (should return with isError: true), destructive tools without annotations, tools without discrimination ("get_data" too vague), and missing examples. Each includes a short fix pattern.
+Common tool design mistakes that cause routing errors, hallucinated parameters, and failed operations. Includes: terse descriptions (no "when to use"), >20 tools at once, opaque IDs (no semantic meaning), unbounded or root-level unions (OpenAI strict mode rejects), optional fields assumed to work everywhere (ambiguous under strict mode), inconsistent naming across tools, thrown errors (should return with isError: true), destructive tools without annotations, tools without discrimination ("get_data" too vague), and missing examples. Each includes a short fix pattern.
 
 - **1. Terse descriptions**: Add "Use when...", "Do not use for..."
 - **2. >20 tools**: Use dynamic selection (tool search, embeddings, or keyword filtering)
 - **3. Opaque IDs**: Use semantic values or detailed examples
-- **4. Nested unions**: Break into separate tools (OpenAI strict mode constraint)
+- **4. Unbounded types and root unions**: Constrain the shape or split into separate tools (OpenAI strict mode constraint)
 - **5. Optional fields assumed to work everywhere**: OpenAI strict mode needs nullable + `required`, not omission
 - **6. Inconsistent naming**: Pick one noun and use it across every tool
-- **7. Throw errors**: Return `{ isError: true, content: [...] }`
+- **7. Throw errors**: Return `{ isError: true, content: [...] }` (MCP)
 - **8. Destructive without annotations**: Mark `destructiveHint` and `idempotentHint`
 - **9. No disambiguation**: One primary tool per intent; name variants explicitly
 - **10. No examples**: Provide input examples in schema
@@ -28,10 +28,12 @@ Poorly designed tools produce routing errors, hallucinated parameters, and faile
 **Mistake:**
 
 ```typescript
-server.tool(
+server.registerTool(
   "search_issues",
-  "Searches for issues.", // Too vague
-  schema,
+  {
+    description: "Searches for issues.", // Too vague
+    inputSchema: schema,
+  },
   handler,
 );
 ```
@@ -41,11 +43,14 @@ The agent has no signal for when to use this tool vs similar ones, what the edge
 **Fix:**
 
 ```typescript
-server.tool(
+server.registerTool(
   "search_issues",
-  "Search for existing issues by text, assignee, or status. Use when finding tickets matching criteria. " +
-    "Do not use for creating new issues (use create_issue). Returns paginated results; use next_offset for subsequent pages.",
-  schema,
+  {
+    description:
+      "Search for existing issues by text, assignee, or status. Use when finding tickets matching criteria. " +
+      "Do not use for creating new issues (use create_issue). Returns paginated results; use next_offset for subsequent pages.",
+    inputSchema: schema,
+  },
   handler,
 );
 ```
@@ -121,10 +126,12 @@ The agent cannot do anything with the result because it cannot resolve the ID to
 }
 
 // Or provide a lookup tool
-server.tool(
+server.registerTool(
   "get_user",
-  "Fetch user by ID. Required when search_users returns only IDs.",
-  schema,
+  {
+    description: "Fetch user by ID. Required when search_users returns only IDs.",
+    inputSchema: schema,
+  },
   handler,
 );
 ```
@@ -133,7 +140,7 @@ server.tool(
 
 ---
 
-## 4. Nested Union Types (OpenAI Strict Mode)
+## 4. Unions and Unbounded Types (OpenAI Strict Mode)
 
 **Mistake:**
 
@@ -146,24 +153,24 @@ const schema = z.object({
 });
 ```
 
-OpenAI strict mode rejects union types. Schema validation fails.
+OpenAI strict mode does support nested `anyOf` when every branch is itself valid in the supported subset, so unions are not banned outright. This schema fails because of the unrestricted `z.any()` branch. A root-level union fails too: the root must be an object, not an `anyOf`. Deeply nested unions are still harder for models to fill in, which is house advice, not an API limit.
 
 **Fix:**
 
 ```typescript
-// Flat discriminated union
+// Flat shape with concrete, nullable fields (all stay in `required`)
 const schema = z.object({
   success: z.boolean(),
-  data: z.any().optional(),
-  error_message: z.string().optional(),
+  data: z.object({ id: z.string(), summary: z.string() }).nullable(),
+  error_message: z.string().nullable(),
 });
 
 // Or use separate tools
-server.tool('operation_dry_run', ...);  // Returns preview
-server.tool('operation_execute', ...);  // Returns result
+server.registerTool("operation_dry_run", ...);  // Returns preview
+server.registerTool("operation_execute", ...);  // Returns result
 ```
 
-**Pattern:** Flatten schemas. Use separate tools for distinct operation modes.
+**Pattern:** Replace unbounded types with constrained shapes, flatten where you can, and use separate tools for distinct operation modes.
 
 ---
 
@@ -196,9 +203,9 @@ const schema = z.object({
 **Mistake:**
 
 ```typescript
-server.tool('create_user', ...);
-server.tool('list_customers', ...);  // Why "customer" vs "user"?
-server.tool('get_person', ...);
+server.registerTool("create_user", ...);
+server.registerTool("list_customers", ...);  // Why "customer" vs "user"?
+server.registerTool("get_person", ...);
 ```
 
 The agent is confused by inconsistent terminology.
@@ -206,9 +213,9 @@ The agent is confused by inconsistent terminology.
 **Fix:**
 
 ```typescript
-server.tool('create_user', ...);
-server.tool('list_users', ...);
-server.tool('get_user', ...);
+server.registerTool("create_user", ...);
+server.registerTool("list_users", ...);
+server.registerTool("get_user", ...);
 ```
 
 **Pattern:** Choose a noun and stick with it. `user`, not `customer` and `person`.
@@ -229,7 +236,7 @@ async (params) => {
 };
 ```
 
-Uncaught exceptions produce MCP protocol errors with generic messages. Agents cannot recover.
+Uncaught exceptions produce MCP protocol errors with generic messages. Agents cannot recover. The `isError: true` result shown below is the MCP adapter contract (see the [MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)); other SDKs have error handlers, exception-to-result conversion or provider-specific tool outputs, so use the equivalent in your framework.
 
 **Fix:**
 
@@ -260,12 +267,14 @@ async (params) => {
 **Mistake:**
 
 ```typescript
-server.tool(
+server.registerTool(
   "delete_invoice",
-  "Deletes an invoice.",
-  schema,
+  {
+    description: "Deletes an invoice.",
+    inputSchema: schema,
+    // No annotations
+  },
   handler,
-  // No annotations
 );
 ```
 
@@ -274,20 +283,23 @@ Downstream systems cannot tell this tool is dangerous.
 **Fix:**
 
 ```typescript
-server.tool(
+server.registerTool(
   "delete_invoice",
-  "Permanently deletes an invoice. This cannot be undone. " +
-    "Use only when the invoice was created in error.",
-  schema,
-  handler,
   {
-    destructiveHint: true, // Signals danger
-    idempotentHint: false, // Not safe to retry
+    description:
+      "Permanently deletes an invoice. This cannot be undone. " +
+      "Use only when the invoice was created in error.",
+    inputSchema: schema,
+    annotations: {
+      destructiveHint: true, // Signals danger
+      idempotentHint: false, // Not safe to retry
+    },
   },
+  handler,
 );
 ```
 
-**Pattern:** Mark all destructive tools with `destructiveHint: true` (MCP) or call it out in the description.
+**Pattern:** Mark all destructive tools with `destructiveHint: true` (MCP) or call it out in the description. Annotations are hints that clients may use, not an authorization boundary; enforce permissions at execution.
 
 ---
 
@@ -308,20 +320,26 @@ Four tools that do nearly the same thing. Agent has no signal for which to use.
 
 ```typescript
 // One primary search tool with a clear description
-server.tool(
+server.registerTool(
   "search_issues",
-  "Search for existing issues by text, assignee, or status. " +
-    "Use for finding tickets matching criteria. Returns paginated results.",
-  schema,
+  {
+    description:
+      "Search for existing issues by text, assignee, or status. " +
+      "Use for finding tickets matching criteria. Returns paginated results.",
+    inputSchema: schema,
+  },
   handler,
 );
 
 // If variants are genuinely needed, name them explicitly
-server.tool("search_issues_simple", "Fast, limited filters for finding tickets.", schema, handler);
-server.tool(
+server.registerTool(
+  "search_issues_simple",
+  { description: "Fast, limited filters for finding tickets.", inputSchema: schema },
+  handler,
+);
+server.registerTool(
   "search_issues_advanced",
-  "Full filter surface: status, assignee, labels.",
-  schema,
+  { description: "Full filter surface: status, assignee, labels.", inputSchema: schema },
   handler,
 );
 ```
@@ -391,11 +409,12 @@ Before shipping a tool:
 - [ ] `` `<20` `` tools per agent session (or use dynamic selection)
 - [ ] All responses include semantic content (names, not opaque IDs)
 - [ ] Destructive tools marked with `destructiveHint` or called out in description
-- [ ] All errors returned as `isError: true` responses, never thrown
+- [ ] Errors returned as results, never thrown (`isError: true` for MCP servers; the framework's equivalent elsewhere)
 - [ ] Naming consistent across tool set (same noun, verb_noun pattern)
 - [ ] Read tools marked `readOnlyHint: true`; write tools marked clearly
 - [ ] Idempotent tools (or those supporting idempotency keys) marked `idempotentHint: true`
 - [ ] Optional fields targeting OpenAI strict mode are nullable and stay in `required`, not omitted
+- [ ] No unconstrained `z.any()` / `any` branches in schemas that target OpenAI strict mode
 
 ## See also
 

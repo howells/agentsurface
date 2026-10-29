@@ -36,7 +36,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 2. **Implement Client Credentials only for service-owned M2M access**:
    - Grant type: `client_credentials`
-   - Endpoint: `POST /oauth/token` (or `/.well-known/oauth-token-endpoint`)
+   - Endpoint: the `token_endpoint` advertised in the authorization server metadata (RFC 8414), typically `POST /oauth/token`
    - Request:
 
      ```
@@ -60,7 +60,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 3. **Implement PKCE S256 for Authorization Code flows**:
    - Bind the authorization request to the code exchange (RFC 7636); do not add PKCE to Client Credentials
-   - Agent generates: `code_verifier = random 128 bytes` (base64url)
+   - Agent generates: `code_verifier` from 32 random bytes (base64url, 43 characters; RFC 7636 allows 43-128 characters)
    - Agent sends: `code_challenge = SHA256(code_verifier)` (base64url)
    - Authorization request includes `code_challenge` and `code_challenge_method=S256`; the code exchange includes `code_verifier`
    - Example:
@@ -71,24 +71,24 @@ Enable clients to authenticate for the correct principal. User-delegated access 
      ```
 
 4. **Implement DPoP (RFC 9449)** (proof-of-possession):
-   - Agent generates ephemeral key pair (2048-bit RSA or Ed25519)
+   - Agent generates a key pair (ES256 or EdDSA preferred)
    - Agent signs DPoP proof JWT for each API request:
      ```json
      {
-       "alg": "RS256",
+       "alg": "ES256",
        "typ": "dpop+jwt",
-       "jwk": { "kty": "RSA", "e": "...", "n": "..." }
+       "jwk": { "kty": "EC", "crv": "P-256", "x": "...", "y": "..." }
      }
      {
        "jti": "<random-unique-id>",
        "htm": "GET",
        "htu": "https://api.example.com/users",
        "iat": 1719273600,
-       "exp": 1719273660
+       "ath": "<base64url SHA-256 of the access token>"
      }
      ```
-   - Include `DPoP` header on every API request
-   - Server validates: signature, iat/exp, htm/htu match request
+   - Send `Authorization: DPoP <token>` and the `DPoP` header on every API request
+   - Server validates: signature, `typ`, iat window, htm/htu (no query), `ath`, jti replay, and `cnf.jkt` thumbprint
    - Prevents token reuse across clients
 
 5. **Implement Token Exchange (RFC 8693)** (federation/delegation):
@@ -119,7 +119,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
          "urn:ietf:params:oauth:grant-type:token-exchange"
        ],
        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-       "dpop_signing_alg_values_supported": ["RS256", "Ed25519"]
+       "dpop_signing_alg_values_supported": ["ES256", "EdDSA"]
      }
      ```
    - Agent discovers auth method, scopes, token lifetime without hardcoding
@@ -155,7 +155,8 @@ Enable clients to authenticate for the correct principal. User-delegated access 
        "authorization_servers": ["https://auth.example.com"],
        "scopes_supported": ["read", "write"],
        "bearer_methods_supported": ["header"],
-       "dpop_signing_alg_values_supported": ["RS256"]
+       "dpop_bound_access_tokens_required": true,
+       "dpop_signing_alg_values_supported": ["ES256", "EdDSA"]
      }
      ```
 
@@ -188,7 +189,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 ## Spec References
 
-- OAuth 2.1 (Internet-Draft; draft-15 published 2026-03-02): https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15
+- OAuth 2.1 (Internet-Draft; draft-16 published 2026-09-03): https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-16
 - PKCE (RFC 7636): https://datatracker.ietf.org/doc/html/rfc7636
 - DPoP (RFC 9449): https://datatracker.ietf.org/doc/html/rfc9449
 - Token Exchange (RFC 8693): https://datatracker.ietf.org/doc/html/rfc8693
@@ -199,7 +200,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 - TypeScript strict mode; no `any`.
 - All token requests use PKCE S256; proof-of-key is mandatory.
-- DPoP proof expires in 60s; jti prevents replay.
+- DPoP proofs are accepted only within a short `iat` window; the jti store covers that whole window to prevent replay.
 - Scopes are coarse-grained (read:users, write:posts, not user.read.all).
 - Token lifetime is hours, not days.
 

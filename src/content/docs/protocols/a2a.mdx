@@ -1,7 +1,7 @@
 ---
 title: Agent-to-Agent Protocol (A2A)
 description: Vendor-neutral protocol for task delegation between AI agents across organizational boundaries
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -13,13 +13,13 @@ Orchestrator        Specialist
    (Agent A)        (Agent B)
      ├─ GET /.well-known/agent-card.json
      │  (discover capabilities)
-     ├─ POST /tasks (hand off task)
-     └─ Poll or callback for result
+     ├─ SendMessage (hand off task)
+     └─ Poll, stream, or callback for result
 ```
 
-- AgentCard: client publishes identity, public JWKS, capabilities at well-known location
+- AgentCard: the server agent publishes its name, interfaces, capabilities, skills, and security requirements at a well-known location
 - Task-based: async, long-lived, with streaming/callback progress
-- OAuth 2.1 + DPoP for authentication between agents; Agent Cards can be cryptographically signed
+- Authentication is declared in the card (API key, HTTP auth, OAuth 2.0, OpenID Connect, or mutual TLS); Agent Cards can carry JWS signatures
 - Works across org boundaries, different infrastructure
 - Multi-transport: JSON-RPC, gRPC, and HTTP+JSON
 - v1.0.1: production-grade - 150+ organizations, SDKs in 5 languages, an 8-state task lifecycle
@@ -30,7 +30,7 @@ A2A solves a different problem than MCP. Where MCP connects an agent to tools an
 
 Google initially developed and published the A2A specification in April 2025 as an open-source protocol for multi-agent coordination. It was donated to the Linux Foundation on 2025-06-23, and was accepted as a **Growth Stage project** at the Agentic AI Foundation (AAIF) - alongside MCP - on 2026-08-27, making A2A a vendor-neutral standard. The spec reached v1.0.0 on 2026-03-12 and v1.0.1 on 2026-05-28 - production-grade, with 150+ participating organizations and SDKs across five languages. For current adopters and governance details, use the A2A project site rather than copying a vendor list into implementation docs.
 
-IBM's separate "ACP" (Agent Communication Protocol) was absorbed into A2A in August 2025 and is dead as a standalone effort. See [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) for the three unrelated protocols that share that acronym.
+IBM's separate "ACP" (Agent Communication Protocol) was absorbed into A2A in August 2025 and is no longer a separate effort. See [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) for the three unrelated protocols that share that acronym.
 
 ## Purpose
 
@@ -68,7 +68,7 @@ A2A is horizontal: an agent connects across to peer agents.
   └─────────────────┘                  └─────────────────┘
 ```
 
-In most production systems, both protocols are present: agents use MCP to access their own tools and A2A to delegate tasks to peer agents.
+A common architecture uses both protocols: agents use MCP to access their own tools and A2A to delegate tasks to peer agents.
 
 ## Task Lifecycle
 
@@ -82,7 +82,7 @@ The canonical location is:
 GET /.well-known/agent-card.json
 ```
 
-For backward compatibility with pre-1.0 servers, `.well-known/agent.json` is accepted as a fallback.
+Pre-1.0 agents published `.well-known/agent.json`. Some clients probe that path as an optional compatibility step, but the specification's path is `agent-card.json`, so do not rely on a server answering at the old one.
 
 A client agent fetches this document to learn:
 
@@ -93,11 +93,11 @@ A client agent fetches this document to learn:
 
 ### Phase 2: Authorization
 
-Once the client has read the Agent Card and confirmed the specialist can handle the task, it establishes authorization. A2A uses standard OAuth 2.1 - the client obtains a token scoped to the specific agent, using the authorization details declared in the Agent Card.
+Once the client has read the Agent Card and confirmed the specialist can handle the task, it establishes authorization. A2A does not mandate one scheme: the Agent Card declares what it accepts in `securitySchemes` (API key, HTTP authentication, OAuth 2.0, OpenID Connect, or mutual TLS) and which of them a caller must satisfy in `securityRequirements`. When the card declares OAuth, the client obtains a token scoped to that agent using the flows and scopes in the card.
 
 ### Phase 3: Communication
 
-With a valid token, the client sends task requests to the specialist over HTTPS JSON-RPC. Responses arrive either synchronously or as Server-Sent Events for long-running tasks.
+With a valid token, the client sends task requests to the specialist over an interface the card lists in `supportedInterfaces` (JSON-RPC, gRPC, or HTTP+JSON). Responses arrive either synchronously or as a stream of updates for long-running tasks.
 
 ## AgentCard Structure
 
@@ -105,27 +105,38 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
 
 ```json
 {
-  "id": "agent:acme-travel/flight-specialist",
   "name": "ACME Flight Specialist",
   "description": "Searches, compares, and books commercial flights. Handles multi-leg itineraries, fare class selection, and seat assignments.",
   "version": "2.3.1",
-  "url": "https://agents.acme.com/flight",
+  "supportedInterfaces": [
+    {
+      "url": "https://agents.acme.com/flight",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
   "capabilities": {
     "streaming": true,
-    "pushNotifications": false,
-    "stateTransitionHistory": true
+    "pushNotifications": false
   },
-  "authentication": {
-    "schemes": ["oauth2"],
-    "oauth2": {
-      "authorizationUrl": "https://auth.acme.com/oauth/authorize",
-      "tokenUrl": "https://auth.acme.com/oauth/token",
-      "scopes": {
-        "flight:search": "Search flights without booking",
-        "flight:book": "Search and book flights on behalf of users"
+  "securitySchemes": {
+    "acmeOAuth": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://auth.acme.com/oauth/authorize",
+            "tokenUrl": "https://auth.acme.com/oauth/token",
+            "pkceRequired": true,
+            "scopes": {
+              "flight:search": "Search flights without booking",
+              "flight:book": "Search and book flights on behalf of users"
+            }
+          }
+        }
       }
     }
   },
+  "securityRequirements": [{ "schemes": { "acmeOAuth": { "list": ["flight:search"] } } }],
   "defaultInputModes": ["text/plain", "application/json"],
   "defaultOutputModes": ["application/json"],
   "skills": [
@@ -152,18 +163,21 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
 
 ### AgentCard Fields
 
-| Field                | Required | Description                                                  |
-| -------------------- | -------- | ------------------------------------------------------------ |
-| `id`                 | Yes      | Globally unique identifier for this agent                    |
-| `name`               | Yes      | Human-readable display name                                  |
-| `description`        | Yes      | What tasks this agent handles - the primary discovery signal |
-| `version`            | Yes      | SemVer version of this agent's capabilities                  |
-| `url`                | Yes      | Base URL for the agent's JSON-RPC endpoint                   |
-| `capabilities`       | Yes      | Which A2A features this agent supports                       |
-| `authentication`     | Yes      | Auth schemes and OAuth 2.1 configuration                     |
-| `skills`             | Yes      | Array of specific tasks this agent can perform               |
-| `defaultInputModes`  | No       | MIME types this agent accepts by default                     |
-| `defaultOutputModes` | No       | MIME types this agent produces by default                    |
+| Field                  | Required | Description                                                                  |
+| ---------------------- | -------- | ---------------------------------------------------------------------------- |
+| `name`                 | Yes      | Human-readable display name                                                  |
+| `description`          | Yes      | What tasks this agent handles - the primary discovery signal                 |
+| `version`              | Yes      | Version of this agent                                                        |
+| `supportedInterfaces`  | Yes      | Ordered endpoints, each with `url`, `protocolBinding`, and `protocolVersion` |
+| `capabilities`         | Yes      | Which A2A features this agent supports                                       |
+| `skills`               | Yes      | Array of specific tasks this agent can perform                               |
+| `defaultInputModes`    | Yes      | MIME types this agent accepts by default                                     |
+| `defaultOutputModes`   | Yes      | MIME types this agent produces by default                                    |
+| `securitySchemes`      | No       | Named auth scheme definitions, including OAuth 2.0 flows                     |
+| `securityRequirements` | No       | Which declared scheme and scopes a caller must use                           |
+| `signatures`           | No       | JWS signatures over the card                                                 |
+
+The card has no top-level `id` or `url`; the endpoint lives in `supportedInterfaces`. Authentication fields are conditional on the schemes you advertise.
 
 ### Capabilities Declaration
 
@@ -172,41 +186,44 @@ The AgentCard is the core discovery document. Every A2A-compatible agent publish
   "capabilities": {
     "streaming": true,
     "pushNotifications": false,
-    "stateTransitionHistory": true
+    "extendedAgentCard": false
   }
 }
 ```
 
-| Capability               | Meaning                                              |
-| ------------------------ | ---------------------------------------------------- |
-| `streaming`              | Agent supports SSE streaming for long-running tasks  |
-| `pushNotifications`      | Agent can send async push updates via webhook        |
-| `stateTransitionHistory` | Agent records and exposes its internal state history |
+| Capability          | Meaning                                                 |
+| ------------------- | ------------------------------------------------------- |
+| `streaming`         | Agent supports streaming updates for long-running tasks |
+| `pushNotifications` | Agent can send async push updates via webhook           |
+| `extensions`        | Protocol extensions the agent supports, by URI          |
+| `extendedAgentCard` | Agent serves a fuller card to authenticated callers     |
+
+Older cards listed `stateTransitionHistory`; it is not a 1.0 capability.
 
 ## Task Communication & Security
 
-A2A uses OAuth 2.1 with DPoP (Demonstration of Proof-of-Possession, RFC 9449) for client authentication. Each agent must obtain a scoped token before sending tasks. The security model ensures tokens cannot be replayed by an unauthorized client.
+A2A authentication is whatever the target card declares. A client must satisfy one of the card's `securityRequirements` before sending tasks, and agents should scope credentials to the skills they expose. A2A does not require DPoP (RFC 9449); use sender-constrained tokens only if the authorization server you choose offers them. The examples below are JSON-RPC binding examples against the v1.0 schema; the other bindings carry the same messages.
 
 ### Sending a Task
 
-Task requests are JSON-RPC calls to the agent's endpoint:
+Task requests are JSON-RPC calls to the agent's endpoint. The task ID is assigned by the agent in its response; the request carries a client-generated `messageId`:
 
 ```json
 POST https://agents.acme.com/flight
 Authorization: Bearer eyJ...
+A2A-Version: 1.0
 Content-Type: application/json
 
 {
   "jsonrpc": "2.0",
-  "id": "task-8821",
+  "id": "req-8821",
   "method": "SendMessage",
   "params": {
-    "id": "task-8821",
     "message": {
-      "role": "user",
+      "messageId": "msg-0001",
+      "role": "ROLE_USER",
       "parts": [
         {
-          "type": "text",
           "text": "Find available business class flights from JFK to LHR on March 15, 2026 for 2 passengers."
         }
       ]
@@ -221,7 +238,7 @@ Content-Type: application/json
 
 ### Task States
 
-A task moves through a defined set of states. v1.0.1 specifies eight:
+A task moves through a defined set of states. v1.0.1 specifies eight operational states (the schema also defines `TASK_STATE_UNSPECIFIED`). On the wire they are ProtoJSON enum values such as `TASK_STATE_WORKING`; the table uses short names:
 
 ```
 submitted → working → (input-required / auth-required →) completed
@@ -238,65 +255,71 @@ submitted → working → (input-required / auth-required →) completed
 | `auth-required`  | Agent needs additional authorization before continuing |
 | `completed`      | Task finished successfully                             |
 | `failed`         | Task failed with an error                              |
-| `canceled`       | Task was canceled by the client or timed out           |
+| `canceled`       | Task was canceled before completion                    |
 | `rejected`       | Agent declined the task before starting work           |
 
 ### Streaming Responses
 
-For long-running tasks, the agent streams updates via Server-Sent Events. Clients that include the `Accept: text/event-stream` header receive a stream:
+For long-running tasks, a client calls `SendStreamingMessage` (the card must declare `capabilities.streaming`) and the agent streams updates via Server-Sent Events. Each event is a `StreamResponse` that wraps exactly one of `task`, `message`, `statusUpdate`, or `artifactUpdate`:
 
 ```
 HTTP/1.1 200 OK
 Content-Type: text/event-stream
 Cache-Control: no-cache
 
-data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"working"},"metadata":{}}}
+data: {"jsonrpc":"2.0","id":"req-8821","result":{"task":{"id":"task-8821","contextId":"ctx-4421","status":{"state":"TASK_STATE_SUBMITTED"}}}}
 
-data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"working"},"artifacts":[],"metadata":{"progress":"Searching 48 airlines..."}}}
+data: {"jsonrpc":"2.0","id":"req-8821","result":{"statusUpdate":{"taskId":"task-8821","contextId":"ctx-4421","status":{"state":"TASK_STATE_WORKING"}}}}
 
-data: {"jsonrpc":"2.0","id":"task-8821","result":{"id":"task-8821","status":{"state":"completed"},"artifacts":[{"parts":[{"type":"application/json","data":{"flights":[...]}}]}]}}
+data: {"jsonrpc":"2.0","id":"req-8821","result":{"artifactUpdate":{"taskId":"task-8821","contextId":"ctx-4421","artifact":{"artifactId":"flights-1","parts":[{"data":{"flights":[]},"mediaType":"application/json"}]},"lastChunk":true}}}
+
+data: {"jsonrpc":"2.0","id":"req-8821","result":{"statusUpdate":{"taskId":"task-8821","contextId":"ctx-4421","status":{"state":"TASK_STATE_COMPLETED"}}}}
 ```
 
-Each event carries a partial or final result. The stream ends when the task reaches a terminal state (`completed`, `failed`, `canceled`, or `rejected`).
+The stream ends when the task reaches a terminal state (`completed`, `failed`, `canceled`, or `rejected`). A part holds exactly one of `text`, `raw`, `url`, or `data`, with an optional `mediaType`.
 
 ### Input Required
 
-When an agent needs more information mid-task, it transitions to `input-required` state and sends a structured request:
+When an agent needs more information mid-task, it moves the task to `TASK_STATE_INPUT_REQUIRED` and puts the question in the status message:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "id": "task-8821",
+  "id": "req-8821",
   "result": {
-    "id": "task-8821",
-    "status": {
-      "state": "input-required",
-      "message": {
-        "role": "agent",
-        "parts": [
-          {
-            "type": "text",
-            "text": "Found 12 flights matching your criteria. Do you prefer morning departures (before noon) or afternoon departures (after noon)?"
-          }
-        ]
+    "task": {
+      "id": "task-8821",
+      "contextId": "ctx-4421",
+      "status": {
+        "state": "TASK_STATE_INPUT_REQUIRED",
+        "message": {
+          "messageId": "msg-0002",
+          "role": "ROLE_AGENT",
+          "parts": [
+            {
+              "text": "Found 12 flights matching your criteria. Do you prefer morning departures (before noon) or afternoon departures (after noon)?"
+            }
+          ]
+        }
       }
     }
   }
 }
 ```
 
-The orchestrator responds by sending additional input to the same task ID:
+The orchestrator replies with a new message that names the same task in `message.taskId`:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "id": "task-8821-followup",
+  "id": "req-8822",
   "method": "SendMessage",
   "params": {
-    "id": "task-8821",
     "message": {
-      "role": "user",
-      "parts": [{ "type": "text", "text": "Morning departures preferred." }]
+      "messageId": "msg-0003",
+      "taskId": "task-8821",
+      "role": "ROLE_USER",
+      "parts": [{ "text": "Morning departures preferred." }]
     }
   }
 }
@@ -329,7 +352,7 @@ The `skills` array in an AgentCard describes discrete capabilities the agent exp
 ## Spec & References
 
 - [A2A v1.0.1 Specification](https://a2a-protocol.org/latest/specification/) - official A2A specification from the Linux Foundation
-- [A2A Project Homepage](https://a2aproject.github.io/A2A/latest/) - documentation and resources
+- [A2A Project Homepage](https://a2a-protocol.org/latest/) - documentation and resources
 
 ## Related Pages
 

@@ -1,16 +1,16 @@
 ---
 title: Webhooks and Events for Agents
 description: Designing webhook schemas and event payloads that agents can route, deduplicate, and act on reliably
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Webhooks push state changes to agents, but poorly designed events cause duplicate processing and unroutable payloads. Well-designed events are self-describing, idempotent, and verifiable. OpenAPI 3.1's webhooks field lets you document incoming payloads in the same spec as your API. Each event needs a unique event_id and idempotency_key for deduplication, explicit event_type for routing, and a timestamp for ordering.
+Webhooks push state changes to agents, but poorly designed events cause duplicate processing and unroutable payloads. Well-designed events are self-describing, idempotent, and verifiable. OpenAPI 3.1's webhooks field lets you document incoming payloads in the same spec as your API. Each event needs an identifier that stays the same across redeliveries for deduplication, an explicit event_type for routing, and an occurrence timestamp as metadata. The envelope on this page carries both an `event_id` and a separate `idempotency_key`; that is a house design, and a single stable ID (the `event_id`, or Standard Webhooks' `webhook-id`) is enough to deduplicate.
 
 - Event payloads are self-describing with event_type and event_id
-- Include idempotency_key to prevent duplicate processing
-- Timestamp every event for reliable ordering and replay
+- Give every event a stable deduplication key, either `event_id` or a separate idempotency_key
+- Timestamp every event as metadata, and define sequencing and replay policy separately
 - Document all webhook types in OpenAPI webhooks field, not separately
 - Provide schema for every event payload
 
@@ -158,7 +158,9 @@ components:
         created_at:
           type: string
           format: date-time
-          description: When the event was generated (not when it was delivered)
+          description: >
+            When the event was generated (not when it was delivered). Occurrence
+            metadata only: it does not guarantee delivery or causal order.
 
     OrderCreatedEvent:
       allOf:
@@ -217,7 +219,7 @@ This allows an agent framework that receives any event payload to look up the co
 
 ### Idempotency Keys
 
-Webhook delivery systems guarantee at-least-once delivery. Agents must handle duplicate events without creating duplicate side effects. Extend the `BaseEvent` schema above with an `idempotency_key`, required on every event payload:
+Webhook delivery systems guarantee at-least-once delivery. Agents must handle duplicate events without creating duplicate side effects. Standard Webhooks does not require a separate idempotency key: its `webhook-id` identifies the message and stays the same across retries, so it can be the deduplication key, and CloudEvents similarly deduplicates on `source` plus `id`. If you prefer a body-level key, extend the `BaseEvent` schema above with an `idempotency_key`, required on every event payload (a house envelope design):
 
 ```yaml
 components:
@@ -270,11 +272,11 @@ webhook-timestamp: 1710460800
 webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 ```
 
-- `webhook-id` - unique identifier for this delivery
-- `webhook-timestamp` - Unix timestamp (seconds) the delivery was signed
+- `webhook-id` - identifier for the message (the event); it stays the same across retries, so don't regenerate it per delivery attempt or deduplication breaks
+- `webhook-timestamp` - Unix timestamp (seconds) the delivery attempt was signed; it can change on retry
 - `webhook-signature` - space-delimited list of signatures, so a secret can be rotated with zero downtime by including both the old and new signature during the overlap window
 
-The signed content is `{webhook-id}.{webhook-timestamp}.{raw_body}`, HMAC-SHA256'd with the webhook secret, base64-encoded, and prefixed `v1,`. Signing secrets are base64, prefixed `whsec_` so tooling can recognize the scheme at a glance.
+For the symmetric scheme used in this page's examples, the signed content is `{webhook-id}.{webhook-timestamp}.{raw_body}`, HMAC-SHA256'd with the webhook secret, base64-encoded, and prefixed `v1,`. Signing secrets are base64, prefixed `whsec_` so tooling can recognize the scheme at a glance. Standard Webhooks 1.0.0 also defines an asymmetric option using Ed25519 (`v1a` signatures, `whsk_` private and `whpk_` public keys), which lets receivers verify without holding a secret that could be used to sign.
 
 ```yaml
 webhooks:
@@ -293,14 +295,14 @@ webhooks:
           required: true
           schema:
             type: string
-          description: Unique ID for this delivery; use for support requests and dedup
+          description: Stable ID for this message, the same on every retry; use for dedup and support requests
         - name: webhook-timestamp
           in: header
           required: true
           schema:
             type: string
           description: >
-            Unix timestamp (seconds) the delivery was signed. Reject requests
+            Unix timestamp (seconds) this delivery attempt was signed. Reject requests
             outside your tolerance window to prevent replay attacks; the spec
             leaves the exact window to the implementer, and five minutes each
             way is a common choice.
@@ -464,7 +466,8 @@ paths:
 
 - [ ] All webhooks are documented in the OpenAPI `webhooks` field (not in a separate file)
 - [ ] Every event payload includes `event_type`, `event_id`, and `created_at`
-- [ ] Every event payload includes an `idempotency_key`
+- [ ] Every event has a stable deduplication key (`event_id`, `webhook-id`, or a separate `idempotency_key`)
+- [ ] Ordering and replay rules (sequence numbers or resource versions) are defined separately from timestamps
 - [ ] A `discriminator` is configured on the union event schema
 - [ ] Signatures follow Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`), not a bespoke header scheme
 - [ ] Signature verification rejects deliveries outside the replay-tolerance window

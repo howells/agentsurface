@@ -1,7 +1,7 @@
 ---
 title: Naming and Descriptions
 description: Verb-first naming conventions and descriptions written as onboarding prompts
-lastVerified: 2026-09-07
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -36,16 +36,16 @@ Do not rename language-native variables or filenames merely to match a public to
 
 A service name can matter when the agent must choose between actual destinations, such as `search_jira_issues` and `search_github_issues`. It does not matter when two backend implementations provide the same product capability. Do not expose both a generic tool and a provider-prefixed duplicate for that reason alone.
 
-Anthropic recommends meaningful namespaces for large tool sets and reports that prefix versus suffix placement affects models differently. Evaluate the names against real tasks; do not claim one word order always wins. [Anthropic tool-design research](https://www.anthropic.com/engineering/writing-tools-for-agents#namespacing-your-tools).
+Anthropic recommends meaningful namespaces for large tool sets and reports that prefix versus suffix placement affects models differently. Evaluate the names against real tasks; do not claim one word order always wins. [Anthropic tool-design research](https://www.anthropic.com/research/writing-tools-for-agents#namespacing-your-tools).
 
 ### Separate protocol validity from design preference
 
-Verified on 7 September 2026:
+Verified on 29 October 2026 (the Claude limit is 128 characters, as MCP recommends; the 64-character figure above is only our shared-client ceiling):
 
 | Source                                                                                                                                     | What it actually says                                                                                                                        | Implication                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | [MCP 2026-07-28: tool names](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names)                             | Recommends 1–128 characters, case sensitivity and ASCII letters, digits, underscores, hyphens or dots. Its valid examples include `getUser`. | MCP does not require snake_case or verb-first names.                 |
-| [Claude: define tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools)                 | User-defined client tool names match `^[a-zA-Z0-9_-]{1,64}$`.                                                                                | A name valid for MCP may still need adaptation for a model provider. |
+| [Claude: define tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools)                 | User-defined client tool names match `^[a-zA-Z0-9_-]{1,128}$`.                                                                               | A name valid for MCP may still need adaptation for a model provider. |
 | [OpenAI: function-calling practices](https://developers.openai.com/api/docs/guides/function-calling#best-practices-for-defining-functions) | Calls for clear, intuitive names and descriptions and moving work into code where possible.                                                  | A readable task boundary matters more than mechanical renaming.      |
 | [Gemini: function-calling practices](https://ai.google.dev/gemini-api/docs/function-calling#best-practices)                                | Recommends descriptive function names and clear parameter descriptions.                                                                      | Do not mistake a platform's examples for a universal casing mandate. |
 
@@ -232,11 +232,11 @@ Good descriptions land between 30 and 200 words: say what's needed and stop; cut
 
 ## Research Evidence
 
-Anthropic's [writing-tools-for-agents](https://www.anthropic.com/engineering/writing-tools-for-agents) article reports that description changes improved tool-use performance in its evaluations. Treat the opening sentence as the main routing hint; put edge cases and secondary context later.
+Anthropic's [writing-tools-for-agents](https://www.anthropic.com/research/writing-tools-for-agents) article reports that description changes improved tool-use performance in its evaluations. Treat the opening sentence as the main routing hint; put edge cases and secondary context later.
 
 ## See also
 
 - `/docs/tool-design/schemas` - companion page on schema design
 - `/docs/tool-design/anti-patterns` - common mistakes with fixes
-- ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([Anthropic tool design guide](https://www.anthropic.com/research/writing-tools-for-agents))
 - ([MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - current tool naming and description fields

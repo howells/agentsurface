@@ -1,6 +1,7 @@
 /**
  * RateLimit + Retry-After header parsing and emission
  * Canonical: https://www.ietf.org/archive/id/draft-ietf-httpapi-ratelimit-headers-11.html
+ *            (an Internet-Draft, not yet an RFC; pin the revision you implement)
  *            https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after
  * Use: Parse rate-limit signals from a response so an agent knows whether and when to
  *      retry, and emit consistent RateLimit headers from your own server.
@@ -8,8 +9,11 @@
  * <CUSTOMISE>
  * - Set DEFAULT_RETRY_MS for 429/503 responses that omit both RateLimit and Retry-After
  * - Adjust MAX_WAIT_MS to cap how long an agent should ever wait before giving up
- * - If your gateway emits `X-RateLimit-*` instead of `RateLimit-*`, both are read below
- * - Treat `reset` as delta-seconds (IETF draft). If your server sends epoch seconds,
+ * - Draft-11 sends `RateLimit: "default";r=50;t=30` (remaining, seconds until reset) and
+ *   `RateLimit-Policy: "default";q=100;w=60` (quota, window seconds). Older drafts and many
+ *   gateways send discrete `RateLimit-Limit/Remaining/Reset` or `X-RateLimit-*`; those are
+ *   read below as compatibility paths.
+ * - Treat `reset` as delta-seconds. If your server sends epoch seconds,
  *   flip RESET_IS_EPOCH to true.
  * </CUSTOMISE>
  */
@@ -17,6 +21,7 @@
 const DEFAULT_RETRY_MS = 1_000;
 const MAX_WAIT_MS = 300_000; // never advise waiting longer than 5 minutes
 const RESET_IS_EPOCH = false;
+const POLICY_NAME = "default"; // quota policy name used in the draft-11 structured fields
 
 /**
  * A framework-neutral view of request/response headers.
@@ -71,20 +76,22 @@ function readHeader(source: HeaderSource, name: string): string | null {
 }
 
 /**
- * Parse the structured single-header form: `RateLimit: limit=100, remaining=50, reset=60`.
- * Returns a partial map of the recognised members.
+ * Parse a draft-11 structured field list such as `"default";r=50;t=30` or
+ * `"burst";q=100;w=60, "daily";q=1000;w=86400`. Returns the parameters of the
+ * first (most specific) item as numbers.
  */
 function parseStructuredRateLimit(value: string): Partial<Record<string, number>> {
   const out: Partial<Record<string, number>> = {};
-  for (const part of value.split(",")) {
+  const firstItem = value.split(",")[0] ?? "";
+  // The first segment is the quoted item name; the rest are `key=value` parameters.
+  for (const part of firstItem.split(";").slice(1)) {
     const [rawKey, rawVal] = part.split("=");
     if (!rawKey || rawVal === undefined) {
       continue;
     }
-    const key = rawKey.trim().toLowerCase();
     const num = Number.parseInt(rawVal.trim(), 10);
     if (!Number.isNaN(num)) {
-      out[key] = num;
+      out[rawKey.trim().toLowerCase()] = num;
     }
   }
   return out;
@@ -101,24 +108,30 @@ function resetToEpochMs(reset: number, nowMs: number): number {
  * Parse RateLimit signals from a response's headers.
  *
  * Recognises, in order of preference:
- * 1. The structured `RateLimit` field (`limit=…, remaining=…, reset=…`)
- * 2. Discrete `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset`
+ * 1. Draft-11 `RateLimit: "name";r=<remaining>;t=<seconds>` and
+ *    `RateLimit-Policy: "name";q=<quota>;w=<window seconds>`
+ * 2. Discrete `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset` (older drafts)
  * 3. Legacy `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`
  */
 export function parseRateLimit(source: HeaderSource, nowMs = Date.now()): RateLimitSnapshot {
   const snapshot: RateLimitSnapshot = {};
 
+  const policy = readHeader(source, "RateLimit-Policy");
+  if (policy) {
+    const parsed = parseStructuredRateLimit(policy);
+    if (parsed.q !== undefined) {
+      snapshot.limit = parsed.q;
+    }
+  }
+
   const structured = readHeader(source, "RateLimit");
-  if (structured) {
+  if (structured?.includes(";")) {
     const parsed = parseStructuredRateLimit(structured);
-    if (parsed.limit !== undefined) {
-      snapshot.limit = parsed.limit;
+    if (parsed.r !== undefined) {
+      snapshot.remaining = parsed.r;
     }
-    if (parsed.remaining !== undefined) {
-      snapshot.remaining = parsed.remaining;
-    }
-    if (parsed.reset !== undefined) {
-      snapshot.resetAtMs = resetToEpochMs(parsed.reset, nowMs);
+    if (parsed.t !== undefined) {
+      snapshot.resetAtMs = resetToEpochMs(parsed.t, nowMs);
     }
   }
 
@@ -235,25 +248,35 @@ export function computeRetryGuidance(
 /**
  * Build RateLimit response headers to emit from your server.
  *
- * Emits the discrete `RateLimit-*` fields (widely supported) and, when the window is
+ * Emits the draft-11 structured fields (`RateLimit` and `RateLimit-Policy`), the discrete
+ * `RateLimit-*` fields many clients and gateways still read, and, when the window is
  * exhausted, a `Retry-After` in delta-seconds so simple clients can act without parsing.
  *
- * <CUSTOMISE> Add the structured `RateLimit` field too if your clients prefer it.
+ * <CUSTOMISE> Set POLICY_NAME and drop the discrete fields once your clients read the draft form.
  */
 export function emitRateLimitHeaders(
   snapshot: RateLimitSnapshot,
   nowMs = Date.now(),
+  windowSeconds?: number,
 ): Record<string, string> {
   const headers: Record<string, string> = {};
+  const resetSeconds =
+    snapshot.resetAtMs === undefined
+      ? undefined
+      : Math.max(0, Math.ceil((snapshot.resetAtMs - nowMs) / 1_000));
 
   if (snapshot.limit !== undefined) {
     headers["RateLimit-Limit"] = String(snapshot.limit);
+    if (windowSeconds !== undefined) {
+      headers["RateLimit-Policy"] = `"${POLICY_NAME}";q=${snapshot.limit};w=${windowSeconds}`;
+    }
   }
   if (snapshot.remaining !== undefined) {
-    headers["RateLimit-Remaining"] = String(Math.max(0, snapshot.remaining));
+    const remaining = Math.max(0, snapshot.remaining);
+    headers["RateLimit-Remaining"] = String(remaining);
+    headers.RateLimit = `"${POLICY_NAME}";r=${remaining}${resetSeconds === undefined ? "" : `;t=${resetSeconds}`}`;
   }
-  if (snapshot.resetAtMs !== undefined) {
-    const resetSeconds = Math.max(0, Math.ceil((snapshot.resetAtMs - nowMs) / 1_000));
+  if (resetSeconds !== undefined) {
     headers["RateLimit-Reset"] = String(resetSeconds);
     if (snapshot.remaining === 0) {
       headers["Retry-After"] = String(resetSeconds);

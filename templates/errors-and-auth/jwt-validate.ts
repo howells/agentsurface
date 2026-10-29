@@ -137,22 +137,24 @@ export function getJWTValidator(opts?: {
 }
 
 /**
- * Next.js middleware to validate JWT from Authorization header
+ * Next.js 16 proxy to validate JWT from Authorization header.
+ * Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`; the function receives only
+ * the request and returns a response (there is no `next` callback to chain to).
  *
- * Usage in middleware.ts:
+ * Usage in proxy.ts (project root, or src/ next to app/):
  * ```typescript
- * import { jwtMiddleware } from '@/lib/jwt-validate';
+ * import { jwtProxy } from '@/lib/jwt-validate';
  *
- * export const middleware = jwtMiddleware;
+ * export const proxy = jwtProxy;
  * export const config = {
  *   matcher: ['/api/:path*'],
  * };
  * ```
  */
-export async function jwtMiddleware(req: NextRequest, next: any): Promise<NextResponse> {
+export async function jwtProxy(req: NextRequest): Promise<NextResponse> {
   // Skip validation for public endpoints
   if (req.nextUrl.pathname === "/api/health") {
-    return next(req);
+    return NextResponse.next();
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -183,7 +185,7 @@ export async function jwtMiddleware(req: NextRequest, next: any): Promise<NextRe
       requestHeaders.set("x-agent-id", claims.azp);
     }
 
-    return next(req, { request: { headers: requestHeaders } });
+    return NextResponse.next({ request: { headers: requestHeaders } });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[JWT] Validation error: ${message}`);
@@ -262,7 +264,7 @@ export function withJWTValidation(
  * ✓ Validate audience (aud) includes your service
  * ✓ Check expiry (exp) is in the future
  * ✓ Check not-before (nbf) is in the past (token not yet valid)
- * ✓ Whitelist algorithms (RS256, ES256) — reject 'none' and symmetric downgrades
+ * ✓ Whitelist algorithms (RS256, ES256) - reject 'none' and symmetric downgrades
  * ✓ Reject if algorithm in header (alg) doesn't match whitelisted set
  *
  * Anti-patterns:

@@ -1,7 +1,7 @@
 ---
 title: Orders and After Purchase
 description: Order status, cancellations, returns, and refunds as agent-callable operations after checkout completes
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -9,19 +9,21 @@ lastVerified: 2026-09-25
 A successful payment is not the end of the task an agent was given - it needs to check the order actually shipped, cancel or change it if the buyer's plans changed, and handle a return or refund if the product was wrong. Most of the mechanics here are not commerce-specific: they are the same webhook, idempotency, and error-handling patterns used everywhere else in Agent Surface, applied to order state. This page is the commerce-specific index into that existing guidance rather than a restatement of it.
 
 - Order status, cancellation, and returns/refunds need to be callable operations, not just an emailed confirmation
-- Order webhooks are the push side; a `get_order`-style call is the pull side - provide both
+- Order webhooks are the push side; a `get_order`-style call is the pull side - provide both where the platform allows (Shop MCP launched without webhooks, so poll `get_checkout`)
 - Idempotent order creation prevents a retried checkout request from creating two orders
 - A payment succeeding and an order fulfilling are different facts - don't conflate them in the response an agent sees
 
 ## Order status and cancellation as callable operations
 
-An agent that completed a purchase, or is checking on one made earlier, needs a stable way to ask "what is the status of this order" and get back a machine-parseable answer - not a link to a human-facing order-history page. Expose this as an API operation or MCP tool (Shopify's Customer Account MCP `get_order` tool is one concrete example - see [Shopify](/docs/agentic-commerce/shopify)) that returns the order's current lifecycle state, not just whether payment succeeded.
+An agent that completed a purchase, or is checking on one made earlier, needs a stable way to ask "what is the status of this order" and get back a machine-parseable answer - not a link to a human-facing order-history page. Expose this as an API operation or MCP tool (Shopify's Order MCP `get_order` tool is one concrete example, and Shop MCP's signed-in `search_orders` finds a shopper's orders and tracking - see [Shopify](/docs/agentic-commerce/shopify)) that returns the order's current lifecycle state, not just whether payment succeeded.
 
-Cancellation follows the same rule: if your checkout protocol supports structured cancellation (ACP's structured cancellation reason codes are one example - see [Checkout Protocols](/docs/agentic-commerce/checkout-protocols)), extend that same machine-readable reasoning to post-purchase cancellation rather than switching to a support-ticket flow the moment payment has cleared.
+Cancellation follows the same rule: extend machine-readable reasoning to post-purchase cancellation rather than switching to a support-ticket flow the moment payment has cleared. Keep it distinct from cancelling an unpaid checkout session, which a checkout protocol handles itself (ACP's `/cancel` accepts an optional structured `intent_trace` - see [Checkout Protocols](/docs/agentic-commerce/checkout-protocols)); that is not a post-purchase cancellation contract, so define your own reason vocabulary for orders.
+
+On Shopify, since 2026-10-01 the 2026-10 Admin API `orderCancel` mutation returns a structured, cancellation-specific [`jobResult`](https://shopify.dev/changelog/posts/the-ordercancel-mutation-now-returns-a-structured-jobresult) (status, errors, affected order) for its asynchronous job, and new [buyer-requested order-edit APIs](https://shopify.dev/changelog/posts/new-apis-for-buyer-requested-order-edits) are available. [Next Gen Events](https://shopify.dev/changelog/blog/next-generation-events-are-now-generally-available), the declarative replacement for classic webhooks, is generally available.
 
 ## Order webhooks
 
-Push order-lifecycle events - `order.created`, `order.status_changed`, `order.shipped`, `order.cancelled`, `order.refunded`, and the equivalent payment events - rather than requiring an agent to poll. [Webhooks and Events for Agents](/docs/api-surface/webhooks-events) covers the full design: document webhooks in the OpenAPI `webhooks` field, give every event a discriminating `event_type` and unique `event_id`, include a full state snapshot rather than only a diff, and sign deliveries per the Standard Webhooks spec (`webhook-id`/`webhook-timestamp`/`webhook-signature`) so a receiver can verify a delivery without inventing bespoke verification. Everything in that page applies directly to order and payment events - this page does not repeat it.
+Push order-lifecycle events - `order.created`, `order.status_changed`, `order.shipped`, `order.cancelled`, `order.refunded`, and the equivalent payment events - rather than requiring an agent to poll, and keep a pull call alongside them. Where a platform exposes no webhooks, polling is the only option: Shop MCP, launched 2026-10-13, has none, so an agent [polls `get_checkout`](https://shopify.dev/changelog/posts/add-shopping-and-shop-pay-checkout-to-any-agent-with-shop-mcp) for status. [Webhooks and Events for Agents](/docs/api-surface/webhooks-events) covers the full design: document webhooks in the OpenAPI `webhooks` field, give every event a discriminating `event_type` and unique `event_id`, include a full state snapshot rather than only a diff, and sign deliveries per the Standard Webhooks spec (`webhook-id`/`webhook-timestamp`/`webhook-signature`) so a receiver can verify a delivery without inventing bespoke verification. Everything in that page applies directly to order and payment events - this page does not repeat it.
 
 ## Idempotent order creation
 

@@ -1,7 +1,7 @@
 ---
 title: Testing
 description: Building evals, metrics, and red-team suites to measure agent reliability
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -15,7 +15,7 @@ Agent testing measures statistical performance under non-determinism. Covers the
 - **Observability**: OpenTelemetry GenAI conventions
 - **CI integration**: PR-gated evals, budget guardrails
 
-Traditional testing verifies deterministic behavior - given input X, does output Y occur every time? An agent may take different paths, call tools in different orders, or succeed on the fifth attempt when it failed on the first. A single success or failure tells you nothing.
+Traditional testing verifies deterministic behavior - given input X, does output Y occur every time? An agent may take different paths, call tools in different orders, or succeed on the fifth attempt when it failed on the first. A single success or failure is evidence about that one case, but it cannot establish a success rate or general performance.
 
 ## Quick reference
 
@@ -23,13 +23,13 @@ Traditional testing verifies deterministic behavior - given input X, does output
 - **LLM-as-judge** - `/docs/testing/llm-as-judge` explains when to use judge models, their biases, and calibration techniques
 - **Evaluation framework** - `/docs/testing/evaluation-framework` - dataset, task, scorer, aggregation loop
 - **Braintrust** - `/docs/testing/braintrust` - end-to-end eval platform with dataset versioning and trace integration
-- **Promptfoo** - `/docs/testing/promptfoo` - YAML-first evals with strong red-teaming, acquisition announced by OpenAI, close unconfirmed
+- **Promptfoo** - `/docs/testing/promptfoo` - YAML-first evals with strong red-teaming, agreed to be acquired by OpenAI (announced 2026-03-09)
 - **Vitest harness** - `/docs/testing/vitest-harness` - in-process evals, useful for fast iteration and local debugging
 - **Red-teaming** - `/docs/testing/red-teaming` - prompt injection, jailbreak, data exfiltration attack templates; OWASP LLM Top 10 mapping
 - **Observability** - `/docs/testing/observability` - OpenTelemetry GenAI semantic conventions for trace-driven debugging
 - **CI integration** - `/docs/testing/ci-integration` - PR-gated evals, regression tests, statistical significance, budget guardrails
 
-Start with the evaluation framework, then pick a platform that fits your workflow. If you're running Vitest-based agents, use the Vitest harness. If you want managed experiment tracking, use Braintrust. For quick red-teaming, Promptfoo is the fastest path.
+Start with the evaluation framework, then pick a platform that fits your workflow. If you're running Vitest-based agents, use the Vitest harness. If you want managed experiment tracking, use Braintrust. For quick red-teaming, Promptfoo is a good starting point.
 
 ## A/B Testing
 

@@ -1,12 +1,12 @@
 ---
 title: Monorepos
 description: Nested context files, precedence rules, and hierarchical AGENTS.md patterns
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Progressive disclosure: root AGENTS.md for overview + cross-package conventions; per-package AGENTS.md for scoped detail. Precedence: narrowest scope wins (packages/api/AGENTS.md overrides root AGENTS.md for api package). Root file stays tight (~150 lines), per-package files focus on package-specific commands, testing, and boundaries. Avoid duplication: per-package files reference root, then add package-specific content. Optional: per-package CLAUDE.md for Claude-specific overrides in specific packages.
+Progressive disclosure: root AGENTS.md for overview + cross-package conventions; per-package AGENTS.md for scoped detail. Precedence: on a conflict the narrowest scope wins (packages/api/AGENTS.md overrides root AGENTS.md for api package), but tools generally combine the files rather than discard the parent. Root file stays tight (~150 lines), per-package files focus on package-specific commands, testing, and boundaries. Avoid duplication: per-package files reference root, then add package-specific content. Optional: per-package CLAUDE.md for Claude-specific overrides in specific packages.
 
 ```
 Root: Overview + cross-package commands (~150 lines)
@@ -336,11 +336,11 @@ See ../AGENTS.md for cross-package info.
 
 ## Precedence Rules
 
-There is no single cross-tool precedence ladder - each tool resolves its own files independently, and the rules don't merge:
+There is no single cross-tool precedence ladder - each tool resolves its own files independently. Several combine files rather than choosing one, so the question is which instruction wins on a conflict, not whether the parent is discarded:
 
-- **AGENTS.md itself**: nested files win over the root. `packages/api/AGENTS.md` overrides `AGENTS.md` (root) for anything under `packages/api/`.
-- **Claude Code** (v2.1.277+): reads `AGENTS.md` directly when no `CLAUDE.md` exists anywhere from the working directory up to the repo root; if one does exist, Claude Code reads that instead unless it starts with a literal `@AGENTS.md` import - see [CLAUDE.md](/docs/context-files/claude-md) for the exact rule.
-- **Cursor**: reads `AGENTS.md` natively (nested wins) and layers `.cursor/rules/*.mdc` on top for glob-scoped detail - see [Cursor and Copilot](/docs/context-files/cursor-and-copilot).
+- **AGENTS.md itself**: on a conflict, nested files win over the root. `packages/api/AGENTS.md` overrides `AGENTS.md` (root) for anything under `packages/api/` that the two disagree on.
+- **Claude Code** (v2.1.277+): reads `AGENTS.md` directly when no `CLAUDE.md` exists anywhere from the working directory up to the repo root; if one does exist, Claude Code reads that instead unless it imports `@AGENTS.md` (an import works anywhere in the file) or the `claude-md-and-agents-md` setting loads both. Claude Code loads multiple ancestor instruction files, not just the nearest one - see [CLAUDE.md](/docs/context-files/claude-md) for the exact rule.
+- **Cursor**: reads `AGENTS.md` natively (nested instructions are combined with their parents, and the more specific ones take precedence on conflict) and layers `.cursor/rules/*.mdc` on top for glob-scoped detail - see [Cursor and Copilot](/docs/context-files/cursor-and-copilot).
 - **GitHub Copilot**: reads `AGENTS.md` directly (coding agent, code review) and separately reads `.github/copilot-instructions.md` plus path-scoped `.github/instructions/*.instructions.md`.
 
 **Example:** For API server conventions, a package-scoped `packages/api/AGENTS.md` is what every tool prefers over the root file for that package - that part is shared. What differs is whether a given tool also reads a tool-specific file (`CLAUDE.md`, `.cursor/rules/`, `.github/instructions/`) alongside it, and each tool's own docs are the source of truth for that.

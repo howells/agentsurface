@@ -1,12 +1,12 @@
 ---
 title: Tool Curation
 description: Managing tool registries, role-based subsets, sprawl prevention, and dynamic tool selection
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Curate task-specific tool subsets from a centralized registry rather than loading everything at once. An API with 100 endpoints shouldn't show all 100 tools; expose a read-only set for auditors, a mutation set for admins, a focused set per workflow. This improves agent reasoning, reduces token cost, and enforces permission boundaries. Left unmanaged, a tool registry accumulates duplicate and overlapping tools - sprawl - that degrades selection accuracy the same way an oversized single request does.
+Curate task-specific tool subsets from a centralized registry rather than loading everything at once. An API with 100 endpoints shouldn't show all 100 tools; expose a read-only set for auditors, a mutation set for admins, a focused set per workflow. This improves agent reasoning and reduces token cost. It is not an authorization boundary by itself: a tool hidden from a selection list can still be called if a client or deferred search surfaces it later, so recheck identity, permission and arguments at execution. Left unmanaged, a tool registry accumulates duplicate and overlapping tools - sprawl - that degrades selection accuracy the same way an oversized single request does.
 
 - **Registry structure**: metadata (category, auth, rate limit), handler, schema
 - **Subsets**: read-only, mutations, admin, dangerous (role-based)
@@ -69,7 +69,7 @@ const toolRegistry: Record<string, ToolMetadata> = {
 
 export const getAllTools = () => Object.values(toolRegistry);
 
-export function getToolsForUser(userId: string): ToolMetadata[] {
+export async function getToolsForUser(userId: string): Promise<ToolMetadata[]> {
   const user = await getUserPermissions(userId);
   return Object.values(toolRegistry).filter((tool) => {
     if (tool.status !== "active") return false;
@@ -80,6 +80,8 @@ export function getToolsForUser(userId: string): ToolMetadata[] {
   });
 }
 ```
+
+This filter shapes what the model sees. Run the same permission check again when a tool executes, because a model, a client or a deferred search can still produce a call to a tool you filtered out of the list.
 
 ### Namespacing
 
@@ -169,7 +171,9 @@ const result = await generateText({
 
 ### Anthropic's Tool Search Tool
 
-For Claude, the server-side tool search tool discovers and loads tool definitions on demand instead of front-loading everything. Mark tools you don't need up front with `defer_loading: true`, include a `tool_search_tool_bm25_20251119` (natural-language queries) or `tool_search_tool_regex_20251119` (Python-regex patterns) entry in `tools`, and Claude searches names, descriptions, and argument fields to discover and expand the tools it needs - typically loading only 3-5 tools per turn out of a catalog of thousands. No beta header is required; it's a standard tool type. See [Anthropic's tool search tool docs](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) for the request/response shape.
+For Claude, the server-side tool search tool discovers and loads tool definitions on demand instead of front-loading everything. Mark tools you don't need up front with `defer_loading: true`, include a `tool_search_tool_bm25_20251119` (natural-language queries) or `tool_search_tool_regex_20251119` (Python-regex patterns) entry in `tools`, and Claude searches names, descriptions, and argument fields to discover and expand the tools it needs. A search returns up to five results by default, but the model can pass a `limit` from 1 to 10,000 and a request can contain up to 10,000 deferred tools, so five is a default result size, not a per-turn loading ceiling. BM25 queries are natural language up to 500 characters; regex patterns are capped at 200 characters. No beta header is required; it's a standard tool type. Deferred search composes with strict tool use, but the separate 20-strict-tool ceiling still applies. See [Anthropic's tool search tool docs](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) for the request/response shape. OpenAI offers a comparable [tool search](https://developers.openai.com/api/docs/guides/tools-tool-search), so deferred loading isn't Anthropic-specific.
+
+Two related Claude features cover different cases. Inline tool definitions (beta, 2026-09-22) let a mid-conversation system message add a tool with its full definition (`tool_addition` blocks under the `inline-tools-2026-09-15` beta header; MCP toolsets also need `mcp-client-2026-09-15`) without breaking the cached prefix; the tool search types above need neither header ([release notes](https://platform.claude.com/docs/en/release-notes/overview#september-22-2026)). Programmatic tool calling lets the model write code that calls a curated set of tools and keeps intermediate results out of its context; it needs a `code_execution_20260120` (or later) tool and `allowed_callers` on each tool the code may call ([guide](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)). To choose between them at runtime, read a model's capabilities from the Models API (2026-10-06): `capabilities.server_tools.code_execution` says the model accepts the server code-execution tool, and the separate top-level `capabilities.code_execution` says code can call the request's other tools ([release notes](https://platform.claude.com/docs/en/release-notes/overview#october-6-2026)).
 
 ### Embedding-Based Selection at Scale
 
@@ -196,7 +200,7 @@ server.registerTool(
 );
 ```
 
-Token savings are the main payoff: a 50-tool list at ~500 tokens shrinks to a 12-tool selection at ~120 tokens per request. The tradeoffs are embedding latency (tens of milliseconds per request), a cold-start cost on the first request after a restart, and coverage - a tool outside the top-N is unreachable except through `search_tools`.
+Token savings are the main payoff, and they scale with how many definitions you stop sending: choosing 12 of 50 tools cuts the definition tokens by about three quarters if the tools are similar in size. That ratio is a hypothetical; measure a real registry with your tokenizer, including provider system overhead and cache state (see [Token Budget](/docs/tool-design/token-budget)). The tradeoffs are embedding latency (tens of milliseconds per request), a cold-start cost on the first request after a restart, and coverage - a tool outside the top-N is unreachable except through `search_tools`.
 
 ## Read-Only vs Mutating Kits
 
@@ -209,7 +213,7 @@ export const mutatingKit = Object.values(toolRegistry).filter((t) =>
 );
 export const dangerousKit = Object.values(toolRegistry); // requires approval: see Human Approval
 
-const auditAgent = agent({ tools: readOnlyKit, model: "claude-sonnet-5" });
+const auditAgent = agent({ tools: readOnlyKit, model: "claude-sonnet-5-5" });
 const adminAgent = agent({
   tools: dangerousKit,
   model: "claude-opus-5-5",
@@ -285,6 +289,6 @@ src/
 - [Idempotency and Safety](/docs/tool-design/idempotency-and-safety) - the read/write/destructive classification that role-based kits filter on
 - [Human Approval](/docs/tool-design/human-approval) - gating the dangerous kit behind approval
 - `/docs/tool-design/cross-framework-portability` - adapting registry tools to frameworks
-- ([Anthropic tool design guide](https://www.anthropic.com/engineering/writing-tools-for-agents))
+- ([Anthropic tool design guide](https://www.anthropic.com/research/writing-tools-for-agents))
 - ([Anthropic tool search tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool))
 - ([OpenAI function calling guide](https://developers.openai.com/api/docs/guides/function-calling))

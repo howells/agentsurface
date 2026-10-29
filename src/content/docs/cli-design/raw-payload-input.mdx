@@ -1,7 +1,7 @@
 ---
 title: Raw Payload Input
 description: Accepting structured JSON input so agents can pass API payloads directly without lossy flag translation
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -76,6 +76,8 @@ mytool dns create < record.json
 
 All three forms pass the JSON body directly to the underlying API call with no field translation. The agent can use the API schema - which it likely already has from the OpenAPI spec or a previous schema introspection - as its documentation.
 
+The `mytool` commands here are illustrations. For a shipped example, the Stripe CLI's `stripe tools` plugin (public preview, CLI 1.43.5 or later) accepts `--body <json>` as an alternative to named flags, with named flags overriding values in the body, as recommended below. It covers only that plugin's supported account operations, not every Stripe API call ([Stripe CLI reference](https://docs.stripe.com/cli), observed 2026-10-29).
+
 ## Zero Translation Loss
 
 The goal is for the agent to be able to read the API reference and use the CLI without needing to learn a separate flag vocabulary. This means:
@@ -99,7 +101,9 @@ async function createDNSRecord(flags: Flags, stdin: Readable) {
         code: 2,
       });
     }
-  } else if (!isTTY() || flags.stdin) {
+  } else if (!process.stdin.isTTY || flags.stdin) {
+    // Check stdin (fd 0), not stdout (fd 1): piping only the output to jq
+    // must not make this command block waiting for payload input.
     // Read JSON from stdin
     const raw = await readStdin();
     try {
@@ -159,7 +163,7 @@ Document this precedence explicitly in `--help --json` output (see [Schema Intro
 
 Accepting JSON from stdin makes agent pipelines composable. Follow these conventions:
 
-- **Check for piped stdin automatically.** Do not require `--stdin` - detect `!isatty(0)` and read stdin as the payload.
+- **Check for piped stdin automatically.** Do not require `--stdin` - detect `!isatty(0)` (file descriptor 0, [`tty.isatty(0)`](https://nodejs.org/api/tty.html#ttyisattyfd) in Node.js) and read stdin as the payload. Test stdin, never stdout: a command whose output is piped to `jq` but whose input is a terminal must not wait for payload input.
 - **Require explicit opt-in when both piped stdin and flags are present.** This prevents silent errors where an agent accidentally pipes unrelated output.
 - **Support `-` as an explicit stdin marker.** `mytool dns create -` reads from stdin explicitly, even in a TTY.
 
@@ -213,7 +217,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 ## Checklist
 
 - [ ] Every mutating command accepts `` `--payload <json>` `` or equivalent
-- [ ] Every mutating command accepts JSON from stdin when stdout is not a TTY
+- [ ] Every mutating command accepts JSON from stdin when stdin (fd 0) is not a TTY
 - [ ] `-` is accepted as an explicit stdin marker
 - [ ] Payload field names match the underlying API schema exactly, with no renaming
 - [ ] All API fields are accepted in the payload, including those without convenience flag equivalents

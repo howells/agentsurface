@@ -1,7 +1,7 @@
 ---
 title: Agentic Commerce
 description: What a merchant or commerce platform needs so agents can find products, trust the listing, check out, pay, and follow up on an order
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -13,7 +13,7 @@ This section is written for anyone running a store or a commerce platform, and t
 - Product data agents can find and trust comes first - nothing downstream works without it
 - Checkout and payment are separate problems: completing a transaction, and proving who authorized spending it
 - Card networks, Stripe, and browser-level bot verification are converging on the same shape - a signed, scoped, revocable authorization
-- Shopify has shipped most of this as platform features already; other stacks have to build the equivalent by hand
+- Shopify has shipped much of this as platform features already; other stacks have to build the equivalent by hand
 - Commerce reuses the existing dimensions, applied to a purchase flow
 
 ## The layers
@@ -30,9 +30,9 @@ A gap in an earlier layer breaks everything above it. A perfect checkout integra
 
 ## What to do first, by role
 
-**Merchant on a commerce platform (Shopify or similar).** Most of layers 1-3 arrive as a platform feature, not something you build. Confirm it is switched on, keep your product data and return policy accurate at the source, and read [Shopify](/docs/agentic-commerce/shopify) for exactly what is automatic versus what you must configure. Your real work is layers 4 and 5: fraud thresholds and order webhooks are yours regardless of platform.
+**Merchant on a commerce platform (Shopify or similar).** Much of layers 1-3 can arrive as a platform feature rather than something you build, depending on the channel, the capabilities negotiated, and your access tier - being listed in a catalog does not make a product eligible for native checkout. Confirm what is switched on, keep your product data and return policy accurate at the source, and read [Shopify](/docs/agentic-commerce/shopify) for exactly what is automatic versus what you must configure. Your real work is layers 4 and 5: fraud thresholds and order webhooks are yours regardless of platform.
 
-**Merchant with a custom stack.** Start at layer 1 - it is cheap and every downstream surface depends on it. Then pick one checkout protocol per [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) rather than hand-building a competing flow; UCP has more live merchant integrations than ACP. Payment authority (layer 3) follows from whichever payment provider you already use - check what your processor supports before picking a mandate format yourself.
+**Merchant with a custom stack.** Start at layer 1 - it is cheap and every downstream surface depends on it. Then pick one checkout protocol per [Checkout Protocols](/docs/agentic-commerce/checkout-protocols) rather than hand-building a competing flow, and choose the one your platform and the agent clients you care about support. Payment authority (layer 3) follows from whichever payment provider you already use - check what your processor supports before picking a mandate format yourself.
 
 **Commerce platform or marketplace operator.** You are building layers 1-4 for your merchants, which means protocol choice and trust decisions are platform policy, not per-merchant configuration. The mandate model (a signed, scoped, revocable spending authorization) is the primitive to standardize on internally regardless of which wire protocol you expose.
 
@@ -44,7 +44,7 @@ Agentic commerce uses the existing ten dimensions of the [Surface scorecard](/do
 
 | Dimension                              | What a commerce audit checks                                                                                    |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Discovery & AEO                        | Product/Offer structured data, merchant feeds, UCP/ACP well-known manifests, the platform product-page audit    |
+| Discovery & AEO                        | Product/Offer structured data, merchant feeds, the UCP well-known profile, the platform product-page audit      |
 | API Surface / MCP Server / Tool Design | Catalog, cart, checkout, and order operations exposed as callable contracts rather than only an HTML page       |
 | Authentication                         | Spending mandates, signed-agent verification (Web Bot Auth, Trusted Agent Protocol), scoped payment credentials |
 | Error Handling                         | Idempotent order creation, payment failure recovery, webhook retry and dedup                                    |

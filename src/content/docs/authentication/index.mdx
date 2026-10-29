@@ -1,7 +1,7 @@
 ---
 title: Authentication
 description: Machine-to-machine and delegated authorization for agents
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -12,7 +12,7 @@ Authentication covers how agents receive credentials, prove identity, narrow aut
 - **Does not own:** tool safety semantics; see [Tool Design](/docs/tool-design). Public discovery broadly; see [Discovery](/docs/discovery).
 - **Agent-ready means:** credentials are scoped, short-lived where possible, machine-usable at runtime, validated on every request, and auditable by agent/user/delegation chain.
 
-Registration can still involve human consent or an OTP claim ceremony. The runtime request path should stay programmatic: no CAPTCHA, login page, or ambient session cookie dependency.
+Registration can still involve human consent or a user-code claim ceremony, where the person enters a displayed code on the service's own signed-in page. The runtime request path should stay programmatic: no CAPTCHA, login page, or ambient session cookie dependency.
 
 ## Choose A Path
 

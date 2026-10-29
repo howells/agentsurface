@@ -131,12 +131,12 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 ├── pnpm-workspace.yaml       # pnpm monorepo config
 ├── turbo.json                # Turbo cache + tasks
 ├── package.json              # Root dependencies
-├── .nvmrc                    # Node 20 LTS required
+├── .nvmrc                    # Node 24 LTS required
 ├── .env.example              # Secrets template (tracked)
 └── public/
     ├── llms.txt              # Agent discovery index
     ├── llms-full.txt         # Full docs dump
-    ├── robots-ai.txt         # AI crawler policy
+    ├── robots.txt            # AI crawler policy
     └── sitemap.xml           # For freshness tracking
 ```
 
@@ -241,7 +241,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 
 ## Gotchas
 
-**Node version:** `.nvmrc` enforces Node 20 LTS. `pnpm install` fails silently on Node <20. Check `node --version`.
+**Node version:** `.nvmrc` enforces Node 24 LTS. `pnpm install` fails silently on older Node versions. Check `node --version`.
 
 **pnpm workspaces:** Always use `pnpm --filter=@acme/PACKAGE` for per-package commands, not `cd packages/PACKAGE && npm`. Workspace hoisting differs from npm.
 
@@ -273,7 +273,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 
 **New tool:** Add Zod schema to `packages/shared/src/schemas/`, implement in `packages/mcp-server/src/tools/`, export from server, add to SDK `Agent.tools[]`.
 
-**New docs page:** Add markdown to `docs/`, link from `packages/dashboard/app/docs/[slug]/`, ensure JSON-LD metadata in `generateMetadata()`. Sync with `public/llms.txt`.
+**New docs page:** Add markdown to `docs/`, link from `packages/dashboard/app/docs/[slug]/`, render JSON-LD in a `<script type="application/ld+json">` element in the page or layout (`generateMetadata()` covers title and description only). Sync with `public/llms.txt`.
 
 ---
 
@@ -284,7 +284,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 - **packages/sdk/AGENTS.md** - SDK-specific commands and conventions
 - **packages/dashboard/AGENTS.md** - Next.js dashboard build and deployment
 - **packages/mcp-server/AGENTS.md** - MCP server testing and debugging
-- **CLAUDE.md** - optional Claude Code overlay (skills, subagents, hooks); only when Claude needs instructions no other tool should see, starting with `@AGENTS.md`
+- **CLAUDE.md** - optional Claude Code overlay (skills, subagents, hooks); only when Claude needs instructions no other tool should see, importing `@AGENTS.md`
 - **.cursor/rules/project.mdc** - Cursor IDE overrides
 - **CONTRIBUTING.md** - Pull request workflow, commit message style
 

@@ -1,11 +1,13 @@
 /**
- * OpenTelemetry GenAI Instrumentation — Emit semantic conventions for agent tracing
+ * OpenTelemetry GenAI Instrumentation - Emit semantic conventions for agent tracing
  *
- * **What it is:** Setup that emits OpenTelemetry GenAI semantic conventions:
- * `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
- * `gen_ai.usage.output_tokens`, `gen_ai.operation.name`, tool spans with
- * `gen_ai.tool.name`, `gen_ai.tool.call.id`. Includes decorator for chat operations
- * and Langfuse + OTLP exporters side-by-side.
+ * **What it is:** Manual setup that emits OpenTelemetry GenAI semantic conventions:
+ * a model-call span named `chat {model}` with `gen_ai.operation.name`, `gen_ai.provider.name`,
+ * `gen_ai.request.model` and `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`, plus
+ * tool spans named `execute_tool {tool}` with `gen_ai.tool.name` and `gen_ai.tool.call.id`.
+ * It also shows an `invoke_agent {agent}` parent span. These spans are written by hand around
+ * your own calls; they are not provider auto-instrumentation. OTLP and Langfuse exporters
+ * run side by side.
  *
  * **When to use:**
  * - Tracing agent operations end-to-end (for debugging and eval)
@@ -13,54 +15,61 @@
  * - Measuring token usage and latency per operation
  * - Correlating tool calls with parent agent spans
  *
- * **Canonical URL:** https://opentelemetry.io/docs/specs/semconv/gen-ai/
+ * **Canonical URL:** https://github.com/open-telemetry/semantic-conventions-genai
+ * (the `gen_ai.*` and `mcp.*` conventions moved there from the mainline semantic-conventions repo)
  *
  * **Customisation checklist:**
- * - [ ] Set OTEL_EXPORTER_OTLP_ENDPOINT (or use auto-detect)
+ * - [ ] Set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT (or use the default local collector)
  * - [ ] Configure Langfuse API key (LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY)
  * - [ ] Update MODEL_NAME and PROVIDER to your target model
  * - [ ] Add domain-specific attributes (e.g., user_id, request_id)
- * - [ ] Wire @withGenAISpan decorator into agent functions
+ * - [ ] Wrap your agent, model and tool calls with withAgentSpan / withChatSpan / withToolSpan
  * - [ ] Test tracing with `pnpm test:traces` or export to UI
  *
  * **Environment variables:**
- * - `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP collector endpoint (default: http://localhost:4318)
- * - `OTEL_EXPORTER_OTLP_HEADERS` — Additional headers
- * - `LANGFUSE_SECRET_KEY` — Langfuse API secret
- * - `LANGFUSE_PUBLIC_KEY` — Langfuse public key
- * - `LANGFUSE_HOST` — Langfuse instance (default: https://cloud.langfuse.com)
+ * - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` - full OTLP traces URL (default: http://localhost:4318/v1/traces)
+ * - `OTEL_EXPORTER_OTLP_HEADERS` - Additional headers
+ * - `LANGFUSE_SECRET_KEY` - Langfuse API secret
+ * - `LANGFUSE_PUBLIC_KEY` - Langfuse public key
+ * - `LANGFUSE_BASE_URL` - Langfuse instance (default: https://cloud.langfuse.com)
  *
  * **References:**
- * - OTEL GenAI semconv: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+ * - OTel GenAI conventions: https://github.com/open-telemetry/semantic-conventions-genai
+ * - GenAI spans: https://raw.githubusercontent.com/open-telemetry/semantic-conventions/main/docs/gen-ai/gen-ai-spans.md
  * - Langfuse: https://langfuse.com/docs/integrations/opentelemetry
  * - Arize Phoenix: https://docs.arize.com/phoenix
  * - Traceloop SDK: https://www.traceloop.com/docs
  */
 
+import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import type { Attributes } from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import {
-  NodeTracerProvider,
-  ConsoleSpanExporter,
-  SimpleSpanProcessor,
   BatchSpanProcessor,
-} from "@opentelemetry/sdk-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-otlp-proto";
-import { context, trace, Span, SpanStatusCode } from "@opentelemetry/api";
-import { z } from "zod";
+  ConsoleSpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-node";
+import type { SpanProcessor } from "@opentelemetry/sdk-trace-node";
 
-// <CUSTOMISE>: Update model, provider, system prompt
+// <CUSTOMISE>: Update model, provider, agent name, system prompt
 const MODEL_NAME = "claude-opus-5-5";
 const PROVIDER = "anthropic";
+const AGENT_NAME = "support-agent";
 const SYSTEM_PROMPT = "You are a helpful AI agent...";
 
 /**
- * Initialize OpenTelemetry tracing
+ * Initialize OpenTelemetry tracing.
+ *
+ * In the JavaScript SDK 2.x, span processors are passed to the provider constructor
+ * (`addSpanProcessor` was removed), and the OTLP HTTP exporter needs the full signal path.
  */
-export function initializeTracing(): NodeTracerProvider {
-  const provider = new NodeTracerProvider();
+export async function initializeTracing(): Promise<NodeTracerProvider> {
+  const spanProcessors: SpanProcessor[] = [];
 
   // Console exporter (for development)
   if (process.env.OTEL_DEBUG === "1") {
-    provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+    spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
   }
 
   // OTLP exporter (production)
@@ -68,18 +77,19 @@ export function initializeTracing(): NodeTracerProvider {
     headers: process.env.OTEL_EXPORTER_OTLP_HEADERS
       ? JSON.parse(process.env.OTEL_EXPORTER_OTLP_HEADERS)
       : {},
-    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318",
+    url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || "http://localhost:4318/v1/traces",
   });
-  provider.addSpanProcessor(new BatchSpanProcessor(otlpExporter));
+  spanProcessors.push(new BatchSpanProcessor(otlpExporter));
 
-  // Langfuse integration (optional)
+  // Langfuse integration (optional): @langfuse/otel provides a span processor
+  // that reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL.
   if (process.env.LANGFUSE_SECRET_KEY) {
-    const { LangfuseExporter } = require("@langfuse/opentelemetry");
-    const langfuseExporter = new LangfuseExporter();
-    provider.addSpanProcessor(new SimpleSpanProcessor(langfuseExporter));
+    const { LangfuseSpanProcessor } = await import("@langfuse/otel");
+    spanProcessors.push(new LangfuseSpanProcessor());
   }
 
-  provider.register();
+  const provider = new NodeTracerProvider({ spanProcessors });
+  provider.register(); // also installs the context manager that makes span parenting work
   return provider;
 }
 
@@ -89,124 +99,94 @@ export function initializeTracing(): NodeTracerProvider {
 const tracer = trace.getTracer("agent-tracer", "1.0.0");
 
 /**
- * Chat operation span
+ * Structured message in the GenAI convention: a role plus typed parts,
+ * not a plain `{role, content}` object.
+ */
+function textMessage(role: string, content: string) {
+  return { parts: [{ content, type: "text" }], role };
+}
+
+function recordError(span: ReturnType<typeof tracer.startSpan>, error: unknown): void {
+  const err = error instanceof Error ? error : new Error(String(error));
+  span.recordException(err);
+  span.setAttribute("error.type", err.name);
+  span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+}
+
+/**
+ * Model-call span (`gen_ai.operation.name` = "chat")
  *
- * Sets GenAI semantic convention attributes:
+ * Span name: `chat {model}`. Sets:
+ * - gen_ai.operation.name = "chat"
  * - gen_ai.provider.name = "anthropic" | "openai" | "google"
  * - gen_ai.request.model = model ID
- * - gen_ai.operation.name = "chat"
- * - gen_ai.input.messages = system + user message
- * - gen_ai.output.messages = assistant response
- * - gen_ai.usage.input_tokens
- * - gen_ai.usage.output_tokens
+ * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens
+ * - gen_ai.response.finish_reasons
+ * Opt-in (may contain sensitive content): gen_ai.input.messages, gen_ai.output.messages
  */
-interface ChatSpanInput {
+export interface ChatSpanInput {
   prompt: string;
   systemPrompt?: string;
   model?: string;
-  userId?: string;
-  requestId?: string;
 }
 
-interface ChatSpanOutput {
+export interface ChatSpanOutput {
   text: string;
   inputTokens: number;
   outputTokens: number;
   stopReason?: string;
 }
 
-export function withGenAISpan<T extends any[], R extends ChatSpanOutput>(
-  operationName: string = "chat",
-) {
-  return function decorator(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalMethod = descriptor.value;
-
-    descriptor.value = async function value(...args: T): Promise<R> {
-      const span = tracer.startSpan(operationName);
-
-      try {
-        // Extract input from first argument (assumed to be ChatSpanInput)
-        const input = args[0] as ChatSpanInput;
-
-        // Set semantic convention attributes
-        span.setAttributes({
-          "gen_ai.input.messages": JSON.stringify([
-            { role: "system", content: input.systemPrompt || SYSTEM_PROMPT },
-            { role: "user", content: input.prompt },
-          ]),
-          "gen_ai.operation.name": operationName,
-          "gen_ai.request.model": input.model || MODEL_NAME,
-          "gen_ai.provider.name": PROVIDER,
-        });
-
-        // Optional: user context
-        if (input.userId) {
-          span.setAttribute("user.id", input.userId);
-        }
-        if (input.requestId) {
-          span.setAttribute("request.id", input.requestId);
-        }
-
-        // Run the original method
-        const result = (await originalMethod.apply(this, args)) as R;
-
-        // Record output
-        span.setAttributes({
-          "gen_ai.output.messages": JSON.stringify([{ content: result.text, role: "assistant" }]),
-          "gen_ai.usage.input_tokens": result.inputTokens,
-          "gen_ai.usage.output_tokens": result.outputTokens,
-        });
-
-        if (result.stopReason) {
-          span.setAttribute("gen_ai.response.finish_reasons", [result.stopReason]);
-        }
-
-        span.setStatus({ code: SpanStatusCode.OK });
-        return result;
-      } catch (error) {
-        span.recordException(error as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
-        throw error;
-      } finally {
-        span.end();
-      }
-    };
-
-    return descriptor;
-  };
-}
-
-/**
- * Tool call span
- *
- * Child span for each tool invocation:
- * - Span name: `tool.{tool_name}`
- * - gen_ai.tool.name = tool_name
- * - gen_ai.tool.call.id = call_id
- */
-export async function withToolSpan<T>(
-  toolName: string,
-  callId: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const span = tracer.startSpan(`tool.${toolName}`);
+export async function withChatSpan<R extends ChatSpanOutput>(
+  input: ChatSpanInput,
+  fn: () => Promise<R>,
+  extraAttributes: Attributes = {},
+): Promise<R> {
+  const model = input.model || MODEL_NAME;
+  // CLIENT kind: the span covers a call to a model provider
+  const span = tracer.startSpan(`chat ${model}`, { kind: SpanKind.CLIENT });
 
   try {
     span.setAttributes({
-      "gen_ai.tool.call.id": callId,
-      "gen_ai.tool.name": toolName,
+      "gen_ai.operation.name": "chat",
+      "gen_ai.provider.name": PROVIDER,
+      "gen_ai.request.model": model,
+      ...extraAttributes,
     });
 
-    const result = await context.with(
-      trace.setSpan(context.active(), span),
-      async () => await fn(),
-    );
+    // Opt-in: record content only where your privacy policy allows it
+    if (process.env.OTEL_GENAI_CAPTURE_CONTENT === "1") {
+      span.setAttribute(
+        "gen_ai.input.messages",
+        JSON.stringify([textMessage("user", input.prompt)]),
+      );
+      span.setAttribute(
+        "gen_ai.system_instructions",
+        JSON.stringify([{ content: input.systemPrompt || SYSTEM_PROMPT, type: "text" }]),
+      );
+    }
 
-    span.setStatus({ code: SpanStatusCode.OK });
+    const result = await context.with(trace.setSpan(context.active(), span), fn);
+
+    span.setAttributes({
+      "gen_ai.usage.input_tokens": result.inputTokens,
+      "gen_ai.usage.output_tokens": result.outputTokens,
+    });
+    if (result.stopReason) {
+      span.setAttribute("gen_ai.response.finish_reasons", [result.stopReason]);
+    }
+    if (process.env.OTEL_GENAI_CAPTURE_CONTENT === "1") {
+      span.setAttribute(
+        "gen_ai.output.messages",
+        JSON.stringify([
+          { ...textMessage("assistant", result.text), finish_reason: result.stopReason },
+        ]),
+      );
+    }
+
     return result;
   } catch (error) {
-    span.recordException(error as Error);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+    recordError(span, error);
     throw error;
   } finally {
     span.end();
@@ -214,38 +194,83 @@ export async function withToolSpan<T>(
 }
 
 /**
- * Example: Agent function with instrumentation
+ * Agent invocation span (`gen_ai.operation.name` = "invoke_agent")
+ *
+ * Span name: `invoke_agent {agent name}`. Parent of the chat and tool spans for one agent run.
+ */
+export async function withAgentSpan<T>(agentName: string, fn: () => Promise<T>): Promise<T> {
+  const span = tracer.startSpan(`invoke_agent ${agentName}`);
+
+  try {
+    span.setAttributes({
+      "gen_ai.agent.name": agentName,
+      "gen_ai.operation.name": "invoke_agent",
+      "gen_ai.provider.name": PROVIDER,
+    });
+    return await context.with(trace.setSpan(context.active(), span), fn);
+  } catch (error) {
+    recordError(span, error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+/**
+ * Tool call span (`gen_ai.operation.name` = "execute_tool")
+ *
+ * Child span for each tool invocation:
+ * - Span name: `execute_tool {tool_name}`
+ * - gen_ai.operation.name = "execute_tool"
+ * - gen_ai.tool.name = tool_name
+ * - gen_ai.tool.call.id = call_id
+ * Opt-in: gen_ai.tool.call.arguments / gen_ai.tool.call.result
+ */
+export async function withToolSpan<T>(
+  toolName: string,
+  callId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const span = tracer.startSpan(`execute_tool ${toolName}`);
+
+  try {
+    span.setAttributes({
+      "gen_ai.operation.name": "execute_tool",
+      "gen_ai.tool.call.id": callId,
+      "gen_ai.tool.name": toolName,
+    });
+
+    return await context.with(trace.setSpan(context.active(), span), fn);
+  } catch (error) {
+    recordError(span, error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+/**
+ * Example: agent run with instrumentation
  */
 interface AgentRequest {
   prompt: string;
-  userId?: string;
-}
-
-interface AgentResponse {
-  text: string;
-  inputTokens: number;
-  outputTokens: number;
 }
 
 export class InstrumentedAgent {
-  @withGenAISpan("chat")
-  async chat(input: AgentRequest & ChatSpanInput): Promise<AgentResponse> {
-    // Call your actual agent SDK here
-    // This is a stub:
+  async run(input: AgentRequest): Promise<ChatSpanOutput> {
+    return withAgentSpan(AGENT_NAME, async () => {
+      // Call your actual agent SDK here. This is a stub.
+      const toolResult = await withToolSpan("search_docs", `call-${Date.now()}`, async () => ({
+        docs: "example documentation",
+      }));
 
-    // Simulate tool calls
-    const toolName = "search_docs";
-    const callId = `call-${Date.now()}`;
-
-    const toolResult = await withToolSpan(toolName, callId, async () => ({
-      docs: "example documentation",
-    }));
-
-    return {
-      inputTokens: 100,
-      outputTokens: 150,
-      text: `Found documentation: ${JSON.stringify(toolResult)}`,
-    };
+      return withChatSpan(input, async () => ({
+        inputTokens: 100,
+        outputTokens: 150,
+        stopReason: "end_turn",
+        text: `Found documentation: ${JSON.stringify(toolResult)}`,
+      }));
+    });
   }
 }
 
@@ -255,8 +280,8 @@ export class InstrumentedAgent {
 export function logSpanContext(): void {
   const span = trace.getActiveSpan();
   if (span) {
-    const context = span.spanContext();
-    console.log(`Trace ID: ${context.traceId}, Span ID: ${context.spanId}`);
+    const spanContext = span.spanContext();
+    console.log(`Trace ID: ${spanContext.traceId}, Span ID: ${spanContext.spanId}`);
   }
 }
 
@@ -267,16 +292,12 @@ export function logSpanContext(): void {
  * import { initializeTracing, InstrumentedAgent } from './otel-genai-instrument';
  *
  * // Initialize at startup
- * initializeTracing();
+ * await initializeTracing();
  *
  * const agent = new InstrumentedAgent();
  *
- * // Spans are automatically created and exported
- * const response = await agent.chat({
- *   prompt: 'Find documentation on MCP',
- *   userId: 'user-123',
- *   requestId: 'req-456',
- * });
+ * // Spans are created and exported: invoke_agent > execute_tool + chat
+ * const response = await agent.run({ prompt: 'Find documentation on MCP' });
  * ```
  *
  * Environment setup for local tracing:
@@ -292,37 +313,37 @@ export function logSpanContext(): void {
  * # Run agent with tracing
  * OTEL_DEBUG=1 node app.js
  * ```
- *
- * Querying traces via Langfuse:
- * - Navigate to https://cloud.langfuse.com
- * - View traces, spans, and metrics
- * - Query by trace_id, span_name, or attributes
  */
 
 /**
- * GenAI semantic convention reference (September 2026):
+ * GenAI semantic convention reference (checked 2026-10-29; the conventions are still marked
+ * development, so pin the version you follow):
  *
  * `gen_ai.system` was replaced by `gen_ai.provider.name`; update any older
  * instrumentation still emitting the former.
  *
- * Root span (chat operation):
- * - gen_ai.provider.name: "anthropic" | "openai" | "google"
- * - gen_ai.request.model: e.g., "claude-opus-5-5"
- * - gen_ai.request.max_tokens: integer
- * - gen_ai.request.temperature: 0-2
- * - gen_ai.input.messages: JSON array of messages
- * - gen_ai.output.messages: JSON array of responses
- * - gen_ai.usage.input_tokens: integer
- * - gen_ai.usage.output_tokens: integer
- * - gen_ai.system_instructions: hash or summary of system prompt
+ * Agent span (`invoke_agent {gen_ai.agent.name}`):
+ * - gen_ai.operation.name: "invoke_agent"
+ * - gen_ai.agent.name, gen_ai.agent.id, gen_ai.agent.version
+ *
+ * Model-call span (`{gen_ai.operation.name} {gen_ai.request.model}`):
+ * - gen_ai.operation.name: required, e.g. "chat", "text_completion", "embeddings"
+ * - gen_ai.provider.name: required, e.g. "anthropic", "openai", "gcp.gemini"
+ * - gen_ai.request.model: conditionally required
+ * - gen_ai.request.max_tokens, gen_ai.request.temperature: optional request parameters
+ *   (record temperature only for models that accept one)
+ * - gen_ai.response.model, gen_ai.response.finish_reasons, error.type
+ * - gen_ai.usage.input_tokens, gen_ai.usage.output_tokens
+ * - gen_ai.input.messages / gen_ai.output.messages: opt-in, structured messages with
+ *   `role` and `parts`
+ * - gen_ai.system_instructions: opt-in, structured content (not a hash or summary)
  * - gen_ai.data_source.id: RAG corpus ID if applicable
- * - gen_ai.operation.name: e.g., "chat", "completion", "embedding"
- * - gen_ai.response.finish_reasons: array, e.g., ["end_turn"] or ["max_tokens"]
  *
- * Tool span (child of root):
- * - Span name: tool.{tool_name}
- * - gen_ai.tool.name: tool name
- * - gen_ai.tool.call.id: unique call ID
+ * Tool span (`execute_tool {gen_ai.tool.name}`, child of the agent span):
+ * - gen_ai.operation.name: "execute_tool"
+ * - gen_ai.tool.name: required
+ * - gen_ai.tool.call.id: conditionally required
+ * - gen_ai.tool.call.arguments / gen_ai.tool.call.result: opt-in
  *
- * See: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+ * See: https://github.com/open-telemetry/semantic-conventions-genai
  */

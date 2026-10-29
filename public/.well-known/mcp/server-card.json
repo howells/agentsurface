@@ -5,7 +5,11 @@
   "serverUrl": "https://agentsurface.dev/mcp",
   "websiteUrl": "https://agentsurface.dev",
   "icons": [
-    { "src": "https://agentsurface.dev/apple-icon", "mimeType": "image/png", "sizes": ["180x180"] }
+    {
+      "src": "https://agentsurface.dev/apple-icon.png",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
   ],
   "serverInfo": {
     "name": "agentsurface-docs",
@@ -13,7 +17,7 @@
     "version": "2.3.0",
     "icons": [
       {
-        "src": "https://agentsurface.dev/apple-icon",
+        "src": "https://agentsurface.dev/apple-icon.png",
         "mimeType": "image/png",
         "sizes": ["180x180"]
       }
@@ -25,19 +29,5 @@
   },
   "authentication": {
     "required": false
-  },
-  "tools": [
-    {
-      "name": "list_pages",
-      "description": "List all docs pages with their pathnames (URLs)."
-    },
-    {
-      "name": "get_page",
-      "description": "Get the Markdown content of a docs page by its pathname (URL)."
-    },
-    {
-      "name": "search",
-      "description": "Search docs pages with a query."
-    }
-  ]
+  }
 }

@@ -1,7 +1,7 @@
 ---
 title: Agent Skills
 description: Packaging reusable agent instructions, scripts, references, and assets.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 Agent Skills are portable capability folders for agents. A skill teaches an agent how to do a specific task without putting every instruction into the base prompt.
@@ -64,11 +64,10 @@ Do not inline every workflow into a catalog file. Point to the skill and let the
 
 ## Publishing Skills
 
-For public sites, expose a skill index:
+For public sites, you can expose a skill index. This hosted index is a proposal, separate from the stable `SKILL.md` format defined at [agentskills.io/specification](https://agentskills.io/specification). Publish it only for consumers that read it.
 
 ```json
 {
-  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
       "name": "create-api-token",
@@ -87,11 +86,11 @@ Publish it at:
 /.well-known/agent-skills/index.json
 ```
 
-This is the discovery v0.2 shape. `type: skill-md` means the URL returns a `SKILL.md` document directly. `digest` is the SHA-256 of the exact bytes returned by that URL, including line endings. Recompute it whenever the artifact changes.
+An earlier draft of this shape pointed `$schema` at `https://schemas.agentskills.io/discovery/0.2.0/schema.json`. That host does not resolve (checked 2026-10-29), so leave the line out until the proposal publishes a schema you can fetch. `type: skill-md` means the URL returns a `SKILL.md` document directly. `digest` is the SHA-256 of the exact bytes returned by that URL, including line endings. Recompute it whenever the artifact changes.
 
 Validate discovery as a chain, not as two unrelated files:
 
-1. Parse the index against its declared schema.
+1. Parse the index and check each entry has the fields your target consumer requires.
 2. Fetch each skill URL and reject redirects to login pages, HTML shells, placeholders, or empty bodies.
 3. Hash the fetched bytes and compare them with `digest`.
 4. Parse the `SKILL.md` frontmatter and require `name` and `description`.
@@ -103,7 +102,9 @@ Only publish skills that are real, reviewed, and kept current with the product. 
 
 Skills started as a coding-CLI convention: a folder an assistant reads off disk while you work in a repository. That is no longer the only consumer. The [Agent Skills specification](https://agentskills.io) is now loaded at runtime by agent frameworks, which point a workspace at one or more skill directories and expose them to the agent as tools, and by hosted model platforms, which attach skill folders directly to a platform-managed execution environment and unpack them server-side.
 
-Only the catalog - each skill's `name` and `description` - goes into the system message; the body of a skill and its supporting files cost nothing until the agent calls for them. That is the same progressive-disclosure economics described above, and it is why `description` has to work as a routing instruction for a running agent, not only as a label a human scans.
+Only the catalog - each skill's `name` and `description` - goes into the system message; the body of a skill and its supporting files are loaded when the agent calls for them. The catalog still occupies context on every turn, and loading or running a skill's assets has implementation-dependent costs, so the saving is large but not zero. That is the same progressive-disclosure economics described above, and it is why `description` has to work as a routing instruction for a running agent, not only as a label a human scans.
+
+The [Agent Skills client list](https://agentskills.io/clients) shows which tools support skills.
 
 See [Frameworks](/docs/agents/frameworks) for how a given runtime wires skill directories into tool calls. The format - the folder, `SKILL.md`, and its frontmatter - is what stays portable across a CLI, a framework workspace, and a hosted platform runtime.
 

@@ -1,12 +1,12 @@
 ---
 title: Schemas
 description: Typed input and output schemas with Zod and JSON Schema for agent reasoning
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Tool schemas define input parameters and output structure, enabling agents to reason reliably over results and avoiding hallucination. Three rules: (1) Flat structure (one or two levels max; each level needs `additionalProperties: false` under OpenAI strict mode), (2) Every field must have description (.describe() in Zod, description in JSON Schema), (3) Enums over free text (constrain values where server enforces them). Input examples reduce errors. Declare output schemas so downstream tools get typed results. OpenAI strict mode requires every property in `required`, with optional fields made nullable rather than omitted; nested union types are rejected outright.
+Tool schemas define input parameters and output structure, enabling agents to reason reliably over results and avoiding hallucination. Three rules: (1) Flat structure (one or two levels is house advice, not an API limit; each level needs `additionalProperties: false` under OpenAI strict mode), (2) Every field must have description (.describe() in Zod, description in JSON Schema), (3) Enums over free text (constrain values where server enforces them). Input examples reduce errors. Declare output schemas so downstream tools get typed results. OpenAI strict mode requires every property in `required`, with optional fields made nullable rather than omitted; it supports nested `anyOf`, but not a root-level `anyOf` or unconstrained `any` branches.
 
 - **Flat structures**: Max 1-2 levels deep
 - **Descriptions**: Every field documented with examples
@@ -211,7 +211,7 @@ An input schema should contain only the domain inputs the agent legitimately dec
 }
 ```
 
-Frameworks provide dedicated mechanisms for injecting this context outside the schema - LangChain's `InjectedToolArg`, an execute-context object, or a closure over the request. Keep the schema free of anything the session already knows.
+Frameworks provide dedicated mechanisms for injecting this context outside the schema - LangChain's hidden `ToolRuntime` parameter (`runtime.context`), a separate runtime-context argument on the execute function (Mastra), or a closure over the request. Older injection patterns such as LangChain's `InjectedToolArg` are version-specific, so show how your host actually supplies the value. Keep the schema free of anything the session already knows.
 
 ## Output Schemas: Semantic Content
 
@@ -236,11 +236,13 @@ const InvoiceOutputSchema = z.object({
     .describe("Payment due date in YYYY-MM-DD format"),
 });
 
-server.tool(
+server.registerTool(
   "billing_create_invoice",
-  "Creates a new invoice and returns the invoice details...",
-  inputSchema,
-  { outputSchema: InvoiceOutputSchema },
+  {
+    description: "Creates a new invoice and returns the invoice details...",
+    inputSchema,
+    outputSchema: InvoiceOutputSchema,
+  },
   async (params) => {
     const invoice = await createInvoice(params);
 
@@ -268,7 +270,7 @@ server.tool(
 
 ## Strict Mode for OpenAI Compatibility
 
-OpenAI requires `strict: true` and `additionalProperties: false` at every object level, and every property listed in `required` - including fields that are logically optional (see Nullable Parameters below). Required when targeting OpenAI Agents SDK.
+When OpenAI strict mode is enabled, it requires `additionalProperties: false` at every object level and every property listed in `required` - including fields that are logically optional (see Nullable Parameters below). Strict mode is a setting, not a universal requirement: the API also supports non-strict function tools (`strict: false`), Chat Completions defaults to non-strict, and in Responses an omitted `strict` that can't be normalized to the strict subset falls back to non-strict calling. The OpenAI Agents SDK enables strict mode by default for schema-validated tools, so design for it when you target that SDK.
 
 ```typescript
 // Zod
@@ -327,20 +329,22 @@ assignee: z.string().nullable(); // emits { "type": ["string", "null"] }, stays 
 
 OpenAI strict mode requires every property to appear in the schema's `required` array - there's no way to mark a field as absent. To express "this field is optional," make it nullable (`"type": ["string", "null"]`) and have the caller pass `null` rather than omitting the key.
 
-### Nested Union Types
+### Unions and Unconstrained Types
 
 ```typescript
-// Bad: OpenAI strict mode rejects
+// Bad: the unconstrained z.any() branch is rejected by OpenAI strict mode
 result: z.union([
   z.object({ type: z.literal('success'), data: z.any() }),
   z.object({ type: z.literal('error'), message: z.string() })
 ])
 
-// Good: use flat discriminated union or separate fields
+// Good: constrained shapes, every field required, optional values nullable
 result_type: z.enum(['success', 'error']),
-result_data: z.any().optional(),
-error_message: z.string().optional(),
+result_data: z.object({ id: z.string(), summary: z.string() }).nullable(),
+error_message: z.string().nullable(),
 ```
+
+OpenAI strict mode supports nested `anyOf` (and internal `$ref` and recursive schemas) as long as every branch stays inside the supported subset; only a root-level `anyOf` is forbidden. Keeping to one or two levels of nesting is house advice for model reliability, not the API limit. The documented limits are 10 nesting levels and 5,000 object properties. Don't "fix" the pattern with `z.any().optional()`: that is incompatible with strict mode too, because unbounded `any` isn't a constrained schema and omitted optional properties conflict with the required-all rule.
 
 ### Free-Text Parameters That Accept Fixed Values
 
@@ -387,11 +391,10 @@ due_date: z.string()
 
 ## Cross-Framework Compilation
 
-Use `zod-to-json-schema` to emit OpenAI-compatible JSON Schema from Zod:
+Most current SDKs accept a Zod schema directly (the Vercel AI SDK's `inputSchema`, the OpenAI Agents SDK's `parameters`, MCP `registerTool`), so convert only when an API needs raw JSON Schema. Zod 4 has native conversion with `z.toJSONSchema()`:
 
 ```typescript
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const schema = z
   .object({
@@ -400,15 +403,28 @@ const schema = z
   })
   .strict();
 
-const jsonSchema = zodToJsonSchema(schema);
+const jsonSchema = z.toJSONSchema(schema);
 console.log(JSON.stringify(jsonSchema, null, 2));
 ```
+
+The third-party `zod-to-json-schema` package is no longer actively maintained according to its maintainer, and version 3.25 supports Zod 4 only as a peer for schemas built from Zod 3 (`zod/v3`). Pin `zod/v3` for legacy code, or migrate to native conversion. Then validate the output against each target provider's subset (below); a valid JSON Schema isn't automatically an accepted tool schema.
+
+## Provider Schema Limits
+
+Checked against primary documentation on 2026-10-29. These are API limits, not recommendations to make tools that large.
+
+- **OpenAI:** strict object schemas need `additionalProperties: false` at each object level and all properties required, with nullable values for logical optionals. Nested `anyOf` is allowed; a root `anyOf` is not. Limits: 5,000 properties, 10 nesting levels, 120,000 aggregate characters across names, enum and const strings, 1,000 enum values overall, and 15,000 characters for an individual enum with more than 250 values. See [supported schemas](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas).
+- **Anthropic:** strict tool use is GA, enabled per tool with `strict: true`, and uses its own JSON Schema subset. Unlike OpenAI, it supports optional properties. Combined strict-schema limits are 20 strict tools, 24 optional parameters and 16 union-typed parameters per request, with further grammar-complexity limits and a 180-second compilation timeout; non-strict tools don't count toward the 20-strict-tool ceiling. See [strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use) and [schema complexity limits](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#schema-complexity-limits).
+- **Gemini:** function declarations use an OpenAPI-schema subset and very large or deep schemas can be rejected; the guide advises an active set of 10-20 tools. The API exposes mutually exclusive `parameters` (Schema object) and `parametersJsonSchema` (raw JSON Schema), so don't assume full JSON Schema support or copy OpenAI's strict-object rules. See [function calling](https://ai.google.dev/gemini-api/docs/function-calling).
+- **AI SDK 7:** `inputSchema` accepts Zod or the SDK's `jsonSchema()` wrapper and validates generated input; provider `strict` remains provider-dependent. `ai@7.0.156` was current on 2026-10-28.
+- **Mastra:** `createTool` has separate input and output schemas, takes the validated input as the first `execute` argument, and supports `requireApproval` and `mcp.annotations`. Core 1.80.0 was current on 2026-10-28.
+- **LangChain:** runtime-context injection uses `ToolRuntime`; provider schema support depends on the model adapter, not on Pydantic alone.
 
 ## See also
 
 - `/docs/tool-design/naming-and-descriptions` - descriptions as prompts
 - `/docs/tool-design/anti-patterns` - schema design mistakes
 - ([JSON Schema 2020-12](https://json-schema.org/specification.html))
-- ([OpenAI strict mode](https://platform.openai.com/docs/guides/function-calling))
+- ([OpenAI function calling and strict mode](https://developers.openai.com/api/docs/guides/function-calling))
 - ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))
-- `zod-to-json-schema` on npm
+- ([Zod JSON Schema conversion](https://zod.dev/json-schema))

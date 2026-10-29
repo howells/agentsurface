@@ -1,7 +1,7 @@
 ---
 title: LLM-as-Judge Patterns
 description: When and how to use LLM judges; biases, calibration, and hybrid approaches
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -37,7 +37,7 @@ Research from Zheng et al. (MT-Bench) and Anthropic's evaluation posts identifie
 
 ### Self-preference bias
 
-A judge model tends to prefer outputs from itself or similar models. If you use GPT-5.6 to judge outputs from Claude Opus 5.5, the judge may systematically overrate outputs that look like GPT-style reasoning.
+A judge model tends to prefer outputs from itself or similar models. If you use GPT-6 Astra to judge outputs from Claude Opus 5.5, the judge may systematically overrate outputs that look like GPT-style reasoning.
 
 **Mitigation:** Use a judge from a different model family and calibrate it against human-labeled examples. For pairwise comparisons, run at least some cross-provider checks so style similarity does not become a hidden scoring advantage.
 
@@ -53,17 +53,17 @@ Longer outputs score higher, even when quality is equivalent. A verbose summary 
 
 **Mitigation:** Normalize output length in the judge prompt: "The reference summary has N tokens. The candidate has M tokens. Account for this length difference when scoring." Or control length in the agent's system prompt.
 
-### Task difficulty collapse
+### Accuracy can vary with task difficulty
 
-Judges do not distinguish between hard and easy tasks. A judge that achieves 90% accuracy on simple tasks may achieve the same 90% on harder tasks (suggesting it is not actually evaluating difficulty).
+This one is a practical check rather than a documented MT-Bench bias. A judge's agreement with human labels on easy tasks does not tell you its agreement on hard ones, so a single overall accuracy figure can hide a weak spot.
 
-**Mitigation:** Stratify evaluations by task difficulty. Measure accuracy separately for easy, medium, and hard tasks. Or use a pilot eval on 20–30 human-labelled examples to ensure the judge distinguishes difficulty.
+**Mitigation:** Stratify evaluations by task difficulty. Measure agreement with human labels separately for easy, medium, and hard tasks, using a pilot of 20-30 human-labelled examples per stratum where you can.
 
 ## Calibration techniques
 
 ### Cross-judge agreement
 
-Run the same evaluation with multiple judge models. If all judges agree, confidence is high. If they disagree, the task or output is ambiguous.
+Run the same evaluation with multiple judge models. Disagreement is a useful signal that the task or output is ambiguous. Agreement is weaker evidence than it looks: judges can share biases and correlated errors, so consensus does not establish correctness. Treat it as one signal and keep calibrating against human-labelled examples.
 
 ```typescript
 interface JudgeScore {
@@ -76,7 +76,7 @@ async function crossJudgeEval(
   task: string,
   output: string,
   judges: string[],
-): Promise<JudgeScore[]> {
+): Promise<{ scores: JudgeScore[]; mean: number; stdDev: number }> {
   const scores: JudgeScore[] = [];
 
   for (const judge of judges) {
@@ -97,7 +97,8 @@ Score this output on a scale of 0-1. Return JSON: {"score": number, "reasoning":
     });
   }
 
-  // Low stdDev = judges agree = confident score; high stdDev = flag for human review
+  // Low stdDev = judges agree; high stdDev = flag for human review.
+  // Agreement is not proof of correctness - judges can share biases.
   const mean = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
   const stdDev = Math.sqrt(
     scores.reduce((sum, s) => sum + Math.pow(s.score - mean, 2), 0) / scores.length,
@@ -106,7 +107,7 @@ Score this output on a scale of 0-1. Return JSON: {"score": number, "reasoning":
   return { scores, mean, stdDev };
 }
 
-// Example: if 3 judges give [0.9, 0.85, 0.88], stdDev ~0.02: high agreement
+// Example: if 3 judges give [0.9, 0.85, 0.88], stdDev ~0.02: high agreement (still check against humans)
 // If they give [0.2, 0.5, 0.9], stdDev ~0.28: low agreement, task is ambiguous
 ```
 
@@ -178,32 +179,36 @@ Combine LLM judges with heuristic checks to mitigate hallucinations and systemat
 
 ### Heuristic + LLM fallback
 
-Use code-based checks first; only invoke LLM judge if heuristics are inconclusive.
+Use code-based checks first; only invoke LLM judge if heuristics are inconclusive. Validate arguments with a real JSON Schema validator rather than hand-rolled type checks, and keep schema validity separate from the judge's view of severity.
 
 ```typescript
+import Ajv from "ajv";
+
+const ajv = new Ajv();
+
 async function hybridGrader(
   toolCall: ToolCall,
   schema: ToolSchema,
 ): Promise<{ score: number; confidence: "high" | "low" }> {
-  // Fast heuristic checks
-  const hasRequiredFields = schema.required.every((f) => toolCall.arguments[f] !== undefined);
-  const typesCorrect = Object.entries(toolCall.arguments).every(([key, value]) => {
-    const spec = schema.properties[key];
-    return spec?.type === typeof value || spec?.type === "number";
-  });
+  // Fast deterministic check: do the arguments validate against the tool's schema?
+  const valid = ajv.validate(
+    { type: "object", properties: schema.properties, required: schema.required },
+    toolCall.arguments,
+  );
 
-  // If heuristics pass, high confidence: no LLM needed
-  if (hasRequiredFields && typesCorrect) {
+  // If the schema check passes, high confidence: no LLM needed
+  if (valid) {
     return { score: 1.0, confidence: "high" };
   }
 
-  // If heuristics fail, use LLM to determine severity
+  // If it fails, use the LLM only to judge how severe the problem is
   const llmScore = await callLLM({
-    model: "claude-haiku-4-5",
+    model: "claude-haiku-5-5",
     prompt: `
 Tool: ${toolCall.name}
 Arguments: ${JSON.stringify(toolCall.arguments)}
 Schema: ${JSON.stringify(schema)}
+Validation errors: ${JSON.stringify(ajv.errors)}
 
 Is this a fatal error or a minor issue? Score 0-1.
     `,
@@ -249,12 +254,13 @@ Which is better? Respond with only "1", "2", or "tie".
     results.push(winner);
   }
 
+  // Count A, B and tie votes separately; ties count for neither side
   const aWins = results.filter((r) => r === "A").length;
-  const confidence = Math.abs(aWins - numJudges / 2) / (numJudges / 2);
+  const bWins = results.filter((r) => r === "B").length;
 
   return {
-    winner: aWins > numJudges / 2 ? "A" : aWins < numJudges / 2 ? "B" : "tie",
-    confidence,
+    winner: aWins > bWins ? "A" : bWins > aWins ? "B" : "tie",
+    confidence: Math.abs(aWins - bWins) / numJudges, // margin of decisive votes
   };
 }
 ```
@@ -267,7 +273,7 @@ A judge asked to rate on a 1-10 scale produces noisy, poorly calibrated numbers 
 
 LLM judges are expensive at scale. Strategies to reduce cost:
 
-- **Use cheaper judges for pre-screening.** Haiku 4.5 for initial triage, then Opus 5.5 for borderline cases.
+- **Use cheaper judges for pre-screening.** Haiku 5.5 for initial triage, then Opus 5.5 for borderline cases. Check the cheaper judge against your human-labelled examples first; a cheaper model is only worth it if its agreement with humans holds on your task.
 - **Batch evaluation.** Ask a judge to score 10 outputs in a single prompt instead of 10 separate API calls.
 - **Threshold-based fallback.** If code-based heuristics give a score of 0.95 or 0.05, don't invoke LLM judge.
 - **Sample-based calibration.** Calibrate on 30 examples, then use cheaper model + heuristics for the remaining 1000.
@@ -281,7 +287,7 @@ LLM judges are expensive at scale. Strategies to reduce cost:
 ## References
 
 - Cite [Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"](https://arxiv.org/abs/2306.05685) for documented biases (MT-Bench)
-- Anthropic's blog posts on evaluation: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+- Anthropic's blog posts on evaluation: https://www.anthropic.com/research/demystifying-evals-for-ai-agents
 - Eugene Yan's [LLM Evaluators guide](https://eugeneyan.com/writing/llm-evaluators/)
 
 ## See also

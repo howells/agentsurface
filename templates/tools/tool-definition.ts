@@ -16,7 +16,7 @@
  * - Errors returned in response, not thrown; include recovery hints
  * - Idempotency markers and token budget estimates in metadata
  *
- * Citation: https://www.anthropic.com/engineering/writing-tools-for-agents
+ * Citation: https://www.anthropic.com/research/writing-tools-for-agents
  * MCP spec: https://modelcontextprotocol.io/specification/2026-07-28
  * OpenAI function calling: https://platform.openai.com/docs/guides/function-calling
  * Vercel AI SDK: https://ai-sdk.dev/docs/reference/ai-sdk-core/
@@ -31,8 +31,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/server";
 import { tool as createVercelTool } from "ai";
-import { Tool as OpenAITool } from "@openai/agents";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { tool as createOpenAITool } from "@openai/agents";
 
 // ============================================================================
 // SHARED SCHEMA & METADATA (framework-neutral)
@@ -40,7 +39,8 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
  * Input schema using Zod for type safety.
- * Keep structure flat (1–2 levels max). Every field described + typed.
+ * Prefer a flat structure: it is easier for models to fill in (a project preference, not a
+ * provider limit; OpenAI and others accept nested objects). Every field described + typed.
  * <CUSTOMISE> Replace with your actual parameters.
  */
 const searchDocsSchema = z
@@ -185,18 +185,6 @@ const toolMetadata = {
   name: "search_docs",
   description: `Search internal documentation by keyword or phrase. Use this when the user asks to find setup guides, API references, troubleshooting steps, or any existing written knowledge. Do not use this for general web search (use web_search tool instead), to create new docs (use create_doc), or to modify existing docs (use update_doc). Returns results ranked by relevance. Requires DOCS_API_KEY environment variable.`,
 
-  // Anthropic supports toModelOutput for token efficiency on large responses
-  toModelOutput: (output: any) => {
-    if (!output.success) {
-      return JSON.stringify(output);
-    }
-    const summary =
-      `Found ${output.total_count} matching docs. ` +
-      `Top result: "${output.results[0]?.title}" (${output.results[0]?.url}). ` +
-      `Use results[].id to fetch full content. ${output.has_more ? `More pages available.` : "No additional pages."}`;
-    return summary;
-  },
-
   // Token budget estimate (for agents doing cost optimization)
   _meta: {
     estimated_input_tokens: 200,
@@ -205,6 +193,22 @@ const toolMetadata = {
     rate_limited: true, // May return 429; include backoff
   },
 };
+
+/**
+ * Compact text for the model when the full result is large. The Vercel AI SDK
+ * applies it through its `toModelOutput` tool property (see below); other
+ * frameworks need their own equivalent, or return this text from the handler.
+ */
+function summarizeForModel(output: ToolOutput): string {
+  if (!output.success) {
+    return JSON.stringify(output);
+  }
+  return (
+    `Found ${output.total_count} matching docs. ` +
+    `Top result: "${output.results[0]?.title}" (${output.results[0]?.url}). ` +
+    `Use results[].id to fetch full content. ${output.has_more ? `More pages available.` : "No additional pages."}`
+  );
+}
 
 // ============================================================================
 // EXPORT: RAW MCP SERVER
@@ -228,7 +232,14 @@ export function createMCPServer() {
         readOnlyHint: true, // Query-only, no mutations
       },
     },
-    searchDocsHandler,
+    // MCP callbacks return a CallToolResult envelope, not the raw handler result.
+    async (input) => {
+      const output = await searchDocsHandler(input);
+      return {
+        content: [{ text: JSON.stringify(output), type: "text" as const }],
+        isError: !output.success,
+      };
+    },
   );
 
   return server;
@@ -242,7 +253,7 @@ export const claudeSearchDocsTool = {
   _meta: toolMetadata._meta,
   description: toolMetadata.description,
   handler: searchDocsHandler,
-  input_schema: searchDocsSchema,
+  input_schema: z.toJSONSchema(searchDocsSchema),
   name: toolMetadata.name,
 };
 
@@ -259,39 +270,38 @@ export const claudeSearchDocsTool = {
 export const vercelSearchDocsTool = createVercelTool({
   description: toolMetadata.description,
   execute: searchDocsHandler,
-  parameters: zodToJsonSchema(searchDocsSchema) as Record<string, unknown>,
+  inputSchema: searchDocsSchema,
+  // AI SDK tool property: what the model sees in place of the full result.
+  toModelOutput: ({ output }) => ({ type: "text", value: summarizeForModel(output) }),
 });
 
 // For use with ai (Vercel):
 // const { text } = await generateText({
-//   model: openai('gpt-5.6-terra'),
+//   model: openai('gpt-6.1-terra'),
 //   prompt: 'Find docs on authentication',
 //   tools: { search_docs: vercelSearchDocsTool },
-//   maxSteps: 5,
+//   stopWhen: stepCountIs(5), // import { stepCountIs } from "ai"
 // });
 
 // ============================================================================
 // EXPORT: OpenAI Agents SDK (with strict: true)
 // ============================================================================
 
-export const openaiSearchDocsTool = new OpenAITool({
+export const openaiSearchDocsTool = createOpenAITool({
   name: toolMetadata.name,
   description: toolMetadata.description,
-  // strict: true is enforced at Agent level, not per-tool
-  parameters: zodToJsonSchema(searchDocsSchema) as Record<string, unknown>,
-  execute: async (params: unknown) => {
-    const validated = searchDocsSchema.parse(params);
-    return await searchDocsHandler(validated);
-  },
+  // Zod parameters require strict mode; the SDK validates the model's arguments.
+  parameters: searchDocsSchema,
+  strict: true,
+  execute: async (params) => JSON.stringify(await searchDocsHandler(params)),
 });
 
 // For use with @openai/agents:
 // const agent = new Agent({
-//   model: 'gpt-5.6-terra',
+//   model: 'gpt-6.1-terra',
 //   tools: [openaiSearchDocsTool],
 // });
-// const session = agent.createSession();
-// const result = await session.run('Find docs on authentication');
+// const result = await run(agent, 'Find docs on authentication'); // import { run } from "@openai/agents"
 
 // ============================================================================
 // SHARED UTILITIES

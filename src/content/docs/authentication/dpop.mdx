@@ -1,7 +1,7 @@
 ---
 title: "DPoP: Demonstrating Proof-of-Possession"
 description: "RFC 9449 sender-constrained tokens, preventing token replay attacks"
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -12,11 +12,11 @@ DPoP binds an access token to a client's public key. On every request, the clien
 Client: (with private key)        Server: (verifies)
   Generate keypair               Extract public key from DPoP
   Sign DPoP proof                Verify signature
-  Send token + DPoP              Check htm, htu, jti
+  Send token + DPoP              Check htm, htu, ath, jti
 ```
 
-- Each request includes a DPoP proof: unique jti, htm (method), htu (URI), iat (timestamp)
-- Server validates signature, claim values, and jti uniqueness (prevents replay)
+- Each request includes a DPoP proof: unique jti, htm (method), htu (URI), iat (timestamp), and ath (access-token hash)
+- Server validates signature, claim values, ath, and jti uniqueness (prevents replay)
 - Token includes a `cnf.jkt` claim: thumbprint of the DPoP proof's JWK
 - Required for financial operations, user data access, administrative actions
 - Use ES256 or Ed25519 for DPoP proof signing
@@ -30,58 +30,58 @@ Use DPoP for high-value operations and agent-to-agent communication where token 
 The client generates an Ed25519 or ES256 keypair. On every request, the client creates a `DPoP` proof JWT that includes:
 
 - `htm` (HTTP Method): the request method (GET, POST, etc.)
-- `htu` (HTTP URI): the request URI
+- `htu` (HTTP URI): the request URI without its query or fragment
 - `iat` (Issued At): Unix timestamp
 - `jti` (JWT ID): unique nonce, prevents replay of the same proof
+- `ath` (Access Token Hash): base64url SHA-256 of the access token, required when calling a protected resource
+- `nonce`: only when the server has issued one in a `DPoP-Nonce` header
 
-The client sends both the `Authorization` (Bearer token) and `DPoP` headers. The server validates:
+The client sends the token with the `DPoP` authorization scheme (`Authorization: DPoP <token>`, not `Bearer`) plus the `DPoP` proof header. The server validates:
 
-1. The DPoP proof is a valid JWT signed by a key the client registered
-2. The `htm` and `htu` match the current request
-3. The `jti` has never been seen before (prevents reuse)
-4. The `iat` is recent (prevents old proofs from being replayed)
+1. The proof has `typ: dpop+jwt`, an allowed asymmetric `alg`, and a valid signature from the public JWK embedded in its own header (no prior key registration is needed)
+2. The `htm` and `htu` match the current request, comparing `htu` without query or fragment
+3. The `ath` matches the hash of the presented access token
+4. The `jti` has not been seen within the acceptance window (prevents reuse)
+5. The `iat` is recent (prevents old proofs from being replayed), and `nonce` matches if the server requires one
+6. The JWK thumbprint matches the token's `cnf.jkt` binding
 
 If the token is stolen without the private key, an attacker cannot create a valid DPoP proof for a different URI, so the stolen token is useless.
 
 ## Client-Side: Generating DPoP Proofs
 
 ```typescript
-import { SignJWT, generateKeyPair } from "jose";
-import { randomUUID } from "crypto";
+import { SignJWT, exportJWK, generateKeyPair } from "jose";
+import { createHash, randomUUID } from "node:crypto";
 
 // Generate keypair once and store securely
 const { publicKey, privateKey } = await generateKeyPair("ES256");
+const { kty, crv, x, y } = await exportJWK(publicKey); // public members only
 
-async function generateDPopProof(method: string, uri: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
+async function generateDPopProof(
+  method: string,
+  uri: string,
+  accessToken: string,
+  nonce?: string,
+): Promise<string> {
+  const url = new URL(uri);
+  const htu = `${url.origin}${url.pathname}`; // no query or fragment
 
-  const proof = await new SignJWT({
+  return new SignJWT({
     jti: randomUUID(), // Unique per request
     htm: method, // GET, POST, etc.
-    htu: uri, // Full request URI
-    iat: now,
-    exp: now + 120, // 2 minutes validity
+    htu,
+    iat: Math.floor(Date.now() / 1000),
+    ath: createHash("sha256").update(accessToken).digest("base64url"),
+    ...(nonce ? { nonce } : {}), // from a DPoP-Nonce response header
   })
-    .setProtectedHeader({
-      alg: "ES256",
-      typ: "dpop+jwt",
-      jwk: {
-        // Public key in JWK format (without private component)
-        kty: "EC",
-        crv: "P-256",
-        x: publicKey.x,
-        y: publicKey.y,
-      },
-    })
+    .setProtectedHeader({ alg: "ES256", typ: "dpop+jwt", jwk: { kty, crv, x, y } })
     .sign(privateKey);
-
-  return proof;
 }
 
 // On every request
 const method = "GET";
-const uri = "https://api.example.com/invoices";
-const dpopProof = await generateDPopProof(method, uri);
+const uri = "https://api.example.com/invoices?status=open";
+const dpopProof = await generateDPopProof(method, uri, accessToken);
 
 const res = await fetch(uri, {
   method,
@@ -92,35 +92,38 @@ const res = await fetch(uri, {
 });
 ```
 
-The `jti` must be globally unique per request to prevent replay. Use a UUID or a counter.
+The `jti` must be unique per request to prevent replay. Use a UUID. If the server answers `401` with a `DPoP-Nonce` header, retry once with that value in the `nonce` claim.
 
 ## Server-Side: Validating DPoP Proofs
 
 ```typescript
-import { jwtVerify, decodeProtectedHeader, importJWK } from "jose";
+import { calculateJwkThumbprint, decodeProtectedHeader, importJWK, jwtVerify } from "jose";
+import { createHash } from "node:crypto";
 
-// Store of seen JTIs to prevent replay
+// Store of seen JTIs to prevent replay. Keep each entry for the whole
+// acceptance window below (iat skew plus max age); use Redis in production.
 const seenJtis = new Set<string>();
-const JTI_MAX_AGE = 2 * 60; // 2 minutes
 
 async function validateDPopProof(
   dpopHeader: string,
   method: string,
   uri: string,
-): Promise<{ thumbprint: string; sub: string }> {
+  accessToken: string,
+): Promise<{ thumbprint: string }> {
   // Read the header first, without verifying: the proof's own public key
   // is embedded in it, so there is nothing to verify against yet.
   const protectedHeader = decodeProtectedHeader(dpopHeader);
 
-  if (!protectedHeader.jwk) {
-    throw new Error("DPoP JWT missing public key in header");
+  if (protectedHeader.typ !== "dpop+jwt" || !protectedHeader.jwk) {
+    throw new Error("Not a DPoP proof, or missing public key in header");
   }
 
   const publicKey = await importJWK(protectedHeader.jwk, protectedHeader.alg);
 
-  // Now verify the signature
+  // Now verify the signature, allowing only asymmetric algorithms
   const { payload } = await jwtVerify(dpopHeader, publicKey, {
     algorithms: ["ES256", "EdDSA"],
+    typ: "dpop+jwt",
   });
 
   // Verify claims
@@ -136,8 +139,17 @@ async function validateDPopProof(
     throw new Error(`DPoP htm does not match request method: ${payload.htm} vs ${method}`);
   }
 
-  if (payload.htu !== uri) {
+  // htu excludes query and fragment on both sides
+  const target = new URL(uri);
+  const proofTarget = new URL(payload.htu as string);
+  if (`${proofTarget.origin}${proofTarget.pathname}` !== `${target.origin}${target.pathname}`) {
     throw new Error(`DPoP htu does not match request URI: ${payload.htu} vs ${uri}`);
+  }
+
+  // ath binds the proof to this access token
+  const ath = createHash("sha256").update(accessToken).digest("base64url");
+  if (payload.ath !== ath) {
+    throw new Error("DPoP ath does not match the presented access token");
   }
 
   // Check JTI for replay
@@ -147,12 +159,9 @@ async function validateDPopProof(
   }
   seenJtis.add(jti);
 
-  // Clean up old JTIs (optional, in production use Redis or similar)
-  // ...
-
-  // Return the thumbprint for binding to access token
+  // Return the thumbprint for comparison with the token's cnf.jkt
   const thumbprint = await calculateJwkThumbprint(protectedHeader.jwk);
-  return { thumbprint, sub: payload.sub as string };
+  return { thumbprint };
 }
 ```
 
@@ -175,40 +184,34 @@ When issuing an access token, the authorization server includes the DPoP proof's
 
 On every request, the server verifies:
 
-1. The DPoP proof is valid (signature, `htm`, `htu`, `jti`)
+1. The DPoP proof is valid (signature, `typ`, `htm`, `htu`, `iat`, `ath`, `jti`, and `nonce` if required)
 2. The DPoP proof's JWK thumbprint matches the token's `cnf.jkt` claim
 
 If an attacker steals the token but not the private key, they cannot create a valid DPoP proof with the matching thumbprint.
 
 ```typescript
-import { jwtVerify, calculateJwkThumbprint, decodeProtectedHeader, importJWK } from "jose";
+import { jwtVerify } from "jose";
 
 async function validateTokenAndDPoP(
-  token: string,
+  authorization: string, // "DPoP <token>"
   dpopHeader: string,
   method: string,
   uri: string,
 ) {
-  // Validate the JWT token
-  const { payload: tokenPayload } = await jwtVerify(token, jwks);
-
-  // Validate the DPoP proof: read its embedded key, then verify against it
-  const protectedHeader = decodeProtectedHeader(dpopHeader);
-  const publicKey = await importJWK(protectedHeader.jwk!, protectedHeader.alg);
-  const { payload: dpopPayload } = await jwtVerify(dpopHeader, publicKey, {
-    algorithms: ["ES256", "EdDSA"],
-  });
-
-  // Compare thumbprints
-  const dpopThumbprint = await calculateJwkThumbprint(protectedHeader.jwk!);
-  const cnf = tokenPayload.cnf as { jkt?: string } | undefined;
-  if (dpopThumbprint !== cnf?.jkt) {
-    throw new Error("DPoP thumbprint does not match token");
+  const [scheme, token] = authorization.split(" ");
+  if (scheme !== "DPoP" || !token) {
+    throw new Error("DPoP-bound tokens must use the DPoP authorization scheme");
   }
 
-  // Verify htm and htu match
-  if (dpopPayload.htm !== method || dpopPayload.htu !== uri) {
-    throw new Error("DPoP proof does not match request");
+  // Validate the access token (a JWT here; opaque tokens need introspection)
+  const { payload: tokenPayload } = await jwtVerify(token, jwks);
+
+  // Full proof validation, including ath against this token
+  const { thumbprint } = await validateDPopProof(dpopHeader, method, uri, token);
+
+  const cnf = tokenPayload.cnf as { jkt?: string } | undefined;
+  if (thumbprint !== cnf?.jkt) {
+    throw new Error("DPoP thumbprint does not match token");
   }
 
   return tokenPayload;
@@ -246,7 +249,7 @@ server.setRequestHandler(
       throw new Error("DPoP proof required");
     }
 
-    await validateDPopProof(dpopHeader, request.method, request.uri);
+    await validateTokenAndDPoP(authHeader, dpopHeader, request.method, request.uri);
     // ... proceed with request
   },
 );
@@ -259,16 +262,16 @@ See [Protected Resource Metadata](/docs/authentication/protected-resource-metada
   implementation easier to reason about if you add one. Sessions are removed, so there is no
   connect-time authentication step whose proof a later request could ride on - every request already
   carries its own token, which is the same per-request model DPoP proofs assume. And client
-  credentials must now be keyed by issuing authorization server (SEP-2352), so a `cnf.jkt`
-  thumbprint you choose to validate is unambiguously tied to one issuer's key material rather than
-  to a client identity that might have been registered in several places.
+  credentials must now be keyed by issuing authorization server (SEP-2352), so it is unambiguous
+  which issuer minted a given DPoP-bound token. The `cnf.jkt` thumbprint itself always binds the
+  token to the client's DPoP public key, not to the issuer's signing keys.
 </Callout>
 
 ## Checklist
 
 - [ ] Clients generate Ed25519 or ES256 keypairs at startup
-- [ ] Every request includes a unique `DPoP` proof with `jti`, `htm`, `htu`, `iat`
-- [ ] Server validates DPoP signature, claims, and JTI uniqueness
+- [ ] Every request sends `Authorization: DPoP <token>` and a unique proof with `jti`, `htm`, `htu`, `iat`, `ath`
+- [ ] Server validates DPoP `typ`, signature, claims, `ath`, and JTI uniqueness
 - [ ] Access tokens include a `cnf.jkt` claim with the proof's JWK thumbprint
 - [ ] Server validates that DPoP thumbprint matches token claim
 - [ ] JTI store prevents reuse (Redis or equivalent for distributed systems)

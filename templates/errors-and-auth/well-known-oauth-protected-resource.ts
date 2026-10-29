@@ -3,18 +3,19 @@
  * Canonical spec: https://datatracker.ietf.org/doc/html/rfc9728
  * Use: Advertise auth config to remote MCP servers and agents
  *
- * RFC 9728 defines this resource's own metadata document — not the
+ * RFC 9728 defines this resource's own metadata document - not the
  * authorization server's. The required field is `resource` (the resource's
  * own identifier), not `resource_url`; the authorization server's issuer,
- * token endpoint, etc. live on that server's own metadata document at its
- * own `/.well-known/oauth-authorization-server` (RFC 8414), reachable via
- * one of the URLs listed in `authorization_servers` below.
+ * token endpoint, grant types and token-signing keys live on that server's
+ * own metadata document at its own `/.well-known/oauth-authorization-server`
+ * (RFC 8414), reachable via one of the URLs listed in `authorization_servers`
+ * below.
  *
  * <CUSTOMISE>
  * - Update resource to your service domain
  * - Add your authorization_server URL
  * - Define scopes relevant to your API
- * - Set jwks_uri to your JWKS endpoint
+ * - Set DPOP_REQUIRED=true if every access token must be DPoP-bound
  * </CUSTOMISE>
  */
 
@@ -22,32 +23,35 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * RFC 9728 Protected Resource Metadata
+ * RFC 9728 Protected Resource Metadata (§2)
  * Used by remote MCP servers to discover auth config
  */
 interface ProtectedResourceMetadata {
   resource: string;
   authorization_servers: string[];
   scopes_supported: string[];
-  jwks_uri: string;
   bearer_methods_supported?: string[];
   resource_name?: string;
   resource_documentation?: string;
-  response_types_supported?: string[];
-  grant_types_supported?: string[];
-  token_endpoint_auth_methods_supported?: string[];
-  revocation_endpoint?: string;
-  introspection_endpoint?: string;
+  // The resource's OWN keys (e.g. for signed responses), not the keys that
+  // verify access tokens; those come from the authorization server metadata.
+  jwks_uri?: string;
+  resource_signing_alg_values_supported?: string[];
+  // Standard DPoP fields (RFC 9728 §2)
+  dpop_bound_access_tokens_required?: boolean;
+  dpop_signing_alg_values_supported?: string[];
 }
 
 /**
  * Next.js App Router route handler for /.well-known/oauth-protected-resource
  *
- * Save to app/.well-known/oauth-protected-resource/route.ts
+ * Save to app/.well-known/oauth-protected-resource/route.ts. If your resource
+ * identifier has a path (https://api.example.com/mcp), RFC 9728 places the
+ * document at /.well-known/oauth-protected-resource/mcp instead.
  */
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(_req: NextRequest): Promise<NextResponse> {
   const metadata: ProtectedResourceMetadata = {
-    // <CUSTOMISE> Update to your domain — this resource's own identifier
+    // <CUSTOMISE> Update to your domain - this resource's own identifier
     resource: process.env.API_URL || "https://api.example.com",
 
     // <CUSTOMISE> Auth server(s) that can issue tokens for this resource
@@ -62,43 +66,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       "posts:read", // Read posts
       "posts:write", // Create/update posts
       "billing:read", // Read billing information
-      "offline_access", // Request refresh token
     ],
-
-    // <CUSTOMISE> URI to JWKS (public keys for token validation)
-    jwks_uri: process.env.JWKS_URI || "https://auth.example.com/.well-known/jwks.json",
 
     // How bearer tokens may be presented (RFC 9728 §2)
     bearer_methods_supported: ["header"],
 
-    // Standard OAuth response types
-    response_types_supported: ["token"],
+    resource_name: "Example API",
 
-    // Supported grant types for this resource
-    grant_types_supported: [
-      "client_credentials", // M2M auth (agents)
-      "urn:ietf:params:oauth:grant-type:token-exchange", // RFC 8693 delegation
-    ],
-
-    // Token endpoint auth methods (if you have a dedicated endpoint)
-    token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
-
-    // Optional: Endpoints for token management
-    ...(process.env.REVOCATION_ENDPOINT && {
-      revocation_endpoint: process.env.REVOCATION_ENDPOINT,
-    }),
-    ...(process.env.INTROSPECTION_ENDPOINT && {
-      introspection_endpoint: process.env.INTROSPECTION_ENDPOINT,
-    }),
+    // <CUSTOMISE> Sender-constrained tokens (RFC 9449). Defaults to false when omitted.
+    dpop_bound_access_tokens_required: process.env.DPOP_REQUIRED === "true",
+    dpop_signing_alg_values_supported: ["ES256", "EdDSA"],
   };
 
   // Return with proper caching headers
-  // (Remote servers may cache this for hours or days)
   return NextResponse.json(metadata, {
     headers: {
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+      "Cache-Control": "public, max-age=3600",
       "Content-Type": "application/json",
     },
     status: 200,
@@ -108,7 +93,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 /**
  * Respond to CORS preflight requests
  */
-export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
+export async function OPTIONS(_req: NextRequest): Promise<NextResponse> {
   return new NextResponse(null, {
     headers: {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -123,21 +108,17 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
 /**
  * MCP 2026-07-28 Remote Server Discovery:
  *
- * When you expose your API to remote MCP servers (e.g., via OpenAI, Claude),
- * those servers fetch this metadata to:
+ * MCP servers have had to publish this document since the 2025-06-18
+ * revision. A client:
  *
- * 1. Discover the auth server URL
- * 2. Understand which scopes are supported
- * 3. Fetch your JWKS to validate tokens
- * 4. Determine token endpoint auth method
- *
- * The MCP server will:
- * 1. GET /.well-known/oauth-protected-resource
- * 2. Cache the response for 1–24 hours
- * 3. Use authorization_servers[0] to find the authorization server's own
- *    metadata (RFC 8414), which carries its actual token endpoint
- * 4. Request tokens with grant_type=client_credentials
- * 5. Validate tokens using JWKS at jwks_uri
+ * 1. Receives 401 with WWW-Authenticate: Bearer resource_metadata="..."
+ *    (or probes the well-known location)
+ * 2. GETs /.well-known/oauth-protected-resource and checks `resource`
+ *    matches the URL it is calling
+ * 3. Uses authorization_servers[0] to fetch the authorization server's own
+ *    metadata (RFC 8414): token endpoint, grant types, signing keys
+ * 4. Requests a token for this resource (with the `resource` parameter)
+ * 5. Sends a DPoP proof as well if dpop_bound_access_tokens_required is true
  *
  * Example:
  *
@@ -148,22 +129,22 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
  *   "resource": "https://api.example.com",
  *   "authorization_servers": ["https://auth.example.com"],
  *   "scopes_supported": ["agent:read", "agent:write", "users:read", "posts:write"],
- *   "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
  *   "bearer_methods_supported": ["header"],
- *   "grant_types_supported": ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"]
+ *   "dpop_bound_access_tokens_required": false
  * }
  * ```
  *
- * Then, an MCP server:
+ * Then, for a service-owned (machine-to-machine) client:
  *
  * ```
  * POST https://auth.example.com/token
  * Content-Type: application/x-www-form-urlencoded
  *
  * grant_type=client_credentials
- * &client_id=openai-org-xyz
- * &client_secret=sk_live_abc123
+ * &client_id=example-agent
+ * &client_secret=...
  * &scope=agent:read+agent:write
+ * &resource=https://api.example.com
  *
  * → {
  *   "access_token": "eyJ...",
@@ -179,19 +160,22 @@ export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
  * GET https://api.example.com/api/data
  * Authorization: Bearer eyJ...
  * ```
+ *
+ * The resource server, not the client, validates each token: signature
+ * against the authorization server's keys (or introspection for opaque
+ * tokens), plus iss, aud and expiry.
  */
 
 /**
  * Why this matters:
  *
- * - Without this endpoint, MCP servers have no standard way to discover your auth config
+ * - Without this endpoint, clients have no standard way to discover which
+ *   authorization server protects you
  * - They might hard-code your token endpoint (fragile; breaks on migration)
- * - They can't validate tokens because they don't know your JWKS location
- * - You can't add new scopes without server updates
+ * - You can't add new scopes without client updates
  *
  * With this endpoint:
- * - Servers auto-discover auth config on every connection
- * - Servers can validate tokens offline (faster)
- * - You can rotate JWKS or change authorization servers
+ * - Clients auto-discover auth config on every connection
+ * - You can change authorization servers without breaking clients
  * - Scopes are published; agents can request only what they need
  */

@@ -1,7 +1,7 @@
 ---
 title: Orchestration
 description: The primary multi-agent coordination patterns, when to use each, and the failure modes to expect.
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -45,12 +45,12 @@ A single agent decomposes the goal, delegates to specialists, collects results, 
 
 Two delegation shapes matter and are not interchangeable:
 
-|                   | Handoff (transfer control)              | Agent-as-tool (return control)                |
-| ----------------- | --------------------------------------- | --------------------------------------------- |
-| Who talks to user | Sub-agent, after transfer               | Supervisor only                               |
-| Result flow       | Back via a return handoff               | Returned as a tool result                     |
-| Context           | Sub-agent has full conversation history | Sub-agent has only what the supervisor passes |
-| Use case          | Deep specialist sessions                | Quick delegated lookups                       |
+|                   | Handoff (transfer control)                                               | Agent-as-tool (return control)                |
+| ----------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
+| Who talks to user | Sub-agent, after transfer                                                | Supervisor only                               |
+| Result flow       | Back via a return handoff                                                | Returned as a tool result                     |
+| Context           | Sub-agent typically gets the conversation history (configurable per SDK) | Sub-agent has only what the supervisor passes |
+| Use case          | Deep specialist sessions                                                 | Quick delegated lookups                       |
 
 Most production supervisors use agents-as-tools for the orchestration layer, reserving handoffs for extended specialist sessions. Give each worker a description that states what it does, what it returns, and - as important - what it does **not** do; vague descriptions ("helps with research and writing") produce routing drift. Filter delegation context per worker rather than passing the full transcript, and add a completion check outside the supervisor's ordinary reasoning - supervisors fail most often by stopping too early on output that reads as fluent prose but does not yet satisfy the goal.
 

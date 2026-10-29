@@ -16,12 +16,12 @@ Dimension 1 scores OpenAPI quality and agent-readiness of HTTP APIs. Baseline is
 
 ## Scoring rubric
 
-| Score | Criteria                                                                                                                                                                         | Detection                                                                                                                                                                        |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema.                                                                                                  | No openapi.json/yaml, no swagger.json, no API schema files                                                                                                                       |
-| 1     | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params.                                                           | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values                                                 |
-| 2     | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties. |
-| 3     | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-\*). LAPIS-style token efficiency. Auto-generated MCP from spec.     | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency <200 tokens per operation.                             |
+| Score | Criteria                                                                                                                                                                         | Detection                                                                                                                                                                                           |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No machine-readable API spec. Endpoints exist but no OpenAPI, no formal schema.                                                                                                  | No openapi.json/yaml, no swagger.json, no API schema files                                                                                                                                          |
+| 1     | OpenAPI exists but descriptions are human-oriented. Missing operationIds, vague summaries, no examples, nested params.                                                           | OpenAPI present but: descriptions say "Gets the data" not when/why; missing operationId on >30% of operations; no example values                                                                    |
+| 2     | Agent-oriented descriptions (when to use, vs alternatives, prerequisites). Proper operationIds (verb_noun). Enums exhaustive. Examples on all params. Flat parameter structures. | Descriptions include disambiguation ("Use this when... For X instead, use..."). operationId on all operations. enum values on constrained strings. example on schema properties.                    |
+| 3     | Full agent optimization. Arazzo workflows for multi-step operations. Semantic extensions (x-action, x-agent-\*). LAPIS-style token efficiency. Auto-generated MCP from spec.     | Arazzo file present. x-speakeasy-mcp or x-action extensions. MCP server generated from spec. Description token efficiency under roughly 200 tokens per operation (house heuristic, not a standard). |
 
 **Key files:** openapi.json, openapi.yaml, swagger.json, api/ routes, Arazzo files
 
@@ -96,7 +96,7 @@ grep -r "HandleFunc\|GET\|POST\|PUT\|DELETE" --include="*.go"
 
 ### OpenAPI 3.1 baseline
 
-Use OpenAPI 3.1.x, not 3.0. OpenAPI 3.1 aligns with JSON Schema 2020-12, removing vendor-specific extensions and enabling standard `$dynamicRef`, format assertions, and type unions ([OpenAPI 3.1.x](https://spec.openapis.org/oas/v3.1.0)).
+Use OpenAPI 3.1.x or later, not 3.0. OpenAPI 3.1 aligns with JSON Schema 2020-12, replacing the 3.0 schema dialect with standard keywords and type unions ([OpenAPI 3.1.x](https://spec.openapis.org/oas/v3.1.0)). The current publication is 3.2.1 (2026-09-10); 3.1 stays the safe compatibility target because more generators and validators support it. `operationId` is optional in the spec but must be unique when present, so treat it as required for agent surfaces. `format` is an annotation, not a guaranteed validation. Overlay 1.2.0 (2026-09-22) lets you add agent-oriented descriptions without editing the source spec.
 
 **Minimal valid OpenAPI 3.1 spec:**
 
@@ -429,7 +429,7 @@ export async function GET(req: Request) {
 
 For multi-step operations, use Arazzo 1.1.0 to model agent workflows ([Arazzo 1.1.0](https://spec.openapis.org/arazzo/latest.html), released 17 May 2026).
 
-**Example: Create user, send welcome email, log event:**
+**Example: Create user, send welcome email:**
 
 ```yaml
 arazzo: 1.1.0
@@ -437,47 +437,50 @@ info:
   title: User Onboarding Workflow
   version: 1.0.0
 sourceDescriptions:
-  - url: https://api.example.com/openapi.json
+  - name: usersApi
+    url: https://api.example.com/openapi.json
+    type: openapi
 workflows:
-  onboardUser:
-    description: Create a new user account and trigger welcome email
+  - workflowId: onboardUser
+    summary: Create a new user account and trigger a welcome email
+    inputs:
+      type: object
+      required: [email, name]
+      properties:
+        email: { type: string }
+        name: { type: string }
     steps:
       - stepId: create_user
-        operationId: create_user
+        operationId: $sourceDescriptions.usersApi.create_user
         requestBody:
           contentType: application/json
           payload:
-            email: "$inputs.email"
-            name: "$inputs.name"
+            email: $inputs.email
+            name: $inputs.name
         successCriteria:
-          - condition: "$response.statusCode == 201"
+          - condition: $statusCode == 201
+        outputs:
+          user_id: $response.body#/id
+        onFailure:
+          - name: email_exists
+            type: end
+            criteria:
+              - condition: $statusCode == 409
       - stepId: send_welcome_email
-        operationId: send_email
+        operationId: $sourceDescriptions.usersApi.send_email
         requestBody:
           contentType: application/json
           payload:
-            to: "$steps.create_user.outputs.email"
-            template: "welcome"
-            user_id: "$steps.create_user.outputs.id"
-      - stepId: log_onboarding_event
-        operationId: create_event
-        requestBody:
-          contentType: application/json
-          payload:
-            event_type: "user_created"
-            user_id: "$steps.create_user.outputs.id"
-            metadata:
-              email: "$inputs.email"
-    onFailure:
-      - condition: "$steps.create_user.statusCode == 409"
-        description: Email already exists
-        actions:
-          - type: returnOutput
-            output: "User with this email already exists"
+            to: $inputs.email
+            template: welcome
+            user_id: $steps.create_user.outputs.user_id
+        successCriteria:
+          - condition: $statusCode == 202
     outputs:
-      user_id: "$steps.create_user.outputs.id"
-      email: "$steps.create_user.outputs.email"
+      user_id: $steps.create_user.outputs.user_id
 ```
+
+Arazzo has no default success criterion for an HTTP step, so declare `successCriteria` on every step you rely on. It describes a sequence of calls; it is not transactional, so a failed later step does not roll back earlier ones.
 
 Agents consume Arazzo workflows as multi-step orchestration blueprints, reducing the context needed to plan complex operations.
 
@@ -485,14 +488,14 @@ Agents consume Arazzo workflows as multi-step orchestration blueprints, reducing
 
 Supplement OpenAPI with agent-aware hints via vendor extensions:
 
-**`x-speakeasy-mcp`:** Indicate this operation should auto-generate an MCP tool
+**`x-speakeasy-mcp`:** Speakeasy-specific hints for MCP tool generation. The exact keys could not be confirmed against Speakeasy's current docs on 2026-10-29, so check them against the version you generate with
 
 ```yaml
 operationId: create_issue
 x-speakeasy-mcp: true
 ```
 
-**`x-openai-isConsequential`:** Mark destructive operations (used by OpenAI models to request explicit approval)
+**`x-openai-isConsequential`:** Mark destructive operations. This comes from OpenAI's GPT Actions; current support in other OpenAI surfaces is unconfirmed, so do not rely on it as your only approval control
 
 ```yaml
 operationId: delete_user
@@ -523,21 +526,13 @@ x-rate-limit:
 
 Use open-source tools to generate MCP servers directly from OpenAPI specs:
 
-- **Speakeasy** (https://speakeasyapi.dev): `speakeasy generate sdk --lang go --openapi spec.yaml` (includes MCP option)
-- **Stainless** (https://www.stainless.com): `stainless generate --sdk-lang typescript --mcp` (TypeScript + MCP)
-- **OpenAPI Generator** (https://openapi-generator.tech): Community-driven; filters to MCP support in progress
+- **Speakeasy** (https://speakeasyapi.dev): generates SDKs and MCP servers from OpenAPI
+- **Stainless** (https://www.stainless.com): generates TypeScript SDKs and MCP servers from OpenAPI
+- **OpenAPI Generator** (https://openapi-generator.tech): community-driven SDK generator; no first-party MCP output
 
-Example with Speakeasy:
+Check each tool's current docs for exact commands and flags; they change between releases.
 
-```bash
-speakeasy generate sdk \
-  --lang go \
-  --openapi openapi.yaml \
-  --out ./gen \
-  --mcp  # Enable MCP server generation
-```
-
-Generated MCP servers inherit operationId naming, descriptions, and examples from the spec. Keep OpenAPI as the source of truth; regenerate MCP after spec changes.
+Generated MCP servers inherit operationId naming, descriptions, and examples from the spec. Keep OpenAPI as the source of truth; regenerate MCP after spec changes, and curate the generated tool set rather than shipping it unreviewed (see the MCP auto-generation page).
 
 ---
 
@@ -548,12 +543,23 @@ Generated MCP servers inherit operationId naming, descriptions, and examples fro
 For Claude Code SDK and Claude Managed Agents, prefer exposing API-derived tools through MCP when the tools should also work outside Anthropic. Keep the OpenAPI-derived registry as the source of truth, then emit MCP tool definitions with agent-first descriptions:
 
 ```typescript
-server.tool(
+import { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
+
+server.registerTool(
   "list_users",
-  "Retrieve a paginated list of users. Use when you need to find users matching criteria or display a directory. Do not use to get a single user by ID (use get_user_by_id instead). Requires users:read scope.",
   {
-    limit: z.number().min(1).max(100).default(20).describe("Number of results per page"),
-    cursor: z.string().optional().describe("Cursor returned from the previous page"),
+    description:
+      "Retrieve a paginated list of users. Use when you need to find users matching criteria or display a directory. Do not use to get a single user by ID (use get_user_by_id instead). Requires users:read scope.",
+    inputSchema: z.object({
+      limit: z.number().min(1).max(100).default(20).describe("Number of results per page"),
+      cursor: z.string().optional().describe("Cursor returned from the previous page"),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   async ({ limit, cursor }) => {
     const page = await users.list({ limit, cursor });
@@ -562,13 +568,6 @@ server.tool(
       content: [{ type: "text", text: `Returned ${page.items.length} users.` }],
     };
   },
-  {
-    annotations: {
-      readOnlyHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
 );
 ```
 
@@ -576,25 +575,29 @@ The description field is identical to OpenAPI - agents benefit from the same onb
 
 ### OpenAI strict-mode function calling
 
-OpenAI `strict: true` requires JSON Schema compliance ([OpenAI function calling](https://platform.openai.com/docs/guides/function-calling)). This has implications for OpenAPI-to-OpenAI schema translation:
+OpenAI `strict: true` accepts only a subset of JSON Schema ([OpenAI function calling](https://platform.openai.com/docs/guides/function-calling)). Strict mode is a setting, not a universal requirement. This has implications for OpenAPI-to-OpenAI schema translation:
 
-- `additionalProperties: false` must be on every object (blocks unexpected fields)
-- No `oneOf`, `anyOf`, or `not` (strict unions unsupported; use enums instead)
-- `format` is advisory only; not validated at decode time
-- No unbounded arrays without `maxItems`
+- `additionalProperties: false` must be on every object, at every nesting level
+- Every property must be listed in `required`; express an optional field as nullable (`type: [string, "null"]`) and have the caller pass `null`
+- Nested `anyOf` is supported; a root-level `anyOf` and unconstrained `any` branches are rejected
+- Keep the schema within OpenAI's published limits on properties, nesting depth and enum size
+- `format` is an annotation, so validate formats in your handler
 
-When generating OpenAI schemas from OpenAPI 3.1, flatten union types and replace with exhaustive `enum`:
+When generating OpenAI schemas from OpenAPI 3.1, make the root an object, mark optional fields nullable, and keep unions inside properties:
 
-```typescript
-// OpenAPI 3.1 (valid, flexible)
-type: [string, number]  // union
+```yaml
+# OpenAPI 3.1 (valid, optional field omitted from required)
+properties:
+  email: { type: string, format: email }
+  role: { type: string, enum: [admin, member] }
+required: [email]
 
-// OpenAI strict (invalid)
-type: [string, number]
-
-// OpenAI strict (correct)
-enum: ["string_value", 123]
-# with description of which is which
+# OpenAI strict (every property required, optional ones nullable)
+properties:
+  email: { type: string }
+  role: { type: [string, "null"], enum: [admin, member, null] }
+required: [email, role]
+additionalProperties: false
 ```
 
 ### Gemini FunctionDeclaration and thought signatures
@@ -627,16 +630,16 @@ const tool: Tool = {
 };
 ```
 
-Export OpenAPI-derived schemas to Gemini using `zod-to-json-schema` (or equivalent) to maintain alignment.
+Export OpenAPI-derived schemas to Gemini from a single source of truth (Zod 4's native `z.toJSONSchema()` or the OpenAPI schema itself) so the declarations stay aligned. The `zod-to-json-schema` package is no longer actively maintained and only handles Zod 3 schemas.
 
 ---
 
 ## Anti-patterns
 
-- **Nested/polymorphic parameters.** Agents struggle with deeply nested object hierarchies and `oneOf`/`anyOf` unions. Flatten parameters; use separate endpoints for polymorphic cases (e.g., `/users/search` vs `/users/{id}`).
+- **Nested/polymorphic parameters.** Deeply nested object hierarchies and `oneOf`/`anyOf` unions are harder for agents to fill in and for some providers to accept. Flatten parameters; use separate endpoints for polymorphic cases (e.g., `/users/search` vs `/users/{id}`).
 - **Missing operationIds.** Without operationIds, agents cannot name tool calls and cannot reference operations in workflows. Every path + method combination must have a unique operationId.
 - **Inconsistent error envelopes.** Some endpoints return `{ "error": "..." }`, others `{ "message": "..." }`. Agents cannot reliably parse errors. Standardize on RFC 9457 everywhere.
-- **OpenAPI 3.0 instead of 3.1.** OpenAPI 3.0 uses JSON Schema draft 5 (incompatible with modern tools). 3.1 aligns with JSON Schema 2020-12. Upgrade during next major release.
+- **OpenAPI 3.0 instead of 3.1+.** OpenAPI 3.0 uses its own modified subset of JSON Schema draft 4/5 keywords, which modern JSON Schema tooling does not read directly. 3.1 aligns with JSON Schema 2020-12. Upgrade during next major release.
 - **Overloaded endpoints.** A single endpoint serving 10 different use cases (filtered by query params or request body shape) forces agents into combinatorial parameter exploration. Prefer separate endpoints: `/users/search`, `/users/by-email`, `/users/active`.
 - **Enum-as-string without documented values.** Status fields with values like "PEND_ACTN", "APRV_RDY", "ACTV" are meaningless to agents without explicit enums and descriptions.
 - **Descriptions that describe implementation, not behavior.** Bad: "Calls the getUserService and returns JSON". Good: "Retrieve a single user by email address. Use when you have the user's email but not their ID."
@@ -688,8 +691,10 @@ The surface skill includes these template files under `/templates`:
 ## Citations
 
 - [OpenAPI 3.1.x Specification](https://spec.openapis.org/oas/v3.1.0)
+- [OpenAPI Specification 3.2.1](https://spec.openapis.org/oas/v3.2.1.html)
+- [Overlay Specification 1.2.0](https://spec.openapis.org/overlay/v1.2.0.html)
 - [Arazzo 1.1.0 Specification](https://spec.openapis.org/arazzo/latest.html)
-- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
+- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/research/writing-tools-for-agents)
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html)
 - [OpenAI Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
 - [OpenAI Strict Mode Documentation](https://platform.openai.com/docs/guides/structured-outputs)

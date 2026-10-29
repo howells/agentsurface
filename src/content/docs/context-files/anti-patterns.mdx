@@ -1,7 +1,7 @@
 ---
 title: Anti-Patterns
 description: Common mistakes in context file design and how to fix them
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -197,7 +197,7 @@ Files drift out of sync. One gets updated; others stay stale. Agents see conflic
 
 **Fix:**
 
-Single source of truth. AGENTS.md is canonical; others defer to it - a Claude Code overlay must import it, not just mention it in prose:
+Single source of truth. AGENTS.md is canonical; others defer to it - a Claude Code overlay should import it, not just mention it in prose:
 
 ```markdown
 # AGENTS.md
@@ -220,7 +220,7 @@ See AGENTS.md > Commands for command reference.
 This file adds Cursor-specific tips.
 ```
 
-A CLAUDE.md that only says "See AGENTS.md" in prose does not load AGENTS.md for Claude Code - only a literal `@AGENTS.md` import does that. Most repos need no CLAUDE.md at all; add one only when Claude needs instructions no other tool should see. Update the source once; overlays that import or reference it stay current automatically.
+A CLAUDE.md that only says "See AGENTS.md" in prose does not load AGENTS.md for Claude Code. An `@AGENTS.md` import is the explicit way to load it; Claude Code can also read AGENTS.md directly when no CLAUDE.md exists, or alongside CLAUDE.md when the `claude-md-and-agents-md` setting is on, but a repository can't choose that setting for its contributors. Most repos need no CLAUDE.md at all; add one only when Claude needs instructions no other tool should see. Update the source once; overlays that import it stay current automatically, while overlays that only mention it in prose don't load it, so test what each client actually loads.
 
 ---
 
@@ -309,7 +309,7 @@ Before committing context files:
 - [ ] All commands verified to work (within last 3 months)
 - [ ] All referenced directories exist
 - [ ] Tech stack versions current
-- [ ] CLAUDE.md, if present, starts with a literal `@AGENTS.md` import, not duplicating
+- [ ] CLAUDE.md, if present, imports `@AGENTS.md` (first line by house recommendation), not duplicating
 - [ ] Cursor rules and Copilot instructions reference AGENTS.md
 - [ ] Permission boundaries explicit (always/ask/never), not aspirational
 - [ ] Links to deeper docs valid

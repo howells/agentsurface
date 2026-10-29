@@ -1,14 +1,14 @@
 ---
 title: Session Control
 description: The controller layer between the UI and the agent loop - modes, subagent surfacing, tool approvals, thread state, and mid-run steering that turn a chat box into a supervised session.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
 A chat box takes a message and waits for a reply. Long-running agents need more: a way to run in different modes, approve individual actions, watch delegated work, steer a run that is already in flight, and recover the whole thing after a reconnect. Session control is the layer that sits between the interface and the agent loop and turns "send message, wait" into a supervised session.
 
-This layer is where coding agents and product agents converge. Claude Code, Cursor, Codex CLI, and GitHub Copilot all expose modes, per-call tool approvals, and steering because a terminal agent that edits files needs supervision. A support agent that drafts refunds for a human to approve needs the same primitives. Product session layers such as Mastra's AgentController (beta) generalize the pattern for non-coding agents. Treat the coding-agent version as one instance of session control.
+This layer is where coding agents and product agents converge. Claude Code, Cursor, Codex CLI, and GitHub Copilot all expose modes, per-call tool approvals, and steering because a terminal agent that edits files needs supervision. A support agent that drafts refunds for a human to approve needs the same primitives. Product session layers such as Mastra's [Agent Controller](https://mastra.ai/docs/harness/agent-controller) (`@mastra/core/agent-controller`: sessions, modes, approvals, subagents, and channels) generalize the pattern for non-coding agents. Treat the coding-agent version as one instance of session control.
 
 Decide by run duration and blast radius: a single-shot, read-only assistant needs none of this; anything that runs across turns, delegates to subagents, or takes irreversible actions needs an explicit controller.
 

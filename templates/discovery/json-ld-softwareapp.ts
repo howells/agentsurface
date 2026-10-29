@@ -1,8 +1,9 @@
 /*
- * json-ld-softwareapp.ts — TypeScript JSON-LD schema generators for SoftwareApplication + related types.
+ * json-ld-softwareapp.ts - TypeScript JSON-LD schema generators for SoftwareApplication + related types.
  *
  * What: Strongly-typed JSON-LD generators for agent discovery via schema.org.
- * Use these in Next.js App Router generateMetadata() or in <script type="application/ld+json"> tags.
+ * Render them in <script type="application/ld+json"> elements in a Next.js page or layout
+ * (generateMetadata() does not emit arbitrary JSON-LD).
  *
  * When: Embed structured data in HTML HEAD to help agents understand your project.
  *
@@ -17,7 +18,7 @@
  * - schema.org SoftwareApplication: https://schema.org/SoftwareApplication
  * - schema.org WebAPI: https://schema.org/WebAPI
  * - JSON-LD format: https://json-ld.org
- * - Next.js generateMetadata: https://nextjs.org/docs/app/api-reference/functions/generate-metadata
+ * - Next.js JSON-LD guide: https://nextjs.org/docs/app/guides/json-ld
  *
  * Validation: Use Zod to validate output shape at build time (see bottom of file).
  */
@@ -374,6 +375,9 @@ export function createOrganization({
  *   description: 'TypeScript SDK for agent-consumable services',
  * });
  *
+ * // Escape "<" so structured data can never close the script element early.
+ * const toJsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
+ *
  * export default function RootLayout({ children }) {
  *   const appSchema = createSoftwareApplication({
  *     name: 'Acme Agent Tools',
@@ -397,11 +401,11 @@ export function createOrganization({
  *       <head>
  *         <script
  *           type="application/ld+json"
- *           dangerouslySetInnerHTML={{ __html: JSON.stringify(appSchema) }}
+ *           dangerouslySetInnerHTML={{ __html: toJsonLd(appSchema) }}
  *         />
  *         <script
  *           type="application/ld+json"
- *           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+ *           dangerouslySetInnerHTML={{ __html: toJsonLd(orgSchema) }}
  *         />
  *       </head>
  *       <body>{children}</body>

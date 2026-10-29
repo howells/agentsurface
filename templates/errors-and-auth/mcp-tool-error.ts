@@ -10,7 +10,7 @@
  */
 
 import type { TextContent } from "@modelcontextprotocol/server";
-import type { ProblemDetails } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType } from "./problem-details";
 import { problemDetails } from "./problem-details";
 
 /**
@@ -38,7 +38,7 @@ function generateTraceId(): string {
 /**
  * Map thrown errors to RFC 9457 ProblemDetails JSON
  */
-function mapErrorToProblemDetails(err: Error | unknown, traceId: string): ProblemDetails {
+function mapErrorToProblemDetails(err: Error | unknown, traceId: string): ProblemDetailsType {
   const message = err instanceof Error ? err.message : String(err);
 
   // Detect error patterns
@@ -48,7 +48,7 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
   const isAuth = /unauthorized|forbidden|auth/i.exec(message);
 
   let statusCode = 500;
-  let code = "ERR_INTERNAL";
+  let code: ProblemCode = "ERR_INTERNAL";
   let type = "https://api.example.com/errors/internal_error";
 
   if (isValidation) {
@@ -73,7 +73,7 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
     code,
     detail: message,
     doc_uri: `https://api.example.com/docs/errors#${code}`,
-    is_retriable: statusCode >= 500 || isNetwork,
+    is_retriable: statusCode >= 500 || Boolean(isNetwork),
     retry_after_ms: isNetwork ? 5000 : undefined,
     status: statusCode,
     title: code.replace("ERR_", "").replace(/_/g, " "),
@@ -171,7 +171,8 @@ export function withToolErrorHandling(
  *
  * ```typescript
  * import { McpServer } from '@modelcontextprotocol/server';
- * import { withToolErrorHandling, toolOk } from './mcp-tool-error';
+ * import { z } from 'zod';
+ * import { withToolErrorHandling } from './mcp-tool-error';
  *
  * const server = new McpServer({ name: 'example', version: '1.0.0' });
  *
@@ -179,12 +180,12 @@ export function withToolErrorHandling(
  *   'fetch_data',
  *   {
  *     description: 'Fetch data by ID',
- *     inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+ *     inputSchema: z.object({ id: z.string() }), // a Zod (Standard Schema) object, not raw JSON Schema
  *   },
- *   withToolErrorHandling(async (input) => {
+ *   // The wrapper builds the MCP content envelope itself: return plain data, not toolOk(...)
+ *   withToolErrorHandling(async (input: { id: string }) => {
  *     if (!input.id) throw new Error('ID is required');
- *     const data = await fetchData(input.id);
- *     return toolOk({ data });
+ *     return { data: await fetchData(input.id) };
  *   }),
  * );
  * ```
@@ -203,7 +204,6 @@ export function withToolErrorHandling(
  *       return {
  *         jsonrpc: '2.0',
  *         result: {
- *           type: 'tool_result',
  *           content: [{ type: 'text', text: JSON.stringify(result) }],
  *         },
  *         id,
@@ -213,10 +213,7 @@ export function withToolErrorHandling(
  *     const errorResult = toolError({ error: err });
  *     return {
  *       jsonrpc: '2.0',
- *       result: {
- *         type: 'tool_result',
- *         ...errorResult,
- *       },
+ *       result: errorResult, // { isError: true, content: [...] }
  *       id,
  *     };
  *   }

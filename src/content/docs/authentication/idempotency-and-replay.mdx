@@ -1,16 +1,16 @@
 ---
 title: Idempotency and Replay Protection
 description: Nonce stores, DPoP jti uniqueness, preventing double-submission
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
 Idempotency and replay protection operate at different layers. DPoP jti uniqueness prevents a stolen proof from being replayed. Idempotency-Key headers prevent double-submission of write operations if retried due to network failure. Together they prevent both replay and double-submission for high-value operations like payments. This page covers how the two compose at the authentication layer; the full idempotency-key implementation lives on [Idempotency](/docs/error-handling/idempotency).
 
-- DPoP jti: unique per request, stored with 2-minute TTL, prevents proof replay
+- DPoP jti: unique per request, remembered for your whole proof acceptance window (the `iat` window plus clock skew), prevents proof replay
 - Idempotency-Key: client-generated, sent on every retry, server deduplicates
-- Idempotency store: cache responses (success and failure) for 24 hours, keyed by the client's idempotency key
+- Idempotency store: cache responses (success and failure) for a published retention window (24 hours is a common choice), keyed by authenticated principal, operation, and the client's idempotency key
 - Use Redis for distributed systems; in-memory for single instance
 - Combine both for payments, user provisioning, data deletion
 
@@ -26,15 +26,15 @@ RFC 9449 DPoP proofs include a `jti` claim - a unique identifier per request. Th
   "htm": "POST",
   "htu": "https://api.example.com/payments",
   "iat": 1700000000,
-  "exp": 1700000120
+  "ath": "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo"
 }
 ```
 
-The server maintains a store of seen JTIs, valid for the lifetime of the proof (typically 2 minutes). On every DPoP proof validation:
+The server maintains a store of seen JTIs for as long as it would accept a proof (RFC 9449 sets no fixed lifetime; this example uses two minutes plus skew). This example shows only the replay check; full validation also checks `typ`, `htm`, `htu`, `iat`, `ath`, any `nonce`, and the token's key binding (see [DPoP](/docs/authentication/dpop)). On every DPoP proof validation:
 
 ```typescript
 const seenJtis = new Map<string, number>();
-const JTI_MAX_AGE = 2 * 60; // 2 minutes
+const JTI_MAX_AGE = 2 * 60 + 60; // local policy: 2-minute window plus 60s skew
 
 async function validateDPopProof(proof: string): Promise<void> {
   const { payload } = await jwtVerify(proof, publicKey);
@@ -91,7 +91,7 @@ The Redis `NX` flag ensures the JTI is only set once. If the key already exists,
 
 ## Idempotency Keys for Mutation Operations
 
-Idempotency keys are client-generated identifiers that prevent double-submission of write operations. If a request is retried due to network failure, timeout, or connection loss, the server recognizes the same logical operation and returns the cached response instead of executing twice. The client sends an `Idempotency-Key` header alongside its `Authorization` and `DPoP` headers; the server caches the response - success or failure - for a window, typically 24 hours, keyed by that header. Generate keys as UUIDv7 so the embedded timestamp lets old keys expire naturally, and log them for audit trails.
+Idempotency keys are client-generated identifiers that prevent double-submission of write operations. If a request is retried due to network failure, timeout, or connection loss, the server recognizes the same logical operation and returns the cached response instead of executing twice. The client sends an `Idempotency-Key` header alongside its `Authorization` and `DPoP` headers; the server caches the response - success or failure - for a published retention window (often 24 hours), keyed by the authenticated principal and operation as well as that header, and rejects a reused key whose payload differs. Check authorization before the lookup so one client can never read another's cached response. Generate keys as UUIDs or similar random values (the IETF draft doesn't require UUIDv7, and an embedded timestamp doesn't enforce expiry on its own), and log them for audit trails.
 
 The full key-generation, storage, and TTL mechanism - including the production Redis handler - lives on the [Idempotency](/docs/error-handling/idempotency) page. What matters at the authentication layer is how this mechanism composes with DPoP replay protection.
 
@@ -121,17 +121,17 @@ async function handlePayment(req: Request): Promise<Response> {
 }
 ```
 
-Maintain separate stores with separate TTLs for the two nonces: a **DPoP JTI store** (2-minute TTL, since a proof is only valid briefly) and an **idempotency key store** (24-hour TTL, since a client may retry hours later). Reusing one store for both loses the distinction between "this proof was replayed" and "this operation was retried."
+Maintain separate stores with separate TTLs for the two nonces: a **DPoP JTI store** (minutes, matching your proof acceptance window) and an **idempotency key store** (24-hour TTL, since a client may retry hours later). Reusing one store for both loses the distinction between "this proof was replayed" and "this operation was retried."
 
 ## Checklist
 
 - [ ] DPoP `jti` claims are stored and validated for uniqueness
-- [ ] DPoP JTI store auto-expires after 2 minutes, kept separate from the idempotency key store
+- [ ] DPoP JTI store keeps entries for the full proof acceptance window, kept separate from the idempotency key store
 - [ ] Mutation operations require and validate `Idempotency-Key` header
 - [ ] Idempotency responses (success and failure) are cached for 24 hours; see [Idempotency](/docs/error-handling/idempotency) for the store implementation
 - [ ] Distributed systems use Redis or equivalent for both nonce stores
 - [ ] DPoP validation runs before the idempotency lookup on every request
-- [ ] Agents generate UUIDv7 idempotency keys and reuse the same key across retries of one logical operation
+- [ ] Agents generate random (UUID) idempotency keys and reuse the same key across retries of one logical operation
 
 ## See Also
 

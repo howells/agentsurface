@@ -1,7 +1,7 @@
 ---
 title: Delta Scorecard
 description: Computing and visualizing improvements between two scorecards
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -64,8 +64,10 @@ interface DeltaScorecard {
   scaledAfter: number;
   ratingBefore: string;
   ratingAfter: string;
-  overallDelta: number;
+  overallDelta: number; // raw points
+  scaledDelta: number; // points on the 0-30 scale
   clustersApproached: string[];
+  warnings: string[]; // reasons the two snapshots may not be comparable
 }
 
 /**
@@ -78,6 +80,13 @@ export function deltaScorecard(before: Scorecard, after: Scorecard): DeltaScorec
     throw new Error(`Project mismatch: ${before.project.name} vs ${after.project.name}`);
   }
 
+  // Snapshots are only comparable under the same rubric. If you log a rubric version
+  // (see Calibration), compare it here as well.
+  const warnings: string[] = [];
+  if (before.version !== after.version) {
+    warnings.push(`Scorecard version changed: ${before.version} vs ${after.version}`);
+  }
+
   // Dimension deltas
   const dimensions: DeltaDimension[] = before.dimensions.map((dimBefore) => {
     const dimAfter = after.dimensions.find((d) => d.name === dimBefore.name);
@@ -88,7 +97,10 @@ export function deltaScorecard(before: Scorecard, after: Scorecard): DeltaScorec
     const scoreBefore = dimBefore.score;
     const scoreAfter = dimAfter.score;
 
-    // Handle N/A dimensions
+    // An N/A transition is not a zero change; flag it instead of hiding it
+    if ((scoreBefore === null) !== (scoreAfter === null)) {
+      warnings.push(`${dimBefore.name}: applicability changed (N/A on one side only)`);
+    }
     const delta = scoreBefore === null || scoreAfter === null ? 0 : scoreAfter - scoreBefore;
 
     return {
@@ -109,12 +121,18 @@ export function deltaScorecard(before: Scorecard, after: Scorecard): DeltaScorec
   const maxBefore = before.overall.maxApplicable;
   const maxAfter = after.overall.maxApplicable;
   const overallDelta = totalAfter - totalBefore;
+  const scaledDelta = after.overall.scaledScore - before.overall.scaledScore;
 
-  // Cluster impact
-  const clustersApproached = after.findingClusters
-    .filter((cluster) =>
-      cluster.findings.some((finding) => finding.currentScore < finding.targetScore),
-    )
+  // A raw difference is only comparable when the same dimensions applied
+  if (maxBefore !== maxAfter) {
+    warnings.push(`Applicable maximum changed: ${maxBefore} vs ${maxAfter}; compare scaled scores`);
+  }
+
+  // Cluster impact: clusters with a before-finding whose stable ID no longer appears after.
+  // An absent ID is a lead, not proof; confirm it against the dimension delta and the re-audit evidence.
+  const afterIds = new Set(after.findingClusters.flatMap((c) => c.findings.map((f) => f.id)));
+  const clustersApproached = before.findingClusters
+    .filter((cluster) => cluster.findings.some((finding) => !afterIds.has(finding.id)))
     .map((c) => c.name);
 
   return {
@@ -131,7 +149,9 @@ export function deltaScorecard(before: Scorecard, after: Scorecard): DeltaScorec
     ratingBefore: before.overall.rating,
     ratingAfter: after.overall.rating,
     overallDelta,
+    scaledDelta,
     clustersApproached,
+    warnings,
   };
 }
 
@@ -164,10 +184,17 @@ export function formatDeltaScorecard(delta: DeltaScorecard): string {
   lines.push(
     `  TOTAL: ${delta.totalBefore}/${delta.maxBefore} → ${delta.totalAfter}/${delta.maxAfter} (scaled: ${delta.scaledBefore}/30 → ${delta.scaledAfter}/30)`,
   );
+  lines.push(`  DELTA: ${delta.overallDelta} raw, ${delta.scaledDelta} scaled`);
   lines.push(
     `  RATING: ${delta.ratingBefore} → ${delta.ratingAfter} ${delta.overallDelta > 0 ? "✦" : delta.overallDelta < 0 ? "✗" : "—"}`,
   );
   lines.push("");
+
+  if (delta.warnings.length > 0) {
+    lines.push("  Comparability warnings:");
+    delta.warnings.forEach((w) => lines.push(`    ! ${w}`));
+    lines.push("");
+  }
 
   if (delta.clustersApproached.length > 0) {
     lines.push(`  Clusters tackled:`);
@@ -293,6 +320,7 @@ Output:
 
   ─────────────────────────────────────────────────────
   TOTAL: 3/24 → 17/24 (scaled: 4/30 → 21/30)
+  DELTA: 14 raw, 17 scaled
   RATING: Human-only → Agent-ready ✦
 
   Clusters tackled:
@@ -322,7 +350,7 @@ Output:
 **Overall:**
 
 - **Rating upgraded**: Human-only → Agent-ready (crossed the 15-point threshold)
-- **Score improvement**: +14 points in 13.5 hours of work
+- **Score improvement**: +14 raw points (4 → 21 on the 0-30 scale) in 13.5 hours of work
 - **Impact**: Agents can now reliably use the API with proper auth, error recovery, and tool discovery
 
 ## Next Steps

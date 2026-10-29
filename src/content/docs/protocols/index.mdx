@@ -1,12 +1,12 @@
 ---
 title: Protocols & Standards
 description: The protocol landscape for agent-to-service and agent-to-agent communication
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Two protocols dominate: MCP (agent-to-tools/data, vertical) and A2A (agent-to-agent, horizontal). Most production systems layer them: agents use MCP to access their tools and A2A to delegate to peers. Commerce protocols (UCP, ACP) that ride on top of these for agent-initiated purchases now have their own section - see [Agentic Commerce](/docs/agentic-commerce). Supporting standards (OpenTelemetry, llms.txt) add observability and API discovery.
+Two protocols dominate: MCP (agent-to-tools/data, vertical) and A2A (agent-to-agent, horizontal). The two compose: an agent can use MCP to reach its tools and A2A to delegate to peers. Commerce protocols (UCP, ACP) that ride on top of these for agent-initiated purchases now have their own section - see [Agentic Commerce](/docs/agentic-commerce). Supporting standards (OpenTelemetry, llms.txt) add observability and API discovery.
 
 ```
 Orchestrator (uses A2A)
@@ -18,7 +18,7 @@ Orchestrator (uses A2A)
        └── MCP → Specialist's tools
 ```
 
-- MCP: remote tools, resources, and prompts - `2026-07-28` is the current revision and is supported by all Tier 1 SDKs; async Tasks are an official extension
+- MCP: remote tools, resources, and prompts - `2026-07-28` is the current revision and is supported by all Tier 1 SDKs; async Tasks, Skills over MCP (SEP-2640, Final 2026-09-13), and Server Cards (SEP-2127, Final 2026-10-06) are official extensions
 - WebMCP: page-scoped browser tools through `document.modelContext`; a W3C Community Group draft, not remote MCP
 - A2A v1.0.1: production-grade task delegation across organizational boundaries
 - Commerce (UCP, ACP): agent-initiated purchases - see [Agentic Commerce](/docs/agentic-commerce), not covered on this page
@@ -56,7 +56,7 @@ These protocols and complementary standards define how agents discover capabilit
 
 ## Architecture Pattern
 
-Most production systems use MCP + A2A + supporting standards:
+A common architecture pattern combines MCP, A2A, and supporting standards:
 
 ```
 Orchestrator Agent (uses A2A)
@@ -73,7 +73,8 @@ Orchestrator Agent (uses A2A)
 Publish these endpoints for agents to find you:
 
 - `/.well-known/agent-card.json` - A2A AgentCard (for multi-agent scenarios)
-- `/.well-known/ucp` or `/.well-known/acp.json` - commerce capabilities (if you accept agent-initiated payments) - see [Agentic Commerce](/docs/agentic-commerce)
+- An MCP Server Card, if you run a remote MCP server - an optional extension (SEP-2127, Final 2026-10-06; format still draft) that recommends hosting at `<streamable-http-url>/server-card` and listing it in `/.well-known/ai-catalog.json` - see [Well-Known Endpoints](/docs/discovery/well-known-endpoints)
+- `/.well-known/ucp` - UCP commerce capabilities (if you accept agent-initiated payments; ACP has no released discovery document) - see [Agentic Commerce](/docs/agentic-commerce)
 - `/AGENTS.md` - Agent context & MCP servers (always useful)
 - `/llms.txt` or `/llms-full.txt` - LLM-friendly docs
 - Structured data as JSON-LD (schema.org markup) for auto-discovery

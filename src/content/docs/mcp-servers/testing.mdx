@@ -1,7 +1,7 @@
 ---
 title: Testing MCP Servers
 description: Unit tests, in-memory integration tests, and interactive debugging with MCP Inspector
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -22,12 +22,13 @@ Testing an MCP server has three distinct levels: unit tests for individual tool 
 The `createServer()` factory pattern described in [Server Architecture](./architecture) exists primarily to enable testing. A server that starts a network listener in its constructor cannot be tested without ports, process management, and timing concerns. A factory function that returns a configured `McpServer` can be connected to an `InMemoryTransport` in a test and exercised synchronously.
 
 <Callout type="info">
-  Current `2026-07-28` behavior: the `initialize` handshake this page's `client.connect()` calls
-  perform is removed. Capabilities move from a one-time connect-time negotiation to `_meta` on every
-  request, so a Level 2 test asserting on the connect response is asserting on a step the wire
-  protocol no longer has. The code below is the `2025-11-25` shape, which the SDK still supports;
-  see [Server Architecture](./architecture) for what changes under `2026-07-28` and update these
-  tests when your SDK version does.
+  Current `2026-07-28` behavior: the `initialize` handshake is removed. Capabilities move from a
+  one-time connect-time negotiation to `_meta` on every request, so a Level 2 test asserting on a
+  connect-time response is asserting on a step the current wire protocol no longer has. The
+  TypeScript SDK v2 (`@modelcontextprotocol/server` and `@modelcontextprotocol/client`) already
+  implements `2026-07-28`, and the code below uses those packages. The in-memory pattern is
+  unchanged, but pin your imports and assertions to the SDK generation and protocol revision you
+  target; see [Server Architecture](./architecture) for what changes under `2026-07-28`.
 </Callout>
 
 ```typescript
@@ -49,28 +50,21 @@ Unit tests cover individual tool registration functions. They verify that the sc
 
 ```typescript
 // src/tools/create-invoice.test.ts
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerCreateInvoice } from "./create-invoice.js";
+import { describe, it, expect, vi } from "vitest";
+import { createInvoiceHandler, CreateInvoiceSchema } from "./create-invoice.js";
 import * as db from "../db.js";
 
 vi.mock("../db.js");
 
+// Export the schema and a handler factory from the tool file, next to registerCreateInvoice(),
+// so the logic can be called directly without reaching into the server's internals.
+const handler = createInvoiceHandler({ stripeApiKey: "sk_test_key", databaseUrl: ":memory:" });
+
 describe("billing_create_invoice", () => {
-  let server: McpServer;
-
-  beforeEach(() => {
-    server = new McpServer({ name: "test", version: "0.0.0" });
-    registerCreateInvoice(server, {
-      stripeApiKey: "sk_test_key",
-      databaseUrl: ":memory:",
-    });
-  });
-
   it("returns isError when customer does not exist", async () => {
     vi.mocked(db.customers.findById).mockResolvedValue(null);
 
-    const result = await callTool(server, "billing_create_invoice", {
+    const result = await handler({
       customer_id: "00000000-0000-0000-0000-000000000001",
       amount_cents: 5000,
       currency: "usd",
@@ -82,25 +76,20 @@ describe("billing_create_invoice", () => {
     expect(result.content[0].text).toContain("billing_list_customers");
   });
 
-  it("rejects invalid amount_cents", async () => {
-    const result = await callTool(server, "billing_create_invoice", {
+  it("schema rejects a negative amount_cents", () => {
+    const parsed = CreateInvoiceSchema.safeParse({
       customer_id: "00000000-0000-0000-0000-000000000001",
       amount_cents: -100, // negative
       currency: "usd",
       due_date: "2025-12-31",
     });
 
-    expect(result.isError).toBe(true);
+    expect(parsed.success).toBe(false);
   });
 });
-
-// Helper - exercise the tool handler without a transport
-async function callTool(server: McpServer, toolName: string, params: Record<string, unknown>) {
-  const tool = (server as any)._registeredTools.get(toolName);
-  if (!tool) throw new Error(`Tool not registered: ${toolName}`);
-  return tool.handler(params, {});
-}
 ```
+
+Calling a handler directly bypasses the server's schema validation, so it cannot show how the server reports a bad argument to a client. Test the schema itself with `safeParse` as above, and cover the end-to-end behavior (an `isError` result for invalid input) through the public in-memory client in Level 2. Do not reach into private fields such as `_registeredTools`; they are not a stable interface.
 
 ## Level 2: In-Memory Integration Tests
 
@@ -109,8 +98,8 @@ Integration tests exercise the full MCP protocol stack using `InMemoryTransport.
 ```typescript
 // src/server.integration.test.ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { createServer } from "./server.js";
 
 describe("billing-mcp integration", () => {
@@ -232,7 +221,7 @@ describe("billing-mcp integration", () => {
 });
 ```
 
-The `InMemoryTransport.createLinkedPair()` call returns two transport objects that are wired together. Anything written to one appears on the other. There are no async I/O operations - the transport is synchronous in memory. Tests run at the full speed of the JavaScript runtime.
+Import `InMemoryTransport` from one package for both halves of the pair; mixing the client's and server's copies breaks the link. The `InMemoryTransport.createLinkedPair()` call returns two transport objects that are wired together. Anything written to one appears on the other. There are no async I/O operations - the transport is synchronous in memory. Tests run at the full speed of the JavaScript runtime.
 
 ## Testing Approach Matrix
 
@@ -247,6 +236,7 @@ The `InMemoryTransport.createLinkedPair()` call returns two transport objects th
 | Prompts return expected messages       | Integration | `client.getPrompt()`        |
 | Human-friendly interactive testing     | Interactive | MCP Inspector               |
 | Authentication is enforced             | Integration | Custom auth middleware test |
+| `server/discover` is answered          | Integration | Explicit conformance test   |
 
 ## MCP Inspector
 
@@ -284,14 +274,19 @@ CLIENT_PORT=6275 npx @modelcontextprotocol/inspector node dist/cli.js
 - Browse resources and read their content
 - List and preview prompt templates
 - View the raw JSON-RPC message log for debugging protocol issues
-- Inspect capabilities carried in `_meta` on requests and, where the server implements it, the optional `server/discover` response
+- Inspect capabilities carried in `_meta` on requests and the `server/discover` response (servers must implement it, even though clients may skip calling it)
+
+Add an explicit test that your server answers `server/discover`: it is required of servers, so a server without it is not compliant with `2026-07-28`, even if clients that skip discovery never notice.
 
 Use the Inspector for exploratory testing, verifying that descriptions read well, and debugging tool failures before writing regression tests. It is not a substitute for automated tests - errors you find in the Inspector should become test cases.
 
 <Callout type="info">
-  The Inspector connects using the same MCP client library used by Claude Desktop and other MCP
-  clients. If something works in the Inspector but fails in your actual agent client, the issue is
-  in the client configuration or authentication layer, not the server implementation.
+  A passing Inspector session only shows that one client, revision, set of capabilities, and request
+  path worked. If something works in the Inspector but fails in your actual agent client, check the
+  client configuration and authentication layer first, but do not rule out the server: it can still
+  have revision-, transport-, extension-, or client-dependent bugs. The [client
+  matrix](https://modelcontextprotocol.io/extensions/client-matrix) shows which clients support
+  which extensions.
 </Callout>
 
 ## Vitest Configuration

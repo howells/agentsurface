@@ -13,7 +13,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { ProblemDetails } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType } from "./problem-details";
 import { problemDetails, toProblemResponse } from "./problem-details";
 
 /**
@@ -21,7 +21,7 @@ import { problemDetails, toProblemResponse } from "./problem-details";
  */
 export class DomainError extends Error {
   constructor(
-    public code: string,
+    public code: ProblemCode,
     public statusCode: number,
     message: string,
     public details?: Record<string, unknown>,
@@ -97,7 +97,7 @@ function getTraceId(req: NextRequest | Request): string {
 function mapErrorToProblemDetails(
   err: DomainError | Error | unknown,
   traceId: string,
-): ProblemDetails {
+): ProblemDetailsType {
   if (err instanceof DomainError) {
     const baseProblem = problemDetails({
       code: err.code,
@@ -162,12 +162,13 @@ export function withProblemDetails(
 }
 
 /**
- * Middleware for Next.js to attach traceId to requests
- * Mount in middleware.ts:
+ * Proxy for Next.js 16 to attach traceId to requests (the `middleware.ts` convention was
+ * renamed to `proxy.ts`). It receives only the request and returns a response; there is no
+ * `next` callback. Mount in proxy.ts:
  *
  * ```typescript
  * import { errorMiddleware } from '@/lib/error-handler';
- * export const middleware = errorMiddleware;
+ * export const proxy = errorMiddleware;
  * export const config = { matcher: ['/api/:path*'] };
  * ```
  */

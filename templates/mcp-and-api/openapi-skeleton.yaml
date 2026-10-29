@@ -462,7 +462,7 @@ components:
           example: "Analyzes support tickets for sentiment and priority"
         model:
           type: string
-          enum: [claude-opus-5-5, claude-sonnet-5, claude-haiku-4-5-20251001]
+          enum: [claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5]
           example: "claude-opus-5-5"
         status:
           type: string
@@ -507,7 +507,7 @@ components:
           example: "Analyzes support tickets"
         model:
           type: string
-          enum: [claude-opus-5-5, claude-sonnet-5, claude-haiku-4-5-20251001]
+          enum: [claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5]
           example: "claude-opus-5-5"
         tools:
           type: array

@@ -68,10 +68,12 @@ Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best 
   "resource": "https://api.example.com",
   "authorization_servers": ["https://auth.example.com"],
   "scopes_supported": ["users:read", "users:write", "billing:read"],
-  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
-  "bearer_methods_supported": ["header"]
+  "bearer_methods_supported": ["header"],
+  "dpop_bound_access_tokens_required": false
 }
 ```
+
+Token-verification keys are not part of this document: they come from the authorization server's own RFC 8414 metadata (its `jwks_uri`). A `jwks_uri` in protected-resource metadata means the resource's own keys, for example for signed responses. If the resource requires DPoP, say so with the standard `dpop_bound_access_tokens_required` and `dpop_signing_alg_values_supported` fields.
 
 Authorization server metadata remains RFC 8414. MCP clients use protected-resource metadata to discover authorization servers and request the right resource and scopes. Always publish it for a protected remote API or MCP server.
 
@@ -131,40 +133,37 @@ Always separate agent identity from user identity in logs and audits.
 The client:
 
 1. Generates a keypair.
-2. Signs a `DPoP` JWT per request (includes method, URI, timestamp, public key hash).
-3. Sends both the `Authorization` and `DPoP` headers.
+2. Signs a `DPoP` proof JWT per request: `typ: dpop+jwt`, the public JWK in the header, and `jti`, `htm`, `htu` (without query or fragment), `iat`, and `ath` (the access-token hash) as claims.
+3. Sends `Authorization: DPoP <token>` (the DPoP scheme, not `Bearer`) plus the `DPoP` proof header.
 
-The server validates the DPoP signature and ensures the public key matches. DPoP is a general OAuth 2.0 mechanism, not part of the MCP authorization specification itself - MCP's auth model builds on OAuth 2.1 and RFC 9728 protected-resource metadata but does not mandate or reference DPoP. Adopt it as an independent hardening step for sensitive remote servers (growing adoption in identity providers such as Connect2id and ZITADEL), and only claim DPoP support when the server actually implements RFC 9449.
+The server validates the proof's signature, claims and `ath`, rejects replayed `jti` values, and checks that the JWK thumbprint matches the token's `cnf.jkt`. DPoP is a general OAuth 2.0 mechanism, not part of the MCP authorization specification itself - MCP's auth model builds on OAuth 2.1 and RFC 9728 protected-resource metadata but does not mandate or reference DPoP. Adopt it as an independent hardening step for sensitive remote servers (growing adoption in identity providers such as Connect2id and ZITADEL), and only claim DPoP support when the server actually implements RFC 9449.
 
 TypeScript example using `jose`:
 
 ```typescript
-import { SignJWT, jwtVerify, exportSPKI, generateKeyPair } from "jose";
+import { SignJWT, exportJWK, generateKeyPair } from "jose";
+import { createHash, randomUUID } from "node:crypto";
 
-async function generateDPopProof(method: string, uri: string, publicKeyPEM: string) {
-  const secret = await crypto.subtle.importKey(
-    "pkcs8",
-    new TextEncoder().encode(privateKeyPEM),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
+const { publicKey, privateKey } = await generateKeyPair("ES256");
+const { kty, crv, x, y } = await exportJWK(publicKey);
 
+async function generateDPopProof(method: string, uri: string, accessToken: string) {
+  const url = new URL(uri);
   return new SignJWT({
-    jti: crypto.randomUUID(),
+    jti: randomUUID(),
     htm: method,
-    htu: uri,
+    htu: `${url.origin}${url.pathname}`, // no query or fragment
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 60,
+    ath: createHash("sha256").update(accessToken).digest("base64url"),
   })
-    .setProtectedHeader({ alg: "RS256", typ: "dpop+jwt" })
-    .sign(secret);
+    .setProtectedHeader({ alg: "ES256", typ: "dpop+jwt", jwk: { kty, crv, x, y } })
+    .sign(privateKey);
 }
 ```
 
 ### OAuth 2.1
 
-([OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) consolidates best practices. It is still an Internet-Draft - draft-15 was published 2026-03-02, with IESG submission targeted for December 2026. Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
+([OAuth 2.1](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)) consolidates best practices. It is still an Internet-Draft - draft-16 was published 2026-09-03 (MCP `2026-07-28` itself cites draft-13). Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
 
 - **PKCE mandatory** on all authorization-code flows (even confidential clients).
 - **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code only.
@@ -172,7 +171,7 @@ async function generateDPopProof(method: string, uri: string, publicKeyPEM: stri
 - **Exact-match redirect URIs.** No wildcard paths.
 - **Bearer tokens restricted to authenticated channels.** No query strings (tokens leak in logs).
 
-For agents, the takeaway: use Client Credentials for service-owned runtime credentials and Token Exchange for delegation. Keep any human consent or OTP flow in a bounded registration path such as `auth.md`, not in every API request.
+For agents, the takeaway: use Client Credentials for service-owned runtime credentials and Token Exchange for delegation. Keep any human consent or user-code claim flow in a bounded registration path such as `auth.md`, not in every API request.
 
 ### JWT validation
 
@@ -183,7 +182,7 @@ Use `jose` (TypeScript, platform-agnostic) or legacy `jsonwebtoken` (Node only).
 3. **Audience (`aud`):** Ensure it includes your service.
 4. **Expiry (`exp`):** Ensure the token has not expired.
 5. **Not-before (`nbf`):** Ensure the token is not used before its valid-from time.
-6. **Type (`typ`):** For DPoP, ensure `typ: 'at+jwt'` (not `'dpop+jwt'`).
+6. **Type (`typ`):** For JWT access tokens in the RFC 9068 profile, expect `typ: 'at+jwt'`; a `dpop+jwt` is a proof, never an access token.
 
 Rejection checklist:
 
@@ -195,7 +194,7 @@ TypeScript with `jose`:
 
 ```typescript
 import { jwtVerify } from "jose";
-import { createRemoteJWKSet } from "jose/jwks.remote";
+import { createRemoteJWKSet } from "jose";
 
 async function validateToken(token: string, jwksUri: string) {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
@@ -240,7 +239,7 @@ const secret =
 
 ```typescript
 import { jwtVerify } from "jose";
-import { createRemoteJWKSet } from "jose/jwks.remote";
+import { createRemoteJWKSet } from "jose";
 
 const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 

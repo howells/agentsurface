@@ -1,7 +1,7 @@
 ---
 title: Clustering Findings
 description: Organizing findings into actionable work clusters
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -62,7 +62,7 @@ Finding 1: Tool Design
   Impact: Tool Design 1/3 → 2/3
 
 Finding 2: MCP Server
-  Issue: .mcp.json — no MCP server. 0 files matching **/.mcp.json.
+  Issue: no MCP server found. No MCP SDK imports or server registration in the source, and 0 files matching **/.mcp.json (a missing client config alone does not prove there is no server; creating one does not implement a server).
   Why: Agents consume MCP to discover tools. Without MCP, agents must use CLI or API docs (harder).
   Fix: Create MCP server with 6 existing tools. Use InMemoryTransport for testing.
   Impact: MCP Server 0/3 → 2/3
@@ -89,7 +89,7 @@ Findings:
 | Severity | Dimension    | Issue                          | Fix                                       | Impact     |
 |----------|--------------|--------------------------------|-------------------------------------------|------------|
 | High     | Tool Design  | Descriptions `` `<10` `` words         | Expand with context & examples            | 1/3 → 2/3  |
-| Critical | MCP Server   | No MCP server exists           | Create .mcp.json + MCP impl               | 0/3 → 2/3  |
+| Critical | MCP Server   | No MCP server exists           | Implement MCP server               | 0/3 → 2/3  |
 | Medium   | Discovery    | No llms.txt at root            | Create llms.txt with categorized links    | 1/3 → 2/3  |
 
 Suggested Approach:
@@ -197,7 +197,10 @@ Error Handling:      0/3 (no structured errors)
 Tool Design:         1/3 (basic schemas, terse descriptions)
 Context Files:       1/3 (auto-generated AGENTS.md)
 Testing:             0/3 (no agent tests)
+Retrievability:      N/A (no searchable data exposed to agents)
 ```
+
+Raw 5 of 24 applicable points scales to 6/30.
 
 ### Raw Findings (Unordered)
 

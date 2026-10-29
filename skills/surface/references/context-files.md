@@ -16,12 +16,12 @@ Context files are the foundational onboarding layer for AI coding agents. They d
 
 ## Scoring rubric
 
-| Score | Criteria                                                                                                                                                                                                                                                                                                 | Detection                                                                                                                                                                                                                                                      |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No AGENTS.md, CLAUDE.md, or equivalent.                                                                                                                                                                                                                                                                  | No agent context files found.                                                                                                                                                                                                                                  |
-| 1     | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands.                                                                                                                                                                                                             | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation).                                                                                                    |
-| 2     | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples.                                                                                                                                             | Commands section at top with exact invocations. Permission boundaries defined. Within the <370-line audit tolerance. Non-obvious conventions documented with examples.                                                                                         |
-| 3     | Curated AGENTS.md as the single source. Tool-specific overlays (CLAUDE.md, .cursor/rules, Copilot instructions) exist only where a tool needs something AGENTS.md can't give it, each deferring to AGENTS.md rather than restating it. Progressive/nested disclosure. Updated iteratively from friction. | AGENTS.md hand-curated; any CLAUDE.md starts with a literal `@AGENTS.md` import; .cursor/rules and Copilot instructions reference AGENTS.md rather than duplicating it. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
+| Score | Criteria                                                                                                                                                                                                                                                                                                 | Detection                                                                                                                                                                                                                                 |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No AGENTS.md, CLAUDE.md, or equivalent.                                                                                                                                                                                                                                                                  | No agent context files found.                                                                                                                                                                                                             |
+| 1     | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands.                                                                                                                                                                                                             | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation).                                                                               |
+| 2     | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples.                                                                                                                                             | Commands section at top with exact invocations. Permission boundaries defined. Within the <370-line audit tolerance. Non-obvious conventions documented with examples.                                                                    |
+| 3     | Curated AGENTS.md as the single source. Tool-specific overlays (CLAUDE.md, .cursor/rules, Copilot instructions) exist only where a tool needs something AGENTS.md can't give it, each deferring to AGENTS.md rather than restating it. Progressive/nested disclosure. Updated iteratively from friction. | AGENTS.md hand-curated; any CLAUDE.md imports `@AGENTS.md`; .cursor/rules and Copilot instructions reference AGENTS.md rather than duplicating it. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
 
 ### Two length numbers, two jobs
 
@@ -50,7 +50,7 @@ A repo whose AGENTS.md sits at 340 lines is not failing the rubric, but you woul
 
 ### AGENTS.md as the unified baseline
 
-AGENTS.md is governed by the [Agentic AI Foundation (Linux Foundation)](https://agents.md). It is read by Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, Aider, Jules, Zed, Warp, RooCode, and many others. More than 60,000 public repositories now ship AGENTS.md. The format is **plain markdown with no schema** - no YAML frontmatter, no JSON. This simplicity is intentional: agents must parse it with regex and heuristics, so readability and structural consistency matter more than strict formats.
+AGENTS.md is governed by the [Agentic AI Foundation (Linux Foundation)](https://agents.md). It is read by Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, Aider, Jules, Zed, Warp, RooCode, and many others. The agents.md site reports 60k+ open-source projects using it. The format is **ordinary markdown with no mandated schema or parser**; YAML frontmatter and JSON are not part of it. This simplicity is intentional, so readability and structural consistency matter more than strict formats.
 
 Recommended top-to-bottom sections:
 
@@ -68,7 +68,7 @@ Recommended top-to-bottom sections:
 
 ### Tool-specific overrides
 
-- **CLAUDE.md** (optional): only when Claude Code needs instructions no other tool should see - a different default model, trigger specific skills, session tips. Most repos don't need one. When you do add it, the file must start with a literal `@AGENTS.md` import - a prose "See AGENTS.md" line does not load it - then layer Claude-only lines below the import. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
+- **CLAUDE.md** (optional): only when Claude Code needs instructions no other tool should see - a different default model, trigger specific skills, session tips. Most repos don't need one. When you do add it, import `@AGENTS.md` - a prose "See AGENTS.md" line does not load it - then layer Claude-only lines below the import. Put the import on the first line as a house recommendation; Claude Code accepts imports anywhere in the file, and its `claude-md-and-agents-md` setting loads both files without one. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
 - **.cursor/rules/\*.mdc**: Cursor-specific rules, scoped by `globs` or `alwaysApply`. Reference AGENTS.md for shared commands; override only where Cursor differs.
 - **.github/copilot-instructions.md**: GitHub Copilot custom instructions. Same pattern: reference AGENTS.md, add Copilot-only guidance.
 - **GEMINI.md** / **.windsurfrules** / **.windsurf/rules/**: Tool-specific variants. Keep as thin overlays.
@@ -162,13 +162,13 @@ Include timing (fast <5s, slow >30s), whether they require user input (--yes fla
 - **Prose-heavy architecture paragraphs** with no commands. If you're explaining a pattern, include a code reference.
 - **1500-line files** that exhaust context budget. Split into multiple files or link to /docs/.
 - **Stale content**. Commands that no longer exist, removed directories, deprecated flags. Tag entries with last-verified date if >6 months old.
-- **Duplication across AGENTS.md, CLAUDE.md, .cursor/rules/**. Single source of truth: AGENTS.md. CLAUDE.md imports it with a literal `@AGENTS.md` line; .cursor/rules and Copilot instructions reference it in prose.
+- **Duplication across AGENTS.md, CLAUDE.md, .cursor/rules/**. Single source of truth: AGENTS.md. CLAUDE.md imports it with an `@AGENTS.md` line; .cursor/rules and Copilot instructions reference it in prose.
 - **Boundaries written as aspirations**, not rules. "We try not to..." should be "Never...". Agents follow rules, not culture.
 
 ### Multi-file strategy
 
 - **Single source of truth**: AGENTS.md.
-- **CLAUDE.md** (optional): starts with `@AGENTS.md`, then Claude-specific additions: [list].
+- **CLAUDE.md** (optional): imports `@AGENTS.md` on the first line, then Claude-specific additions: [list].
 - **.cursor/rules/\*.mdc**: Reference AGENTS.md section headers. Add Cursor-scoped rules (e.g., per-file globs).
 - **.github/copilot-instructions.md**: Same pattern. Copilot overrides only.
 
@@ -176,7 +176,7 @@ Resist sprawl. Every tool should link to the canonical AGENTS.md.
 
 ### Memory patterns (cross-session)
 
-Claude Code's memory tool (beta `context-management-2025-06-27`) persists `/memories` across sessions. Use this for "learned" constraints that came from friction:
+Claude Code carries its own memory across sessions (CLAUDE.md files and auto memory; see the [Claude Code memory docs](https://code.claude.com/docs/en/memory)). The Claude API memory tool (beta `context-management-2025-06-27`) is a separate, client-side tool that persists a `/memories` directory for agents you build. Either way, use memory for "learned" constraints that came from friction:
 
 ```
 # memories/AGENTS.md-lessons.md
@@ -186,7 +186,7 @@ Claude Code's memory tool (beta `context-management-2025-06-27`) persists `/memo
 - Database migrations require approval; never run auto-migrate in CI without explicit gate
 ```
 
-Cursor's memory system also surfaces relevant past context across sessions. Update AGENTS.md when a memory becomes stable; use memory for transient lessons or session-specific constraints discovered during work.
+Update AGENTS.md when a memory becomes stable; use memory for transient lessons or session-specific constraints discovered during work.
 
 ### Monorepo-specific patterns
 
@@ -212,9 +212,9 @@ Each package can override permission boundaries (e.g., API server can deploy, we
 ## Cross-vendor notes
 
 - **Anthropic**: Claude Code reads `AGENTS.md` directly (v2.1.277+) when no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the working directory or above it; if one of those CLAUDE files is present, Claude reads that instead by default, unless the `CLAUDE.md` explicitly imports the `AGENTS.md` with an `@path` import, or the **Project instructions** setting is changed to read both. A repository that wants both files loaded unconditionally should either add the import or set `claude-md-and-agents-md`. Do not assume CLAUDE.md "takes precedence" while AGENTS.md still loads alongside it - by default, one or the other loads, not both. See [Claude Code project memory docs](https://code.claude.com/docs/en/memory).
-- **Cursor** reads AGENTS.md + .cursor/rules/ with high fidelity. See [Cursor rules docs](https://docs.cursor.com/context/rules).
-- **GitHub Copilot** reads AGENTS.md and .github/copilot-instructions.md. Lower token budget than Claude; keep instructions terse.
-- **Google Gemini CLI** reads GEMINI.md + AGENTS.md (if Gemini-specific file missing, defaults to AGENTS.md).
+- **Cursor** reads AGENTS.md + .cursor/rules/. Nested AGENTS.md files are combined with their parents, and the more specific instructions win on conflict. See [Cursor rules docs](https://cursor.com/docs/rules).
+- **GitHub Copilot** reads AGENTS.md and .github/copilot-instructions.md, plus path-scoped `.github/instructions/*.instructions.md` files (use `excludeAgent: "code-review"` or `"cloud-agent"` in their frontmatter to keep one away from that surface). Keep instructions terse; check the limits of the specific Copilot surface you target.
+- **Google Gemini CLI** reads context files from a configurable filename list (`context.fileName`), which defaults to `GEMINI.md` and can include `AGENTS.md`; it is not an automatic fallback.
 
 ## Templates and tooling
 
@@ -320,10 +320,10 @@ This example is ~90 lines, command-first, boundary-explicit, and ready to ship.
 
 - [agents.md](https://agents.md) - Agentic AI Foundation (Linux Foundation).
 - [Claude Code docs on CLAUDE.md](https://code.claude.com/docs/en/memory).
-- [Cursor rules docs](https://docs.cursor.com/context/rules).
+- [Cursor rules docs](https://cursor.com/docs/rules).
 - [GitHub Copilot custom-instruction support](https://docs.github.com/en/copilot/reference/custom-instructions-support).
 - Simon Willison: [Context Engineering](https://simonwillison.net/2025/Jun/27/context-engineering/) (essay on agent context design).
-- Anthropic: [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).
+- Anthropic: [Effective Context Engineering for AI Agents](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents).
 
 ## See also
 

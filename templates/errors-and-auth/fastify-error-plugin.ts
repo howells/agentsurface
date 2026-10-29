@@ -12,7 +12,7 @@
 
 import fastifyPlugin from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from "fastify";
-import type { ProblemDetails } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType } from "./problem-details";
 import { problemDetails } from "./problem-details";
 
 /**
@@ -20,10 +20,10 @@ import { problemDetails } from "./problem-details";
  */
 export class FastifyDomainError extends Error implements FastifyError {
   public statusCode: number;
-  public code: string;
+  public code: ProblemCode;
 
   constructor(
-    code: string,
+    code: ProblemCode,
     statusCode: number,
     message: string,
     public context?: Record<string, unknown>,
@@ -58,7 +58,7 @@ function getTraceId(request: FastifyRequest): string {
 function mapFastifyErrorToProblemDetails(
   err: FastifyError | Error,
   traceId: string,
-): ProblemDetails {
+): ProblemDetailsType {
   // Handle validation errors from Fastify's built-in validator
   if ("validation" in err && Array.isArray((err as any).validation)) {
     const validationErrors = (err as any).validation.map(
@@ -105,7 +105,7 @@ function mapFastifyErrorToProblemDetails(
     const fastErr = err as FastifyError;
     return problemDetails({
       detail: fastErr.message,
-      is_retriable: fastErr.statusCode >= 500,
+      is_retriable: (fastErr.statusCode ?? 500) >= 500,
       status: fastErr.statusCode || 500,
       title: "HTTP Error",
       trace_id: traceId,
@@ -166,13 +166,15 @@ const errorPlugin = fastifyPlugin(
       throw new ValidationErrorFastify(message, fields);
     });
 
-    fastify.decorate("throwDomainError", (code: string, statusCode: number, message: string) => {
-      throw new FastifyDomainError(code, statusCode, message);
-    });
+    fastify.decorate(
+      "throwDomainError",
+      (code: ProblemCode, statusCode: number, message: string) => {
+        throw new FastifyDomainError(code, statusCode, message);
+      },
+    );
   },
   {
     name: "error-handler-plugin",
-    version: "1.0.0",
   },
 );
 
@@ -184,7 +186,7 @@ export default errorPlugin;
 declare module "fastify" {
   interface FastifyInstance {
     throwValidationError: (message: string, fields?: any) => never;
-    throwDomainError: (code: string, statusCode: number, message: string) => never;
+    throwDomainError: (code: ProblemCode, statusCode: number, message: string) => never;
   }
 }
 

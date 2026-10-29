@@ -1,23 +1,24 @@
 ---
 title: Well-Known Discovery Endpoints
 description: Standardized /.well-known/ paths that let agents and protocols discover your capabilities programmatically
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-/.well-known/ is an IETF standard (RFC 5785) for site-wide metadata. Agents use it for capability discovery without prior knowledge. Key files include API Catalog, MCP Server Cards, Agent Skills indexes, OAuth protected-resource metadata, Web Bot Auth key directories, and agent cards. Publishing these enables agents to discover and use your system programmatically.
+/.well-known/ is an IETF-standardized framework (RFC 8615, which obsoleted RFC 5785) for site-wide metadata. Agents use it for capability discovery without prior knowledge. Some of the names on this page are registered in the IANA well-known URI registry: `api-catalog`, `agent-card.json` and `oauth-protected-resource`. Others are proposals or drafts with no registration - MCP Server Cards (SEP-2127, Final as an extension charter, with the card format still draft), Agent Skills indexes, and the AI discovery file - and registration does not by itself mean a given agent reads the file. Publish the files your intended consumers actually use.
 
-- /.well-known/api-catalog: RFC 9727 API catalog for API specs, docs, and status
-- /.well-known/mcp/server-card.json: MCP server metadata before connection
-- /.well-known/agent-skills/index.json: domain skills agents can load
-- /.well-known/oauth-protected-resource: OAuth resource metadata
+- /.well-known/api-catalog: RFC 9727 API catalog for API specs, docs, and status (IANA-registered)
+- /.well-known/agent-card.json: A2A agent card (IANA-registered)
+- /.well-known/oauth-protected-resource: OAuth resource metadata (RFC 9728, IANA-registered)
+- /.well-known/mcp/server-card.json: MCP server metadata before connection (earlier proposal path, not registered; SEP-2127 now recommends `<streamable-http-url>/server-card` plus `/.well-known/ai-catalog.json`)
+- /.well-known/agent-skills/index.json: domain skills agents can load (proposal, not registered)
 - /.well-known/security.txt: RFC 9116 vulnerability disclosure contact
 - /.well-known/http-message-signatures-directory: Web Bot Auth public keys
 - Serve JSON files as `application/json`, the API catalog as `application/linkset+json` and `security.txt` as `text/plain`
 - Send Access-Control-Allow-Origin on these files so browser-based agents can fetch them cross-origin
 
-The `/.well-known/` directory is an IETF-standardized location (RFC 5785) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here lets compatible agents and protocols find your capabilities without out-of-band configuration.
+The `/.well-known/` directory is an IETF-standardized location (RFC 8615) for site-wide metadata that any client can find without prior knowledge. Browsers use it for security policies and certificate verification. Agents use it for capability discovery. Publishing the right files here lets compatible agents and protocols find your capabilities without out-of-band configuration.
 
 ## /.well-known/api-catalog
 
@@ -55,7 +56,7 @@ Link: </.well-known/api-catalog>; rel="api-catalog"
 
 ## /.well-known/ai
 
-The IETF draft "AI Discovery Endpoint" defines `/.well-known/ai` as a JSON file describing a site's AI-facing capabilities. This is the broadest of the well-known files - it covers what AI systems can do with your site, what formats you support, and where to find more specific declarations.
+The individual Internet-Draft [`draft-aiendpoint-ai-discovery`](https://datatracker.ietf.org/doc/draft-aiendpoint-ai-discovery/) ("AI Discovery Endpoint") defines `/.well-known/ai` as a JSON file describing a site's AI-facing capabilities. This is the broadest of the well-known files - it covers what AI systems can do with your site, what formats you support, and where to find more specific declarations.
 
 Maximum file size: 64 KB.
 
@@ -96,18 +97,24 @@ Maximum file size: 64 KB.
 }
 ```
 
-Serve with `Content-Type: application/json`. This file is still a draft standard - field names may change before finalization.
+Serve with `Content-Type: application/json`. This is an individual draft, not an IETF standard, and `ai` is not an IANA-registered well-known name. Field names may change, so confirm a consumer reads it before relying on it.
 
 ## /.well-known/agent-card.json
 
-The Agent-to-Agent (A2A) protocol, originated by Google, uses `agent-card.json` for agent-to-agent discovery. Google transferred the protocol to the Linux Foundation in June 2025, and in August 2026 it became a hosted project of the Agentic AI Foundation (AAIF), which now governs it alongside sibling projects rather than any single vendor. When one agent wants to delegate a task to another agent, it fetches the target's agent card to understand capabilities, authentication requirements, and endpoint locations.
+The Agent-to-Agent (A2A) protocol, originated by Google, uses `agent-card.json` for agent-to-agent discovery. Google transferred the protocol to the Linux Foundation in June 2025, and in August 2026 it became a hosted project of the Agentic AI Foundation (AAIF), which now governs it alongside sibling projects rather than any single vendor. `agent-card.json` is registered in the IANA well-known URI registry. When one agent wants to delegate a task to another agent, it fetches the target's agent card to understand capabilities, authentication requirements, and endpoint locations.
 
 ```json
 {
   "name": "Acme Deployment Agent",
   "description": "Deploys and manages applications on the Acme platform. Can create deployments, roll back, scale, and inspect logs.",
   "version": "1.2.0",
-  "url": "https://agent.example.com",
+  "supportedInterfaces": [
+    {
+      "url": "https://agent.example.com/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
   "documentationUrl": "https://docs.example.com/agents/deployment",
   "iconUrl": "https://example.com/agent-icon.png",
   "provider": {
@@ -116,14 +123,23 @@ The Agent-to-Agent (A2A) protocol, originated by Google, uses `agent-card.json` 
   },
   "capabilities": {
     "streaming": true,
-    "pushNotifications": true,
-    "stateTransitionHistory": true,
-    "multiTurn": true
+    "pushNotifications": true
   },
-  "authentication": {
-    "schemes": ["Bearer"],
-    "credentials": "https://auth.example.com/agent/token"
+  "securitySchemes": {
+    "acmeOAuth": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.example.com/agent/token",
+            "scopes": {
+              "deployments:write": "Create, roll back, and scale deployments"
+            }
+          }
+        }
+      }
+    }
   },
+  "securityRequirements": [{ "schemes": { "acmeOAuth": { "list": ["deployments:write"] } } }],
   "defaultInputModes": ["text/plain", "application/json"],
   "defaultOutputModes": ["text/plain", "application/json"],
   "skills": [
@@ -156,15 +172,18 @@ The Agent-to-Agent (A2A) protocol, originated by Google, uses `agent-card.json` 
 }
 ```
 
+This card follows the [A2A specification](https://a2a-protocol.org/latest/specification/) v1.0 (AgentCard, section 4.4.1). Credentials are declared with `securitySchemes` (named scheme definitions) and `securityRequirements` (which scheme and scopes a caller must use; v0.3 cards call this field `security`). The old `authentication` object with `schemes` and `credentials` is obsolete, and so are the top-level `url` field (replaced by `supportedInterfaces`) and capability flags such as `stateTransitionHistory`. Pin the protocol version your agent serves and validate the whole card against it.
+
 The A2A protocol uses this card for routing - an orchestrating agent looks up the skills array to decide whether to delegate a task here. The `examples` field in each skill is particularly important: these are used for semantic matching when an agent does not know your agent's ID but is searching for a capable agent by task description.
 
 ## /.well-known/mcp/server-card.json
 
-An MCP Server Card describes a remote MCP server before an agent connects: what it does, which transport it uses, how to authenticate, and which tools are available. Prefer this over hiding the endpoint in prose.
+An MCP Server Card describes a remote MCP server before an agent connects: what it does, which transport it uses, and how to authenticate. Prefer this over hiding the endpoint in prose. [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (Final, merged 2026-10-06) charters the `io.modelcontextprotocol/server-card` extension, but the card format and discovery details still live in the [extension repository](https://github.com/modelcontextprotocol/ext-server-card/blob/main/docs/discovery.md), which is labeled draft. That document recommends hosting a card at `<streamable-http-url>/server-card` and advertising it through `/.well-known/ai-catalog.json` (entry type `application/mcp-server-card+json`); it advises against `/.well-known/mcp/server-card` and no `.well-known` name is IANA-registered for it. Cards describe identity and remote endpoints and leave out tools, which clients get at runtime from `server/discover`. The example below uses the earlier proposal path and shape, so pin the extension revision you follow and confirm your target clients read it.
 
 ```json
 {
   "version": "1.0",
+  "protocolVersion": "2026-07-28",
   "serverInfo": {
     "name": "docs-search",
     "title": "Documentation Search",
@@ -175,15 +194,13 @@ An MCP Server Card describes a remote MCP server before an agent connects: what 
     "type": "streamable-http",
     "endpoint": "https://example.com/mcp"
   },
-  "tools": [
-    { "name": "search_docs", "description": "Full-text search across published documentation." },
-    { "name": "get_page", "description": "Fetch one page by canonical URL." }
-  ],
   "authentication": {
     "required": false
   }
 }
 ```
+
+`protocolVersion` is the MCP revision the server speaks; the draft's own example shows it alongside a `$schema` reference, which this example omits because the draft's field set is still moving.
 
 ## /.well-known/mcp.json
 
@@ -228,13 +245,12 @@ The well-known MCP files above advertise a _remote_ MCP server. [WebMCP](/docs/p
 
 ## /.well-known/agent-skills/index.json
 
-Publish an Agent Skills index when your site can teach agents how to complete domain-specific tasks. The index should point to separate skill documents rather than inline long procedures.
+Publish an Agent Skills index when your site can teach agents how to complete domain-specific tasks. The index should point to separate skill documents rather than inline long procedures. The hosted index is a proposal with no IANA registration, separate from the stable `SKILL.md` format at [agentskills.io/specification](https://agentskills.io/specification).
 
 Each linked skill should follow the public Agent Skills format: a folder with a `SKILL.md` file, required `name` and `description` frontmatter, and optional `scripts/`, `references/`, and `assets/` directories. Keep skill descriptions specific because compatible agents load only the catalog first, then activate the full skill through progressive disclosure.
 
 ```json
 {
-  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
   "skills": [
     {
       "name": "create-api-token",
@@ -247,7 +263,7 @@ Each linked skill should follow the public Agent Skills format: a folder with a 
 }
 ```
 
-Use the discovery v0.2 schema and hash the exact served `SKILL.md` bytes. Validation must fetch the linked artifact, compare its SHA-256 with `digest`, parse its frontmatter, and confirm the description says when to use it. A valid index pointing to an HTML shell, login page, empty document, malformed skill, or mismatched digest is not a working discovery surface.
+An earlier draft of this shape pointed `$schema` at `https://schemas.agentskills.io/discovery/0.2.0/schema.json`, but that host does not resolve (checked 2026-10-29), so the example leaves it out. Hash the exact served `SKILL.md` bytes. Validation must fetch the linked artifact, compare its SHA-256 with `digest`, parse its frontmatter, and confirm the description says when to use it. A valid index pointing to an HTML shell, login page, empty document, malformed skill, or mismatched digest is not a working discovery surface.
 
 ## /.well-known/oauth-protected-resource
 
@@ -283,39 +299,9 @@ Web Bot Auth uses signed HTTP requests so a site can identify friendly bots and 
 
 Implement this when your service sends outbound bot or agent requests and wants other sites to distinguish it from anonymous automation.
 
-## /.well-known/acp.json
+## Agentic Commerce Protocol (no well-known file)
 
-The Agentic Commerce Protocol (ACP) uses `acp.json` for capability advertisement. ACP focuses on commercial agent interactions - agents that can transact, book, purchase, or negotiate on behalf of users.
-
-```json
-{
-  "version": "1.0",
-  "provider": {
-    "name": "Acme Inc",
-    "url": "https://example.com",
-    "description": "Developer platform and marketplace"
-  },
-  "capabilities": [
-    {
-      "type": "api_access",
-      "description": "Programmatic access to all platform features",
-      "endpoint": "https://api.example.com/v2",
-      "pricing": "per_request",
-      "documentation": "https://docs.example.com/api"
-    },
-    {
-      "type": "subscription_management",
-      "description": "Purchase and manage platform subscriptions",
-      "endpoint": "https://api.example.com/v2/billing",
-      "documentation": "https://docs.example.com/billing"
-    }
-  ],
-  "contact": {
-    "technical": "api@example.com",
-    "commercial": "partnerships@example.com"
-  }
-}
-```
+There is no official Agentic Commerce Protocol (ACP) discovery document at `/.well-known/acp.json` yet. The name is not in the IANA well-known URI registry, and the released ACP contract (`2026-04-17`) defines no such file; an unreleased ACP RFC proposes one. Don't publish one expecting agents to read it until it ships. See [Agentic Commerce](/docs/agentic-commerce) for the commerce protocols that do exist.
 
 ## /openapi.json
 
@@ -419,31 +405,36 @@ The `flows` array is the distinguishing feature of `agents.json`. Rather than ju
 
 ## NLWeb /ask
 
-NLWeb, published by Microsoft, adds a `/ask` endpoint that provides a conversational interface to any site's content. An agent sends a natural-language question; the site answers it directly rather than returning a list of links.
+NLWeb, published by Microsoft, adds an `/ask` endpoint that provides a natural-language interface to a site's content. An agent sends a natural-language query and, depending on the `mode` parameter, gets back a ranked list of matching items (`list`, the default), a summary plus the list (`summarize`), or a generated answer (`generate`).
 
-NLWeb implementations also expose an MCP server interface, making the endpoint usable both for direct HTTP calls and through MCP-compatible agent frameworks.
+NLWeb implementations also expose an MCP server interface (`/mcp`) that takes the same arguments, making the endpoint usable both for direct HTTP calls and through MCP-compatible agent frameworks.
 
 ```
-GET /ask?q=How+do+I+authenticate+with+the+API
+GET /ask?query=How+do+I+authenticate+with+the+API&streaming=false
 Accept: application/json
 ```
 
+The `query` parameter is required. `streaming` defaults to true, so set `streaming=false` for a single JSON response. In the default `list` mode the response is a JSON object with a `query_id` and an array of results, each with `url`, `name`, `site`, `score`, `description` and `schema_object`:
+
 ```json
 {
-  "question": "How do I authenticate with the API?",
-  "answer": "Authentication uses OAuth 2.0 Client Credentials. POST to https://auth.example.com/oauth/token with grant_type=client_credentials, client_id, and client_secret. The response contains an access_token valid for 3600 seconds. Include it in all API requests as Authorization: Bearer {token}.",
-  "sources": [
+  "query_id": "q-1234",
+  "results": [
     {
-      "title": "Authentication Guide",
       "url": "https://docs.example.com/authentication",
-      "excerpt": "..."
+      "name": "Authentication Guide",
+      "site": "docs.example.com",
+      "score": 87,
+      "description": "How to authenticate API requests with OAuth 2.0 Client Credentials.",
+      "schema_object": {}
     }
-  ],
-  "confidence": 0.94
+  ]
 }
 ```
 
-The NLWeb reference implementation is available at `github.com/nlweb-ai/NLWeb`. It connects to your existing content (via `llms.txt` or a vector database) and generates answers using a configured LLM backend.
+The shape above follows the [reference REST API documentation](https://github.com/nlweb-ai/NLWeb/blob/main/docs/nlweb-rest-api.md) on its main branch, which also notes that the results array is expected to move to a richer structure. Do not count on an `answer`, `sources` or `confidence` field unless you run `summarize` or `generate` mode and have checked what your pinned version returns. Treat `score` as an implementation-defined relevance value, not a probability.
+
+The NLWeb reference implementation is available at `github.com/nlweb-ai/NLWeb`. It connects to your existing content (via `llms.txt` or a vector database) and uses a configured LLM backend for the modes that need one.
 
 ## Advertising Well-Known Files
 

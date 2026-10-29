@@ -1,7 +1,7 @@
 ---
 title: Frameworks
 description: Choosing where agent work runs and which runtime or framework fits - request handlers versus background workflows, and the current framework landscape.
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -28,21 +28,21 @@ Do not hide multi-minute work inside a request. If the user needs progress, crea
 
 ## Choosing A Framework
 
-| Project shape                                                                                                  | Prefer                        | Why                                                                                                            |
-| -------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without a stronger platform signal | Mastra                        | Coherent app-owned framework for TypeScript agent infrastructure                                               |
-| OpenAI-native app: Responses API, hosted tools, remote MCP, tracing/evals, realtime                            | OpenAI Agents SDK             | Keeps OpenAI response items, traces, hosted tools, and handoffs visible                                        |
-| Claude-native autonomous work, managed sandboxes, Agent Skills, multiagent sessions                            | Claude Managed Agents         | Anthropic owns the harness, sandbox, credential vaulting, and events - see [Platforms](/docs/agents/platforms) |
-| Coding-agent work embedded in an app or service                                                                | Claude Agent SDK              | Embeds the Claude Code harness with permission modes and MCP configuration                                     |
-| Next.js/Vercel app with streaming UI, provider routing, durable agent steps, tool approvals                    | Vercel AI SDK 7               | `WorkflowAgent` adds durability, timeouts, and sandboxes on top of the streaming core                          |
-| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs                          | LangGraph                     | Mature graph model for stateful multi-step flows                                                               |
-| Workers-native app: Durable Objects, WebSockets, Browser Run, edge-hosted MCP                                  | Cloudflare Agents             | Keeps stateful agents and supporting infrastructure in the Worker runtime                                      |
-| .NET/Python enterprise systems already on Azure                                                                | Microsoft Agent Framework 1.0 | Production-ready successor that unifies AutoGen and Semantic Kernel into one SDK                               |
-| The product mainly exposes tools, resources, or workflows to outside agents                                    | MCP-first                     | The public contract is MCP; the internal runtime is an implementation detail                                   |
+| Project shape                                                                                                  | Prefer                    | Why                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| TypeScript app needing local agents, tools, workflows, memory, RAG, and MCP without a stronger platform signal | Mastra                    | Coherent app-owned framework for TypeScript agent infrastructure                                               |
+| OpenAI-native app: Responses API, hosted tools, remote MCP, tracing/evals, realtime                            | OpenAI Agents SDK         | Keeps OpenAI response items, traces, hosted tools, and handoffs visible                                        |
+| Claude-native autonomous work, managed sandboxes, Agent Skills, multiagent sessions                            | Claude Managed Agents     | Anthropic owns the harness, sandbox, credential vaulting, and events - see [Platforms](/docs/agents/platforms) |
+| Coding-agent work embedded in an app or service                                                                | Claude Agent SDK          | Embeds the Claude Code harness with permission modes and MCP configuration                                     |
+| Next.js/Vercel app with streaming UI, provider routing, durable agent steps, tool approvals                    | Vercel AI SDK 7           | `WorkflowAgent` adds durability, timeouts, and sandboxes on top of the streaming core                          |
+| Python or graph-heavy orchestration, explicit state machines, interrupt/resume graphs                          | LangGraph                 | Mature graph model for stateful multi-step flows                                                               |
+| Workers-native app: Durable Objects, WebSockets, Browser Run, edge-hosted MCP                                  | Cloudflare Agents         | Keeps stateful agents and supporting infrastructure in the Worker runtime                                      |
+| .NET/Python enterprise systems already on Azure                                                                | Microsoft Agent Framework | Stable successor that unifies AutoGen and Semantic Kernel into one SDK                                         |
+| The product mainly exposes tools, resources, or workflows to outside agents                                    | MCP-first                 | The public contract is MCP; the internal runtime is an implementation detail                                   |
 
-Microsoft shipped Agent Framework 1.0 on 2026-04-03: it merges AutoGen's multi-agent orchestration patterns with Semantic Kernel's enterprise state management, filters, and telemetry into one stable, long-term-supported SDK. Microsoft positions it as the successor for new agent work; Semantic Kernel and AutoGen both still receive maintenance releases, but new builds should start on Agent Framework.
+Microsoft Agent Framework merges AutoGen's multi-agent orchestration patterns with Semantic Kernel's enterprise state management, filters, and telemetry into one SDK. The stable Python package `agent-framework` was at 1.23.0 on 2026-10-22; the 1.0 release date and long-term-support terms from earlier versions of this page were not independently confirmed, so check Microsoft's support policy before relying on them. Microsoft positions it as the successor for new agent work; Semantic Kernel and AutoGen both still receive maintenance releases, but new builds should start on Agent Framework.
 
-Vercel AI SDK 7 (shipped 2026-06-25) is the current major version and adds a production agent layer on top of the streaming core: `WorkflowAgent` for durable, restart-safe runs, HMAC-signed tool approvals, timeouts, and sandbox support. Approval is set on the agent with `toolApproval` (per tool or as a policy function returning approved, denied, user-approval or not-applicable), while `WorkflowAgent` tools still declare `needsApproval` - check code written against AI SDK 6 before reusing it.
+Vercel AI SDK 7 (shipped 2026-06-25) is the current major version and adds a production agent layer on top of the streaming core: `WorkflowAgent` for durable, restart-safe runs, HMAC-signed tool approvals, timeouts, and sandbox support. Approval is set on the agent with `toolApproval` (per tool or as a policy function returning approved, denied, user-approval or not-applicable), while `WorkflowAgent` tools still declare `needsApproval` - check code written against AI SDK 6 before reusing it. `HarnessAgent` is a separate choice from building a `ToolLoopAgent`: it runs an established Claude Code, Codex, or Pi harness behind AI SDK-compatible streams. `WorkflowAgent` from Workflow 5 is still the durable agent API; Workflow 5 docs point users to it.
 
 For the full vendor list, including Pydantic AI, Google ADK, Agno, Strands Agents, and coding-agent tooling, see [Frameworks and Runtimes](/docs/tooling-catalog/frameworks-and-runtimes).
 
@@ -58,7 +58,7 @@ For the full vendor list, including Pydantic AI, Google ADK, Agno, Strands Agent
 
 Do not hand-roll the request/tool-call/response cycle. Streaming, schema validation, max-step enforcement, and conversation-history management are solved problems in every current framework:
 
-- **Vercel AI SDK**: `ToolLoopAgent` or `generateText`/`streamText` with `stopWhen: stepCountIs(n)`.
+- **Vercel AI SDK**: `ToolLoopAgent` or `generateText`/`streamText` with `stopWhen: stepCountIs(n)`; `HarnessAgent` when you want an existing coding-agent harness instead of your own loop.
 - **Claude Agent SDK**: `query()` reuses the Claude Code harness, permission modes, and MCP configuration.
 - **OpenAI Agents SDK**: `Agent` and `run()` (JS: `import { Agent, run } from '@openai/agents'`; Python: `from agents import Agent, Runner`) handle handoffs, guardrails, sessions, and tracing.
 

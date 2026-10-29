@@ -1,7 +1,7 @@
 ---
 title: Auth Anti-Patterns
 description: Silent failures and late-stage breakage in agent auth workflows
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Recap
@@ -12,7 +12,7 @@ Nine patterns that break agent auth silently: an authorization flow that does no
 | ----------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Wrong grant for the acting identity | User consent or service access cannot complete | Authorization Code + PKCE for user delegation; Client Credentials for service-owned M2M |
 | CAPTCHA on token endpoint           | Blocks automated requests                      | Use rate limiting instead                                                               |
-| Session cookies                     | Expire without a structured signal             | Use Bearer tokens with explicit `exp`                                                   |
+| Session cookies                     | Expire without a structured signal             | Use OAuth access tokens with a documented expiry                                        |
 | Long-lived broad-scope keys         | Maximum blast radius on leak                   | Short-lived, minimum-scope                                                              |
 | Overly broad scopes                 | Excess permissions on every token              | Request only required scopes                                                            |
 | Hardcoded secrets                   | Permanent compromise on commit                 | Environment variables only                                                              |
@@ -51,7 +51,7 @@ Session cookies are browser state. Agents do not maintain a cookie jar unless ex
 
 The failure is insidious: the agent succeeds for a time, then receives HTML where it expected JSON and has no mechanism to recognize it needs re-authentication.
 
-Fix: Use Bearer tokens with explicit `exp` claims. If sessions are needed for the web UI, issue separate API keys or OAuth tokens for programmatic access.
+Fix: Use OAuth access tokens with a documented expiry (`expires_in`, or `exp` when the token is a JWT). If sessions are needed for the web UI, issue separate API keys or OAuth tokens for programmatic access.
 
 ## Long-Lived Broad-Scope Credentials
 
@@ -163,14 +163,14 @@ A stolen token can be replayed against the resource server indefinitely until ex
 // Without DPoP: token can be replayed anywhere
 Authorization: Bearer eyJhbGciOiJSUzI1NiI...
 
-// With DPoP: token is bound to client keypair
-Authorization: Bearer eyJhbGciOiJSUzI1NiI...
+// With DPoP: token is bound to client keypair (note the DPoP scheme)
+Authorization: DPoP eyJhbGciOiJSUzI1NiI...
 DPoP: eyJhbGciOiJSUzI1NiIsInR5cCI6ImRwb3Arand0IiwianRpIjoiMTIzIiwiaHRtIjoiR0VUIiwiaHR1IjoiaHR0cHM6Ly9hcGkuZXhhbXBsZS5jb20vZGF0YSJ9...
 ```
 
 For high-value resources and sensitive agent-to-agent communication, require DPoP. See [DPoP](/docs/authentication/dpop).
 
-`auth.md` OTP claim flows are not the same anti-pattern as browser-only login. They are bounded registration ceremonies that end by issuing or upgrading a programmatic credential. They become an anti-pattern only when OTP or browser state is required on every API call.
+`auth.md` user-code claim flows are not the same anti-pattern as browser-only login. They are bounded registration ceremonies that end by issuing or upgrading a programmatic credential. They become an anti-pattern only when a claim code or browser state is required on every API call.
 
 ## See Also
 

@@ -44,7 +44,7 @@ export default function PrivacyPage() {
               The site runs on Vercel. Like any web host, Vercel handles each request, including
               your IP address, your browser's user agent and the address you asked for, and keeps
               logs to run and secure the service. It does so under{" "}
-              <a href="https://vercel.com/legal/privacy-policy">its own privacy policy</a>.
+              <a href="https://vercel.com/legal/privacy-notice">its own privacy policy</a>.
             </p>
           </InfoSection>
 

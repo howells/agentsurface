@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 2 scores machine-readability of CLI output and automation capability. Baseline is consistent JSON output across all commands with semantic exit codes (0–5 for success/failure/usage/notfound/permission/conflict). Frontier includes NDJSON streaming for pagination, full schema introspection (--schema returns params/types/required), and input hardening (path traversal, control character rejection). The Agent DX CLI Scale frames progression from human-only (tables, color) to fully agent-native (streaming, introspection, hardening).
+Dimension 2 scores machine-readability of CLI output and automation capability. Baseline is consistent JSON output across all commands with documented, distinct exit codes (this guide proposes 0-5 for success/failure/usage/notfound/permission/conflict as one contract; only 0 and non-zero are universal). Frontier includes NDJSON streaming for pagination, full schema introspection (--schema returns params/types/required), and input hardening (path traversal, control character rejection). The Agent DX CLI Scale frames progression from human-only (tables, color) to fully agent-native (streaming, introspection, hardening).
 
 - **0**: Human-only output, no structured format, interactive prompts (blocker)
 - **1**: JSON exists but inconsistent across commands
@@ -20,7 +20,7 @@ CLIs designed for AI agents look fundamentally different from human-oriented com
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **0/3** | Human-only output. Tables, color codes, prose. No structured format. Interactive prompts with no bypass.                                                                                                                            | CLI exists but: no `--json` flag; no `--output` flag; interactive prompts without `--yes`; no machine-readable output path                                                                        |
 | **1/3** | JSON output exists but inconsistent. Some commands support `--json`, others don't. Errors may not be structured.                                                                                                                    | `--json` or `--output json` on some commands but not all. Inconsistent JSON shapes across commands. Non-zero exit code but no semantic distinction.                                               |
-| **2/3** | Consistent JSON across all commands. Errors return structured JSON. Semantic exit codes (0-5). `--dry-run` on mutations. TTY detection. Non-interactive when flags provided.                                                        | All commands produce JSON. Exit codes differentiate success/failure/usage/notfound/permission/conflict. `--dry-run` on all write operations. `isatty()` detection suppresses spinners when piped. |
+| **2/3** | Consistent JSON across all commands. Errors return structured JSON. Documented, distinct exit codes (e.g. the 0-5 contract proposed here). `--dry-run` on mutations. TTY detection. Non-interactive when flags provided.            | All commands produce JSON. Exit codes differentiate success/failure/usage/notfound/permission/conflict. `--dry-run` on all write operations. `isatty()` detection suppresses spinners when piped. |
 | **3/3** | NDJSON streaming for paginated results. Full schema introspection (`--schema` dumps params/types/required as JSON). Input hardening (path traversal, control chars, encoded segments). SKILL.md shipped. Agent knowledge packaging. | `--schema` or `--describe` command returns full machine-readable schema. NDJSON streaming. Input validation rejects `../`, `%2e`, control chars. SKILL.md or AGENTS.md ships with the CLI.        |
 
 **Key files:** `bin/`, CLI entry points in `package.json`, `commander`/`yargs`/`oclif` configs
@@ -147,37 +147,34 @@ program
 
 Every JSON object is on a single line (when `--json` is used) so agents can parse it line-by-line.
 
-### Semantic exit codes (BSD sysexits.h conventions)
+### Semantic exit codes
 
-Not all non-zero codes are equal. Agents need to distinguish:
+Only two exit codes are universal: 0 is success and non-zero is failure. There is no shared meaning for the rest. GitHub CLI, for example, uses 2 for cancellation and 4 for authentication and tells callers to check each command's documentation ([gh exit codes](https://cli.github.com/manual/gh_help_exit-codes)). So an agent must read the contract of the CLI in front of it, and your CLI must publish its own in `--help --json` and its skill file. This guide proposes one contract:
 
 - **0** - Success. Operation completed as requested.
-- **1** - User error. Bad flag, invalid argument, resource not found. Agent should check input and retry with corrections.
-- **2** - System error. Permission denied, disk full, service unavailable. Agent should retry with backoff.
-- **3** - Reserved for shell builtins (not used in CLI).
-- **64** - Command line usage error (EX_USAGE).
-- **65** - Data format error (EX_DATAERR).
-- **66** - Cannot open input (EX_NOINPUT).
-- **67** - Addressee unknown (EX_NOUSER).
-- **69** - Service unavailable (EX_UNAVAILABLE).
-- **70** - Internal software error (EX_SOFTWARE).
-- **77** - Permission denied (EX_NOPERM).
+- **1** - General failure. Agent should read the structured error.
+- **2** - Usage error. Bad flag or invalid argument. Fix the input and retry.
+- **3** - Not found.
+- **4** - Permission denied.
+- **5** - Conflict (resource exists or state changed).
 
-Cite: https://www.freebsd.org/cgi/man.cgi?query=sysexits
+BSD `sysexits.h` (64 usage, 65 data error, 66 no input, 69 unavailable, 70 software error, 77 no permission) is an older vocabulary some tools borrow; it is a convention, not a standard that agents can assume ([sysexits](https://man.freebsd.org/cgi/man.cgi?query=sysexits)). Either works if you pick one and use it consistently. Pair the exit code with a structured error body; neither replaces the other.
 
 Implement exit codes in TypeScript:
 
 ```typescript
 import { exit } from "process";
 
-function handleError(error: Error, context: string): void {
-  const json = { success: false, error: { message: error.message, context } };
-  console.error(JSON.stringify(json));
+const EXIT = { ok: 0, failure: 1, usage: 2, notFound: 3, permission: 4, conflict: 5 } as const;
 
-  if (error.message.includes("permission")) exit(77);
-  if (error.message.includes("not found")) exit(1);
-  if (error.message.includes("validation")) exit(65);
-  exit(70); // EX_SOFTWARE
+function handleError(error: CliError, context: string): never {
+  console.error(
+    JSON.stringify({
+      success: false,
+      error: { code: error.code, message: error.message, context },
+    }),
+  );
+  exit(EXIT[error.kind] ?? EXIT.failure);
 }
 ```
 
@@ -255,11 +252,10 @@ $ my-cli create-user --schema
 }
 ```
 
-Implement with Zod + zod-to-json-schema:
+Implement with Zod 4's native `z.toJSONSchema()`:
 
 ```typescript
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const CreateUserInput = z.object({
   name: z.string().describe("Full name"),
@@ -280,8 +276,8 @@ program
       console.log(
         JSON.stringify(
           {
-            input: zodToJsonSchema(CreateUserInput),
-            output: zodToJsonSchema(CreateUserOutput),
+            input: z.toJSONSchema(CreateUserInput),
+            output: z.toJSONSchema(CreateUserOutput),
           },
           null,
           2,
@@ -297,33 +293,33 @@ program
 
 Agents often pass user input through CLI arguments. Prevent injection attacks:
 
-- **Path traversal:** Reject `../`, `..\\`, UNC paths (`\\server\share`).
+- **Path traversal:** Resolve the real path (`fs.realpath`) and reject anything outside the allowed directory; also reject `../`, `..\\` and UNC paths (`\\server\share`) early for a clear error.
 - **URL encoding:** Reject `%2e`, `%2f`, `%5c` (encoded path separators).
 - **Control characters:** Reject `\0`, `\n`, `\r`, `\x1b` (ESC).
 - **Shell metacharacters:** Warn if input contains `$`, `` ` ``, `|`, `;`, `&` (agents should use `--` or stdin JSON instead).
 
 ```typescript
 function validateInput(value: string, fieldName: string): string {
-  // Path traversal
-  if (value.includes("..") || value.includes("\\\\")) {
-    throw new Error(`${fieldName} contains path traversal attempt`);
-  }
-
   // URL encoding
-  if (value.match(/%2[ef]|%5c/i)) {
+  if (/%2[ef]|%5c/i.test(value)) {
     throw new Error(`${fieldName} contains URL-encoded path separator`);
   }
 
   // Control characters
-  if (value.match(/[\x00\n\r\x1b]/)) {
+  if (/[\x00\n\r\x1b]/.test(value)) {
     throw new Error(`${fieldName} contains control characters`);
   }
 
   return value;
 }
 
-program.command("fetch-file <path>").action((path) => {
-  const safePath = validateInput(path, "path");
+// Do not rely on string checks like value.includes("..") for paths: a symlink inside the
+// allowed directory can still lead outside it. Resolve the real path of the nearest existing
+// ancestor with fs.promises.realpath and compare it to the real working directory.
+// See the Input Hardening docs page for a full sandboxOutputPath() example.
+
+program.command("fetch-file <path>").action(async (path) => {
+  const safePath = await sandboxOutputPath(validateInput(path, "path"));
   // ... proceed safely
 });
 ```
@@ -515,25 +511,18 @@ console.error("Downloading artifacts... 45%"); // stderr
 console.log(JSON.stringify({ status: "in_progress", progress: 0.45 })); // stdout
 ```
 
-Agents ignore stderr; they parse stdout. This pattern lets humans see progress while agents remain unaffected.
+Agents parse stdout as data, and many harnesses capture stderr separately or show it only on failure. This pattern keeps stdout valid JSON while humans still see progress.
 
 ---
 
 ## Cross-vendor notes
 
-**Anthropic Claude Code CLI** (https://code.claude.com/docs/en/cli-reference) is the gold standard:
+Coding-agent CLIs show the pattern but differ in detail, so read each one's reference rather than assuming a shared contract:
 
-- Every command supports `--json` (consistent envelope: `{ ok: true, data }, { ok: false, error }`).
-- Semantic exit codes (0 success, non-zero failure).
-- `--dry-run` on write operations.
-- TTY detection suppresses colours when piped.
-- SKILL.md shipped with the CLI.
+- **Claude Code** ([CLI reference](https://code.claude.com/docs/en/cli-reference)) has a non-interactive print mode (`-p`) with selectable output formats for scripts and agents.
+- **OpenAI Codex** and **Gemini CLI** ([repo](https://github.com/google-gemini/gemini-cli)) document their own non-interactive modes and JSON output options (Gemini CLI: `-p` with `--output-format json` or `stream-json`). Verify flags against the installed version.
 
-**OpenAI Codex / API CLI** follows similar patterns with `--json` output and structured errors, though less mature on streaming.
-
-**Gemini CLI** (https://github.com/google-gemini/gemini-cli): Open source, FastMCP integration, supports `--json` and structured output. Less mature on NDJSON streaming.
-
-All three converge on: structured output + semantic exit codes + TTY detection + agent self-documentation.
+What carries over is the shape: structured output, a documented exit-code contract, TTY detection, and agent self-documentation (a skill file or schema command). Per-CLI claims such as "every command supports `--json`" or "`--dry-run` on every write" are not established by these references; test your own CLI against the checklist above.
 
 ---
 
@@ -565,7 +554,7 @@ All three converge on: structured output + semantic exit codes + TTY detection +
 - `citty` - Modern, lightweight. Better for typed CLIs with Zod.
 - `oclif` - For large, plugin-able CLIs. Built-in JSON support.
 - `yargs` - Legacy but still useful. Good argument parsing.
-- `zod` - Runtime validation. Integrates with `zod-to-json-schema` for schema introspection.
+- `zod` - Runtime validation. Zod 4 converts to JSON Schema natively with `z.toJSONSchema()`; the third-party `zod-to-json-schema` is no longer actively maintained and only supports Zod 3.
 - `@clack/prompts` - Terminal prompts (use sparingly; gate with `--yes` flag for agents).
 
 **Testing:**
@@ -597,7 +586,8 @@ All three converge on: structured output + semantic exit codes + TTY detection +
 - https://code.claude.com/docs/en/cli-reference - Anthropic Claude Code CLI reference (gold standard)
 - https://jsonlines.org - NDJSON specification
 - https://github.com/ndjson/ndjson-spec - NDJSON spec repository
-- https://www.freebsd.org/cgi/man.cgi?query=sysexits - BSD sysexits.h conventions
+- https://man.freebsd.org/cgi/man.cgi?query=sysexits - BSD sysexits.h conventions (optional vocabulary)
+- https://cli.github.com/manual/gh_help_exit-codes - GitHub CLI exit codes (example of a per-CLI contract)
 - https://github.com/google-gemini/gemini-cli - Gemini CLI (open source)
 - https://github.com/enquirer/enquirer - Interactive prompts library (for --yes bypass patterns)
 

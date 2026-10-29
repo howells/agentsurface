@@ -1,7 +1,7 @@
 ---
 title: Context Window Discipline
 description: Controlling response size so CLI output does not bloat agent context windows
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -140,11 +140,11 @@ $ mytool users list --all --json
 [...all 1543 users...]
 ```
 
-The pagination metadata in the default response is a useful signal for agents - they can see whether to fetch more and at what cost.
+Whether `--all` buffers or streams is an implementation choice, not part of the flag's meaning; the buffered form is shown here, and the next section streams the same traversal. The pagination metadata in the default response is a useful signal for agents - they can see whether to fetch more and at what cost.
 
 ## Streaming Pagination with NDJSON
 
-`--all` concatenates everything before outputting, which means the agent waits for the full dataset before it can process any records. For large datasets, this is slow and still consumes peak memory.
+A buffered `--all` (as above) concatenates everything before outputting, which means the agent waits for the full dataset before it can process any records. For large datasets, this is slow and still consumes peak memory.
 
 Streaming pagination emits each record as it is fetched, one JSON object per line. The agent can begin processing immediately and - if it has enough information before reaching the end - stop consuming early.
 
@@ -206,7 +206,7 @@ These instructions prime the agent with the right patterns at the start of every
 
 ## Default Field Sets
 
-Consider defining sensible default field sets for each command that are smaller than the full response. The full response remains available with `--fields *` or `--full`, but the default saves tokens for the common case.
+Consider defining sensible default field sets for each command that are smaller than the full response. The full response remains available with `--fields '*'` or `--full`, but the default saves tokens for the common case. Quote the wildcard in a real shell invocation: an unquoted `*` is subject to pathname expansion and can turn into a list of file names before the CLI sees it. Quoting lets the CLI interpret its own wildcard.
 
 ```bash
 # Default: returns id, name, email, status, created_at (5 fields)
@@ -267,7 +267,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 - [ ] SKILL.md includes explicit guidance on which fields to request for common tasks
 - [ ] AGENTS.md includes the "always use --fields" invariant
 - [ ] Default field set for each command is smaller than the full response
-- [ ] `--full` or `--fields *` available to opt into the full response explicitly
+- [ ] `--full` or `--fields '*'` (quoted) available to opt into the full response explicitly
 - [ ] Schema introspection output documents default and available field sets per command
 
 ## Related Pages

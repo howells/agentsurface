@@ -1,7 +1,7 @@
 ---
 title: Browser and Sandboxes
 description: Choosing and scaffolding browser access and isolated code execution for agents - two of the highest-risk tool surfaces an agent can receive.
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -45,7 +45,7 @@ One class is worth calling out on its own: **platform-attached shells**, where t
 
 **Independent sandbox vendors:** E2B (secure code-interpreter sandboxes, strong for data analysis); Modal (serverless VM-backed sandboxes, elastic Python/GPU); Vercel Sandbox (ephemeral microVMs with persistent-filesystem support); Cloudflare Sandbox SDK (container sandboxes driven from a Worker); AWS Bedrock AgentCore (managed Runtime and Code Interpreter for AWS-native stacks).
 
-Daytona's hosted product remains active, but core development moved to a private codebase in June 2026. The public [`daytonaio/daytona`](https://github.com/daytonaio/daytona) repository stays readable and forkable under its last licence (v0.190.0) with no further updates, fixes or releases. Treat "self-hostable" as meaning a frozen snapshot, and evaluate the hosted product on its own terms rather than assuming an open fallback.
+Daytona's hosted product remains active. Earlier notes said core development moved to a private codebase in June 2026, leaving the public [`daytonaio/daytona`](https://github.com/daytonaio/daytona) repository frozen at v0.190.0; that was not re-confirmed against a dated repository notice on 2026-10-29. Check the repository before treating "self-hostable" as more than a possibly frozen snapshot, and evaluate the hosted product on its own terms rather than assuming an open fallback.
 
 ## Workspace Surfaces
 

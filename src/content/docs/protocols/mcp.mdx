@@ -1,12 +1,12 @@
 ---
 title: Model Context Protocol (MCP)
 description: Protocol for connecting AI agents to external tools, data sources, and services
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-MCP defines how agents discover and use tools, read resources, and invoke prompts. It is the baseline protocol for connecting AI applications to external systems. Current spec revision: `2026-07-28`, with a stateless core, no initialization handshake, and no protocol sessions. All Tier 1 SDKs - TypeScript, Python, Go, and C# - support it. Transport options are stdio for local processes and Streamable HTTP for remote servers. Protected HTTP servers use OAuth-based authorization discovery.
+MCP defines how agents discover and use tools, read resources, and invoke prompts. It is the baseline protocol for connecting AI applications to external systems. Current spec revision: `2026-07-28`, with a stateless core, no initialization handshake, and no protocol sessions. All Tier 1 SDKs - TypeScript, Python, C#, Go, Rust, and Ruby - support it. Transport options are stdio for local processes and Streamable HTTP for remote servers. Protected HTTP servers use OAuth-based authorization discovery.
 
 ```
 Agent → connects via stdio/HTTP → MCP Server
@@ -22,7 +22,8 @@ Agent → connects via stdio/HTTP → MCP Server
 - Authorization for protected HTTP servers via OAuth protected-resource metadata and authorization-server discovery
 - Server advertises capabilities; agent selects which to use
 - MCP Apps - the first official MCP extension (SEP-1865, Stable `2026-01-26`) - add interactive UI surfaces inside compatible clients (ChatGPT, Claude, VS Code, Goose, Postman); see [MCP Apps](/docs/agentic-ui/mcp-apps)
-- Agent Skills complement MCP by packaging reusable instructions, scripts, references, and assets
+- Agent Skills complement MCP by packaging reusable instructions, scripts, references, and assets; the official Skills extension (`io.modelcontextprotocol/skills`, SEP-2640, Final 2026-09-13) lets a server publish them over MCP
+- MCP Server Cards (SEP-2127, Final 2026-10-06) are an optional extension for describing a remote server before connecting
 
 MCP defines a standard wire format for an agent to discover what a server can do, call tools, read resources, use structured prompts, and negotiate extensions. Implement MCP first when you are exposing remote tools, data, or workflows to external agents. For page-scoped browser tools, see [WebMCP](/docs/protocols/webmcp).
 
@@ -35,15 +36,18 @@ The current specification revision is [`2026-07-28`](https://modelcontextprotoco
 <Callout type="info">
   Revision `2026-07-28` was the largest change since MCP launched. It introduced a **stateless
   protocol core** (removing the `initialize` / `notifications/initialized` handshake and the
-  `Mcp-Session-Id` header), an optional `server/discover` method, a single `subscriptions/listen`
-  stream in place of the HTTP GET endpoint and `resources/subscribe`, multi round-trip requests in
-  place of server-initiated `roots/list`, `sampling/createMessage`, and `elicitation/create`, a
-  formal extensions framework, OAuth 2.0 / OIDC hardening, a deprecation lifecycle with a 12-month
-  minimum window, JSON Schema 2020-12 tool schemas, and W3C Trace Context. Build new servers against
-  `2026-07-28`; add predecessor compatibility only when a supported client requires it.
+  `Mcp-Session-Id` header), a `server/discover` method (servers must implement it; clients may skip
+  calling it), a single `subscriptions/listen` stream in place of the HTTP GET endpoint and
+  `resources/subscribe`, multi round-trip requests in place of server-initiated `roots/list`,
+  `sampling/createMessage`, and `elicitation/create`, a formal extensions framework, OAuth 2.0 /
+  OIDC hardening, a deprecation lifecycle with a 12-month minimum window, JSON Schema 2020-12 tool
+  schemas, and W3C Trace Context. Build new servers against `2026-07-28`; add predecessor
+  compatibility only when a supported client requires it.
 </Callout>
 
 The [MCP roadmap update (2026-08-22)](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) sets direction for what lands next: server-initiated events (webhooks and channels, replacing polling) alongside maturing the Tasks extension; a unified HTTP-native transport that extends Streamable HTTP to local servers currently reached over stdio; agent identity work (DPoP adoption and Workload Identity Federation for delegation without long-lived tokens); standardized tool-result handling and progressive discovery so a server can expose a small entry point and reveal more of a large tool catalogue as a conversation narrows; and SDK ergonomics and spec-conformance work. None of this is shipped spec behavior yet; build against shipped features only.
+
+On release timing, [SEP-3398](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/3398-release-cycle-updates.md) (Process SEP, accepted 2026-10-14) moves spec releases to a March and September cadence with overlapping eight-month cycles, and moves the release previously planned for December 2026 to a target of 30 March 2027. Treat that date as a target, not a commitment; the SEP fixes the cadence, not the scope.
 
 ## Core Primitives and Extensions
 
@@ -162,13 +166,19 @@ Use tasks when an operation cannot complete in a single RPC roundtrip - report g
   `tasks/result` and `tasks/list`. Those methods are not part of the current Tasks extension.
 </Callout>
 
+### Other Official Extensions
+
+**Skills over MCP** (`io.modelcontextprotocol/skills`, [SEP-2640](https://modelcontextprotocol.io/extensions/skills/overview), Final 2026-09-13) lets a server publish [Agent Skills](/docs/discovery/agent-skills) to clients. A server that declares the extension implements `skills/list` and `skills/get`, and serves the skill files through `resources/read`; `resources/directory/read` is optional. Reading `SKILL.md` as a resource does not activate the skill - the host decides how to load it and applies any approval. The TypeScript SDK 2.4.0 ships the stable Skills API; client and host support is still being implemented, so check the [client matrix](https://modelcontextprotocol.io/extensions/client-matrix).
+
+**Server Cards** (`io.modelcontextprotocol/server-card`, [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127), Final 2026-10-06) describe a remote server's identity and endpoints before a client connects. The SEP charters the extension; the card format and discovery details are still marked draft in the [extension repository](https://github.com/modelcontextprotocol/ext-server-card/blob/main/docs/discovery.md). Cards are not a replacement for runtime `server/discover`, which wins on any conflict, or for the Registry's `server.json`. See [Well-Known Endpoints](/docs/discovery/well-known-endpoints#wellknownmcpserver-cardjson) for where to publish one.
+
 ## Wire Format
 
 MCP uses JSON-RPC 2.0 as its message format. Every interaction is a request/response pair or a notification, encoded as JSON.
 
 ### Current Per-Request Metadata
 
-In `2026-07-28`, each request carries its protocol version and client capabilities in `_meta`. A server may implement `server/discover` to advertise supported versions, capabilities, and identity before normal calls, but discovery is optional. Handlers must not depend on connection state established by an initialization exchange.
+In `2026-07-28`, each request carries its protocol version and client capabilities in `_meta`. Servers must implement `server/discover` to advertise supported versions, capabilities, and identity; clients may call it before normal requests but are not required to. Handlers must not depend on connection state established by an initialization exchange.
 
 ### Legacy `2025-11-25` Initialization Handshake
 
@@ -222,12 +232,15 @@ The server must respond with the same `protocolVersion` or a lower supported ver
   `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`, and
   `io.modelcontextprotocol/clientInfo`; servers identify themselves with
   `io.modelcontextprotocol/serverInfo` in the result `_meta`, and a version mismatch returns
-  `UnsupportedProtocolVersionError`. Servers may implement `server/discover` to advertise supported
-  versions, capabilities, and identity, with a back-compatibility probe for stdio. Design new
-  servers so that no handler depends on state established at connect time.
+  `UnsupportedProtocolVersionError`. Servers must implement `server/discover` to advertise supported
+  versions, capabilities, and identity (calling it is optional for clients), with a
+  back-compatibility probe for stdio. Design new servers so that no handler depends on state
+  established at connect time.
 </Callout>
 
 ### Tool Call
+
+The examples in this section are abridged. In `2026-07-28` every request also carries the per-request `_meta` described above (`io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`, `io.modelcontextprotocol/clientInfo`), and every result carries `resultType`. List and read results also carry `ttlMs` and `cacheScope`.
 
 ```json
 // Client → Server: tool call request
@@ -242,6 +255,11 @@ The server must respond with the same `protocolVersion` or a lower supported ver
       "amount_cents": 149900,
       "currency": "usd",
       "due_date": "2025-02-15"
+    },
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {},
+      "io.modelcontextprotocol/clientInfo": { "name": "example-client", "version": "1.0.0" }
     }
   }
 }
@@ -251,6 +269,7 @@ The server must respond with the same `protocolVersion` or a lower supported ver
   "jsonrpc": "2.0",
   "id": 42,
   "result": {
+    "resultType": "complete",
     "content": [
       {
         "type": "text",
@@ -269,6 +288,7 @@ For error conditions, set `isError: true` and include a recovery-oriented messag
   "jsonrpc": "2.0",
   "id": 42,
   "result": {
+    "resultType": "complete",
     "content": [
       {
         "type": "text",
@@ -304,13 +324,16 @@ For error conditions, set `isError: true` and include a recovery-oriented messag
   "jsonrpc": "2.0",
   "id": 7,
   "result": {
+    "resultType": "complete",
     "contents": [
       {
         "uri": "billing://customers/cus_01HV3K8MNP/invoices",
         "mimeType": "application/json",
         "text": "[{\"id\":\"inv_01HV\",\"status\":\"paid\",\"amount_cents\":149900}]"
       }
-    ]
+    ],
+    "ttlMs": 60000,
+    "cacheScope": "private"
   }
 }
 ```
@@ -333,12 +356,12 @@ Tool definitions support an `annotations` field. Annotations communicate behavio
 }
 ```
 
-| Annotation        | Type    | Meaning                                                                            |
-| ----------------- | ------- | ---------------------------------------------------------------------------------- |
-| `readOnlyHint`    | boolean | Tool does not modify any state (safe to call freely)                               |
-| `destructiveHint` | boolean | Tool may delete or irreversibly modify data                                        |
-| `idempotentHint`  | boolean | Calling with the same arguments multiple times has the same effect as calling once |
-| `openWorldHint`   | boolean | Tool interacts with external systems outside the MCP server's control              |
+| Annotation        | Type    | Meaning                                                                                                 |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------- |
+| `readOnlyHint`    | boolean | Tool does not modify any state (safe to call freely)                                                    |
+| `destructiveHint` | boolean | Tool (when not read-only) may make destructive updates rather than only additive ones                   |
+| `idempotentHint`  | boolean | Calling with the same arguments multiple times has the same effect as calling once (when not read-only) |
+| `openWorldHint`   | boolean | Tool interacts with external systems outside the MCP server's control                                   |
 
 Annotations are hints, not enforcement. Clients may use them to require user confirmation before destructive calls or to allow unrestricted use of read-only tools, but trusted server or workflow code must still enforce authorization, scopes, tenant boundaries, and approval gates.
 
@@ -352,7 +375,7 @@ The November 2025 revision adds several important capabilities:
 
 **Authorization-server discovery** - HTTP authorization now leans on OAuth protected-resource metadata and supports OAuth or OpenID Connect discovery for authorization servers.
 
-**URL Mode Elicitation** - Servers can direct users to external URLs for sensitive out-of-band interactions that should not pass through the MCP client. Removed in `2026-07-28`; see the multi round-trip replacement below.
+**URL Mode Elicitation** - Servers can direct users to external URLs for sensitive out-of-band interactions that should not pass through the MCP client. In `2026-07-28` URL mode is still supported, but through multi round-trip requests rather than server-initiated dispatch; see below.
 
 **Tool-call support in sampling** - Sampling can include `tools` and `toolChoice` parameters.
 
@@ -435,15 +458,15 @@ Roots tell the server which filesystem or resource locations the client has auth
 Servers that respect roots will not access paths outside the declared roots, providing a scope boundary for filesystem operations.
 
 <Callout type="warn">
-  Deprecated in `2026-07-28` (SEP-2577), along with the `notifications/roots/list_changed`
-  notification, which is removed outright. Express scope boundaries as explicit tool parameters,
-  resource URIs, or server configuration instead - all three survive the stateless core, whereas a
-  client-declared root list does not.
+  Deprecated in `2026-07-28` (SEP-2577), not removed: during the deprecation window a roots request
+  survives in its multi round-trip form, but `notifications/roots/list_changed` is removed. Express
+  scope boundaries as explicit tool parameters, resource URIs, or server configuration instead - all
+  three survive the stateless core without relying on a client-declared root list.
 </Callout>
 
 ### Elicitation
 
-Elicitation allows a server to request additional information from the user during a tool execution - mid-call user input rather than pre-declared parameters. A server handling a file operation might elicit confirmation before overwriting an existing file.
+Elicitation allows a server to request additional information from the user during a tool execution - mid-call user input rather than pre-declared parameters. A server handling a file operation might elicit confirmation before overwriting an existing file. The request below is the legacy `2025-11-25` form.
 
 ```json
 {
@@ -466,10 +489,10 @@ Elicitation allows a server to request additional information from the user duri
 ```
 
 <Callout type="warn">
-  Deprecated in `2026-07-28` (SEP-2577). Server-initiated `elicitation/create` stays available
-  through the 12-month minimum deprecation window, but the replacement path is a multi round-trip
-  request: the server returns `resultType: "input_required"` and the client retries with
-  `inputResponses`.
+  Elicitation is not deprecated (SEP-2577 deprecates Roots, Sampling, and Logging), but in
+  `2026-07-28` the server-initiated `elicitation/create` request is replaced by a multi round-trip
+  request: the server returns `resultType: "input_required"` with an elicitation input request, and
+  the client retries with `inputResponses`.
 </Callout>
 
 ### Progress Notifications
@@ -554,6 +577,8 @@ The Streamable HTTP transport is the preferred non-stdio transport for MCP serve
 
 - A single JSON response for request/response operations
 - A Server-Sent Events stream for operations that produce multiple messages (progress notifications, streaming tool results, task polling)
+
+A legacy `2025-11-25` request looks like this; the `2026-07-28` headers are listed in the callout below.
 
 ```
 POST /mcp HTTP/1.1
@@ -661,11 +686,17 @@ Declaring `resources.subscribe: true` without implementing `resources/subscribe`
   `io.modelcontextprotocol/tasks`.
 </Callout>
 
+## SDKs
+
+The [official SDK directory](https://modelcontextprotocol.io/docs/sdk) lists six Tier 1 SDKs (observed 2026-10-29): TypeScript, Python, C#, Go, Rust, and Ruby. Java is Tier 2; Swift, PHP, and Kotlin are Tier 3. Tier describes maintenance commitments, not identical extension coverage, so check each SDK for the extensions you need. For TypeScript, the v2 packages `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (2.4.0, 2026-10-23) are current; the monolithic `@modelcontextprotocol/sdk` 1.x line (1.32.2) is maintained for compatibility. See [Server Architecture](/docs/mcp-servers/architecture) for the v2 registration API.
+
 ## Spec & References
 
 - [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) - the predecessor revision, for compatibility work with clients that have not migrated
 - [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) - current normative specification
 - [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/) - migration summary and SDK support status
+- [Skills over MCP](https://modelcontextprotocol.io/extensions/skills/overview) - the Final SEP-2640 extension
+- [SEP-3398 release cycle](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/3398-release-cycle-updates.md) - cadence and the next release target
 - [modelcontextprotocol.io](https://modelcontextprotocol.io) - official docs and server registry
 
 ## Related Pages

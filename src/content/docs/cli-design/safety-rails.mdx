@@ -1,7 +1,7 @@
 ---
 title: Safety Rails
 description: Dry-run mode, confirmation bypass, structured missing-flag errors, and response sanitization against prompt injection
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -12,7 +12,7 @@ Agents cannot undo destructive operations via Ctrl+Z. Safety rails include --dry
 - Dry-run returns preview of affected resources and total count
 - --yes flag to bypass interactive prompts in non-interactive contexts
 - Structured error messages for missing required flags
-- Sanitize retrieved data to prevent injection attacks
+- Sanitize retrieved data to reduce injection risk (a mitigation, not a guarantee)
 
 An agent that makes a destructive API call cannot undo it by pressing Ctrl+Z. There is no "are you sure?" prompt that an agent can stop at and reflect. Safety rails are the mechanisms that make dangerous operations safe to attempt in an automated context - and the defenses that protect the agent from being manipulated by the data it retrieves.
 
@@ -232,11 +232,12 @@ function sanitizeRecord(
 
 For higher-assurance contexts, run returned text through your approved prompt-injection or content-filtering layer before returning it to the agent. Document the scanner, policy version, and action taken on failure. Google Cloud's Model Armor is one such layer - a standalone REST API that screens prompts and responses independently for content-safety categories, prompt-injection and jailbreak attempts, sensitive-data exposure, and malicious URLs, running in "inspect only" or "inspect and block" mode. It is a request/response screening service you put in front of the CLI's data path, separate from the delimiter pattern above.
 
-The full request→response loop defense covers:
+Delimiters and screening lower the risk of prompt injection; they don't prevent it, and Model Armor is a screening service, not proof that returned data can't manipulate an agent. Keep least privilege, execution-time authorization and approval checks outside the model's interpretation of the data. A layered request→response defense covers:
 
 1. **Input hardening** (see [Input Hardening](./input-hardening)) - validate what goes in
 2. **Dry-run** - inspect what would happen before it does
-3. **Response sanitization** - protect what comes back from manipulating the agent
+3. **Response sanitization** - reduce the chance that what comes back manipulates the agent
+4. **Authorization at execution** - enforce permissions and approvals in code, whatever the agent read
 
 ```typescript
 async function getUser(userId: string, flags: Flags) {
@@ -272,18 +273,18 @@ $ mytool users delete --confirm-token drydel_01HV3K8MNP_1711108800 --json
 {"deleted": 23}
 ```
 
-This pattern is optional - it ensures the agent is executing precisely the operation it previewed, not a new version of the command constructed with potentially different parameters.
+This pattern is optional - it ensures the agent is executing precisely the operation it previewed, not a new version of the command constructed with potentially different parameters. For that to hold, the server must bind the token to the reviewed action (its parameters and resolved targets) and check it again when the real operation runs; a token that is merely accepted proves nothing about what was previewed.
 
 ## Scoring Rubric
 
 This axis is part of the [Agent DX CLI Scale](./cli-scale).
 
-| Score | Criteria                                                                                                                                |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No dry-run mode. No response sanitization.                                                                                              |
-| 1     | `--dry-run` exists for some mutating commands.                                                                                          |
-| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                                |
-| 3     | Dry-run plus response sanitization to defend against prompt injection embedded in API data. The full request→response loop is defended. |
+| Score | Criteria                                                                                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | No dry-run mode. No response sanitization.                                                                                          |
+| 1     | `--dry-run` exists for some mutating commands.                                                                                      |
+| 2     | `--dry-run` for all mutating commands. Agent can validate requests without side effects.                                            |
+| 3     | Dry-run plus response sanitization to reduce prompt injection embedded in API data. The request→response loop has layered defenses. |
 
 ## Checklist
 

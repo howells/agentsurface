@@ -1,7 +1,7 @@
 ---
 title: Token Exchange
 description: RFC 8693 narrowing scope and delegation for sub-agents
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -54,7 +54,7 @@ Parameters:
 - `actor_token_type` - type of the actor token
 - `requested_token_type` - type of token to return (usually `urn:ietf:params:oauth:token-type:jwt`)
 - `audience` - the service that will consume the new token
-- `scope` - the scopes to include in the new token (must be a subset of subject token's scopes)
+- `scope` - the scopes to include in the new token (your exchange policy should require a subset of the subject token's scopes; RFC 8693 leaves this to the authorization server)
 
 The server returns a new access token:
 
@@ -124,7 +124,7 @@ The sub-agent receives a token that:
 - Is scoped to `invoices:read` only (cannot write)
 - Is only valid for `invoices-service.example.com` (audience-restricted)
 - Expires in 15 minutes (short-lived)
-- Includes the orchestrator's identity via the `act` claim
+- Keeps the orchestrator as the subject (`sub`) and names the sub-agent as the current actor (`act.sub`), preserving any earlier actors as nested `act` claims
 
 ## Use Case: User Delegation (On-Behalf-Of)
 

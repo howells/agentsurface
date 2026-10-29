@@ -60,7 +60,8 @@ export default function AboutPage() {
             <p>
               Pages about fast-moving tools carry a last-verified date, and a page that goes 120
               days without a check is flagged to be verified again against primary sources. Model
-              names in examples come from a single allowlist, so an outdated name fails the build.
+              names in examples are checked against a single allowlist during the build, and each
+              entry on it is verified against the provider's own documentation.
             </p>
             <p>
               The site itself is tested with the public agent-readiness checkers from Google

@@ -12,6 +12,9 @@
 
 import { jwtVerify, createRemoteJWKSet, SignJWT } from "jose";
 
+/** RFC 8693 section 3 token-type identifier for access tokens. */
+const TOKEN_TYPE_ACCESS_TOKEN = "urn:ietf:params:oauth:token-type:access_token";
+
 /**
  * Token Exchange Request per RFC 8693 section 2.1
  */
@@ -21,7 +24,7 @@ interface TokenExchangeRequest {
   subject_token_type: "urn:ietf:params:oauth:token-type:jwt";
   actor_token: string; // JWT of the agent acting on behalf of the user
   actor_token_type: "urn:ietf:params:oauth:token-type:jwt";
-  requested_token_use: "access_token" | "refresh_token";
+  requested_token_type: string; // token-type URN, e.g. TOKEN_TYPE_ACCESS_TOKEN
   audience: string; // Service that will accept the token
   scope?: string; // Space-separated scopes (narrower than either input token)
   resource?: string; // Optional: specific resource URI
@@ -110,7 +113,7 @@ export class TokenExchangeClient {
       actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
       audience,
       grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-      requested_token_use: "access_token",
+      requested_token_type: TOKEN_TYPE_ACCESS_TOKEN,
       subject_token: subjectToken,
       subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     });

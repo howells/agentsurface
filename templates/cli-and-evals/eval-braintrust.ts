@@ -1,45 +1,57 @@
 /**
- * Braintrust Eval Script — Agent evaluation with dataset management & human review
+ * Braintrust Eval Script - Agent evaluation with dataset management & human review
  *
- * **What it is:** Complete Braintrust eval harness in TypeScript. Includes dataset loader,
- * task function that calls your agent, and scorers (e.g. Factuality, ToolCallOrder, Cost).
- * Emits metrics: pass@k, pass^k, trajectory traces, token usage.
+ * **What it is:** Braintrust eval in TypeScript using the `braintrust` SDK's
+ * `Eval(project, { data, task, scores })` and scorers from `autoevals`. Includes a
+ * fixture loader, a task that calls your agent, and scorers (an LLM-judged factuality
+ * score, tool-call order, cost, output match). Records per-case scores, token usage and
+ * traces in Braintrust.
+ *
+ * **What it does not do:** it does not compute pass@k or pass^k. Set `trialCount` to run
+ * each case several times, then derive those metrics from the per-trial results
+ * (pass@k: at least one of k trials succeeds; pass^k: all k trials succeed).
  *
  * **When to use:**
  * - Continuous eval loop during agent development
  * - Tracking regressions in CI with baseline comparison
  * - Collecting human feedback and traces for offline analysis
  *
- * **Canonical URL:** https://braintrust.dev/docs
+ * **Canonical URL:** https://www.braintrust.dev/docs
  *
  * **Customisation checklist:**
- * - [ ] Update AGENT_MODEL to your model ID (claude-opus-5-5, claude-sonnet-5, etc.)
- * - [ ] Customize task() function to call your actual agent
- * - [ ] Add domain-specific graders (not just Factuality)
- * - [ ] Load real production traces or labelled dataset
- * - [ ] Set up CI integration: `pnpm braintrust eval -e`
+ * - [ ] Update AGENT_MODEL to your model ID (claude-opus-5-5, claude-sonnet-5-5, etc.)
+ * - [ ] Customize runAgent() to call your actual agent
+ * - [ ] Add domain-specific scorers (not just factuality)
+ * - [ ] Load real production traces or a labelled dataset (see `initDataset`)
+ * - [ ] Set up CI integration: `npx braintrust eval eval-braintrust.ts`
  * - [ ] Configure Braintrust API key in env or .env
  *
  * **Environment variables:**
- * - `BRAINTRUST_API_KEY` — Required. Get from https://www.braintrust.dev
- * - `BRAINTRUST_ORG_NAME` — Optional. Project org (default: personal)
+ * - `BRAINTRUST_API_KEY` - Required. Get from https://www.braintrust.dev
+ * - `OPENAI_API_KEY` - The default autoevals judge model is an OpenAI model. To judge with
+ *   another provider, pass `model` and `client` to the scorer (see autoevals docs).
  *
  * **References:**
- * - Braintrust docs: https://braintrust.dev/docs
- * - Anthropic evals: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
- * - pass@k metrics: https://arxiv.org/abs/2010.03174
+ * - Braintrust docs: https://www.braintrust.dev/docs
+ * - autoevals scorers: https://github.com/braintrustdata/autoevals
+ * - Anthropic evals: https://www.anthropic.com/research/demystifying-evals-for-ai-agents
+ * - pass@k metrics: https://arxiv.org/abs/2107.03374
  */
 
-import Braintrust from "@braintrust/eval";
+import { Eval } from "braintrust";
+import { Factuality } from "autoevals";
 import { z } from "zod";
 
-// <CUSTOMISE>: Update model and dataset loading
+// <CUSTOMISE>: Update model and project
 const AGENT_MODEL = "claude-opus-5-5";
-const DATASET_NAME = "agent-tasks-v1";
-const EVAL_NAME = "agent-routing-eval";
+const PROJECT_NAME = "agent-routing-eval";
+// Claude Opus 5.5 list price per million tokens (claude-api skill, cached 2026-10-06):
+// $4 input / $20 output. Check current pricing before relying on these numbers.
+const INPUT_USD_PER_MTOK = 4;
+const OUTPUT_USD_PER_MTOK = 20;
 
 /**
- * Test case schema — what your dataset contains
+ * Test case schema - what your fixture file contains
  */
 const TestCaseSchema = z.object({
   category: z.enum(["happy_path", "edge_case", "adversarial"]).optional(),
@@ -52,7 +64,7 @@ const TestCaseSchema = z.object({
 type TestCase = z.infer<typeof TestCaseSchema>;
 
 /**
- * Agent response schema — what your agent returns
+ * Agent response schema - what your agent returns
  */
 const AgentResponseSchema = z.object({
   text: z.string().describe("Final response"),
@@ -70,13 +82,20 @@ const AgentResponseSchema = z.object({
 
 type AgentResponse = z.infer<typeof AgentResponseSchema>;
 
+/** Case metadata carried alongside each Braintrust row. */
+interface CaseMetadata extends Record<string, unknown> {
+  category: string;
+  expected_tools: string[];
+  id: string;
+}
+
 /**
  * Custom scorer: Tool call order correctness
  */
-async function scoreToolCallOrder(
+function scoreToolCallOrder(
   expected: string[],
   actual: AgentResponse,
-): Promise<{ score: number; details: string }> {
+): { score: number; details: string } {
   const actualToolNames = actual.tool_calls.map((tc) => tc.name);
 
   if (JSON.stringify(expected) === JSON.stringify(actualToolNames)) {
@@ -85,10 +104,10 @@ async function scoreToolCallOrder(
 
   // Allow subset match (agent called all expected tools, order correct, may have extras)
   let idx = 0;
-  for (const expected_tool of expected) {
-    const found = actualToolNames.indexOf(expected_tool, idx);
+  for (const expectedTool of expected) {
+    const found = actualToolNames.indexOf(expectedTool, idx);
     if (found === -1) {
-      return { score: 0, details: `Missing expected tool: ${expected_tool}` };
+      return { details: `Missing expected tool: ${expectedTool}`, score: 0 };
     }
     idx = found + 1;
   }
@@ -99,10 +118,9 @@ async function scoreToolCallOrder(
 /**
  * Custom scorer: Cost (sum of input + output tokens)
  */
-async function scoreCost(response: AgentResponse): Promise<{ score: number; cost: number }> {
-  // Example: $5 per 1M input tokens, $25 per 1M output tokens (Opus 5.5)
-  const inputCost = (response.tokens.input / 1e6) * 5;
-  const outputCost = (response.tokens.output / 1e6) * 25;
+function scoreCost(response: AgentResponse): { score: number; cost: number } {
+  const inputCost = (response.tokens.input / 1e6) * INPUT_USD_PER_MTOK;
+  const outputCost = (response.tokens.output / 1e6) * OUTPUT_USD_PER_MTOK;
   const totalCost = inputCost + outputCost;
 
   // Score: higher is better. Invert cost as score.
@@ -110,14 +128,14 @@ async function scoreCost(response: AgentResponse): Promise<{ score: number; cost
 }
 
 /**
- * Your agent function — integrate your actual agent here
+ * Your agent function - integrate your actual agent here
  *
  * <CUSTOMISE>: Replace with your agent implementation
  */
 async function runAgent(prompt: string): Promise<AgentResponse> {
   // Example stub; replace with actual agent SDK call
   const response = await fetch("http://localhost:3000/agent", {
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ model: AGENT_MODEL, prompt }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
   });
@@ -131,146 +149,110 @@ async function runAgent(prompt: string): Promise<AgentResponse> {
 }
 
 /**
- * Load test dataset from Braintrust
+ * Load the test dataset.
  */
-async function loadDataset(client: typeof Braintrust): Promise<TestCase[]> {
+async function loadDataset(): Promise<TestCase[]> {
   // <CUSTOMISE>: Implement your dataset loader
-  // Option 1: Load from Braintrust
-  // const dataset = await client.getDataset({ name: DATASET_NAME });
-  // return dataset.records.map((r) => TestCaseSchema.parse(r.input));
+  // Option 1: Load from Braintrust. Pass `data: initDataset({ project, dataset })` to Eval
+  // instead of an array (import { initDataset } from "braintrust").
 
-  // Option 2: Load from JSON file
+  // Option 2: Load from a JSON file
   const fs = await import("node:fs/promises");
   const data = await fs.readFile("./evals/fixtures.json", "utf-8");
-  const records = JSON.parse(data);
-  return records.map((r: any) => TestCaseSchema.parse(r));
+  const records: unknown[] = JSON.parse(data);
+  return records.map((r) => TestCaseSchema.parse(r));
 }
+
+const dataset = await loadDataset();
+console.log(`Loaded ${dataset.length} test cases`);
 
 /**
- * Main eval function
+ * The eval. Run it with `npx braintrust eval eval-braintrust.ts` (or `npx tsx` for a local run).
+ * Eval() returns a summary with the experiment name and URL, per-score averages and the
+ * results for each case.
  */
-async function runEval() {
-  const client = Braintrust();
-
-  const dataset = await loadDataset(client);
-  console.log(`Loaded ${dataset.length} test cases`);
-
-  const eval_results = await client.Eval(EVAL_NAME, {
-    data: () => dataset,
+export const result = await Eval(PROJECT_NAME, {
+  // Each row: input goes to the task, expected and metadata go to the scorers.
+  data: dataset.map((testCase) => ({
+    expected: testCase.expected_output ?? null,
+    input: testCase.prompt,
     metadata: {
-      dataset_version: "1.0",
-      eval_timestamp: new Date().toISOString(),
-      model: AGENT_MODEL,
-    },
-    scores: [
-      // Built-in Braintrust scorers
-      Braintrust.Factuality.Score(),
-      Braintrust.Summary.Score(),
-
-      // Custom scorer: tool order
-      {
-        name: "tool_call_order",
-        description: "Verifies tools are called in the expected order",
-        score: async (testCase: TestCase, response: AgentResponse) => {
-          const result = await scoreToolCallOrder(testCase.expected_tools, response);
-          return {
-            name: "tool_call_order",
-            score: result.score,
-            details: result.details,
-          };
-        },
-      },
-
-      // Custom scorer: cost
-      {
-        name: "cost_efficiency",
-        description: "Token usage cost (lower is better)",
-        score: async (testCase: TestCase, response: AgentResponse) => {
-          const result = await scoreCost(response);
-          return {
-            name: "cost_efficiency",
-            score: result.score,
-            metadata: { cost_usd: result.cost },
-          };
-        },
-      },
-
-      // Pass/fail: did agent produce expected output?
-      {
-        name: "output_match",
-        description: "Final output matches expected (if provided)",
-        score: async (testCase: TestCase, response: AgentResponse) => {
-          if (!testCase.expected_output) {
-            return { name: "output_match", score: null }; // Skip if no ground truth
-          }
-
-          const match = response.text.includes(testCase.expected_output);
-          return {
-            name: "output_match",
-            score: match ? 1 : 0,
-            details: match
-              ? "Output matched"
-              : `Expected substring not found: ${testCase.expected_output}`,
-          };
-        },
-      },
-    ],
-    task: async (testCase) => {
-      try {
-        const response = await runAgent(testCase.prompt);
-        return {
-          output: response,
-          metadata: {
-            category: testCase.category || "unspecified",
-          },
-        };
-      } catch (err) {
-        console.error(`Task failed for ${testCase.id}:`, err);
-        throw err;
+      category: testCase.category ?? "unspecified",
+      expected_tools: testCase.expected_tools,
+      id: testCase.id,
+    } satisfies CaseMetadata,
+  })),
+  experimentName: `${AGENT_MODEL}-baseline`,
+  metadata: {
+    eval_timestamp: new Date().toISOString(),
+    model: AGENT_MODEL,
+  },
+  // Run each case this many times to see variance; compute pass@k / pass^k from the trials.
+  trialCount: 1,
+  task: async (input: string) => runAgent(input),
+  scores: [
+    // LLM-judged factuality against the expected answer (autoevals). Needs an expected value.
+    async ({ input, output, expected }) => {
+      if (!expected) {
+        return null; // Skip when there is no ground truth
       }
+      return Factuality({ expected, input, output: output.text });
     },
-  });
 
-  console.log("\n=== Eval Results ===");
-  console.log(`Total cases: ${eval_results.summary.total}`);
-  console.log(`Passed: ${eval_results.summary.passed}`);
-  console.log(`Failed: ${eval_results.summary.failed}`);
-  console.log(
-    `Pass rate: ${((eval_results.summary.passed / eval_results.summary.total) * 100).toFixed(1)}%`,
-  );
+    // Custom scorer: tool order
+    ({ metadata, output }) => {
+      const result = scoreToolCallOrder((metadata as CaseMetadata).expected_tools, output);
+      return {
+        metadata: { details: result.details },
+        name: "tool_call_order",
+        score: result.score,
+      };
+    },
 
-  // Detailed metrics by scorer
-  for (const [name, metrics] of Object.entries(eval_results.metrics ?? {})) {
-    console.log(`\n${name}:`);
-    console.log(`  mean: ${metrics.mean?.toFixed(3)}`);
-    console.log(`  std: ${metrics.std?.toFixed(3)}`);
-  }
+    // Custom scorer: cost
+    ({ output }) => {
+      const result = scoreCost(output);
+      return { metadata: { cost_usd: result.cost }, name: "cost_efficiency", score: result.score };
+    },
 
-  console.log(`\nView results: ${eval_results.html_url}`);
+    // Pass/fail: did the agent produce the expected output?
+    ({ expected, output }) => {
+      if (!expected) {
+        return null; // Skip if no ground truth
+      }
+      const match = output.text.includes(expected);
+      return {
+        metadata: {
+          details: match ? "Output matched" : `Expected substring not found: ${expected}`,
+        },
+        name: "output_match",
+        score: match ? 1 : 0,
+      };
+    },
+  ],
+});
+
+console.log("\n=== Eval Results ===");
+console.log(`Experiment: ${result.summary.experimentName}`);
+for (const [name, score] of Object.entries(result.summary.scores)) {
+  console.log(`${name}: ${score.score.toFixed(3)}`);
 }
-
-// CLI entry
-if (require.main === module) {
-  runEval().catch(console.error);
-}
+console.log(`\nView results: ${result.summary.experimentUrl}`);
 
 export type { TestCase, AgentResponse };
-export { runEval, loadDataset, runAgent };
+export { loadDataset, runAgent };
 
 /**
  * Usage:
  *
  * ```bash
  * # Run evaluation
- * BRAINTRUST_API_KEY=sk_... pnpm tsx eval-braintrust.ts
+ * BRAINTRUST_API_KEY=sk_... npx braintrust eval eval-braintrust.ts
  *
  * # Or from package.json:
  * "scripts": {
- *   "eval": "tsx eval-braintrust.ts",
- *   "eval:watch": "tsx --watch eval-braintrust.ts"
+ *   "eval": "braintrust eval eval-braintrust.ts",
+ *   "eval:watch": "braintrust eval --watch eval-braintrust.ts"
  * }
- *
- * # Via Braintrust CLI:
- * pnpm braintrust eval
  * ```
  */

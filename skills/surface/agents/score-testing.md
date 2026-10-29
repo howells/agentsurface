@@ -7,7 +7,7 @@ tools: Read, Glob, Grep
 
 ## Role
 
-You are a scoring agent for **Dimension 10: Testing** of an agent readiness audit. Your job is to examine a project's agent-specific testing and evaluation practices and score them 0-3 against the rubric in your reference file.
+You are a scoring agent for **Dimension 9: Testing** of an agent readiness audit. Your job is to examine a project's agent-specific testing and evaluation practices and score them 0-3 against the rubric in your reference file.
 
 <required_reading>
 Read this reference file NOW - it contains the scoring rubric, evidence patterns, and detection instructions:
@@ -56,7 +56,7 @@ Bar visualization:
 ```
 <score_result>
 DIMENSION: Testing
-DIMENSION_NUMBER: 10
+DIMENSION_NUMBER: 9
 SCORE: {0-3}
 MAX: 3
 CONFIDENCE: {high|medium|low}

@@ -1,7 +1,7 @@
 ---
 title: Trust and Risk
 description: Telling legitimate shopping agents from abusive bots at checkout, without blocking the agents you want
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -15,13 +15,13 @@ A merchant needs to let a legitimate shopping agent through to checkout while st
 
 ## Web Bot Auth - signed bot identity
 
-Web Bot Auth is an IETF effort built on RFC 9421 HTTP Message Signatures, with two drafts doing the work: a **directory draft**, letting a crawler or agent publish its public keys, and a **protocol draft**, defining how those keys sign a request's identity into HTTP headers.
+Web Bot Auth is an IETF effort built on RFC 9421 HTTP Message Signatures. It is still Internet-Drafts, not RFCs: the working-group **protocol draft** [draft-ietf-webbotauth-httpsig-protocol-00](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/) (2026-09-01) defines how keys sign a request's identity into HTTP headers; the **directory draft** [draft-meunier-webbotauth-httpsig-directory-00](https://datatracker.ietf.org/doc/draft-meunier-webbotauth-httpsig-directory/) (2026-07-01) lets a crawler or agent publish its public keys; and a [registry draft](https://datatracker.ietf.org/doc/draft-meunier-webbotauth-registry/) (draft-meunier-webbotauth-registry-04, 2026-10-27) is also in progress.
 
-A signer publishes a JSON Web Key Set at `/.well-known/http-message-signatures-directory` over HTTPS, itself signed so the directory can't be spoofed, with each key's base64url-encoded JWK thumbprint available for lookup. Every signed request carries three headers: `Signature-Input` (which components are signed, the validity window, and a key identifier), `Signature` (the cryptographic signature), and `Signature-Agent` (the HTTPS URL of the signer's key directory, quoted). A verifier fetches the directory, checks its own signature, then validates each request against the published key - see [Cloudflare's reference](https://developers.cloudflare.com/bots/reference/bot-verification/web-bot-auth) for the implementation detail. This is the same mechanism [Cloudflare Pay Per Crawl](/docs/discovery/robots-txt) uses to price crawl access, applied here to identity rather than payment.
+A signer publishes a JSON Web Key Set at `/.well-known/http-message-signatures-directory` over HTTPS, itself signed so the directory can't be spoofed, with each key's base64url-encoded JWK thumbprint available for lookup. A signed request carries `Signature-Input` (which components are signed, the validity window, and a key identifier) and `Signature` (the cryptographic signature). It may also carry `Signature-Agent`, which names the signer's key directory; the current draft makes it a Structured Fields dictionary, for example `Signature-Agent: agent2="https://signature-agent.test"`, with that member covered in `Signature-Input`. The bare quoted-string form is legacy, kept for migration, and should not be copied into new deployments. Not every signed request includes it. A verifier fetches the directory, checks its own signature, then validates each request against the published key - see [Cloudflare's reference](https://developers.cloudflare.com/bots/reference/bot-verification/web-bot-auth) for the implementation detail. This is the same mechanism [Cloudflare Pay Per Crawl](/docs/discovery/robots-txt) uses to price crawl access, applied here to identity rather than payment.
 
 ## Visa Trusted Agent Protocol
 
-Visa's [Trusted Agent Protocol](https://developer.visa.com/capabilities/trusted-agent-protocol/overview), developed with Cloudflare and part of Visa Intelligent Commerce, does the same job for agentic e-commerce checkout specifically: an agent signs a request with a merchant- and purpose-specific, time-bound signature that can't be replayed or relayed, and a merchant verifies it against a key retrieved from a trusted key store before treating the caller as a genuine commerce agent rather than a bot. See [Payments](/docs/agentic-commerce/payments) for how this sits alongside Visa's wider Intelligent Commerce portfolio.
+Visa's [Trusted Agent Protocol](https://developer.visa.com/docs/trusted-agent-protocol), developed with Cloudflare and part of Visa Intelligent Commerce, does the same job for agentic e-commerce checkout specifically: an agent signs a request with a merchant- and purpose-specific, time-bound signature, and a merchant verifies it against a key retrieved from a trusted key store before treating the caller as a genuine commerce agent rather than a bot. Replay and relay protection depends on the merchant actually checking the signature, its freshness, and the intended recipient; a signature alone is not a guarantee. See [Payments](/docs/agentic-commerce/payments) for how this sits alongside Visa's wider Intelligent Commerce portfolio.
 
 The practical difference from Web Bot Auth is scope: Web Bot Auth verifies _a_ signed request came from _a_ published identity; Trusted Agent Protocol verifies specifically that the caller is authorized to act as a commerce agent for a purchase at that merchant. A merchant accepting agent traffic broadly wants Web Bot Auth-style verification; a merchant gating checkout specifically wants a scheme like Trusted Agent Protocol layered on top.
 
@@ -35,9 +35,10 @@ Configure bot management with these three categories as separate decisions, not 
 
 None of the signing schemes above replace normal fraud controls - they establish _who is asking_, not whether the purchase itself is legitimate. Set approval thresholds based on the authorization shape from [Payments](/docs/agentic-commerce/payments):
 
-- A **human-present** purchase with a verified signed-agent identity and an in-the-moment mandate is the closest analogue to a normal card-present transaction - apply your existing fraud rules, adjusted for the absence of a browser fingerprint.
+- A **human-present** purchase with a verified signed-agent identity and an in-the-moment mandate is the shape closest to a normal checkout - apply your existing fraud rules, adjusted for the absence of a browser fingerprint. Human approval inside an agent interface does not make the transaction card-present; the payment processor and card network decide how it is treated, and 3DS and off-session permissions are handled separately.
 - A **human-not-present** purchase needs its risk control baked into the mandate itself (amount cap, merchant allowlist, expiry) rather than relying on point-of-sale review, since there is no human reviewing that specific transaction to catch a fraud signal in the moment.
 - An unsigned request claiming to be a shopping agent, with no verifiable identity and no mandate, should be treated as an anonymous bot regardless of its user-agent string.
+- Consent is its own signal: on Shopify, UCP's `dev.ucp.shopping.buyer_consent` capability negotiates `buyer.consent` on cart and checkout (2026-10-16), and missing required consent contact data can block completion ([source](https://shopify.dev/changelog/posts/checkout-mcp-and-cart-mcp-now-support-ucp-buyer-consent)).
 
 Chargeback liability and dispute handling for agent-initiated purchases follow whichever payment rail actually settled the transaction (card network, MPP/x402 settlement, or a wallet); this section does not change that liability model, only who the merchant can prove was asking.
 

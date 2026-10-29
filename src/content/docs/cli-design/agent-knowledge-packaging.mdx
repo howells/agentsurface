@@ -1,17 +1,17 @@
 ---
 title: Agent Knowledge Packaging
 description: Shipping CLI documentation in formats agents consume at conversation start - CONTEXT.md, AGENTS.md, and structured SKILL.md files
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Agents starting fresh will hallucinate without guidance. Agent knowledge packaging bundles CLI documentation in formats agents load automatically at conversation start: CONTEXT.md (general orientation), AGENTS.md (repo context), and Agent Skills (`SKILL.md` plus optional supporting files). This eliminates discovery cost and prevents common failure modes.
+Agents starting fresh will hallucinate without guidance. Agent knowledge packaging bundles CLI documentation in formats agents can load at the start of a session: CONTEXT.md (general orientation), AGENTS.md (repo context), and Agent Skills (`SKILL.md` plus optional supporting files). This cuts discovery cost and prevents common failure modes. What loads automatically depends on the client, so document each one you support.
 
 - CONTEXT.md: high-level orientation, credentials, invariants
 - AGENTS.md: commands, build/test steps, boundaries, exclusions
 - SKILL.md: portable task guidance, with optional CLI metadata extensions
-- Most agent frameworks auto-load these files from project root
+- File discovery is client-specific: Codex discovers AGENTS.md, Claude Code reads CLAUDE.md and the files it imports, and neither loads CONTEXT.md on its own
 - Lead with commands in AGENTS.md - this is the most valuable content
 
 An agent that has never used your CLI before will try to discover how it works through schema introspection, trial and error, and hallucination. A CLI that ships explicit, structured knowledge for agents to load at conversation start eliminates most of that discovery cost and prevents the most common failure modes before they occur.
@@ -22,7 +22,7 @@ Agent knowledge packaging is the practice of bundling the right information in t
 
 ### CONTEXT.md
 
-A general-purpose context file that most agent frameworks will load automatically when it appears in the project root or the directory from which the CLI is run. It provides high-level orientation: what the tool does, what credentials are needed, and the most important invariants.
+A general-purpose context file. `CONTEXT.md` is a convention, not a format a client is documented to load by default, so treat it as explicitly loaded: reference or import it from the file your client does read (for example, an `@CONTEXT.md` import in `CLAUDE.md`, or a pointer in `AGENTS.md`). It provides high-level orientation: what the tool does, what credentials are needed, and the most important invariants.
 
 ```markdown
 # mytool Context
@@ -53,7 +53,7 @@ CONTEXT.md is intentionally lightweight. It orients the agent without overwhelmi
 
 ### AGENTS.md
 
-AGENTS.md is the open repo-instruction format used by coding agents. It is the primary context file agents look for in a repository.
+AGENTS.md is the open repo-instruction format used by coding agents; [Codex discovers it](https://developers.openai.com/codex/guides/agents-md) automatically. Claude Code reads `CLAUDE.md` and [explicit imports](https://code.claude.com/docs/en/memory), so point `CLAUDE.md` at `AGENTS.md` if you want one source of truth.
 
 Structure AGENTS.md around three concerns:
 
@@ -128,7 +128,7 @@ mytool user create --help --json
 
 The `SKILL.md` folder shape - YAML frontmatter with `name`/`description`, a Markdown body, optional `scripts/`, `references/`, and `assets/` - is covered on [Agent Skills](/docs/discovery/agent-skills); this section covers only what a CLI adds to that base shape.
 
-Skill folders are read off disk at conversation start, loaded at runtime by agent frameworks as a skill tool surface, and attached server-side by hosted model platforms to their managed execution environments - see [Agent Skills](/docs/discovery/agent-skills) for the consumption models. Packaging a CLI's knowledge as skills therefore pays off in three places at once, without a translation layer.
+Skills use progressive disclosure ([Agent Skills specification](https://agentskills.io/specification#progressive-disclosure)): only the `name` and `description` metadata load at startup, the body loads when the skill is activated, and supporting files load when needed. Skills are read off disk by local agents, loaded at runtime by agent frameworks as a skill tool surface, and attached server-side by hosted model platforms to their managed execution environments - see [Agent Skills](/docs/discovery/agent-skills) for the consumption models. Packaging a CLI's knowledge as skills therefore pays off in three places at once, without a translation layer.
 
 A CLI skill extends the base frontmatter with fields that point at runtime introspection instead of a static description - see [Schema Introspection](./schema-introspection#skill-metadata-for-clis) for the `schema_command`/`auth`/`capabilities` fields and a worked example. Keep the base `name` and `description` valid on their own for agents that only understand the public Agent Skills format; treat the extension fields as additive.
 
@@ -234,7 +234,7 @@ Skill files should be versioned and referenced from the CLI's machine-readable s
 }
 ```
 
-An agent can discover skill file URLs from the schema, fetch only the skills relevant to its current task, and load them into context selectively.
+An agent can discover skill file URLs from the schema, fetch only the skills relevant to its current task, and load them into context selectively. The `example/mytool` URLs above are placeholders and return 404; use your own repository's URLs.
 
 ## The "Always Use" Pattern
 
@@ -267,7 +267,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 ## Checklist
 
 - [ ] `AGENTS.md` in the repository root with setup instructions, capabilities, and guardrails
-- [ ] `CONTEXT.md` in the repository root for agent frameworks that load it automatically
+- [ ] `CONTEXT.md` in the repository root, referenced or imported from `AGENTS.md` or `CLAUDE.md` (clients don't load it on their own)
 - [ ] `SKILL.md` with at least `name` and `description` frontmatter
 - [ ] CLI metadata extension points to the live introspection command (`schema_command` or equivalent)
 - [ ] Per-command or per-domain skill files in a `skills/` directory for complex CLIs

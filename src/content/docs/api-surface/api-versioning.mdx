@@ -1,7 +1,7 @@
 ---
 title: API Versioning for Agents
 description: Versioning strategies that protect agents from silent breaking changes across schema, behavior, and descriptions
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -53,8 +53,10 @@ The conservative list of breaking changes for agent APIs:
 | Fixing a description that was factually wrong | Sometimes | Monitor CUJ pass rates before and after          |
 
 <Callout type="warn">
-  Changing an `operationId` is the most impactful breaking change. All generated SDKs, MCP servers,
-  and tool definitions use the `operationId` as the function name. Treat `operationId` as immutable
+  Changing an `operationId` is the most impactful breaking change. OpenAPI makes `operationId`
+  optional, but when present it is the identifier tools MAY use for an operation, and most
+  generators configured to derive names from it use it as the SDK function, MCP tool or tool
+  definition name. Name overrides exist, so check your generator. Treat `operationId` as immutable
   once an endpoint ships.
 </Callout>
 
@@ -94,6 +96,8 @@ Stripe-Version: 2024-06-20
 ```
 
 Date-based versioning has a softer rollout path - you can ship a change and let clients opt in by bumping their version date, while existing clients remain on the older behavior until they explicitly migrate. The downside is that the version is invisible in URLs and harder to introspect from agent call logs.
+
+A concrete current case: Claude API version `2026-10-21` (released 2026-10-21, selected with the `anthropic-version` header) removes `temperature`, `top_p` and `top_k` from Messages requests (a request that sends them returns a 400), removes client-side tool-runner compaction, adds role-specific `MessageParam` types and makes Bearer authentication the default. SDKs send the version that was current when their major version shipped, so the Python 2.0.0, TypeScript 1.0.0 and `ant` 2.0.0 releases pick it up by default. Requests that pin an older version are not migrated automatically: an agent harness that pins `anthropic-version` keeps the old behavior until someone bumps it, which is why the pin should be a deliberate, logged setting. See the [Claude API migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21) and [release notes](https://platform.claude.com/docs/en/release-notes/overview).
 
 ```yaml
 parameters:
@@ -161,6 +165,8 @@ parameters:
 ## Deprecation Timeline
 
 Agent integrations require longer deprecation windows than human developer integrations because agents cannot update themselves. A human developer reads the deprecation notice and ships a fix within weeks. An agent is only re-tooled when someone on the team decides to do it.
+
+The two windows below are house guidance for agent-facing APIs, not requirements. Neither RFC 8594 nor RFC 9745 sets a minimum window.
 
 **Minimum deprecation window:** 12 months from announcement to removal
 
@@ -253,7 +259,7 @@ const listOrders = tool({
 - [ ] Every breaking change triggers a new major version (URL versioning) or new version date (date-based versioning)
 - [ ] Deprecated endpoints have `deprecated: true` in the OpenAPI spec
 - [ ] Deprecated endpoints include `Sunset` (RFC 8594, HTTP-date) and `Deprecation` (RFC 9745, `@`-prefixed Unix timestamp) HTTP response headers
-- [ ] Sunset dates are at least 12 months from deprecation announcement
+- [ ] Sunset dates are at least 12 months from deprecation announcement (house guidance)
 - [ ] `operationId` values are treated as immutable after initial release
 - [ ] CUJ eval suite is run before and after any description change
 - [ ] Description changes that regress CUJ routing are treated as breaking changes

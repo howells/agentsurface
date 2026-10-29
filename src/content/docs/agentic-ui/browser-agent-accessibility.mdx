@@ -1,7 +1,7 @@
 ---
 title: Browser Agent Accessibility
 description: Verify semantics, names, forms, and untrusted content in the browser accessibility tree
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Browser agents often locate controls through roles and accessible names. Build an interface that supports people using assistive technology and verify that the same task is legible to browser automation. An automated accessibility or readiness score is not proof of WCAG conformance or task success.
@@ -37,9 +37,9 @@ Run this category locally, against your own build, before shipping - it needs Ch
 Two browser-vendor tools let you inspect a page the way a browsing agent does, from your own machine, without shipping anything:
 
 - **Safari's built-in MCP server** (Safari 27, 2026-09-17) runs entirely locally and makes no network calls of its own. It gives a coding agent the DOM, network requests, screenshots, and console output for a page, so an agent can check how markup renders, verify form and checkout state, compare computed styles against other browsers, flag accessibility issues (missing labels, bad ARIA, poor contrast), and read navigation-timing and resource-load performance. It has no access to personal data stored in Safari. See the [WebKit Safari 27 announcement](https://webkit.org/blog/18325/webkit-features-for-safari-27-0/).
-- **Chrome DevTools MCP** added an Agent Plugins 1.0 package (2026-09-22) so agents can load modular plugin extensions, a `--no-javascript-evaluation` flag that inspects a page with script execution disabled, a `query_heapsnapshot` tool for inspecting retained objects by size or property name, and dedicated tools for automating PWA install and lifecycle checks. See the [Chrome DevTools changelog](https://developer.chrome.com/blog/new-in-devtools-october-2026).
+- **Chrome DevTools MCP** added an Agent Plugins 1.0 package (2026-09-22) so agents can load modular plugin extensions, a `--no-javascript-evaluation` flag that turns off the tools that evaluate JavaScript in the page (it restricts the agent's tooling; it does not load the page with the site's own scripts disabled), a `query_heapsnapshot` tool for inspecting retained objects by size or property name, and dedicated tools for automating PWA install and lifecycle checks. See the [Chrome DevTools changelog](https://developer.chrome.com/blog/new-in-devtools-october-2026).
 
-A [proposed W3C Agent Conformance and Benchmarking Community Group](https://www.w3.org/community/blog/2026/08/25/proposed-group-agent-conformance-and-benchmarking-community-group/) (2026-08-25) aims to standardize how conformance to agent-facing specs like this one is measured and reported - weighted rubrics with observable evidence, runnable conformance suites, and versioned benchmark corpora. It is a proposal with no output yet; watch it rather than build against it.
+The W3C [Agent Conformance and Benchmarking Community Group](https://www.w3.org/community/agent-conformance/) launched on 2026-08-30 (it was [proposed on 2026-08-25](https://www.w3.org/community/blog/2026/08/25/proposed-group-agent-conformance-and-benchmarking-community-group/)). It aims to standardize how conformance to agent-facing specs like this one is measured and reported - weighted rubrics with observable evidence, runnable conformance suites, and versioned benchmark corpora. The group existing does not mean a finished benchmark or standard exists; watch it rather than build against it.
 
 ## Layout Stability
 

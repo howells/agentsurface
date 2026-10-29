@@ -1,7 +1,7 @@
 ---
 title: Metrics for Agent Evaluation
 description: Defining pass@k, tool-routing accuracy, schema conformance, and other quantitative measures
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -26,10 +26,10 @@ Agent metrics bridge the gap between "the agent works" and "the agent reliably s
 
 These metrics measure agent capability and consistency under non-determinism.
 
-**pass@k** is the probability that at least one of k attempts succeeds. Use this when a single success demonstrates the agent is capable of the task.
+**pass@k** is the probability that at least one of k attempts succeeds. Use this when a single success demonstrates the agent is capable of the task. The function below is the per-task indicator: 1 if any of the first k trials succeeded, else 0. Average it across tasks to get a rate. With n > k trials per task and c successes, the unbiased estimator from the HumanEval paper, `1 - C(n-c, k) / C(n, k)`, uses all the trials and has less variance (sketched after the example).
 
 ```typescript
-// Calculate pass@k given k independent trials
+// Per-task indicator: did any of the first k trials succeed?
 function calculatePassAtK(results: boolean[], k: number): number {
   if (results.length < k) {
     throw new Error(`Need at least ${k} trials, got ${results.length}`);
@@ -49,9 +49,17 @@ for (let k = 1; k <= 10; k++) {
 // pass@3: 1
 // ...
 // pass@10: 1 (at least one of all 10 succeeded)
+
+// Unbiased estimator from n trials with c successes: 1 - C(n-c, k) / C(n, k)
+function passAtKEstimate(n: number, c: number, k: number): number {
+  if (n - c < k) return 1;
+  let product = 1;
+  for (let i = n - c + 1; i <= n; i++) product *= 1 - k / i;
+  return 1 - product;
+}
 ```
 
-**pass^k** (pass-caret-k) is the probability that all k attempts succeed. Use this when consistency is required - every execution must work.
+**pass^k** (pass-caret-k) is the probability that all k attempts succeed. Use this when consistency is required - every execution must work. As with pass@k, the function below is the per-task indicator; average it across tasks.
 
 ```typescript
 function calculatePassCaretK(results: boolean[], k: number): number {
@@ -116,7 +124,7 @@ console.log(`Tool F1: ${f1.toFixed(2)}`); // 1.00 (all expected tools used, mino
 
 ### Schema conformance rate
 
-Fraction of tool calls where all required parameters are present and correctly typed. Measured by validating against the tool's JSON schema.
+Fraction of tool calls where all required parameters are present and correctly typed. Measured by validating against the tool's JSON schema. The hand-rolled check below handles flat primitive types only; for arrays, integers, nulls, enums and other constraints, use a JSON Schema validator such as Ajv.
 
 ```typescript
 interface ToolSchema {
@@ -154,18 +162,19 @@ function conformanceRate(calls: ToolCall[], schemas: Record<string, ToolSchema>)
 
 ### Mean time to recovery (MTTR)
 
-For agents that retry on failure, MTTR measures how many attempts it takes to recover after a transient error (rate limit, timeout, service unavailable).
+For agents that retry on failure, recovery measures how long it takes to get back to a success after a transient error (rate limit, timeout, service unavailable). Count both attempts and elapsed time, and report failures that never recovered separately; leaving them out flatters the average.
 
 ```typescript
 interface Attempt {
-  timestamp: number;
+  timestamp: number; // ms
   success: boolean;
   error?: string;
 }
 
-function mttr(attempts: Attempt[]): number {
-  let totalRecoverySteps = 0;
-  let recoveryCount = 0;
+function recoveryStats(attempts: Attempt[]) {
+  let totalSteps = 0;
+  let totalMs = 0;
+  let recovered = 0;
   let failureStart: number | null = null;
 
   for (let i = 0; i < attempts.length; i++) {
@@ -174,27 +183,33 @@ function mttr(attempts: Attempt[]): number {
         failureStart = i;
       }
     } else if (failureStart !== null) {
-      totalRecoverySteps += i - failureStart;
-      recoveryCount++;
+      totalSteps += i - failureStart;
+      totalMs += attempts[i].timestamp - attempts[failureStart].timestamp;
+      recovered++;
       failureStart = null;
     }
   }
 
-  return recoveryCount > 0 ? totalRecoverySteps / recoveryCount : 0;
+  return {
+    meanStepsToRecover: recovered > 0 ? totalSteps / recovered : 0,
+    mttrMs: recovered > 0 ? totalMs / recovered : 0,
+    recovered,
+    unresolved: failureStart !== null ? 1 : 0, // a failure still open at the end
+  };
 }
 
 // Example: agent failed, retried, succeeded after 2 more attempts
 const attempts = [
-  { timestamp: 1, success: false },
-  { timestamp: 2, success: false },
-  { timestamp: 3, success: true },
+  { timestamp: 1000, success: false },
+  { timestamp: 2000, success: false },
+  { timestamp: 3000, success: true },
 ];
-console.log(`MTTR: ${mttr(attempts)} steps`); // 2
+console.log(recoveryStats(attempts)); // meanStepsToRecover: 2, mttrMs: 2000, recovered: 1, unresolved: 0
 ```
 
 ### Hallucination rate
 
-Fraction of tool calls where the agent invoked a tool that does not exist or passed arguments that violate the schema. Hallucinations indicate the agent's reasoning has diverged from the actual tool definitions.
+Fraction of tool calls where the agent invoked a tool that does not exist or omitted a required argument. The function below checks only those two things; to also catch wrong types or other constraint violations, validate the arguments against the tool's full JSON Schema with a validator such as Ajv. Hallucinations indicate the agent's reasoning has diverged from the actual tool definitions.
 
 ```typescript
 function hallucinationRate(
@@ -321,7 +336,7 @@ See [OpenTelemetry GenAI semantic conventions](https://github.com/open-telemetry
 
 ## References
 
-- [Anthropic, "Demystifying evals for AI agents"](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) covers pass@k and pass^k definitions for agent evals
+- [Anthropic, "Demystifying evals for AI agents"](https://www.anthropic.com/research/demystifying-evals-for-ai-agents) covers pass@k and pass^k definitions for agent evals
 - [OpenAI HumanEval](https://github.com/openai/human-eval) introduced pass@k as the standard metric for code generation
 
 ## See also

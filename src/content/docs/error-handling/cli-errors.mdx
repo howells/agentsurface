@@ -1,7 +1,7 @@
 ---
 title: CLI Error Design
 description: Exit codes, structured error output, and stable error codes for CLIs consumed by agents
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -28,16 +28,16 @@ A CLI error that prints to stderr and exits with code 1 communicates exactly one
 
 Exit code 0 means success. Exit codes 1–127 have no inherent meaning beyond "failure" by convention, but agents benefit from a consistent vocabulary across commands.
 
-A five-level scale provides enough resolution for agents to categorize failures without requiring them to parse error messages:
+A five-level scale (this guide's proposed contract, not a general CLI standard) provides enough resolution for agents to categorize failures without requiring them to parse error messages:
 
-| Code | Category          | Description                                                                           |
-| ---- | ----------------- | ------------------------------------------------------------------------------------- |
-| 0    | Success           | The command completed successfully                                                    |
-| 1    | Failure           | An unexpected error - safe to retry with exponential backoff                          |
-| 2    | Usage error       | The command was called incorrectly - wrong flags, missing arguments                   |
-| 3    | Not found         | The specified resource does not exist                                                 |
-| 4    | Permission denied | Authentication or authorization failed - do not retry until credentials are refreshed |
-| 5    | Conflict          | The operation conflicts with current state - precondition not met                     |
+| Code | Category          | Description                                                                              |
+| ---- | ----------------- | ---------------------------------------------------------------------------------------- |
+| 0    | Success           | The command completed successfully                                                       |
+| 1    | Failure           | An unexpected error - retry only if the operation is idempotent or its status is checked |
+| 2    | Usage error       | The command was called incorrectly - wrong flags, missing arguments                      |
+| 3    | Not found         | The specified resource does not exist                                                    |
+| 4    | Permission denied | Authentication or authorization failed - do not retry until credentials are refreshed    |
+| 5    | Conflict          | The operation conflicts with current state - precondition not met                        |
 
 Agents can branch on exit codes without parsing any output:
 
@@ -248,12 +248,12 @@ When the agent provides invalid arguments, report per-argument failures in a str
       "arg": "--due-date",
       "reason": "Must be a future date in YYYY-MM-DD format",
       "received": "2025-01-01",
-      "expected": "A date after 2026-09-24"
+      "expected": "A date after today"
     }
   ],
   "suggestions": [
     "Change --amount to a positive integer (e.g., --amount 5000)",
-    "Change --due-date to a future date (e.g., --due-date 2026-10-01)"
+    "Change --due-date to a future date (e.g., --due-date 2027-03-01)"
   ]
 }
 ```

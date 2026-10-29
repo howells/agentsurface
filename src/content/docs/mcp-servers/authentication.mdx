@@ -1,12 +1,12 @@
 ---
 title: MCP Authentication
 description: Securing MCP servers with bearer tokens, identity proxies, and OAuth 2.1
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. OAuth 2.1 is mandated for public servers, a requirement in place since the `2025-03-26` revision introduced MCP's authorization framework. Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
+MCP servers require authentication matching their scope. Bearer tokens suffice for small, controlled environments. Authorization is optional in the MCP specification, but HTTP servers that support it should follow the MCP authorization framework (introduced in `2025-03-26`): authorization servers must implement OAuth 2.1, and MCP servers must publish protected-resource metadata. For public, multi-user servers OAuth 2.1 is the practical choice. Three approaches by complexity: bearer tokens (simple, environment-controlled), identity proxies (add authorization layer), and OAuth 2.1 (standards-based, public-scale). Even internal servers need basic defense.
 
 ```
 Use Case              Approach
@@ -25,7 +25,7 @@ Public servers        OAuth 2.1
 
 An unauthenticated MCP server is an unauthenticated API. Any tool it exposes - including destructive ones - is callable by anyone who can reach the endpoint. Authentication in MCP is not optional for any server that handles real data or performs real actions.
 
-The current `2026-07-28` MCP specification requires OAuth 2.1 for publicly accessible protected servers and hardens the predecessor model. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
+The current `2026-07-28` MCP specification treats authorization as optional, says HTTP implementations should conform to the authorization framework when they support it, and hardens the predecessor model. It does not sort servers into public and internal categories with blanket requirements; for publicly accessible, multi-user servers, follow the framework in full. Servers used only within a controlled environment (single user, stdio, internal network) can use simpler approaches. This page covers all three patterns in order of complexity.
 
 ## Approach 1: Bearer Token
 
@@ -129,7 +129,7 @@ app.post("/mcp", (req, res, next) => {
 
 ## Approach 3: OAuth 2.1 with PKCE
 
-OAuth 2.1 with PKCE is mandatory for publicly accessible MCP servers, a requirement in place since the `2025-03-26` revision introduced MCP's authorization framework. It is the only authentication method that supports delegated authorization - where an agent acts on behalf of a user without the user handing over their credentials.
+OAuth 2.1 with PKCE is the approach to use for publicly accessible, multi-user MCP servers. Authorization is optional in the spec, but when a server uses it the framework is OAuth-based (authorization servers must implement OAuth 2.1). OAuth is the interoperable standard MCP uses for delegated authorization - where an agent acts on behalf of a user without the user handing over their credentials.
 
 The protocol-level model - protected-resource metadata discovery, authorization-server discovery, client registration options, and token audience binding - lives in [MCP Authorization](/docs/authentication/mcp-auth-model). This section is the server-implementer view: the endpoints you expose, PKCE, token validation, scope enforcement, and the on-behalf-of flow. Read the canonical page first if you need the full OAuth 2.1 discovery and registration flow; use this page to implement it.
 
@@ -156,7 +156,7 @@ The protocol-level model - protected-resource metadata discovery, authorization-
 
 ### Required .well-known Endpoints
 
-Your server must expose two discovery endpoints so clients can discover your authorization server (the [MCP Authorization](/docs/authentication/mcp-auth-model) and [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) pages cover the discovery protocol and full field set):
+Your MCP server must publish protected-resource metadata so clients can find its authorization server. The authorization server publishes its own metadata (RFC 8414 or OpenID Connect discovery), often on a different host, so you only serve the second document if you run your own authorization server (the [MCP Authorization](/docs/authentication/mcp-auth-model) and [Protected Resource Metadata](/docs/authentication/protected-resource-metadata) pages cover the discovery protocol and full field set):
 
 **`GET /.well-known/oauth-protected-resource`** - declares that this resource requires OAuth and points to the authorization server:
 
@@ -169,7 +169,7 @@ Your server must expose two discovery endpoints so clients can discover your aut
 }
 ```
 
-**`GET /.well-known/oauth-authorization-server`** - describes the authorization server's capabilities (if you are running your own):
+**`GET /.well-known/oauth-authorization-server`** - describes the authorization server's capabilities. This is published by the authorization server, not by the MCP resource server; include it only if you run your own:
 
 ```json
 {
@@ -260,9 +260,10 @@ function requireScope(scopes: string[], required: string): void {
   }
 }
 
-// In your tool handler
-async (params, context) => {
-  requireScope(context.scopes, "billing:write");
+// In your tool handler (SDK v2: the second argument is the request context;
+// auth info is at ctx.http?.authInfo, and is undefined on stdio)
+async (params, ctx) => {
+  requireScope(ctx.http?.authInfo?.scopes ?? [], "billing:write");
 
   // proceed with creating the invoice
 };
@@ -271,8 +272,8 @@ async (params, context) => {
 Throwing from a scope check causes the tool to return an MCP error. Return it as an `isError: true` response instead for better agent recovery:
 
 ```typescript
-async (params, context) => {
-  if (!context.scopes.includes("billing:write")) {
+async (params, ctx) => {
+  if (!ctx.http?.authInfo?.scopes.includes("billing:write")) {
     return {
       isError: true,
       content: [
@@ -322,36 +323,43 @@ This preserves the audit trail - the downstream API sees that the request is `on
 
 ## Using withMcpAuth
 
-The `mcp-handler` package provides a `withMcpAuth` wrapper that integrates OAuth validation directly into the Vercel route handler:
+The `mcp-handler` package (2.x, which needs `@modelcontextprotocol/server` ^2) provides a `withMcpAuth` wrapper that integrates bearer-token verification into the route handler. It takes the handler, a `verifyToken(req, bearerToken)` callback that returns an `AuthInfo` (or `undefined` when there is no valid token), and options. It returns a single request-handler function, which you export under the method names you serve. `required` defaults to `false`, so set `required: true` for a protected endpoint; missing or invalid tokens then get a `401` (and insufficient scope a `403`) with an RFC 9728 `WWW-Authenticate` challenge.
 
 ```typescript
 // app/mcp/route.ts
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
-import { createServer } from "@/lib/billing-mcp/server";
+import type { AuthInfo } from "@modelcontextprotocol/server";
+import { registerBillingTools } from "@/lib/billing-mcp/register";
 
-const mcpHandler = createMcpHandler((req) =>
-  createServer({
+// The first argument receives the MCP server to register tools on, not the request.
+const mcpHandler = createMcpHandler((server) => {
+  registerBillingTools(server, {
     stripeApiKey: process.env.STRIPE_API_KEY!,
     databaseUrl: process.env.DATABASE_URL!,
-    // Pass the authenticated user from the request context
-    userId: (req as any).mcpAuth?.userId,
-    scopes: (req as any).mcpAuth?.scopes ?? [],
-  }),
-);
+  });
+});
 
-async function validateAuth(token: string) {
-  const result = await validateToken(token);
-  return result; // { userId, scopes }
+async function verifyToken(req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  if (!bearerToken) return undefined;
+  const { userId, scopes } = await validateToken(bearerToken); // jose-based check from above
+  return { token: bearerToken, clientId: userId, scopes, extra: { userId } };
 }
 
-export const { GET, POST, DELETE } = withMcpAuth(mcpHandler, validateAuth);
+const handler = withMcpAuth(mcpHandler, verifyToken, {
+  required: true,
+  requiredScopes: ["billing:read"],
+});
+
+export { handler as GET, handler as POST };
 
 export const maxDuration = 60;
 ```
 
+Tool handlers read the verified identity from `ctx.http?.authInfo` (it was `extra.authInfo` in SDK v1); there is no `req.mcpAuth` property to read. Because registration happens once in the callback rather than per request, look up the user in the handler, not at registration time. Pair this route with a protected-resource metadata route (see the package README for `protectedResourceHandler`).
+
 ## Five Security Mistakes
 
-**1. Token passthrough without validation.** Forwarding the client's token directly to downstream services without validating it first. Always validate signature, issuer, audience, and expiry before trusting a token.
+**1. Token passthrough.** Forwarding the token your server received to a downstream API, validated or not. MCP forbids accepting tokens that were not issued for your server and forwarding a received token to a different API. Validate every inbound token's signature, issuer, audience, and expiry, and call downstream services with separately issued or exchanged credentials (see the On-Behalf-Of pattern above).
 
 **2. Missing audience claim validation.** A token issued for `https://other-service.example.com` is not valid for your server. Without `aud` validation, tokens stolen from other services work against yours. Always pass your server's URL as the expected audience.
 

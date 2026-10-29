@@ -1,7 +1,7 @@
 ---
 title: Channels
 description: Reaching users on Slack, WhatsApp, Telegram, and other messaging surfaces - one agent core, thin platform adapters, and conversation continuity across replies and notifications.
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -33,7 +33,9 @@ The core agent takes a `platform` parameter that only affects which block `build
 
 A hand-built bot layer per platform - normalize webhook events, forward to the agent over HTTP, write the reverse path back - owned most of the bugs at the seam. That has moved inside the frameworks. The current pattern is a channel adapter configured on the agent itself, with the framework mounting the webhook route and handling platform-shaped work (signature verification, thread/message identity, streaming into an editable message, interactive components).
 
-Two shipped reference points: Mastra exposes channels as a first-class agent capability covering Slack, Microsoft Teams, Discord, Telegram, and WhatsApp directly, reaching further platforms through compatible Chat SDK adapters. Vercel's [Chat SDK](https://chat-sdk.dev/) targets Slack, Microsoft Teams, Google Chat, Discord, Telegram, WhatsApp, GitHub, and Linear through one adapter interface, usable standalone or as a layer a framework builds on.
+Two shipped reference points: Mastra documents channels as an agent capability for platforms including Slack, Microsoft Teams, Discord, Telegram, and WhatsApp, with further platforms through compatible Chat SDK adapters - the exact native-versus-adapter split was not re-verified on 2026-10-29, so check Mastra's channel reference before relying on a platform. Vercel's [Chat SDK](https://chat-sdk.dev/) targets Slack, Microsoft Teams, Google Chat, Discord, Telegram, WhatsApp, GitHub, and Linear through one adapter interface, usable standalone or as a layer a framework builds on; it also documents Vercel Connect Slack authentication and an eve integration. [eve](https://github.com/vercel/eve), Vercel's filesystem-first durable-agent framework (pre-1.0), declares channels next to instructions, tools, skills, and schedules.
+
+Platform-side changes as of 2026-10-29: Slack's agent surface now covers app threads, streaming, suggested prompts, Slackbot skills, and MCP integrations ([Slack AI docs](https://docs.slack.dev/ai/)). Microsoft's former Teams AI Library entry point now documents the Teams SDK, for TypeScript, C#, and Python ([Teams SDK docs](https://learn.microsoft.com/en-us/microsoftteams/platform/teams-ai-library/welcome)).
 
 The tradeoff is real: in-framework adapters collapse the seam and stop you re-solving thread identity per platform, at the cost of coupling your conversational surface to the framework's release cadence. Two things stay yours regardless of which adapter layer you pick: platform session rules (WhatsApp's 24-hour free-form reply window is the usual one - outside it, only pre-approved template messages are allowed) and the notification continuity below.
 

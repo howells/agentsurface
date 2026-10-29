@@ -1,29 +1,31 @@
 ---
 title: Embeddings
 description: Model selection, Matryoshka truncation, and multimodal embeddings - condensed current practice
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 Embeddings are dense vectors that represent text (or images, audio, video) semantically, powering nearest-neighbor search. Choose based on cost, latency, privacy boundary, and corpus shape, then validate on your own data.
 
 ## Model selection
 
-| Model                                         | Dims               | Cost (per 1M tokens)     | Notes                                                                               |
-| --------------------------------------------- | ------------------ | ------------------------ | ----------------------------------------------------------------------------------- |
-| OpenAI `text-embedding-3-large`               | 3,072 (Matryoshka) | $0.13                    | Highest-quality OpenAI embedding; use with the Responses API file-search tool.      |
-| OpenAI `text-embedding-3-small`               | 1,536 (Matryoshka) | $0.02                    | Cheaper, nearly comparable quality for many domains.                                |
-| Voyage 4 Large                                | 1,536              | $0.12                    | Highest-quality Voyage retrieval embedding.                                         |
-| Voyage 4                                      | 1,536              | $0.06                    | Balanced Voyage embedding.                                                          |
-| Voyage 4 Lite                                 | 1,536              | $0.02                    | Lower cost and latency; shares a vector space with the rest of the Voyage 4 family. |
-| Cohere Embed v4 `embed-v4`                    | 1,536 (Matryoshka) | $0.12 text / $0.47 image | Multimodal (text + image), 128K-token context.                                      |
-| Gemini Embedding 2                            | 768                | Verify current pricing   | Google's current embedding model; check modality support before relying on it.      |
-| Open-source (BGE-M3, E5-Mistral, Nomic Embed) | Varies             | Free (self-hosted)       | Competitive on MTEB for many domains; you own infrastructure, latency, and updates. |
+| Model                                         | Dims                                                        | Cost (per 1M tokens)     | Notes                                                                                                                               |
+| --------------------------------------------- | ----------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI `text-embedding-3-large`               | 3,072 (Matryoshka)                                          | $0.13                    | Highest-quality OpenAI embedding. Check the file-search tool docs before assuming you can choose its embedding model or dimensions. |
+| OpenAI `text-embedding-3-small`               | 1,536 (Matryoshka)                                          | $0.02                    | Cheaper, nearly comparable quality for many domains.                                                                                |
+| Voyage 4 Large                                | 1,024 default (256, 512, 2,048 optional)                    | $0.12                    | Highest-quality Voyage retrieval embedding.                                                                                         |
+| Voyage 4                                      | 1,024 default (256, 512, 2,048 optional)                    | $0.06                    | Balanced Voyage embedding.                                                                                                          |
+| Voyage 4 Lite                                 | 1,024 default (256, 512, 2,048 optional)                    | $0.02                    | Lower cost and latency; shares a vector space with the rest of the Voyage 4 family.                                                 |
+| Cohere Embed 5 Pro `embed-v5.0-pro`           | 2,048 default (256, 512, 768, 1,024, 1,536 optional)        | $0.12 text               | Launched 2026-09-30. Text and image, 128K-token context. Use Cohere's pricing page for image units.                                 |
+| Cohere Embed 5 Fast `embed-v5.0-fast`         | 2,048 default (256, 512, 768, 1,024, 1,536 optional)        | $0.08 text               | Launched 2026-09-30. Same inputs and context as Pro at lower cost.                                                                  |
+| Cohere Embed v4 `embed-v4.0`                  | 1,536 (Matryoshka)                                          | $0.12 text / $0.47 image | Previous Cohere generation; still available. Multimodal (text + image), 128K-token context.                                         |
+| Gemini Embedding 2 `gemini-embedding-2`       | 3,072 default (128-3,072; 768, 1,536 and 3,072 recommended) | Verify current pricing   | Multimodal: text, image, video, audio and documents. Check modality support before relying on it.                                   |
+| Open-source (BGE-M3, E5-Mistral, Nomic Embed) | Varies                                                      | Free (self-hosted)       | Competitive on MTEB for many domains; you own infrastructure, latency, and updates.                                                 |
 
-Voyage's 4-generation models share one vector space, so you can index with a larger model and query with a smaller one without re-indexing. Confirm current pricing and model availability before committing - this table is a snapshot.
+Voyage's 4-generation models share one vector space, so you can index with a larger model and query with a smaller one without re-indexing. Cohere's Embed 5 Pro and Fast also share an embedding space (per the launch post). Confirm current pricing and model availability before committing - this table is a snapshot.
 
 ## Matryoshka truncation
 
-Matryoshka-trained models (OpenAI 3-large/small, Voyage 4 family, Cohere Embed v4) let you truncate both stored and query vectors to a smaller dimension without re-embedding the corpus. Stored and query vectors must use the same dimension - a nearest-neighbour comparison across mismatched dimensions doesn't work:
+Matryoshka-trained models (OpenAI 3-large/small, Voyage 4 family, Cohere Embed v4 and 5, Gemini Embedding 2) let you truncate both stored and query vectors to a smaller dimension without re-embedding the corpus. Stored and query vectors must use the same dimension - a nearest-neighbour comparison across mismatched dimensions doesn't work:
 
 ```typescript
 const stored = await openai.embeddings.create({
@@ -39,7 +41,7 @@ const query = await openai.embeddings.create({
 });
 ```
 
-Truncating to 256–512 dimensions typically costs 2–5% accuracy versus the full vector, in exchange for faster queries and lower storage.
+Truncating to 256–512 dimensions often costs some accuracy versus the full vector, in exchange for faster queries and lower storage. A loss of roughly 2–5% is a rough rule of thumb, not a published benchmark: the real figure varies by model, dimension pair, corpus and metric, so measure recall@k or nDCG on your own workload before you pick a size.
 
 ## API versus self-hosted
 
@@ -47,7 +49,7 @@ Use a hosted API when scale is under roughly 1M documents/month, latency under 5
 
 ## Multimodal embeddings
 
-Use multimodal embeddings when source documents include images, slides, charts, or video, or when queries need to cross modalities ("find documents with a chart like this image"). Voyage Multimodal 3.5 (text, image, video; unified 1,024-dim space) and Cohere Embed v4 (`embed-v4`; text, image) are the current commercial options; CLIP and SigLIP are common open-source baselines. For PDFs and visually complex documents, a late-interaction approach (ColPali-style, treating pages as images) can outperform OCR-then-chunk pipelines - see [RAG Patterns](/docs/agent-retrieval/rag-patterns).
+Use multimodal embeddings when source documents include images, slides, charts, or video, or when queries need to cross modalities ("find documents with a chart like this image"). Voyage Multimodal 3.5 (text, image, video; unified 1,024-dim space), Cohere Embed 5 (`embed-v5.0-pro`, `embed-v5.0-fast`; text, image), Cohere Embed v4 (`embed-v4.0`) and Gemini Embedding 2 (text, image, video, audio, documents) are selected options, not an exhaustive list; CLIP and SigLIP are common open-source baselines. For PDFs and visually complex documents, a late-interaction approach (ColPali-style, treating pages as images) can outperform OCR-then-chunk pipelines - see [RAG Patterns](/docs/agent-retrieval/rag-patterns).
 
 ## See also
 

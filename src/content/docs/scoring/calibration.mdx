@@ -1,7 +1,7 @@
 ---
 title: Rubric Calibration
 description: Maintaining consistency and preventing score drift over time
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -52,7 +52,7 @@ For each dimension, ask:
 - **Are the detection signals clear?** Can two auditors independently verify them, or do they require judgment?
 - **Has the ecosystem changed?** RFC standards, new frameworks, or tool adoption may have shifted what "good" means.
 
-Example: In 2025, RFC 9728 protected-resource metadata was optional for Authentication 3/3. The 2026-07-28 MCP spec makes it the discovery mechanism for protected remote servers, so 3/3 now requires it there.
+Example: an earlier version of this rubric did not require RFC 9728 protected-resource metadata for Authentication 3/3. MCP's authorization spec has required protected servers to publish it since the 2025-06-18 revision, and the 2026-07-28 revision keeps it as the discovery mechanism, so the rubric now requires it there for 3/3.
 
 ### 3. Create a Calibration Set (2 hours)
 

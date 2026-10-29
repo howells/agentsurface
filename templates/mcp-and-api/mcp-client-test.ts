@@ -1,5 +1,5 @@
 /**
- * MCP Client Test Harness — Test tools against stdio or HTTP servers
+ * MCP Client Test Harness - Test tools against stdio or HTTP servers
  *
  * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
  * Testing pattern: InMemoryTransport.createLinkedPair()
@@ -29,9 +29,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { McpServer } from "@modelcontextprotocol/server";
-import type { Client, TextContent } from "@modelcontextprotocol/client";
-import { InMemoryTransport } from "@modelcontextprotocol/client";
+import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server";
+import { Client } from "@modelcontextprotocol/client";
+import type { TextContent } from "@modelcontextprotocol/client";
 import { z } from "zod";
 
 // ===== MCP Server Factory =====
@@ -61,7 +61,7 @@ function createTestServer(): McpServer {
         },
         {
           title: "Tool Design Guide",
-          url: "https://www.anthropic.com/engineering/writing-tools-for-agents",
+          url: "https://www.anthropic.com/research/writing-tools-for-agents",
         },
       ].slice(0, input.limit);
 
@@ -86,7 +86,8 @@ function createTestServer(): McpServer {
         priority: z.enum(["low", "medium", "high"]).default("medium"),
         title: z.string().min(1),
       }),
-      annotations: { destructiveHint: true, idempotentHint: true },
+      // Each call creates a new issue, so the tool is not idempotent.
+      annotations: { destructiveHint: true, idempotentHint: false },
     },
     async (input) => {
       const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
@@ -140,15 +141,37 @@ function createTestServer(): McpServer {
   );
 
   // config resource
-  server.resource("config://test", "text/plain", "Test Configuration", async () => ({
-    contents: [
-      {
-        mimeType: "text/plain",
-        text: "Test config data",
-        uri: "config://test",
-      },
-    ],
-  }));
+  server.registerResource(
+    "test-config",
+    "config://test",
+    { description: "Test Configuration", mimeType: "text/plain" },
+    async () => ({
+      contents: [
+        {
+          mimeType: "text/plain",
+          text: "Test config data",
+          uri: "config://test",
+        },
+      ],
+    }),
+  );
+
+  // summarize prompt
+  server.registerPrompt(
+    "summarize",
+    {
+      description: "Summarize a document in a few sentences.",
+      argsSchema: z.object({ document: z.string() }),
+    },
+    async ({ document }) => ({
+      messages: [
+        {
+          role: "user" as const,
+          content: { type: "text" as const, text: `Summarize this document:\n\n${document}` },
+        },
+      ],
+    }),
+  );
 
   return server;
 }
@@ -161,11 +184,12 @@ describe("MCP Client Tests", () => {
 
   beforeEach(async () => {
     server = createTestServer();
-    const { client: linkedClient, server: linkedServerTransport } =
-      InMemoryTransport.createLinkedPair();
+    // createLinkedPair() returns a [clientTransport, serverTransport] tuple.
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
-    client = linkedClient;
-    await server.connect(linkedServerTransport);
+    client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
   });
 
   afterEach(async () => {
@@ -174,9 +198,12 @@ describe("MCP Client Tests", () => {
 
   describe("search_docs tool", () => {
     it("should return search results", async () => {
-      const result = await client.callTool("search_docs", {
-        limit: 2,
-        query: "MCP",
+      const result = await client.callTool({
+        name: "search_docs",
+        arguments: {
+          limit: 2,
+          query: "MCP",
+        },
       });
 
       expect(result.content).toHaveLength(1);
@@ -192,9 +219,12 @@ describe("MCP Client Tests", () => {
     });
 
     it("should respect limit parameter", async () => {
-      const result = await client.callTool("search_docs", {
-        limit: 1,
-        query: "test",
+      const result = await client.callTool({
+        name: "search_docs",
+        arguments: {
+          limit: 1,
+          query: "test",
+        },
       });
 
       const { text } = result.content[0] as TextContent;
@@ -204,8 +234,11 @@ describe("MCP Client Tests", () => {
     });
 
     it("should use default limit", async () => {
-      const result = await client.callTool("search_docs", {
-        query: "test",
+      const result = await client.callTool({
+        name: "search_docs",
+        arguments: {
+          query: "test",
+        },
       });
 
       expect(result.content).toHaveLength(1);
@@ -224,10 +257,13 @@ describe("MCP Client Tests", () => {
 
   describe("create_issue tool", () => {
     it("should create an issue with required fields", async () => {
-      const result = await client.callTool("create_issue", {
-        description: "Users cannot log in on mobile",
-        priority: "high",
-        title: "Bug: login fails",
+      const result = await client.callTool({
+        name: "create_issue",
+        arguments: {
+          description: "Users cannot log in on mobile",
+          priority: "high",
+          title: "Bug: login fails",
+        },
       });
 
       expect(result.content).toHaveLength(1);
@@ -244,9 +280,12 @@ describe("MCP Client Tests", () => {
     });
 
     it("should use default priority", async () => {
-      const result = await client.callTool("create_issue", {
-        description: "Clean up auth logic",
-        title: "Task: refactor auth",
+      const result = await client.callTool({
+        name: "create_issue",
+        arguments: {
+          description: "Clean up auth logic",
+          title: "Task: refactor auth",
+        },
       });
 
       const { text } = result.content[0] as TextContent;
@@ -255,20 +294,23 @@ describe("MCP Client Tests", () => {
       expect(parsed.priority).toBe("medium");
     });
 
-    it("should have destructiveHint and idempotentHint", async () => {
+    it("should declare destructiveHint and a non-idempotent write", async () => {
       const tools = await client.listTools();
       const createIssueRef = tools.tools.find((t) => t.name === "create_issue");
 
       expect(createIssueRef).toBeDefined();
       expect(createIssueRef?.annotations?.destructiveHint).toBe(true);
-      expect(createIssueRef?.annotations?.idempotentHint).toBe(true);
+      expect(createIssueRef?.annotations?.idempotentHint).toBe(false);
     });
   });
 
   describe("error handling", () => {
     it("should return isError: true on failure", async () => {
-      const result = await client.callTool("error_demo", {
-        should_fail: true,
+      const result = await client.callTool({
+        name: "error_demo",
+        arguments: {
+          should_fail: true,
+        },
       });
 
       expect(result.isError).toBe(true);
@@ -277,8 +319,11 @@ describe("MCP Client Tests", () => {
     });
 
     it("should succeed when should_fail is false", async () => {
-      const result = await client.callTool("error_demo", {
-        should_fail: false,
+      const result = await client.callTool({
+        name: "error_demo",
+        arguments: {
+          should_fail: false,
+        },
       });
 
       expect(result.isError).toBeFalsy();
@@ -292,18 +337,18 @@ describe("MCP Client Tests", () => {
 
       expect(resources.resources).toContainEqual(
         expect.objectContaining({
-          name: "Test Configuration",
+          name: "test-config",
           uri: "config://test",
         }),
       );
     });
 
     it("should read resource content", async () => {
-      const resource = await client.readResource("config://test");
+      const resource = await client.readResource({ uri: "config://test" });
 
       expect(resource.contents).toHaveLength(1);
       expect(resource.contents[0].mimeType).toBe("text/plain");
-      expect(resource.contents[0].text).toBe("Test config data");
+      expect((resource.contents[0] as { text?: string }).text).toBe("Test config data");
     });
   });
 
@@ -311,8 +356,7 @@ describe("MCP Client Tests", () => {
     it("should list available prompts", async () => {
       const prompts = await client.listPrompts();
 
-      // Server in this test doesn't register prompts, so list should be empty
-      expect(Array.isArray(prompts.prompts)).toBe(true);
+      expect(prompts.prompts.map((p) => p.name)).toContain("summarize");
     });
   });
 
@@ -360,9 +404,12 @@ describe("MCP Client Tests", () => {
 
   describe("output schema validation", () => {
     it("search_docs output should be valid JSON", async () => {
-      const result = await client.callTool("search_docs", {
-        limit: 1,
-        query: "test",
+      const result = await client.callTool({
+        name: "search_docs",
+        arguments: {
+          limit: 1,
+          query: "test",
+        },
       });
 
       const { text } = result.content[0] as TextContent;
@@ -383,9 +430,12 @@ describe("MCP Client Tests", () => {
     });
 
     it("create_issue output should be valid JSON", async () => {
-      const result = await client.callTool("create_issue", {
-        description: "Test issue",
-        title: "Test",
+      const result = await client.callTool({
+        name: "create_issue",
+        arguments: {
+          description: "Test issue",
+          title: "Test",
+        },
       });
 
       const { text } = result.content[0] as TextContent;

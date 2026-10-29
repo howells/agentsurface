@@ -1,18 +1,18 @@
 ---
 title: Cross-Framework Portability
 description: Defining tools once and exporting adapters for MCP, Claude Agent SDK, and OpenAI
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Agent SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). This reduces drift and duplication, but each adapter still needs framework-specific tests. Pattern: shared registry (metadata, handler, schema), then adapters (MCP server.tool, Claude Code MCP config, OpenAI function/tool declarations).
+Define tool logic once in a framework-neutral registry module; emit adapters for each framework (MCP, Claude Agent SDK through MCP, @openai/agents, Vercel AI SDK, LangChain). This reduces drift and duplication, but each adapter still needs framework-specific tests. Pattern: shared registry (metadata, handler, schema), then adapters (MCP registerTool, Claude Code MCP config, OpenAI function/tool declarations).
 
 - **Shared registry**: Tool metadata, handler, schema (Zod)
-- **MCP adapter**: server.tool() registration
+- **MCP adapter**: `McpServer.registerTool()` registration, wrapping results in `content` / `structuredContent`
 - **Claude Agent SDK adapter**: expose the registry as MCP or allowed SDK tools
-- **OpenAI adapter**: FunctionDeclaration with handler wrapper
-- **Vercel AI SDK adapter**: tools object
+- **OpenAI adapter**: `tool()` from `@openai/agents` with a handler wrapper
+- **Vercel AI SDK adapter**: tools record keyed by tool name, `inputSchema` per tool
 - **Benefits**: Reduced duplication, lower drift, adapter-specific tests
 
 ---
@@ -92,45 +92,54 @@ export const allTools = [searchDocsTool, createDocTool, updateDocTool];
 
 ```typescript
 // tools/mcp.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { allTools, searchDocsTool, createDocTool, updateDocTool } from "./registry";
+import { McpServer } from "@modelcontextprotocol/server";
+import { searchDocsTool, createDocTool } from "./registry";
 
-const server = new Server({
+const server = new McpServer({
   name: "docs-mcp",
   version: "1.0.0",
 });
 
+// The shared handler returns plain data. MCP needs a CallToolResult, so the adapter wraps it.
+const toResult = (data: Record<string, unknown>) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(data) }],
+  structuredContent: data,
+});
+
 // Register all tools with MCP-specific annotations
-server.tool(
+server.registerTool(
   searchDocsTool.name,
-  searchDocsTool.description,
-  searchDocsTool.schema,
   {
+    description: searchDocsTool.description,
+    inputSchema: searchDocsTool.schema,
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
     },
   },
-  searchDocsTool.handler,
+  async (input) => toResult(await searchDocsTool.handler(input)),
 );
 
-server.tool(
+server.registerTool(
   createDocTool.name,
-  createDocTool.description,
-  createDocTool.schema,
   {
+    description: createDocTool.description,
+    inputSchema: createDocTool.schema,
     annotations: {
       destructiveHint: false,
       idempotentHint: true, // Supports idempotency_key parameter
     },
   },
-  createDocTool.handler,
+  async (input) => toResult(await createDocTool.handler(input)),
 );
 
 // ... register remaining tools
 
+// The entry point that .mcp.json launches connects the server to a StdioServerTransport
 export default server;
 ```
+
+This uses `registerTool` from the TypeScript MCP SDK v2 (`@modelcontextprotocol/server`, Zod 4 schemas passed whole). The low-level `Server` class has no `.tool()` method, and the v1 positional `McpServer.tool()` form is removed in v2. See [Server Architecture](/docs/mcp-servers/architecture) for the full registration pattern.
 
 ### Step 3: Claude Agent SDK / MCP Adapter
 
@@ -151,7 +160,7 @@ Claude Code and the Claude Agent SDK are usually best served by exposing the sam
 }
 ```
 
-Then use the Claude Agent SDK with the repo or service MCP configuration and an allowlist:
+Then use the Claude Agent SDK with the server passed in `mcpServers` and an allowlist:
 
 ```typescript
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -159,7 +168,13 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 for await (const message of query({
   prompt: "Find the authentication guide and summarize the setup steps.",
   options: {
-    mcpConfig: ".mcp.json",
+    mcpServers: {
+      docs: {
+        command: "node",
+        args: ["dist/tools/mcp.js"],
+        env: { DOCS_API_TOKEN: process.env.DOCS_API_TOKEN ?? "" },
+      },
+    },
     allowedTools: ["mcp__docs__search_docs"],
     maxTurns: 6,
   },
@@ -168,61 +183,74 @@ for await (const message of query({
 }
 ```
 
+The Agent SDK also picks up a project `.mcp.json` when the `project` setting source is enabled (it is for default `query()` options; include `"project"` if you set `settingSources` yourself). See [Connect to external tools with MCP](https://code.claude.com/docs/en/agent-sdk/mcp) in the Agent SDK docs.
+
 For Claude Managed Agents, register equivalent tool definitions or MCP servers in the managed-agent session rather than creating a separate in-process adapter. Keep the registry as the source of truth.
 
 ### Step 4: OpenAI Agents SDK Adapter
 
 ```typescript
 // tools/openai-agents.ts
-import { Tool } from "@openai/agents";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { tool } from "@openai/agents";
 import { allTools } from "./registry";
 
-export const openaiTools = allTools.map(
-  (t) =>
-    new Tool({
-      name: t.name,
-      description: t.description,
-      parameters: zodToJsonSchema(t.schema),
-      execute: t.handler,
-    }),
+// `tool()` creates a function tool; pass the Zod schema directly as `parameters`
+export const openaiTools = allTools.map((t) =>
+  tool({
+    name: t.name,
+    description: t.description,
+    parameters: t.schema,
+    execute: t.handler,
+  }),
 );
 
-export const searchDocsTool = openaiTools.find((t) => t.name === "search_docs");
-export const createDocTool = openaiTools.find((t) => t.name === "create_doc");
+export const searchDocsTool = openaiTools.find((t) => t.name === "search_docs")!;
+export const createDocTool = openaiTools.find((t) => t.name === "create_doc")!;
 ```
 
-In an OpenAI agent:
+In an OpenAI agent, run it with `run(agent, input)`:
 
 ```typescript
-import { Agent } from "@openai/agents";
+import { Agent, run } from "@openai/agents";
 import { searchDocsTool, createDocTool } from "./tools/openai-agents";
 
 const agent = new Agent({
+  name: "Docs assistant",
+  instructions: "Answer questions from the internal docs.",
   tools: [searchDocsTool, createDocTool],
 });
 
-const result = await agent.run("Find the authentication guide");
+const result = await run(agent, "Find the authentication guide");
+console.log(result.finalOutput);
 ```
+
+Validation schemas enable strict mode by default in the Agents SDK; set `strict: false` on a tool whose schema uses constructs strict mode can't express. Two OpenAI-specific points for the adapter layer. Tool calling for GPT-6 models requires the Responses API, so a Chat Completions-only adapter needs model scoping. And the open-source Agents SDK used here is a different product from the OpenAI Agents API (public beta since 2026-09-10), a managed service that handles durable sessions, orchestration, context compaction and recovery and accepts tools and MCP servers. Don't use the two names interchangeably in code or docs. See the [OpenAI changelog](https://developers.openai.com/api/docs/changelog).
 
 ### Step 5: Vercel AI SDK Adapter
 
 ```typescript
 // tools/vercel-ai.ts
 import { tool } from "ai";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { allTools } from "./registry";
 
-export const vercelTools = allTools.map((t) =>
-  tool({
-    description: t.description,
-    parameters: zodToJsonSchema(t.schema),
-    execute: t.handler,
-  }),
+// AI SDK tools are a record keyed by the public tool name.
+// Pass the Zod schema as `inputSchema` (or wrap raw JSON Schema with `jsonSchema()`).
+export const vercelTools = Object.fromEntries(
+  allTools.map((t) => [
+    t.name,
+    tool({
+      description: t.description,
+      inputSchema: t.schema,
+      execute: t.handler,
+    }),
+  ]),
 );
 
-export const searchDocsTool = vercelTools.find((t) => t.name === "search_docs");
+// Use it as: generateText({ model, tools: vercelTools, prompt })
+export const searchDocsTool = vercelTools["search_docs"];
 ```
+
+This is the AI SDK 7 shape (`ai@7.0.156` was current on 2026-10-28). `parameters` is the older name, and the OpenAI Agents SDK adapter above still uses `parameters`, so fix each adapter against its own framework rather than copying between them.
 
 ## Adapters for Other Frameworks
 
@@ -230,33 +258,38 @@ The same registry entry - name, description, schema, handler - projects onto eve
 
 ### LangChain
 
-LangChain uses the `@tool` decorator with Pydantic models. Context (auth, DB session) flows through `InjectedToolArg`, never through tool parameters.
+LangChain uses the `@tool` decorator. Context (auth, DB session) flows through a `ToolRuntime` parameter, never through tool parameters: the runtime is injected when the tool is called and the model never sees it in the schema. `InjectedToolArg`, `InjectedState` and similar are older low-level injection patterns that LangChain's current tools guide supersedes with `ToolRuntime`; keep any older examples pinned to the LangChain version they were written for, and show how the host supplies the value (here through `context_schema` and `context=` on `invoke`).
 
 ```python
-from langchain_core.tools import tool, InjectedToolArg
-from pydantic import BaseModel, Field
-from typing import Annotated
+from dataclasses import dataclass
+from langchain.tools import tool, ToolRuntime
 
-class GetOrderInput(BaseModel):
-    order_id: str = Field(description="Order ID returned by list_orders or create_order")
+@dataclass
+class AppContext:
+    user_id: str
+    db_session: Session  # supplied by the host: invoke(..., context=AppContext(...))
 
-@tool("get_order", args_schema=GetOrderInput)
-def get_order(
-    order_id: str,
-    db_session: Annotated[Session, InjectedToolArg],  # injected at runtime
-) -> dict:
+@tool
+def get_order(order_id: str, runtime: ToolRuntime[AppContext]) -> dict:
     """Retrieves full details for a single order including line items and status.
     Use when you have a specific order ID. For searching orders by customer or
-    date range, use search_orders instead."""
-    order = db_session.orders.get(order_id)
+    date range, use search_orders instead.
+
+    Args:
+        order_id: Order ID returned by list_orders or create_order.
+    """
+    order = runtime.context.db_session.orders.get(order_id)
     if not order:
-        raise ToolException(f"Order {order_id} not found")
+        # Raised errors are turned into a ToolMessage by middleware such as wrap_tool_call
+        raise ValueError(f"Order {order_id} not found")
     return order.to_dict()
 ```
 
+Build the agent with `create_agent(..., context_schema=AppContext)`. `config` and `runtime` are reserved argument names.
+
 ### Mastra
 
-Mastra's `createTool` takes Zod input/output schemas and a typed execute context, and carries MCP annotations under `mcp.annotations`.
+Mastra's `createTool` takes Zod input/output schemas. The validated input is the first argument to `execute` (runtime context is a separate argument), and MCP annotations go under `mcp.annotations`. `requireApproval` is also a tool property. Mastra core was at 1.80.0 on 2026-10-28.
 
 ```typescript
 import { createTool } from "@mastra/core/tools";
@@ -275,7 +308,7 @@ export const getOrderTool = createTool({
     total: z.number(),
   }),
   mcp: { annotations: { readOnlyHint: true, idempotentHint: true } },
-  execute: async ({ context }) => fetchOrder(context.orderId),
+  execute: async ({ orderId }) => fetchOrder(orderId),
 });
 ```
 
@@ -369,15 +402,19 @@ const toolAnnotations = {
 };
 
 for (const toolDef of allTools) {
-  server.tool(
+  server.registerTool(
     toolDef.name,
-    toolDef.description,
-    toolDef.schema,
-    { annotations: toolAnnotations[toolDef.name] || {} },
-    toolDef.handler,
+    {
+      description: toolDef.description,
+      inputSchema: toolDef.schema,
+      annotations: toolAnnotations[toolDef.name] ?? {},
+    },
+    async (input) => toResult(await toolDef.handler(input)),
   );
 }
 ```
+
+MCP annotations are hints that clients may use, not an approval or authorization guarantee. Enforce permissions where the handler runs.
 
 ### Output Schemas
 
@@ -400,14 +437,18 @@ const SearchDocsOutputSchema = z.object({
   next_offset: z.number().int(),
 });
 
-server.tool(
+server.registerTool(
   "search_docs",
-  searchDocsTool.description,
-  searchDocsTool.schema,
-  { outputSchema: SearchDocsOutputSchema },
-  searchDocsTool.handler,
+  {
+    description: searchDocsTool.description,
+    inputSchema: searchDocsTool.schema,
+    outputSchema: SearchDocsOutputSchema,
+  },
+  async (input) => toResult(await searchDocsTool.handler(input)),
 );
 ```
+
+When an `outputSchema` is declared, a successful result must carry `structuredContent` that conforms to it, which is what `toResult` provides.
 
 The MCP adapter is also the layer where schema dialect differences bite. MCP's `2026-07-28` revision widens `inputSchema` and `outputSchema` to any JSON Schema 2020-12 keyword including `$ref` (SEP-2106), while several other frameworks still accept only a flat subset. Keep the shared registry on the narrowest dialect all your targets accept and let each adapter widen from there, rather than authoring `$ref`-heavy schemas that only the MCP adapter can carry.
 
@@ -417,13 +458,40 @@ For agents with a large tool surface, both providers support server-side deferre
 
 **Anthropic tool search tool:** include a `tool_search_tool_bm25_20251119` (natural-language queries) or `tool_search_tool_regex_20251119` (regex patterns) entry in `tools`, and mark the tools you don't need up front with `defer_loading: true`. Claude searches names, descriptions, and argument fields and the API expands matches into full definitions on demand - see [Tool Curation](/docs/tool-design/tool-curation#dynamic-tool-selection) for the full mechanics.
 
-**OpenAI deferred loading:** pair `defer_loading: true` on each candidate tool with a `ToolSearchTool()` added exactly once to the agent - `defer_loading` alone on every tool with no search tool present does not work.
+**OpenAI deferred loading:** the raw Responses API uses `defer_loading: true` on each candidate tool plus a tool search tool. In the Agents JS SDK the names are `deferLoading: true` on each function tool (or hosted MCP tool) and `toolSearchTool()` added once to the same `tools` array - deferral alone with no search tool present does not work. Deferred tools are Responses-only: Chat Completions rejects them. Convert tools from the shared registry with `tool()` first (see Step 4), rather than spreading the registry's custom shape.
 
 ```typescript
+import { Agent, tool, toolSearchTool } from "@openai/agents";
+
 const agent = new Agent({
-  tools: [ToolSearchTool(), ...allTools.map((t) => ({ ...t, defer_loading: true }))],
+  name: "Docs assistant",
+  tools: [
+    toolSearchTool(),
+    ...allTools.map((t) =>
+      tool({
+        name: t.name,
+        description: t.description,
+        parameters: t.schema,
+        execute: t.handler,
+        deferLoading: true,
+      }),
+    ),
+  ],
 });
 ```
+
+**Anthropic inline tool definitions (beta, 2026-09-22):** a different mechanism from tool search. A mid-conversation system message can carry `tool_addition` blocks with full tool definitions under the `inline-tools-2026-09-15` beta header (MCP toolsets additionally use `mcp-client-2026-09-15`), adding tools without breaking the cached prefix. The ordinary tool search types above need neither header. See the [release notes](https://platform.claude.com/docs/en/release-notes/overview#september-22-2026).
+
+### Programmatic Tool Calling
+
+Both providers can let the model write code that calls several tools, so intermediate results stay out of the model's context. On Claude, add a `code_execution_20260120` (or later) tool and set `allowed_callers` on each custom tool the code may call; calls then route through code, and intermediate results can stay out of the model's context. See the [Claude guide](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling). In the OpenAI Agents JS SDK, add `programmaticToolCallingTool()` to the agent and set `allowedCallers` on each tool (`["programmatic"]` for program-only, `["direct", "programmatic"]` for either); it is Responses-only and Chat Completions rejects it. See the [SDK tools guide](https://openai.github.io/openai-agents-js/guides/tools/). Keep your registry's handlers free of framework assumptions, because the same handler may now be called from generated code rather than directly by the model.
+
+### Provider Constraints the Adapter Must Know
+
+- **Claude forced tool choice:** Claude Opus 5.5, Sonnet 5.5 and Fable 5.1 reject `tool_choice` of type `any` or `tool` with a 400. Use `auto` with a prompt instruction, plus strict tool use (`strict: true`) where you need schema-valid arguments, or structured outputs when the forced call only existed to get JSON back. An adapter that always forces a tool must check the model first. See the [release notes](https://platform.claude.com/docs/en/release-notes/overview#september-22-2026).
+- **Claude capability discovery:** the Models API (2026-10-06) reports `capabilities.server_tools.code_execution` (the model accepts the server code-execution tool) separately from top-level `capabilities.code_execution` (code can call the request's other tools). Check the right one before enabling programmatic tool calling, instead of hard-coding model names. See the [release notes](https://platform.claude.com/docs/en/release-notes/overview#october-6-2026).
+- **Claude API version pin:** pin `anthropic-version` deliberately. Version `2026-10-21` removes `temperature`, `top_p` and `top_k` (a 400 if sent), so an adapter that passes sampling parameters through must drop them before moving to that version, and SDK majors that default to it (Python 2.0.0, TypeScript 1.0.0) pick it up on upgrade. See the [migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21) and [API Versioning](/docs/api-surface/api-versioning).
+- **OpenAI endpoint:** tool calling for GPT-6 models requires the Responses API.
 
 ## Testing Strategy
 
@@ -458,13 +526,21 @@ Then test each adapter separately:
 
 ```typescript
 // test/mcp.test.ts
+import { Client } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
 import server from "../tools/mcp";
 
 describe("MCP adapter", () => {
   it("exposes search_docs tool with annotations", async () => {
-    const tools = await server.listTools({});
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities: {} });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const { tools } = await client.listTools();
     const searchDocs = tools.find((t) => t.name === "search_docs");
     expect(searchDocs).toBeDefined();
+    expect(searchDocs?.annotations?.readOnlyHint).toBe(true);
   });
 });
 

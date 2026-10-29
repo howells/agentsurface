@@ -1,22 +1,22 @@
 ---
 title: llms.txt
-description: The llms.txt specification for giving coding agents and IDE tools a curated, token-efficient index of your site
-lastVerified: 2026-09-24
+description: The llms.txt proposal for giving coding agents and IDE tools a curated, token-efficient index of your site
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-llms.txt is a standard file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation, llms.txt lets you declare upfront what matters most. The confirmed consumers are narrow: IDE and coding-agent workflows - Cursor, Claude Code, and similar tools - that index the file during project setup or on demand. General-purpose crawlers and inference-time browsing largely skip it; see [Adoption and Consumption](#adoption-and-consumption) below.
+llms.txt is a proposal (not a standard), now at v2 (updated 2026-08-10), for a file served at /llms.txt that publishes a curated, token-efficient index of your site. Rather than agents crawling your entire documentation, llms.txt lets you declare upfront what matters most. The confirmed consumers are narrow: IDE and coding-agent workflows - Cursor, Claude Code, and similar tools - that index the file during project setup or on demand. Whether other tools read it depends on the tool, and Google says no special AI text files are needed; see [Adoption and Consumption](#adoption-and-consumption) below.
 
 - Served at /llms.txt as text/plain; charset=utf-8
 - Required: H1 with product/site name
 - Recommended: blockquote summary, H2 sections with links and descriptions
 - Link format: - [Title](url): description
-- Total size under 5,000 tokens for efficiency
+- Total size under 5,000 tokens is this site's guideline; the proposal sets no cap
 - Use ## Optional section for lower-priority content
 - Worth shipping for documentation and developer-tool sites; not a general-site AEO tactic
 
-The `llms.txt` specification, proposed by Jeremy Howard in September 2024 at [llmstxt.org](https://llmstxt.org), gives sites a standard location to publish a curated, token-efficient index of their content. Where a sitemap describes every URL for crawlers, `llms.txt` describes the most important content for AI agents - with enough context to navigate without crawling the full site.
+The `llms.txt` proposal, put forward by Jeremy Howard in September 2024 at [llmstxt.org](https://llmstxt.org), suggests a standard location to publish a curated, token-efficient index of their content. Where a sitemap describes every URL for crawlers, `llms.txt` describes the most important content for AI agents - with enough context to navigate without crawling the full site.
 
 ## The Problem It Solves
 
@@ -61,27 +61,29 @@ The only required element is the H1 (`#`) with the product or site name. Everyth
 
 ## The .md URL Convention
 
-Links in `llms.txt` should point to the Markdown version of each page, not the HTML version. The convention is appending `.md` to the URL path:
+Links in `llms.txt` should point to the Markdown version of each page, not the HTML version. llms.txt v2 allows two forms: `.md` appended to the full page URL (`page.html.md`), or the extension replaced (`page.md`), because some publishing tools replace it. Pick one and use it consistently:
 
 ```
 https://docs.example.com/authentication       → HTML page for browsers
 https://docs.example.com/authentication.md    → Markdown for agents
 ```
 
+v2 also names the link relations for discovery from a page: `rel="alternate" type="text/markdown"` points to the page's Markdown version, and `rel="describedby"` points to the `llms.txt` file that covers it. Provide them as HTML `<link>` elements or an HTTP `Link:` header ([v2 changes](https://llmstxt.org/changes.html)).
+
 If your site does not yet serve `.md` endpoints, link to the HTML pages as a fallback. See [Content Negotiation](./content-negotiation) for how to implement Markdown serving.
 
 ## Token Budget
 
-Keep the full `llms.txt` under 5,000 tokens. This fits comfortably in a single context window turn and ensures agents can load the entire index at once without truncation.
+As a house guideline, keep the full `llms.txt` under 5,000 tokens (the proposal itself sets no cap). That fits comfortably in a single context window turn and lets agents load the entire index at once without truncation.
 
-The Anthropic `llms.txt` is a useful reference point: their index file is approximately 8,364 tokens and their `llms-full.txt` is approximately 481,349 tokens. Both extremes demonstrate what is possible, but the index should be the compact version - agents fetch the full content when they need depth.
+Published files vary enormously in size. A large vendor's index can run to thousands of tokens and its `llms-full.txt` to hundreds of thousands, and those counts change whenever the docs do. Count your own files with your own tokenizer and date the measurement. The index should be the compact version - agents fetch the full content when they need depth.
 
 ## Real Examples
 
 **Anthropic** publishes two files:
 
-- `/llms.txt` - 8,364-token index with sections for Claude models, APIs, and product features
-- `/llms-full.txt` - 481,349-token file with all documentation content inlined
+- `/llms.txt` - an index with sections for Claude models, APIs, and product features
+- `/llms-full.txt` - a much larger file with all documentation content inlined
 
 **Stripe** publishes three files across their domains:
 
@@ -95,7 +97,7 @@ Stripe also uses an `## Instructions` section (see below) to give behavioral gui
 
 - Deployment, Edge Functions, Storage, Observability, and CLI each appear as separate H2 sections
 - Each link includes a description that differentiates it from adjacent pages
-- The file is kept under 3,000 tokens despite covering dozens of products
+- The index stays compact despite covering dozens of products
 
 ## The Instructions Section
 
@@ -141,13 +143,13 @@ Agents that read this section have the directives in context when answering; tre
 
 **RAG pipelines** - Teams building internal knowledge bases chunk and embed `llms-full.txt` rather than crawling and parsing HTML. A single well-structured file is easier to process than hundreds of HTML pages.
 
-**IDE indexing** - Tools like Cursor and Claude Code download `llms-full.txt` once and index it locally. Subsequent queries against your documentation happen without network round trips.
+**Optional material for tools and users** - `llms-full.txt` is publisher-provided material that a user or a tool can fetch, for example to paste into a chat or load as a documentation source. What a given tool does with it, and whether it keeps a local copy, is tool-specific; check that tool's documentation rather than assuming it.
 
 Maintain `llms-full.txt` as a generated artifact. Inlining content manually does not scale. See [Generation Tools](#generation-tools) below.
 
 ## Serving Requirements
 
-Serve both files as `text/plain; charset=utf-8`. Do not use `text/html` or `text/markdown`. Some agents and tools check the Content-Type header and will reject files served under the wrong type.
+Serve both files as `text/plain; charset=utf-8`. That is a site convention, not a requirement of the proposal, which describes a Markdown document and does not forbid `text/markdown`. What matters is that you never serve an HTML shell (a rendered page, a login redirect or a single-page-app wrapper) at these paths, because a client expects the file's text.
 
 ```
 Content-Type: text/plain; charset=utf-8
@@ -225,10 +227,10 @@ Submission to directories is optional. The primary value of `llms.txt` comes fro
 
 ## Adoption and Consumption
 
-Few agents actually read `llms.txt`. General-purpose crawlers and inference-time browsing do not use it:
+Consumption is tool-dependent, and the evidence that general-purpose crawlers and inference-time browsing use `llms.txt` is thin:
 
-- An Ahrefs study of ~137,000 sites found that roughly 28% publish an `llms.txt` file, but 97% of the valid files received **zero** requests during May 2026.
-- The major AI crawlers - GPTBot, ClaudeBot, PerplexityBot - skip `llms.txt` entirely.
+- The documented purposes of the major AI crawlers - GPTBot, ClaudeBot, PerplexityBot - do not include fetching `llms.txt`. That is not proof they never request it.
+- Google's guidance says no special AI text files are needed to appear in its AI features.
 - Google's John Mueller compared `llms.txt` to the keywords meta tag, and Google's own AI-optimization guidance states that files like this are not needed or used for its systems.
 
 So `llms.txt` is not an answer-engine-optimization (AEO) strategy for a general site. Treat any claim that it improves visibility in AI Overviews or chatbot answers with skepticism.
@@ -239,6 +241,6 @@ The genuine, confirmed value is narrow: coding agents and IDE assistants - Curso
 
 ## Modular, per-section indexes
 
-For a large site, publish section-level `llms.txt` files alongside the root index - `/docs/llms.txt` for documentation, `/api/llms.txt` for API reference - so an agent working in one area loads a focused index instead of the whole site. Link each section file from the root index and verify both levels independently. Ora's `modular-llms-txt` check looks for this pattern by name: "Per-section llms.txt files (like /docs/llms.txt) so an agent working in one area gets a focused index instead of your whole site" ([ora.ai/api/checks](https://ora.ai/api/checks)).
+For a large site, publish section-level `llms.txt` files alongside the root index - `/docs/llms.txt` for documentation, `/api/llms.txt` for API reference - so an agent working in one area loads a focused index instead of the whole site. llms.txt v2 defines what a subpath file means: it covers the pages under its path, and the most specific file applies. That also lets a site that controls only a path, such as a GitHub Pages project site, take part. Link each section file from the root index and verify both levels independently. Ora's `modular-llms-txt` check looks for this pattern by name: "Per-section llms.txt files (like /docs/llms.txt) so an agent working in one area gets a focused index instead of your whole site" ([ora.ai/api/checks](https://ora.ai/api/checks)).
 
 Keep authoritative prices in sync across visible pages and a pricing.md representation when useful. See [Commercial and Entity Discovery](/docs/discovery/commercial-and-entity-discovery) for scope, provenance, and validation.

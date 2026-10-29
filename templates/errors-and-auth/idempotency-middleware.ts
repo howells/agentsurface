@@ -1,20 +1,31 @@
 /**
- * Idempotency middleware via Idempotency-Key header + Redis cache
- * Canonical: https://stripe.com/docs/api/idempotent_requests
- * Use: Deduplicate POST/PATCH/DELETE requests so agents can safely retry
+ * Idempotency for Next.js route handlers via the Idempotency-Key header + Redis
+ * Draft: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ (-08, active, not an RFC)
+ * Reference implementation: https://stripe.com/docs/api/idempotent_requests
+ * Use: Deduplicate POST/PATCH/PUT/DELETE requests so agents can safely retry
+ *
+ * What makes this safe, not just cached:
+ * - The key is reserved atomically (SET NX) before the handler runs, so two
+ *   concurrent requests with the same key cannot both execute
+ * - Keys are namespaced by authenticated principal and route, so one client
+ *   can never replay another client's cached response
+ * - The request body is fingerprinted; a reused key with a different body is
+ *   rejected with 422, and a duplicate that arrives mid-flight gets 409
  *
  * <CUSTOMISE>
- * - Set IDEMPOTENCY_TTL_SECONDS to your desired deduplication window (24h typical)
- * - Configure Redis client connection
- * - Customize error responses per your domain
+ * - Set IDEMPOTENCY_TTL_SECONDS to your published retention window (24h is common)
+ * - Implement getPrincipalId() from your auth layer (run auth before this wrapper)
+ * - Configure the Redis client connection
  * </CUSTOMISE>
  */
 
+import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { Redis } from "ioredis";
 
-const IDEMPOTENCY_TTL_SECONDS = 86_400; // 24 hours
+const IDEMPOTENCY_TTL_SECONDS = 86_400; // published retention window
+const IN_FLIGHT_TTL_SECONDS = 60; // how long a crashed request blocks its key
 const IDEMPOTENCY_KEY_HEADER = "idempotency-key";
 const IDEMPOTENCY_REPLAY_HEADER = "x-idempotency-replayed";
 
@@ -37,19 +48,49 @@ function getRedisClient(): Redis {
 }
 
 /**
- * Cache entry for idempotent responses
+ * <CUSTOMISE> Return the authenticated caller (user, client or tenant id).
+ * Authorization must run before the idempotency lookup.
  */
-interface IdempotencyEntry {
-  status: number;
-  headers: Record<string, string>;
-  body: unknown;
-  timestamp: number;
+function getPrincipalId(req: NextRequest): string {
+  const principal = req.headers.get("x-principal-id");
+  if (!principal) {
+    throw new Error("idempotency requires an authenticated principal");
+  }
+  return principal;
 }
 
+type IdempotencyEntry =
+  | { state: "in_flight"; fingerprint: string }
+  | {
+      state: "done";
+      fingerprint: string;
+      status: number;
+      headers: Record<string, string>;
+      body: unknown;
+    };
+
 /**
- * Serialize a response for caching
+ * The draft defines the header as a Structured Fields string ("..."); many
+ * providers also accept unquoted values, so accept both.
  */
-async function serializeResponse(response: NextResponse): Promise<IdempotencyEntry> {
+function parseIdempotencyKey(raw: string | null): string | null {
+  if (!raw) {
+    return null;
+  }
+  const trimmed = raw.trim();
+  const unquoted =
+    trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1) : trimmed;
+  return unquoted.length > 0 ? unquoted : null;
+}
+
+function problem(status: number, type: string, title: string, detail: string, retriable: boolean) {
+  return NextResponse.json(
+    { detail, is_retriable: retriable, status, title, type },
+    { headers: { "Content-Type": "application/problem+json" }, status },
+  );
+}
+
+async function serializeResponse(response: NextResponse) {
   const headers: Record<string, string> = {};
   response.headers.forEach((value, key) => {
     if (!key.startsWith("content-encoding")) {
@@ -62,99 +103,15 @@ async function serializeResponse(response: NextResponse): Promise<IdempotencyEnt
     .json()
     .catch(() => null);
 
-  return {
-    body,
-    headers,
-    status: response.status,
-    timestamp: Date.now(),
-  };
+  return { body, headers, status: response.status };
 }
 
-/**
- * Replay a cached response
- */
-function replayResponse(entry: IdempotencyEntry): NextResponse {
-  const response = NextResponse.json(entry.body, {
-    status: entry.status,
-  });
-
+function replayResponse(entry: Extract<IdempotencyEntry, { state: "done" }>): NextResponse {
+  const response = NextResponse.json(entry.body, { status: entry.status });
   Object.entries(entry.headers).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
-
   response.headers.set(IDEMPOTENCY_REPLAY_HEADER, "true");
-  return response;
-}
-
-/**
- * Middleware to handle idempotent requests
- *
- * Mount in middleware.ts:
- * ```typescript
- * import { idempotencyMiddleware } from '@/lib/idempotency-middleware';
- *
- * export const middleware = idempotencyMiddleware;
- * export const config = {
- *   matcher: ['/api/:path*'],
- * };
- * ```
- */
-export async function idempotencyMiddleware(req: NextRequest, next: any): Promise<NextResponse> {
-  // Only apply to mutation methods
-  if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
-    return next(req);
-  }
-
-  const idempotencyKey = req.headers.get(IDEMPOTENCY_KEY_HEADER);
-
-  // Idempotency-Key is required for mutations
-  if (!idempotencyKey) {
-    return NextResponse.json(
-      {
-        code: "ERR_VALIDATION",
-        detail: `${IDEMPOTENCY_KEY_HEADER} header is required for ${req.method} requests`,
-        status: 400,
-        title: "Missing Idempotency Key",
-        type: "https://api.example.com/errors/missing-idempotency-key",
-      },
-      {
-        headers: { "Content-Type": "application/problem+json" },
-        status: 400,
-      },
-    );
-  }
-
-  const cacheKey = `idempotency:${idempotencyKey}`;
-  const redis = getRedisClient();
-
-  try {
-    // Check cache
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      const entry: IdempotencyEntry = JSON.parse(cached);
-      console.log(`[Idempotency] Cache hit for key ${idempotencyKey}`);
-      return replayResponse(entry);
-    }
-  } catch (error) {
-    console.warn(`[Idempotency] Cache lookup error: ${error}`, { idempotencyKey });
-    // Fall through; don't fail the request on cache miss
-  }
-
-  // Call the next middleware/handler
-  const response = await next(req);
-
-  // Only cache successful responses (2xx)
-  if (response.status >= 200 && response.status < 300) {
-    try {
-      const entry = await serializeResponse(response);
-      await redis.setex(cacheKey, IDEMPOTENCY_TTL_SECONDS, JSON.stringify(entry));
-      console.log(`[Idempotency] Cached response for key ${idempotencyKey}`);
-    } catch (error) {
-      console.warn(`[Idempotency] Cache write error: ${error}`, { idempotencyKey });
-      // Proceed anyway; caching failure shouldn't block the response
-    }
-  }
-
   return response;
 }
 
@@ -178,45 +135,77 @@ export function withIdempotency(
       return await handler(req);
     }
 
-    const idempotencyKey = req.headers.get(IDEMPOTENCY_KEY_HEADER);
-
+    const idempotencyKey = parseIdempotencyKey(req.headers.get(IDEMPOTENCY_KEY_HEADER));
     if (!idempotencyKey) {
-      return NextResponse.json(
-        {
-          code: "ERR_VALIDATION",
-          detail: `${IDEMPOTENCY_KEY_HEADER} header is required`,
-          status: 400,
-          title: "Missing Idempotency Key",
-          type: "https://api.example.com/errors/missing-idempotency-key",
-        },
-        { headers: { "Content-Type": "application/problem+json" }, status: 400 },
+      return problem(
+        400,
+        "https://api.example.com/errors/missing-idempotency-key",
+        "Missing Idempotency Key",
+        `${IDEMPOTENCY_KEY_HEADER} header is required for ${req.method} requests`,
+        false,
       );
     }
 
-    const cacheKey = `idempotency:${idempotencyKey}`;
-    const redis = getRedisClient();
+    const route = `${req.method} ${req.nextUrl.pathname}`;
+    const cacheKey = `idempotency:${getPrincipalId(req)}:${route}:${idempotencyKey}`;
+    const rawBody = await req.clone().text();
+    const fingerprint = createHash("sha256").update(rawBody).digest("hex");
+    const client = getRedisClient();
 
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        const entry: IdempotencyEntry = JSON.parse(cached);
-        console.log(`[Idempotency] Replaying cached response for ${idempotencyKey}`);
-        const response = replayResponse(entry);
-        return response;
+    // Atomically reserve the key; only one request can win
+    const reserved = await client.set(
+      cacheKey,
+      JSON.stringify({ fingerprint, state: "in_flight" } satisfies IdempotencyEntry),
+      "EX",
+      IN_FLIGHT_TTL_SECONDS,
+      "NX",
+    );
+
+    if (reserved !== "OK") {
+      const existing = await client.get(cacheKey);
+      const entry = existing ? (JSON.parse(existing) as IdempotencyEntry) : null;
+
+      if (entry && entry.fingerprint !== fingerprint) {
+        return problem(
+          422,
+          "https://api.example.com/errors/idempotency-key-reused",
+          "Idempotency key reused",
+          "This Idempotency-Key was already used with a different request body",
+          false,
+        );
       }
-    } catch (error) {
-      console.warn(`[Idempotency] Cache error, proceeding: ${error}`);
+      if (!entry || entry.state === "in_flight") {
+        return problem(
+          409,
+          "https://api.example.com/errors/request-in-progress",
+          "Request in progress",
+          "A request with this Idempotency-Key is still being processed",
+          true,
+        );
+      }
+      return replayResponse(entry);
     }
 
-    const response = await handler(req);
+    let response: NextResponse;
+    try {
+      response = await handler(req);
+    } catch (error) {
+      // Release the key so a retry can run; nothing was recorded as done
+      await client.del(cacheKey);
+      throw error;
+    }
 
-    if (response.status >= 200 && response.status < 300) {
-      try {
-        const entry = await serializeResponse(response);
-        await redis.setex(cacheKey, IDEMPOTENCY_TTL_SECONDS, JSON.stringify(entry));
-      } catch (error) {
-        console.warn(`[Idempotency] Failed to cache: ${error}`);
-      }
+    // Record the outcome, success or failure, so a retry gets the same answer.
+    // 5xx are released instead: the operation may not have happened.
+    if (response.status >= 500) {
+      await client.del(cacheKey);
+    } else {
+      const entry: IdempotencyEntry = {
+        fingerprint,
+        state: "done",
+        ...(await serializeResponse(response)),
+      };
+      await client.set(cacheKey, JSON.stringify(entry), "EX", IDEMPOTENCY_TTL_SECONDS);
     }
 
     return response;
@@ -236,13 +225,12 @@ export function withIdempotency(
  * - Duplicate user account
  * - Duplicate task or message
  *
- * Idempotency-Key ensures: same key → same response, even if called 100 times.
- * Typical TTL: 24 hours. Critical for financial, identity, or mutation-heavy APIs.
+ * Idempotency-Key ensures: same key + same body → same response, for as long
+ * as the published retention window. Once a key expires, it may execute again.
  *
  * Agent usage:
- * 1. Agent generates a UUID: `const key = crypto.randomUUID()`
- * 2. Includes in request: `headers: { 'Idempotency-Key': key }`
- * 3. Server stores response hash keyed by the UUID
- * 4. If agent retries with same key, server replays cached response
- * 5. If TTL expires, server treats it as a new request
+ * 1. Agent generates a random key once per logical operation: `crypto.randomUUID()`
+ * 2. Includes it on every attempt: `headers: { 'Idempotency-Key': `"${key}"` }`
+ * 3. On 409, waits and retries with the same key
+ * 4. On 422 (key reused with a different body), generates a new key
  */

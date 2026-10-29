@@ -1,7 +1,7 @@
 ---
 title: Structured Data for Agents
 description: JSON-LD schema markup that gives search and agent systems machine-readable facts about your content
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -12,7 +12,7 @@ JSON-LD markup embeds structured data so search engines and agents can extract f
 - FAQPage and HowTo schema are still valid Schema.org markup for agents and other parsers, but Google no longer shows either as a Search rich result (HowTo since September 2023, FAQPage since May 2026)
 - BreadcrumbList schema for navigation and hierarchy
 - LocalBusiness, Product, and NewsArticle schemas for specific content types
-- Schema must match visible content exactly; mismatched schema is a trust signal search engines penalize
+- Schema must match visible content exactly; Google's structured data policies can make mismatched or misleading markup ineligible for rich results and can lead to a manual action
 
 Search-augmented AI systems retrieve pages from the web before generating answers. Structured data gives those systems machine-readable facts that sit alongside your prose, reducing the inference work required to extract accurate information. Treat it as an extraction aid and search-quality signal, not as a guarantee that a page will appear in generated answers.
 
@@ -33,11 +33,11 @@ The practical benefit is extraction reliability: agents can read named fields in
 
 ## The Fundamental Rule
 
-JSON-LD must exactly match the visible content on the page. If your FAQ schema contains a question-and-answer pair that does not appear in the page body, search engines will penalize the page and agents may distrust all structured data from your domain. The schema is a machine-readable version of the page.
+JSON-LD must exactly match the visible content on the page. If your FAQ schema contains a question-and-answer pair that does not appear in the page body, you are marking up content users cannot see. Google's [structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies) say such markup can make the page ineligible for rich results and can lead to a manual action. Other consumers set their own rules, but a mismatch gives any agent a reason to trust your markup less than your visible text. The schema is a machine-readable version of the page.
 
 ## FAQPage
 
-Use `FAQPage` for any content structured as questions and answers: FAQ sections, definition pages, policy explanations, troubleshooting guides. Google removed FAQ rich results from Search in May 2026, so this schema no longer earns Google's rich-result presentation. Keep it anyway: it is still valid Schema.org markup, and agents and other parsers that read JSON-LD directly still benefit from question-and-answer content marked up explicitly rather than left to prose inference.
+Use `FAQPage` for a page that presents a list of frequently asked questions with one answer each, written by the site: FAQ sections, policy explanations, troubleshooting lists. It is not for every question-and-answer structure. A page focused on a single question that users answer (a forum or support thread) is [`QAPage`](https://schema.org/QAPage), and a definition page is not an FAQ. Google removed FAQ rich results from Search in May 2026, so this schema no longer earns Google's rich-result presentation. Keep it anyway: it is still valid Schema.org markup, and agents and other parsers that read JSON-LD directly still benefit from question-and-answer content marked up explicitly rather than left to prose inference.
 
 ```html
 <script type="application/ld+json">

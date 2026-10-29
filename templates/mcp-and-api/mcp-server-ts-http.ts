@@ -1,22 +1,28 @@
 /**
- * MCP Server (Streamable HTTP) — Remote, stateless, horizontally scalable
+ * MCP Server (Streamable HTTP) - Remote, stateless, horizontally scalable
  *
  * Canonical spec: https://modelcontextprotocol.io/specification/2026-07-28
- * Transport: Streamable HTTP only — HTTP+SSE is Deprecated as of this revision
+ * Transport: Streamable HTTP only - HTTP+SSE is Deprecated as of this revision
  * Framework: Fastify (minimal HTTP server)
- * Authentication: OAuth 2.1 Bearer token + JWT validation; prefer Client ID
- *   Metadata Documents over Dynamic Client Registration for new clients
+ * Authentication: OAuth 2.1 Bearer token; the JWT is verified against the
+ *   authorization server's JWKS with issuer, audience and scope checks. Prefer
+ *   Client ID Metadata Documents over Dynamic Client Registration for new clients.
  * SDK: `@modelcontextprotocol/server` (v2, implements the 2026-07-28 spec).
  *   v2 replaced the monolithic `@modelcontextprotocol/sdk` package with the
  *   separate `@modelcontextprotocol/server` and `@modelcontextprotocol/client` packages.
+ *   `createMcpHandler` is the web-standard serving entry; `toNodeHandler` from
+ *   `@modelcontextprotocol/node` adapts it to Fastify's Node request/response.
+ *
+ * Install: pnpm add @modelcontextprotocol/server @modelcontextprotocol/node \
+ *   fastify @fastify/cors jose zod
  *
  * 2026-07-28 removed protocol-level sessions entirely: no `Mcp-Session-Id`
  * header, no `initialize`/`notifications/initialized` handshake. Every
  * request carries its own protocol version and capabilities in `_meta`
- * (`io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`),
- * and servers MUST implement `server/discover` so clients can probe supported
- * versions and capabilities before (or instead of) any other call. Anything
- * that needs to persist across calls — the old use for a session id — must
+ * (`io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`).
+ * Servers must implement `server/discover` (the SDK answers it) so clients can
+ * probe supported versions and capabilities; clients may skip it. Anything
+ * that needs to persist across calls - the old use for a session id - must
  * be an explicit, server-minted handle passed as a normal tool argument, not
  * a transport-level concept. The identifier this handler generates per
  * request is a correlation id for logs and rate-limit buckets only; it never
@@ -37,28 +43,37 @@
  * Customization checklist:
  * ✓ Update server name and version
  * ✓ Update OAuth issuer and audience URIs
- * ✓ Implement JWT validation against your auth server
+ * ✓ Point OAUTH_JWKS_URL at your authorization server's JWKS
  * ✓ Add/remove tools
  * ✓ Configure rate limits (requests per minute per client)
- * ✓ Configure CORS origin whitelist
+ * ✓ Configure ALLOWED_ORIGINS (CORS and Origin check) and ALLOWED_HOSTNAMES (Host check)
  * ✓ Test with MCP client library
  */
 
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import fastifyJwt from "@fastify/jwt";
 import fastifyCors from "@fastify/cors";
-import { McpServer } from "@modelcontextprotocol/server";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/server/streamable-http";
+import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
+import type { AuthInfo } from "@modelcontextprotocol/server";
+import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import type { IncomingMessage } from "node:http";
 import { z } from "zod";
 
 // ===== Configuration =====
 
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
+const API_URL = process.env.API_URL || "https://api.example.com";
 const OAUTH_ISSUER = process.env.OAUTH_ISSUER || "https://auth.example.com";
-const OAUTH_AUDIENCE = process.env.OAUTH_AUDIENCE || "mcp-server";
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:*").split(",");
+// The audience is this MCP server's canonical resource URL (RFC 8707 / RFC 9728).
+const OAUTH_AUDIENCE = process.env.OAUTH_AUDIENCE || `${API_URL}/mcp`;
+const OAUTH_JWKS_URL = process.env.OAUTH_JWKS_URL || `${OAUTH_ISSUER}/.well-known/jwks.json`;
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:3000").split(",");
+const ALLOWED_HOSTNAMES = (process.env.ALLOWED_HOSTNAMES || "localhost,127.0.0.1").split(",");
+
+const jwks = createRemoteJWKSet(new URL(OAUTH_JWKS_URL));
+const validateHost = hostHeaderValidation(ALLOWED_HOSTNAMES);
+const validateOrigin = originValidation(ALLOWED_ORIGINS.map((origin) => new URL(origin).hostname));
 
 // ===== Structured Logging =====
 
@@ -185,7 +200,9 @@ function setupMcpServer(): McpServer {
       description:
         "Create a new issue in the project tracker. Use when reporting bugs or requesting features.",
       inputSchema: createIssueSchema,
-      annotations: { destructiveHint: true, idempotentHint: true },
+      // Each call creates a new issue, so the tool is not idempotent. Only
+      // advertise idempotentHint: true if the handler deduplicates repeat calls.
+      annotations: { destructiveHint: true, idempotentHint: false },
     },
     async (input) => {
       logger.info("tool:create_issue", { title: input.title });
@@ -207,29 +224,28 @@ function setupMcpServer(): McpServer {
   );
 
   // config resource
-  server.resource("config://api-docs", "text/markdown", "API Documentation", async () => ({
-    contents: [
-      {
-        mimeType: "text/markdown",
-        text: "# API Documentation\n\nRemote MCP server. See https://modelcontextprotocol.io/specification/2026-07-28",
-        uri: "config://api-docs",
-      },
-    ],
-  }));
+  server.registerResource(
+    "api-docs",
+    "config://api-docs",
+    { description: "API Documentation", mimeType: "text/markdown" },
+    async () => ({
+      contents: [
+        {
+          mimeType: "text/markdown",
+          text: "# API Documentation\n\nRemote MCP server. See https://modelcontextprotocol.io/specification/2026-07-28",
+          uri: "config://api-docs",
+        },
+      ],
+    }),
+  );
 
   return server;
 }
 
-// ===== FastAPI Setup =====
+// ===== Fastify Setup =====
 
 async function setupFastify(): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: false }); // Use custom logger
-
-  // ===== JWT Authentication =====
-  await fastify.register(fastifyJwt, {
-    secret: JWT_SECRET,
-    sign: { expiresIn: "1h" },
-  });
 
   // ===== CORS =====
   await fastify.register(fastifyCors, {
@@ -243,38 +259,42 @@ async function setupFastify(): Promise<FastifyInstance> {
   );
 
   // ===== OAuth Protected Resource Metadata (RFC 9728) =====
-  // `resource` (not `issuer`/`token_endpoint`) is the required field — this
+  // `resource` (not `issuer`/`token_endpoint`) is the required field - this
   // document only points at the authorization server(s); it does not carry
   // that server's own metadata. See templates/errors-and-auth/
   // well-known-oauth-protected-resource.ts for the full metadata shape.
   fastify.get("/.well-known/oauth-protected-resource", async (_request, reply) =>
     reply.send({
-      resource: process.env.API_URL || "https://api.example.com",
+      resource: OAUTH_AUDIENCE,
       authorization_servers: [OAUTH_ISSUER],
       scopes_supported: ["mcp:tools:read", "mcp:resources:read"],
       bearer_methods_supported: ["header"],
-      dpop_signing_alg_values_supported: ["RS256"],
     }),
   );
 
   // ===== MCP Endpoint =====
   // Stateless per 2026-07-28: no Mcp-Session-Id, no initialize handshake.
   // `x-mcp-request-id` below is a per-request correlation id for logs and
-  // rate-limit buckets only — the server never reads it back as state, and a
+  // rate-limit buckets only - the server never reads it back as state, and a
   // client generating a fresh one on every call is correct, not a bug.
+  // `createMcpHandler` builds a fresh McpServer for each request, so nothing
+  // is shared between calls; `toNodeHandler` adapts it to Node's req/res.
+  const mcpHandler = toNodeHandler(createMcpHandler(setupMcpServer), {
+    onerror: (error) => {
+      logger.error("mcp_handler_error", error);
+    },
+  });
+
   fastify.post<{ Body: Record<string, unknown> }>(
     "/mcp",
     {
       schema: {
-        description: "MCP Streamable HTTP endpoint (stateless, spec 2026-07-28)",
         headers: {
           properties: {
             authorization: { type: "string" },
-            "mcp-method": { type: "string" },
-            "mcp-name": { type: "string" },
             "x-mcp-request-id": { type: "string" },
           },
-          required: ["authorization", "mcp-method", "mcp-name"],
+          required: ["authorization"],
           type: "object",
         },
       },
@@ -283,11 +303,12 @@ async function setupFastify(): Promise<FastifyInstance> {
       const authHeader = request.headers.authorization;
       const correlationId =
         (request.headers["x-mcp-request-id"] as string) || `req-${crypto.randomUUID()}`;
+      const challenge = `Bearer resource_metadata="${API_URL}/.well-known/oauth-protected-resource"`;
 
-      // ===== JWT Validation =====
+      // ===== Token Validation =====
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         logger.error("mcp_auth_missing", undefined, { correlationId });
-        return reply.status(401).send({
+        return reply.status(401).header("WWW-Authenticate", challenge).send({
           detail: "Authorization header missing or malformed",
           instance: correlationId,
           status: 401,
@@ -296,40 +317,56 @@ async function setupFastify(): Promise<FastifyInstance> {
         });
       }
 
-      let clientId: string;
+      const token = authHeader.replace(/^Bearer /, "");
+      let auth: AuthInfo;
       try {
-        const token = authHeader.replace(/^Bearer /, "");
-        const decoded = fastify.jwt.verify(token) as { sub: string; scope: string };
-        clientId = decoded.sub;
-
-        // Validate scopes
-        const scopes = (decoded.scope || "").split(" ");
-        if (!scopes.includes("mcp:tools:read")) {
-          logger.error("mcp_insufficient_scope", undefined, {
-            clientId,
-            correlationId,
+        // Verifies the signature against the authorization server's JWKS and
+        // checks the trusted issuer, this server as audience, and expiry.
+        const { payload } = await jwtVerify(token, jwks, {
+          audience: OAUTH_AUDIENCE,
+          issuer: OAUTH_ISSUER,
+        });
+        const scopes = typeof payload.scope === "string" ? payload.scope.split(" ") : [];
+        auth = {
+          clientId: typeof payload.sub === "string" ? payload.sub : "unknown",
+          expiresAt: payload.exp,
+          scopes,
+          token,
+        };
+      } catch (error) {
+        logger.error("mcp_jwt_verify_failed", error as Error, { correlationId });
+        return reply
+          .status(401)
+          .header("WWW-Authenticate", `${challenge}, error="invalid_token"`)
+          .send({
+            detail: "Token validation failed",
+            instance: correlationId,
+            status: 401,
+            title: "Invalid Token",
+            type: "https://api.example.com/errors/invalid-token",
           });
-          return reply.status(403).send({
+      }
+
+      const clientId = auth.clientId;
+      if (!auth.scopes.includes("mcp:tools:read")) {
+        logger.error("mcp_insufficient_scope", undefined, { clientId, correlationId });
+        return reply
+          .status(403)
+          .header(
+            "WWW-Authenticate",
+            `${challenge}, error="insufficient_scope", scope="mcp:tools:read"`,
+          )
+          .send({
             detail: "Token missing 'mcp:tools:read' scope",
             instance: correlationId,
             status: 403,
             title: "Insufficient Scope",
             type: "https://api.example.com/errors/insufficient-scope",
           });
-        }
-      } catch (error) {
-        logger.error("mcp_jwt_verify_failed", error as Error, { correlationId });
-        return reply.status(401).send({
-          detail: "JWT validation failed",
-          instance: correlationId,
-          status: 401,
-          title: "Invalid Token",
-          type: "https://api.example.com/errors/invalid-token",
-        });
       }
 
       // ===== Rate Limiting =====
-      // Keyed by clientId (the authenticated caller), never by a session —
+      // Keyed by clientId (the authenticated caller), never by a session -
       // there is no session to key on.
       if (!limiter.check(clientId)) {
         logger.error("mcp_rate_limit_exceeded", undefined, {
@@ -352,35 +389,32 @@ async function setupFastify(): Promise<FastifyInstance> {
         userAgent: request.headers["user-agent"],
       });
 
+      // The handler does no Host or Origin validation of its own (DNS rebinding
+      // protection). The guards answer rejected requests with 403 themselves.
+      reply.hijack();
+      if (!validateHost(request.raw, reply.raw) || !validateOrigin(request.raw, reply.raw)) {
+        return;
+      }
+
       try {
-        // ===== Create MCP Server & Transport =====
-        // A fresh server + transport per request keeps the handler stateless;
-        // there is no sessionIdGenerator option to set because the 2026-07-28
-        // Streamable HTTP transport has no session concept at all.
-        const mcpServer = setupMcpServer();
-        const transport = new StreamableHTTPServerTransport();
-
-        // Attach context for logging
-        (request as any).mcp = { clientId, correlationId };
-
-        await mcpServer.connect(transport);
-        await transport.handleRequest(request.raw, reply.raw, request.body);
-        logger.info("mcp_request_complete", {
-          clientId,
-          correlationId,
-        });
+        // Hand the verified token info to the SDK, which attaches it to each request.
+        (request.raw as IncomingMessage & { auth?: AuthInfo }).auth = auth;
+        await mcpHandler(request.raw, reply.raw, request.body);
+        logger.info("mcp_request_complete", { clientId, correlationId });
       } catch (error) {
-        logger.error("mcp_request_error", error as Error, {
-          clientId,
-          correlationId,
-        });
-        reply.status(500).send({
-          type: "https://api.example.com/errors/mcp-error",
-          title: "MCP Error",
-          status: 500,
-          detail: (error as Error).message,
-          instance: correlationId,
-        });
+        logger.error("mcp_request_error", error as Error, { clientId, correlationId });
+        if (!reply.raw.headersSent) {
+          reply.raw.writeHead(500, { "Content-Type": "application/problem+json" });
+          reply.raw.end(
+            JSON.stringify({
+              detail: (error as Error).message,
+              instance: correlationId,
+              status: 500,
+              title: "MCP Error",
+              type: "https://api.example.com/errors/mcp-error",
+            }),
+          );
+        }
       }
     },
   );

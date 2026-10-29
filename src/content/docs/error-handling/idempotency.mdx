@@ -1,12 +1,12 @@
 ---
 title: Idempotency and the Idempotency-Key Header
 description: Safe retry semantics for agent-driven write operations using request deduplication
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
 
-The Idempotency-Key header enables safe retries on write operations. Client generates a unique key per logical operation and sends it on every retry. Server stores responses keyed by idempotency key with 24-hour TTL and returns the cached result if the same key arrives again.
+The Idempotency-Key header enables safe retries on write operations. Client generates a unique key per logical operation and sends it on every retry. Server stores responses keyed by the caller, the operation and the idempotency key for a published retention window, and returns the cached result if the same key arrives again with the same payload.
 
 ```
 First request:  Idempotency-Key: abc123 → processes, stores response
@@ -15,10 +15,11 @@ Retry:          Idempotency-Key: abc123 → returns cached response
 ```
 
 - Generate key once per logical operation, not per attempt
-- Prefer UUIDv7 keys - the embedded timestamp lets old keys expire naturally
+- Use UUIDs or similar random values for keys
 - Send same key on every retry of the same logical operation
 - Server caches both successful and failed responses, so a permanent error doesn't get retried into a different outcome
-- Cache with 24-hour TTL (allow delayed retries)
+- Publish a retention window (24 hours is common) and say that a key may execute again once it expires
+- Reject a reused key with a different payload (`422`), and a duplicate that arrives while the first is still running (`409`)
 - Use Redis for multi-instance deployments
 - Combine with Retry-After header for explicit wait times
 
@@ -28,11 +29,11 @@ Idempotency keys prevent this. The client generates a unique key per logical ope
 
 ## The Idempotency-Key Header
 
-The `Idempotency-Key` header comes from an IETF draft (`draft-ietf-httpapi-idempotency-key-header`) that expired April 2026 without advancing to a standard; it is not an active working-group document. Treat the header as a de facto convention established by wide production use - Stripe's implementation is the most-cited reference - rather than a ratified spec. Generate a unique key per logical operation and send it on every retry:
+The `Idempotency-Key` header comes from an IETF draft (`draft-ietf-httpapi-idempotency-key-header`) that is an active working-group Internet-Draft again (-08, 22 October 2026) but not yet an RFC. The header is also a de facto convention established by wide production use - Stripe's implementation is the most-cited reference. In the draft the value is a Structured Fields string, so it is quoted; some providers also accept unquoted values. Generate a unique key per logical operation and send it on every retry:
 
 ```http
 POST /api/invoices HTTP/1.1
-Idempotency-Key: my-unique-txn-id-12345
+Idempotency-Key: "my-unique-txn-id-12345"
 Content-Type: application/json
 
 { "amount": 100, "currency": "USD" }
@@ -136,12 +137,14 @@ async function handleCreateInvoice(req: Request, res: Response) {
 }
 ```
 
-For production, use Redis instead of in-memory storage:
+For production, move the store to Redis - but shared storage alone isn't enough. Two concurrent requests with the same key can both miss a plain `get` and both execute. Reserve the key atomically before doing the work, namespace it by caller and operation, and fingerprint the payload:
 
 ```typescript
+import { createHash } from "node:crypto";
 import { createClient } from "redis";
 
 const redis = createClient();
+const TTL_SECONDS = 24 * 60 * 60; // published retention window
 
 async function handleCreateInvoice(req: Request, res: Response) {
   const idempotencyKey = req.headers.get("idempotency-key");
@@ -154,10 +157,33 @@ async function handleCreateInvoice(req: Request, res: Response) {
     });
   }
 
-  // Check cache
-  const cached = await redis.get(`idempotency:${idempotencyKey}`);
-  if (cached) {
-    const entry = JSON.parse(cached);
+  // Scope by authenticated caller and operation (authorization runs first)
+  const key = `idempotency:${req.principalId}:create-invoice:${idempotencyKey}`;
+  const fingerprint = createHash("sha256").update(JSON.stringify(req.body)).digest("hex");
+
+  // Atomically reserve the key; only one request can win
+  const reserved = await redis.set(key, JSON.stringify({ state: "in_flight", fingerprint }), {
+    NX: true,
+    EX: TTL_SECONDS,
+  });
+
+  if (!reserved) {
+    const entry = JSON.parse((await redis.get(key)) ?? "{}");
+    if (entry.fingerprint !== fingerprint) {
+      return res.status(422).json({
+        type: "https://example.com/errors/idempotency-key-reused",
+        status: 422,
+        detail: "This Idempotency-Key was already used with a different request body",
+      });
+    }
+    if (entry.state === "in_flight") {
+      return res.status(409).json({
+        type: "https://example.com/errors/request-in-progress",
+        status: 409,
+        detail: "A request with this Idempotency-Key is still being processed",
+        is_retriable: true,
+      });
+    }
     res.writeHead(entry.status, {
       "Content-Type": "application/json",
       "X-Idempotency-Cached": "true",
@@ -169,21 +195,25 @@ async function handleCreateInvoice(req: Request, res: Response) {
   try {
     const invoice = await createInvoice(req.body);
 
-    // Store with 24-hour TTL
-    await redis.setex(
-      `idempotency:${idempotencyKey}`,
-      24 * 60 * 60,
-      JSON.stringify({ status: 201, body: invoice }),
+    await redis.set(
+      key,
+      JSON.stringify({ state: "done", fingerprint, status: 201, body: invoice }),
+      { EX: TTL_SECONDS },
     );
 
     res.writeHead(201);
     res.end(JSON.stringify(invoice));
   } catch (err) {
     const errorResponse = toApiError(err);
-    await redis.setex(
-      `idempotency:${idempotencyKey}`,
-      24 * 60 * 60,
-      JSON.stringify({ status: errorResponse.status, body: errorResponse }),
+    await redis.set(
+      key,
+      JSON.stringify({
+        state: "done",
+        fingerprint,
+        status: errorResponse.status,
+        body: errorResponse,
+      }),
+      { EX: TTL_SECONDS },
     );
 
     res.writeHead(errorResponse.status);
@@ -235,7 +265,7 @@ async function createWithRetry(data: InvoiceData): Promise<Invoice> {
 
 - [ ] POST/PATCH/DELETE operations require `Idempotency-Key` header
 - [ ] Idempotency-Key is generated once per logical operation (not per retry attempt)
-- [ ] Server stores responses with a 24-hour TTL
+- [ ] Server stores responses for a published retention window, reserves keys atomically, and rejects a reused key with a different payload
 - [ ] Cached responses include `X-Idempotency-Cached: true` header
 - [ ] Duplicate requests return the original response without re-executing
 - [ ] Failed requests are also cached to prevent infinite retries on permanent errors

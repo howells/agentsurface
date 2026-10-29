@@ -1,7 +1,7 @@
 ---
 title: Auto-Generating MCP from OpenAPI
 description: Generating MCP tool definitions from OpenAPI specs - and why generation alone is not enough
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -54,7 +54,7 @@ This is not a fully automated process. The pruning and rewriting phases require 
 
 ### Stainless
 
-Stainless generates SDKs and MCP servers from OpenAPI specs. Its key insight is the **two-tool architecture**: instead of generating one tool per operation, it generates two tools per major resource:
+Stainless generates SDKs and MCP servers from OpenAPI specs. Its documentation has described a **two-tool architecture**: instead of generating one tool per operation, generate two tools per major resource. Treat the details below as illustrative: Stainless's current docs could not be retrieved in the October 2026 review, so confirm the default behavior and the configuration keys against its reference before relying on them.
 
 - `{resource}_get` - fetch a resource by ID, with all its relationships
 - `{resource}_search` - find resources matching a filter
@@ -62,7 +62,7 @@ Stainless generates SDKs and MCP servers from OpenAPI specs. Its key insight is 
 This cuts the tool count to two per resource and matches how agents use APIs: they either know what they want (get by ID) or they need to find it (search with filters).
 
 ```yaml
-# stainless.yml - configuration for MCP output
+# stainless.yml - illustrative configuration for MCP output; check Stainless's current schema
 mcp:
   resources:
     invoices:
@@ -76,11 +76,11 @@ mcp:
         create: "Creates a new draft invoice. Call invoices_send separately to send the payment request."
 ```
 
-Stainless generates type-safe, well-described tools when configured correctly. The `descriptions` block in the config is where you replace generated text with agent-oriented descriptions - this is the rewrite phase.
+The idea carries over whichever generator you use: replace generated text with agent-oriented descriptions - this is the rewrite phase.
 
 ### Speakeasy
 
-Speakeasy generates MCP servers from OpenAPI specs with Zod schema validation and TypeScript types. It respects the `x-speakeasy-mcp` extension for per-operation configuration:
+Speakeasy generates MCP servers from OpenAPI specs: each operation becomes a discoverable tool, and the generator supports scoping and the `x-speakeasy-mcp` extension for per-operation configuration. The extension keys below are illustrative; pin a generator version and check its extension reference, because Speakeasy's overview does not define the `include` opt-in rule or every key shown:
 
 ```yaml
 # openapi.yaml
@@ -98,13 +98,11 @@ paths:
       # standard OpenAPI spec continues...
 ```
 
-The `x-speakeasy-mcp` extension overrides the generated tool name and description with your agent-oriented versions. Operations without `include: true` are excluded from the generated MCP server, which handles the pruning phase.
-
-Speakeasy also generates Zod schemas with types from the OpenAPI spec, but you still need to add `.describe()` to the generated schemas - the extension does not currently propagate field descriptions through to Zod annotations.
+The extension overrides the generated tool name and description with your agent-oriented versions. Verify, for your generator version, whether operations are included by default or only when marked, and whether field descriptions propagate into the generated schemas; if they do not, add `.describe()` to the generated schemas yourself.
 
 ### FastMCP
 
-FastMCP is a Python-first framework (with a JavaScript port) for building MCP servers. It does not generate from OpenAPI - you define tools in Python or TypeScript directly. For teams using Python or with existing FastAPI applications, FastMCP provides a clean decorator-based syntax:
+FastMCP is a Python-first framework (with a JavaScript port) for building MCP servers. It can also generate from OpenAPI: `FastMCP.from_openapi()` (available since FastMCP 2.0; the 3.x docs describe an `OpenAPIProvider` underneath) builds a server from a spec, and `FastMCP.from_fastapi()` does the same for a FastAPI app. FastMCP's own documentation recommends curating the result rather than treating generation as a finished server. You can also define tools directly in Python, with a clean decorator-based syntax:
 
 ```python
 # Python example
@@ -127,20 +125,20 @@ def billing_create_invoice(
     # implementation
 ```
 
-FastMCP is a good choice if you are building the MCP server from scratch rather than deriving it from an existing OpenAPI spec. It is not an auto-generation tool.
+FastMCP is a good choice whether you build the server by hand or start from a spec and curate the generated tools.
 
 ### openapi-mcp-generator
 
-`openapi-mcp-generator` is a TypeScript CLI that performs a direct 1:1 generation from OpenAPI to MCP. Use it as the generation step in the hybrid workflow, not as the complete solution:
+`openapi-mcp-generator` (5.0.1 as of 2026-10-24) is a TypeScript CLI that turns an OpenAPI 3.x spec into a runnable MCP server project on the TypeScript SDK v2. Use it as the generation step in the hybrid workflow, not as the complete solution:
 
 ```bash
 npx openapi-mcp-generator \
-  --spec ./openapi.yaml \
+  --input ./openapi.yaml \
   --output ./generated \
-  --prefix billing_
+  --exclude-tags admin,internal
 ```
 
-The output is a directory of TypeScript files with one tool file per OpenAPI operation. Review the generated files as the starting point for your pruning and rewriting phase. Do not ship the generated output directly.
+The generated server proxies calls to your REST API and validates tool arguments against each operation's JSON Schema; it is not one hand-readable file per operation. Use `--include-tags`, `--exclude-tags`, `--include-operations`, and `--exclude-operations` for the pruning step, and review the generated tool list as the starting point for rewriting. Do not ship the generated output directly. Generated projects need Node.js 22 or later, and stay on `openapi-mcp-generator@4` if you are not ready for the v2 SDK.
 
 ## The x-speakeasy-mcp Extension
 
@@ -171,20 +169,21 @@ paths:
         include: false # Exclude from MCP - too destructive for agents
 ```
 
-Operations marked `include: false` are not generated. Start by setting `include: false` on everything, then enable the operations you want agents to use.
+Operations marked `include: false` are left out of the generated server. To prune safely, exclude everything you have not reviewed and enable operations deliberately; confirm the default for your generator version first.
 
 ## The Correct Workflow
 
 ```
 1. Point generator at your OpenAPI spec
-   npx openapi-mcp-generator --spec ./openapi.yaml --output ./generated
+   npx openapi-mcp-generator --input ./openapi.yaml --output ./generated
 
 2. Review the generated tool list
    - How many tools were generated?
    - Which operations do agents genuinely need?
    - Which are internal, admin, or legacy?
 
-3. Prune: mark excluded operations in openapi.yaml with x-speakeasy-mcp.include: false
+3. Prune: exclude operations with the generator's own controls (for example
+   --exclude-operations or --exclude-tags, or x-speakeasy-mcp.include: false with Speakeasy)
    Target: 10-30 tools for a focused domain server
 
 4. Rewrite descriptions in openapi.yaml or in the generated files

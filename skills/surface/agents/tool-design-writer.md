@@ -26,7 +26,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 
 ## Inputs
 
-- Existing tool definitions (MCP `server.tool(...)`, Vercel AI SDK `tools: {...}`, OpenAI `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`)
+- Existing tool definitions (MCP `server.registerTool(...)` (v2; v1 used `server.tool(...)`), Vercel AI SDK `tools: {...}`, OpenAI `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`)
 - Scoring rubric for the Tool Design dimension (`/skills/surface/agents/score-tool-design.md`)
 - Transformation tasks list
 
@@ -78,9 +78,9 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - Enum every constrained string; no free text where the server enforces a set
    - `.describe()` + a concrete example on every field
    - min/max/format (`uuid`, `email`, `date-time`, `uri`) constraints on every applicable field
-   - Max two levels of nesting; flatten or split deep objects (OpenAI strict mode rejects deep nesting)
+   - Prefer one or two levels of nesting; flatten or split deep objects (house advice; OpenAI strict mode allows up to 10 levels and 5,000 properties)
    - `.strict()` / `additionalProperties: false` for OpenAI compatibility
-   - Prefer optional over nullable; avoid `assignee?: string | null`
+   - For OpenAI strict targets keep every property in `required` and make logical optionals nullable (`z.string().nullable()`); no unconstrained `z.any()` branches and no root-level `anyOf`
 
 5. **Add annotation coverage** on every MCP tool using the current 2026-07-28 fields:
    - `readOnlyHint: true` - query-only, no side effects
@@ -89,11 +89,15 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - `openWorldHint: false` - effects local to this API
 
    ```typescript
-   server.tool("create_issue", "Create a new issue in the tracker", schema, handler, {
-     destructiveHint: true,
-     idempotentHint: true,
-     openWorldHint: false,
-   });
+   server.registerTool(
+     "create_issue",
+     {
+       description: "Create a new issue in the tracker",
+       inputSchema: schema,
+       annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false },
+     },
+     handler,
+   );
    ```
 
 6. **Curate the set:**
@@ -106,7 +110,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - Return semantic names, not opaque IDs alone (`{ id, name, email }`, not `user_ids: [...]`)
    - Paginate by default: `next_cursor`, `has_more`, `total_count`
    - Offer `response_format: 'concise' | 'detailed'` where payloads vary
-   - Apply Anthropic `toModelOutput` to compress large payloads into a summary string + top structured refs
+   - Compress (the AI SDK `toModelOutput` tool property, or your own `tool_result` shaping) large payloads into a summary string + top structured refs
    - Reference longer docs via `doc_uri` rather than inlining; tool descriptions count toward every request
 
 8. **Preserve cross-framework portability.** Where a project targets multiple runtimes, centralize schema + metadata once and emit adapters (`/templates/tools/tool-definition.ts`) so MCP, Vercel AI SDK, OpenAI, and LangChain stay consistent.
@@ -131,7 +135,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 ## Spec References
 
 - Tool Design dimension: `/skills/surface/references/tool-design.md`
-- Anthropic writing-tools-for-agents: https://www.anthropic.com/engineering/writing-tools-for-agents
+- Anthropic writing-tools-for-agents: https://www.anthropic.com/research/writing-tools-for-agents
 - MCP 2026-07-28 specification (current): https://modelcontextprotocol.io/specification/2026-07-28/
 - OpenAI function calling: https://platform.openai.com/docs/guides/function-calling
 - Tool definition template: `/templates/tools/tool-definition.ts`
@@ -151,6 +155,6 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 - Do NOT write terse descriptions ("Creates a thing"); they compound agent confusion.
 - Do NOT leave >20 tools on a single agent without dynamic selection.
 - Do NOT return opaque IDs without a lookup tool or semantic fields.
-- Do NOT nest request bodies >2 levels; OpenAI strict mode rejects them.
+- Do NOT nest request bodies >2 levels (house limit; OpenAI strict mode's documented maximum is 10 levels).
 - Do NOT ship destructive tools without `destructiveHint`.
 - Do NOT throw errors from tools; return structured errors with recovery hints.

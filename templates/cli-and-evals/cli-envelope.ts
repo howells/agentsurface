@@ -1,9 +1,9 @@
 /**
- * CLI Response Envelope — Standard envelope for agent-consumable CLI output
+ * CLI Response Envelope - Standard envelope for agent-consumable CLI output
  *
  * **What it is:** Reusable TS helpers for emitting structured JSON responses from CLI commands.
  * Shape: `{version, ok, data?, error?, meta: {trace_id, took_ms, command}}`.
- * Includes pretty-print + JSON modes, exit-code mapping (0 ok, 1 error, 2 usage, 3 auth).
+ * Includes pretty-print + JSON modes, exit-code mapping (0 ok, 1 failure, 2 usage, 3 not found, 4 permission denied, 5 conflict).
  *
  * **When to use:**
  * - Every CLI command that returns data or errors
@@ -20,7 +20,9 @@
  * - [ ] Test with `--json` and pretty modes
  *
  * **References:**
- * - Exit codes: https://www.freebsd.org/cgi/man.cgi?query=sysexits
+ * - Exit codes: this template uses the per-CLI 0-5 contract from the Agent Surface CLI guide;
+ *   only 0 (success) and non-zero (failure) are universal, so publish yours in `--help --json`.
+ *   BSD sysexits is an optional alternative vocabulary: https://man.freebsd.org/cgi/man.cgi?query=sysexits
  * - RFC 9457 Problem+JSON: https://www.rfc-editor.org/rfc/rfc9457.html
  */
 
@@ -51,16 +53,16 @@ export type CLIEnvelope<T = unknown> = z.infer<typeof CLIEnvelopeSchema> & {
   data?: T;
 };
 
-// Exit codes (BSD sysexits conventions)
+// Exit codes: this CLI's own contract. Only 0 and non-zero are universal, so
+// document these in `--help --json` and your skill file. Swap in BSD sysexits
+// (64 usage, 69 unavailable, 70 software, 77 no permission) if you prefer that vocabulary.
 export enum ExitCode {
   SUCCESS = 0,
   GENERAL_ERROR = 1,
   USAGE_ERROR = 2,
-  AUTH_ERROR = 3,
-  NOT_FOUND = 4,
-  PERMISSION_DENIED = 77,
-  TEMP_FAILURE = 69,
-  SOFTWARE_ERROR = 70,
+  NOT_FOUND = 3,
+  PERMISSION_DENIED = 4,
+  CONFLICT = 5,
 }
 
 // Builder for responses
@@ -203,7 +205,7 @@ export function shouldUseColor(jsonMode: boolean): boolean {
  *         'DB_ERROR',
  *         (err as Error).message,
  *         { stack: (err as Error).stack },
- *         ExitCode.TEMP_FAILURE
+ *         ExitCode.GENERAL_ERROR
  *       );
  *     }
  *   });

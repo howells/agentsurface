@@ -9,7 +9,7 @@
       "identifier": "urn:air:agentsurface.dev:mcp:docs",
       "displayName": "Agent Surface MCP server",
       "type": "application/mcp-server-card+json",
-      "url": "https://agentsurface.dev/.well-known/mcp/server-card.json",
+      "url": "https://agentsurface.dev/mcp/server-card",
       "description": "Search and read Agent Surface documentation over MCP: list_pages, get_page, and search tools.",
       "tags": ["mcp", "documentation"],
       "representativeQueries": [

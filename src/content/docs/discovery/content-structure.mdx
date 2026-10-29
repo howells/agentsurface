@@ -1,7 +1,7 @@
 ---
 title: Content Structure for AI Consumption
 description: Structuring documentation so AI agents retrieve accurate answers with minimal tokens
-lastVerified: 2026-09-25
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -18,7 +18,7 @@ AI agents retrieve and quote your documentation. The structure of that documenta
 
 ## Answer-First Structure
 
-Put the conclusion or direct answer in the first 200 words of the page. Agents truncate context for efficiency; they weight earlier content more heavily than later content. If the answer to "what is the rate limit" appears in paragraph seven, some agents will answer from an earlier, less accurate paragraph.
+Put the conclusion or direct answer in the first 200 words of the page. The 200-word figure is a house default to test against your own retrieval results, not a standard or a known retrieval threshold. Agents truncate context for efficiency; they weight earlier content more heavily than later content. If the answer to "what is the rate limit" appears in paragraph seven, some agents will answer from an earlier, less accurate paragraph.
 
 The traditional SEO pattern of "introduce the topic, explain the background, eventually answer" is the wrong structure for AEO. Lead with the answer:
 
@@ -94,7 +94,7 @@ This section is complete. An agent can retrieve it and answer "how do I verify w
 
 Two page-level signals sit underneath everything else on this page, and both are checked by name in Lighthouse's SEO and accessibility audits:
 
-- `<link rel="canonical" href="https://docs.example.com/authentication" />` in `<head>` - Lighthouse's `canonical` audit fails a page without one. When the same content is reachable at more than one URL (tracking parameters, trailing slashes, a staging mirror), the canonical link tells an agent which one to cite and revisit.
+- `<link rel="canonical" href="https://docs.example.com/authentication" />` in `<head>` - Lighthouse's `canonical` audit is not applicable (it neither passes nor fails) when a page declares no canonical URL, and it fails invalid or conflicting canonical declarations. A canonical link is still worth having: when the same content is reachable at more than one URL (tracking parameters, trailing slashes, a staging mirror), the canonical link tells an agent which one to cite and revisit.
 - `<html lang="en">` on the root element - Lighthouse's `html-has-lang` audit fails a page without it. Ora's `metadata-completeness` check groups both together: "The basics AIs use to identify a page: canonical URL, language, and Open Graph image and type. Missing pieces mean mangled citations and wrong previews" ([ora.ai/api/checks](https://ora.ai/api/checks)).
 
 ## Heading Hierarchy
@@ -172,7 +172,7 @@ Use the same format for response fields, environment variables, and configuratio
 
 ## Token Budgets
 
-Keep page token counts within these limits. Agents working with large context windows (200K to 1M+ tokens) may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded.
+Keep page token counts within these limits. Context windows vary widely between agents (an illustrative range is 200K to 1M tokens, not a shared capability), and an agent may load many pages simultaneously; pages that consume too many tokens limit how much can be loaded. The targets and hard limits below are house defaults to test against your own agents and retrieval setup, not standards or established retrieval thresholds.
 
 | Page type                       | Target       | Hard limit |
 | ------------------------------- | ------------ | ---------- |
@@ -269,7 +269,7 @@ Quote the exact error message string - including punctuation and capitalization 
 </urlset>
 ```
 
-Search engines and AI crawlers use `lastmod` to prioritize recrawling. A sitemap without `lastmod` gives crawlers no signal about what has changed - they recrawl everything with equal priority. Use W3C datetime format: `YYYY-MM-DD` or the full ISO 8601 form.
+Search engines use many signals to decide what to recrawl. `lastmod` is one optional signal, and Google uses it when it is consistently accurate. A sitemap without `lastmod` gives crawlers one less hint about what has changed, but it does not mean they crawl every URL with equal priority. Use W3C datetime format: `YYYY-MM-DD` or the full ISO 8601 form.
 
 **Sitemap limits:** maximum 50,000 URLs per sitemap file. For larger sites, use a sitemap index file that references multiple sitemaps.
 

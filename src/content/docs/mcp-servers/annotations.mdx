@@ -1,7 +1,7 @@
 ---
 title: Tool Annotations
 description: Communicating tool behavior hints to clients through MCP annotations
-lastVerified: 2026-09-24
+lastVerified: 2026-10-29
 ---
 
 ## Summary
@@ -9,7 +9,7 @@ lastVerified: 2026-09-24
 Tool annotations are metadata hints signaling tool behavior to clients. Current MCP tool hints include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint. Annotations are hints, not guarantees or permission policy. Unverified servers' annotations are treated as untrusted. Verified, trusted servers can enable smarter client behavior, but destructive and high-risk tools still need server-side approval and authorization policy.
 
 - readOnlyHint: tool does not modify persistent state
-- destructiveHint: tool may permanently delete or irreversibly modify
+- destructiveHint: a non-read-only tool may make destructive updates, as opposed to only additive ones
 - idempotentHint: repeated calls with the same arguments have no additional effect
 - openWorldHint: tool interacts with external systems outside the server boundary
 - Default destructiveHint: true (assume worst)
@@ -28,12 +28,14 @@ Signals that the tool does not modify any persistent state. It only reads, obser
 - **Default:** `false` - if you do not set this, clients assume the tool may write
 - **Client effect:** Clients may allow the tool to run automatically without confirmation in agentic workflows
 
+The examples use `registerTool` from the TypeScript SDK v2 (`@modelcontextprotocol/server`), where `annotations` sits inside the tool configuration next to `description` and `inputSchema`. The v1 positional `server.tool()` overload took the annotations object directly as its own argument (not wrapped in `{ annotations: ... }`); it is deprecated in v1 and removed in v2.
+
 ```typescript
-server.tool(
+server.registerTool(
   "billing_get_invoice",
-  "Fetches a single invoice by its ID. Returns the full invoice record.",
-  { invoice_id: z.string().uuid().describe("The invoice UUID to fetch") },
   {
+    description: "Fetches a single invoice by its ID. Returns the full invoice record.",
+    inputSchema: z.object({ invoice_id: z.string().uuid().describe("The invoice UUID to fetch") }),
     annotations: {
       readOnlyHint: true,
     },
@@ -47,20 +49,20 @@ server.tool(
 
 ### destructiveHint
 
-Signals that the tool may permanently delete or irreversibly modify data.
+Signals that a tool that is not read-only may make destructive updates to its environment, as opposed to only additive ones. It is not limited to permanent deletion. `destructiveHint` and `idempotentHint` only have meaning when `readOnlyHint` is `false`.
 
 - **Default:** `true` - clients assume the worst if you do not say otherwise
 - **Client effect:** Clients typically show a confirmation dialog before executing a tool with `destructiveHint: true`
 
 ```typescript
-server.tool(
+server.registerTool(
   "billing_void_invoice",
-  "Permanently voids an invoice. This cannot be undone.",
   {
-    invoice_id: z.string().uuid().describe("The invoice UUID to void"),
-    reason: z.string().max(200).optional().describe("Optional reason for voiding"),
-  },
-  {
+    description: "Permanently voids an invoice. This cannot be undone.",
+    inputSchema: z.object({
+      invoice_id: z.string().uuid().describe("The invoice UUID to void"),
+      reason: z.string().max(200).optional().describe("Optional reason for voiding"),
+    }),
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -81,14 +83,15 @@ Signals that calling the tool multiple times with the same parameters produces t
 - **Client effect:** Clients can safely retry an idempotent tool on timeout or transient failure without risk of duplicate actions
 
 ```typescript
-server.tool(
+server.registerTool(
   "billing_send_invoice_email",
-  "Sends the invoice payment email to the customer. " +
-    "Idempotent: calling twice for the same invoice does not send duplicate emails.",
   {
-    invoice_id: z.string().uuid().describe("The invoice UUID to send"),
-  },
-  {
+    description:
+      "Sends the invoice payment email to the customer. " +
+      "Idempotent: calling twice for the same invoice does not send duplicate emails.",
+    inputSchema: z.object({
+      invoice_id: z.string().uuid().describe("The invoice UUID to send"),
+    }),
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -115,17 +118,17 @@ Signals that the tool interacts with systems outside the MCP server - it makes e
 - **Client effect:** Clients in sandboxed or offline environments may restrict tools with `openWorldHint: true`
 
 ```typescript
-server.tool(
+server.registerTool(
   "billing_sync_from_stripe",
-  "Pulls the latest invoice data from Stripe into the local database.",
   {
-    since: z
-      .string()
-      .datetime()
-      .optional()
-      .describe("Only sync invoices updated after this ISO 8601 timestamp"),
-  },
-  {
+    description: "Pulls the latest invoice data from Stripe into the local database.",
+    inputSchema: z.object({
+      since: z
+        .string()
+        .datetime()
+        .optional()
+        .describe("Only sync invoices updated after this ISO 8601 timestamp"),
+    }),
     annotations: {
       readOnlyHint: false,
       openWorldHint: true, // Makes external requests to Stripe API
@@ -137,15 +140,16 @@ server.tool(
   },
 );
 
-server.tool(
+server.registerTool(
   "billing_calculate_tax",
-  "Calculates the applicable tax for an invoice using local tax tables. " +
-    "No external requests are made.",
   {
-    amount_cents: z.number().int().positive(),
-    jurisdiction: z.string().describe("ISO 3166-1 alpha-2 country code"),
-  },
-  {
+    description:
+      "Calculates the applicable tax for an invoice using local tax tables. " +
+      "No external requests are made.",
+    inputSchema: z.object({
+      amount_cents: z.number().int().positive(),
+      jurisdiction: z.string().describe("ISO 3166-1 alpha-2 country code"),
+    }),
     annotations: {
       readOnlyHint: true,
       openWorldHint: false, // Pure computation, no external calls
@@ -160,12 +164,12 @@ server.tool(
 
 ## Defaults Assume Worst Case
 
-The default for every annotation is the most conservative possible value:
+The default for every annotation is the conservative value for a client:
 
 | Annotation      | Default | Meaning of default                             |
 | --------------- | ------- | ---------------------------------------------- |
 | readOnlyHint    | `false` | Assume the tool may modify state               |
-| destructiveHint | `true`  | Assume the tool may permanently destroy data   |
+| destructiveHint | `true`  | Assume the tool may make destructive updates   |
 | idempotentHint  | `false` | Assume repeated calls have compounding effects |
 | openWorldHint   | `true`  | Assume the tool makes external requests        |
 
@@ -232,7 +236,7 @@ Creates a new record each time - retry may create duplicates:
 
 ### Deletion tool
 
-Permanently removes data, not safe to retry blindly:
+Removes or overwrites data, not safe to retry blindly:
 
 ```typescript
 {

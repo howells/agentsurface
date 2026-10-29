@@ -491,15 +491,14 @@ if (fs.existsSync(packageJsonPath)) {
 // fields and map local agentsurface.dev skill URLs back to their source files.
 const agentSkillsIndexPath = path.join(repoRoot, "public/.well-known/agent-skills/index.json");
 const agentSkillsIssues = [];
-const agentSkillsSchema = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
 
 if (fs.existsSync(agentSkillsIndexPath)) {
   try {
     const index = JSON.parse(fs.readFileSync(agentSkillsIndexPath, "utf-8"));
-    if (index.$schema !== agentSkillsSchema) {
-      agentSkillsIssues.push(
-        `public/.well-known/agent-skills/index.json must declare ${agentSkillsSchema}`,
-      );
+    // The proposal's schema host (schemas.agentskills.io) does not resolve, so the
+    // index omits `$schema`. If one is declared it must at least be a string URL.
+    if (index.$schema !== undefined && typeof index.$schema !== "string") {
+      agentSkillsIssues.push("public/.well-known/agent-skills/index.json $schema must be a string");
     }
 
     if (!Array.isArray(index.skills) || index.skills.length === 0) {
