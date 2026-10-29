@@ -236,7 +236,7 @@ const ProblemDetails = z.object({
 type ErrorResponse = z.infer<typeof ProblemDetails>;
 ```
 
-See [`templates/errors-and-auth/problem-details.ts`](/templates/errors-and-auth/problem-details.ts) for a production-ready implementation.
+See [`templates/errors-and-auth/problem-details.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/problem-details.ts) for a production-ready implementation.
 
 ## Handling Problem Details in an Agent
 
@@ -358,4 +358,4 @@ function problemResponse(res: Response, status: number, problem: ProblemDetails)
 
 - [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents) - structuring error content to enable recovery
 - [Retry Patterns](/docs/error-handling/retry-patterns) - how agents should act on error information
-- [Templates: Problem Details Schema](/templates/errors-and-auth/problem-details.ts) - Zod implementation
+- [Templates: Problem Details Schema](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/problem-details.ts) - Zod implementation
