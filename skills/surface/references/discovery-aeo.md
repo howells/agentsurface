@@ -23,12 +23,16 @@ When auditing a public website, evaluate the same categories that current agent-
 | Category                  | Signals                                                                                           |
 | ------------------------- | ------------------------------------------------------------------------------------------------- |
 | Discoverability           | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs              |
-| Content accessibility     | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints |
+| Content accessibility     | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints, an llms.txt pointer on every page, HTML/Markdown parity, content before navigation in source order |
 | Bot access control        | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots                     |
 | Capability discovery      | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata         |
 | Commerce, when applicable | x402, MPP, UCP, ACP, product feeds - see `references/agentic-commerce.md`                         |
 
 Use scanner results as timestamped outside-in evidence for Dimension 4. [Is Agentic](https://is-agentic.com/) is a Vercel public-site scanner powered by Ora; its completed reports are also available through a read-only API, CLI, and remote MCP server. Inspect the individual checks and observed journey rather than copying its headline score into the Surface score. Do not overfit to one vendor's methodology, and never submit private, authenticated, confidential, or pre-release URLs merely to get a score.
+
+### Documentation delivery: AFDocs
+
+For documentation sites, the [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/) (draft v0.6.0, September 2026) defines 28 checks on how a docs site serves fetching agents. [AFDocs](https://github.com/agent-ecosystem/afdocs) (`npx afdocs check <url>`, MIT, 0.x) implements it and powers Fern's Agent Score; Mintlify's Agent Score reports cite the same checks. Hosted reports sample about 15 pages and do not name them; run AFDocs with `--format json` to get per-page evidence, including against a local build with `--urls`. The page-level checks most often worth citing are `markdown-content-parity`, `content-start-position`, `llms-txt-directive-html`, `llms-txt-directive-md` and `markdown-link-portability`. Results for non-page targets listed in llms.txt (OpenAPI, JSON discovery documents) are not applicable to page checks. Canonical explanation: `src/content/docs/scoring/public-scanners.mdx`.
 
 ### Cloudflare comparison
 
@@ -110,6 +114,8 @@ If production access, authentication, or mutation risk prevents capability testi
 - Commerce manifests or headers when applicable: x402, MPP, UCP, ACP - see `references/agentic-commerce.md` for the full detection and scoring guidance
 - WebMCP registration (`document.modelContext.registerTool`) in browser code when page-local tools apply
 - Public readiness report URL, scanner name, and scan timestamp when an outside-in scan is available
+- AFDocs JSON output (`npx afdocs check <url> --format json`) for page-level evidence: which pages miss the llms.txt directive, where content starts in the converted page, and which HTML segments are missing from the Markdown twin
+- Glossary, tooltip or popover terms rendered only inside `<button>`; tab or disclosure panels mounted on demand; MDX components left as raw JSX in Markdown output
 
 ---
 

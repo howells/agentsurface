@@ -186,6 +186,8 @@ Pages over 30K tokens should be split. A "REST API Reference" page with every en
 
 Estimate token count: `character_count / 4` gives a rough approximation for English prose. Code-heavy content is slightly more token-dense.
 
+Fetch tools have their own, much smaller limits, and those apply before any context window does. Claude Code's WebFetch "reads up to 100,000 characters of a page's content per call" ([tools reference](https://code.claude.com/docs/en/tools-reference)). The reference MCP fetch server returns 5,000 characters by default unless the caller raises `max_length` ([source](https://github.com/modelcontextprotocol/servers/blob/main/src/fetch/src/mcp_server_fetch/server.py)). Measure size on what the agent actually receives, the converted Markdown or the page's `.md` twin, not on the HTML transfer size. The [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/page-size/) uses 50,000 characters as its pass line and 100,000 as its fail line for the same reason.
+
 ## Error Documentation
 
 Error messages are high-value retrieval targets. When a user pastes an error into an AI chat, the AI searches for documentation matching that exact error text. Document errors with the exact message text as a heading or inline code:
@@ -348,6 +350,16 @@ Avoid:
 Both render identically in a browser. To a parser or agent reading the HTML structure, the first is unambiguous; the second requires CSS class analysis to infer hierarchy.
 
 A single `<main>` region matters beyond the landmark itself: it is what lets an agent (or a screen reader) separate the content it came for from navigation chrome, promo banners, and related-articles rails. Ora's `ax-document-structure` check reads this the same way a screen reader would: "Agents navigate your page the way screen readers do: by landmarks and headings. We check your HTML is a real document, with a main region, nav, and a sane heading order" ([ora.ai/api/checks](https://ora.ai/api/checks)). Keep the actual content inside `<main>` large relative to the surrounding chrome - a page that is mostly navigation links, a cookie banner, and a footer around a few sentences of content gives a retrieval agent little to extract regardless of how clean the markup is.
+
+## What Survives Conversion to Markdown
+
+Most agents that fetch HTML convert it to Markdown or plain text before reading it. Converters keep document text and drop interface: script, style and form controls, and some, including the parity check in [AFDocs](https://afdocs.dev/checks/observability), drop everything inside a `<button>`. Two consequences follow, and neither shows up in a browser.
+
+**Text inside interactive elements disappears.** A glossary term rendered as a popover trigger (`<button>OAuth</button>`) leaves "Start with : a standard way to grant access" in the converted text. Tab panels that render only the active tab, accordions that mount their content on open, and "show more" sections that fetch on click lose everything the reader did not open. Keep the words of the sentence as ordinary text and attach the interaction to it, for example with a trigger laid over the term and named by it (`aria-labelledby`), so a screen reader still announces the term once. Render every tab and disclosure panel into the HTML, hidden with CSS or `hidden` until chosen, rather than mounting it on demand.
+
+**Navigation that comes first in the source is read first.** Converters work in source order, not visual order. A docs layout that renders a long sidebar before `<main>` makes an agent read the whole navigation tree before the first paragraph. A truncated fetch may then stop before the content starts at all. Where regions are placed by CSS grid areas or flex `order`, move the sidebar after the content in the DOM; the layout does not change. Measure the result: convert the page and check how far into the output the first content heading falls. The [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/page-size/) passes a page when content starts in the first 10% of the converted output and fails it past 50%. A content-first DOM changes keyboard focus order too, so keep a skip link and check that the order still makes sense.
+
+[AFDocs](/docs/scoring/public-scanners#agent-friendly-documentation-spec-and-afdocs) runs both measurements (`content-start-position`, and `markdown-content-parity` against the page's Markdown twin) on any URL, including a local build.
 
 ## Avoid Redirect Chains
 

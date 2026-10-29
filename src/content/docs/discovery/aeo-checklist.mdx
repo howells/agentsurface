@@ -101,9 +101,15 @@ See [Content Structure for AI Consumption](./content-structure).
 - [ ] Documentation pages are available in Markdown format at `.md` URLs or via `Accept: text/markdown`
 - [ ] `<link rel="alternate" type="text/markdown" href="...">` present in HTML `<head>`
 - [ ] Markdown output strips navigation and footer, preserves content
+- [ ] Markdown twins match the HTML page: under 5% of content segments missing, with intentional human-only elements marked `data-markdown-ignore`
+- [ ] Links in served Markdown are absolute URLs
+- [ ] Every HTML page names `/llms.txt` near the top of `<body>`, outside `<nav>`, and every `.md` page opens with a pointer to it
+- [ ] Converted HTML reaches the first content heading within the first 10% of the output (sidebar after content in source order)
+- [ ] No sentence loses words when converted: terms are not rendered only inside `<button>`, and tab and disclosure panels are in the HTML
+- [ ] Pages convert to under 50,000 characters, so a single fetch returns all of them
 - [ ] For localized content: `hreflang` alternates are present, the locale is a path segment on Markdown routes (not a cookie or query parameter), and each locale has its own `llms.txt`
 
-See [Serving Markdown to Agents](./content-negotiation).
+See [Serving Markdown to Agents](./content-negotiation) and [What Survives Conversion to Markdown](./content-structure#what-survives-conversion-to-markdown). [AFDocs](/docs/scoring/public-scanners#agent-friendly-documentation-spec-and-afdocs) checks each of these on a local build or a deployed site.
 
 ### Vary Header
 

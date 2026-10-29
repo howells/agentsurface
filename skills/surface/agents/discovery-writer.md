@@ -208,6 +208,11 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - `Vary: Accept` is critical for CDN caching
    - Include `x-markdown-tokens` for token budgeting
    - If the platform cannot send custom Accept headers, expose `.md` or `index.md` URL fallbacks
+   - Verify `Vary: Accept` on the deployed response, cached and uncached: some hosts serve prerendered pages with the `Vary` stored at build time, ignoring middleware and framework header config
+   - Generate the Markdown twin from the same source as the HTML; rewrite framework components (MDX `<Callout>` and similar) to plain Markdown and make every link absolute
+   - Put a pointer to `/llms.txt` near the top of every HTML page (server-rendered, outside `<nav>`, may be visually hidden) and at the start of every `.md` page
+   - Keep words out of `<button>`-only markup and render tab and disclosure panels into the HTML; converters drop both
+   - Check the result with AFDocs: `npx afdocs check <url> --checks markdown-content-parity,content-start-position,llms-txt-directive-html,llms-txt-directive-md,markdown-link-portability`
 
 8. **Publish `.well-known` capability metadata** where applicable:
    - `/.well-known/api-catalog` for public APIs and OpenAPI specs
@@ -285,6 +290,8 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 - Do NOT exceed 5,000 tokens in llms.txt; agents skip large indexes.
 - Do NOT include secrets, API keys, or internal IPs in any discovery file.
 - Do NOT omit Vary: Accept header in content negotiation responses.
+- Do NOT rely on a footer link as the only pointer to llms.txt; converted pages read it last, if at all.
+- Do NOT hand-maintain a Markdown version of a page alongside its HTML; it drifts.
 - Do NOT publish Content Signals that conflict with robots.txt.
 - Do NOT advertise MCP, Agent Skills, OAuth, or commerce capabilities that are not implemented.
 - Do NOT forget JSON-LD on docs pages; agents use for context extraction.

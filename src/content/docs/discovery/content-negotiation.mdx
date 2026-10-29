@@ -353,7 +353,7 @@ When generating Markdown for agents, preserve:
 
 - All code blocks with language identifiers
 - Table content - agents parse Markdown tables directly
-- Internal links - relative links are still useful for context
+- Internal links - rewrite them to absolute URLs, because a relative link stops resolving once the Markdown is read outside the page it came from (the [spec's](https://agentdocsspec.com/spec/web/content-structure/) `markdown-link-portability` check)
 - Heading hierarchy - agents use this for navigation and summarization
 
 Strip:
@@ -363,9 +363,12 @@ Strip:
 - Cookie consent banners and modals
 - Advertisement placeholders
 - HTML-only interactive elements (accordions, tabs - flatten to headings and content)
+- Framework components left as raw JSX. In MDX output, a `<Callout>` or similar block reaches the Markdown as an HTML block, and CommonMark does not parse the links or emphasis inside it; rewrite each one as a blockquote or plain Markdown
 
 ## Missing paths and representation parity
 
 A missing page must return HTTP 404 rather than redirecting every unknown path to the homepage or returning a successful empty shell. For a Markdown request, provide a short explanation and links to the documentation index, search, or the nearest valid section. API failures should use the [structured error contract](/docs/error-handling/rfc-9457). Verify status, media type, and recovery links on the deployed host.
 
 If an explicit agent view or User-Agent-based Markdown variant exists, compare its facts, prices, links, and permissions with ordinary HTML. User-Agent strings are spoofable and must not grant authorization. Prefer explicit content negotiation where possible and test cache separation. Frontmatter on the Markdown response is optional but useful when the consuming client reads it: `title`, `description`, and a source-derived `dateModified` cover the common case. Never stamp `dateModified` as the current request time - derive it from the underlying content's actual last-modified date.
+
+Generated Markdown drifts from the HTML without anyone noticing, because people read one representation and agents read the other. Measure it: convert the HTML page's main content, split it into segments and check each one appears in the Markdown twin. The [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/observability/) defines this as `markdown-content-parity` and passes a page with under 5% of segments missing. Mark content that is intentionally human-only, such as "Choose a card to learn more" or a decorative count, with `data-markdown-ignore`. That attribute is a convention of the [AFDocs](https://afdocs.dev/checks/observability) checker rather than of the spec, and it makes the comparison skip the element instead of reporting drift. The usual causes are a hand-written Markdown route that stopped tracking the page, text inside buttons or popovers that the converter drops, and components left as raw JSX. Serve both representations from one source of copy rather than maintaining two.

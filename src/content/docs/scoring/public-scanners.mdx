@@ -73,6 +73,25 @@ npx lighthouse https://example.com --only-categories=agentic-browsing
 
 Unlike the hosted scanners above, Lighthouse runs on your own machine, so the "only submit public URLs" caution above does not apply to it: point it at a pre-release, staging, or authenticated environment you can reach locally.
 
+## Agent-Friendly Documentation Spec and AFDocs
+
+The [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/), by Dachary Carey and community contributors, defines 28 checks in seven categories for how well a documentation site serves agents that fetch it: llms.txt, Markdown availability, page size and truncation, content structure, URL stability, observability and authentication. It was a draft at v0.6.0 (13 September 2026) when observed on 2026-10-29. Its [platforms page](https://agentdocsspec.com/platforms/) records the fetch and truncation behaviour of common agents, which is where its size thresholds come from.
+
+[AFDocs](https://github.com/agent-ecosystem/afdocs) is the MIT-licensed implementation, published on npm as `afdocs` (0.22.2 when observed, and still labelled early development, so check IDs and flags can change between minor versions). It powers Fern's [Agent Score](https://buildwithfern.com/agent-score), and Mintlify's [Agent Score](https://www.mintlify.com/score) reports group their documentation checks under AFDocs references, adding components of their own for `llms-full.txt`, `skill.md` and MCP.
+
+Use AFDocs where a hosted report stops: it names the pages. A hosted score samples a handful of pages and reports, for example, "3 of 15 pages have content differences" without saying which. AFDocs runs locally against any URL, including a local production build, and `--format json` returns per-page evidence:
+
+```bash
+# Whole site, discovered through llms.txt and the sitemap
+npx afdocs check https://docs.example.com --max-links 200 --format json
+
+# Exactly these pages, for example a local build before deploying
+npx afdocs check http://localhost:3000 --urls http://localhost:3000/,http://localhost:3000/docs/quickstart \
+  --checks markdown-content-parity,content-start-position,llms-txt-directive-html
+```
+
+Its page-level checks catch problems that look fine in a browser: words lost from sentences because they sat inside a `<button>`, navigation read before content, Markdown twins that drifted from the page, and relative links in Markdown. See [What Survives Conversion to Markdown](/docs/discovery/content-structure#what-survives-conversion-to-markdown) and [representation parity](/docs/discovery/content-negotiation#missing-paths-and-representation-parity). When it samples links from `llms.txt`, it also tests non-page targets such as `openapi.json` and JSON discovery documents against page checks; read those results as not applicable rather than as failures. AFDocs also ships [vitest helpers](https://afdocs.dev/ci-integration) for running its checks in CI.
+
 ## Shopify product-page audit
 
 [Shopify's product-page audit](https://www.shopify.com/agentic-readiness) takes a single product-page URL and checks the structured data AI shopping agents read to answer shoppers' questions, tied to Shopify Catalog and Agentic Storefronts. Shopify does not publish a detailed methodology or check list for the tool; it states plainly that results are "informational signals" and do not guarantee a product will be surfaced by AI agents. Treat it as a commerce-specific spot check on a product page's structured data, not a general-purpose agent-readiness scanner.

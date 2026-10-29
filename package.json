@@ -11,7 +11,8 @@
     "deploy:prod:publish": "node scripts/publish-vercel-prebuilt.mjs",
     "deploy:prod:pull": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel pull --yes --environment=production --scope danielhowells",
     "deploy:prod:stamp": "node scripts/stamp-build.mjs",
-    "deploy:prod:verify": "node scripts/check-vercel-prebuilt.mjs",
+    "check:agent-docs": "node scripts/check-agent-docs.mjs",
+    "deploy:prod:verify": "node scripts/check-vercel-prebuilt.mjs && node scripts/check-agent-docs.mjs",
     "dev": "next dev --port 3900",
     "generate:patterns": "node scripts/render-patterns.mts",
     "lint": "howells-check --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
@@ -52,6 +53,7 @@
     "@howells/husky": "catalog:",
     "@howells/lint": "catalog:",
     "@types/node": "catalog:",
+    "afdocs": "0.22.2",
     "lint-staged": "catalog:",
     "oxlint-tsgolint": "catalog:"
   },

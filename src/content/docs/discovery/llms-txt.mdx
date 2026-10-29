@@ -147,6 +147,25 @@ Agents that read this section have the directives in context when answering; tre
 
 Maintain `llms-full.txt` as a generated artifact. Inlining content manually does not scale. See [Generation Tools](#generation-tools) below.
 
+## Point to the Index from Every Page
+
+An agent that lands on one page from a search result or a pasted link does not know your `llms.txt` exists. Tell it on the page itself, near the top, in both representations:
+
+- **HTML:** a short sentence early in `<body>` that names `/llms.txt` and says how to get Markdown. It can be visually hidden (`sr-only`), but it must be server-rendered, outside `<nav>`, and present in the HTML before any script runs. If you hide it from assistive technology with `aria-hidden`, give any link inside it `tabindex="-1"` so it cannot take focus.
+- **Markdown:** a blockquote at the start of every `.md` page, for example `> For the complete documentation index, see [llms.txt](https://example.com/llms.txt)`.
+
+```html
+<body>
+  <p class="sr-only" aria-hidden="true">
+    For AI agents: the documentation index is at <a href="/llms.txt" tabindex="-1">/llms.txt</a>.
+    Every page is also available as Markdown: add .md to its URL or send Accept: text/markdown.
+  </p>
+  ...
+</body>
+```
+
+A link in the site footer does not do this job: in the converted page it arrives last, after the content, if a truncated fetch reaches it at all. The [Agent-Friendly Documentation Spec](https://agentdocsspec.com/spec/web/content-discoverability/) defines both checks (`llms-txt-directive-html`, `llms-txt-directive-md`); a directive passes when it appears near the top of nearly every page.
+
 ## Serving Requirements
 
 Serve both files as `text/plain; charset=utf-8`. That is a site convention, not a requirement of the proposal, which describes a Markdown document and does not forbid `text/markdown`. What matters is that you never serve an HTML shell (a rendered page, a login redirect or a single-page-app wrapper) at these paths, because a client expects the file's text.
