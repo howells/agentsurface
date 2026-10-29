@@ -9,7 +9,7 @@ catalog:
   "@howells/envy": "^0.3.7"
   "@howells/husky": "^0.2.5"
   "@howells/lint": "^0.5.0"
-  "@modelcontextprotocol/server": "^2.1.0"
+  "@modelcontextprotocol/server": "^2.3.0"
   "@radix-ui/react-scroll-area": "^1.2.18"
   "@tailwindcss/postcss": "^4.3.3"
   "@types/mdx": "^2.0.14"
