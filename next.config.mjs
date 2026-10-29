@@ -12,6 +12,14 @@ const config = {
       { source: "/guide/:area.md", destination: "/llms.mdx/guide/:area/content.md" },
     ];
   },
+  // The icons used to be generated at these paths, and published listings (the MCP
+  // Registry entry for dev.agentsurface/docs) still point at them.
+  async redirects() {
+    return [
+      { source: "/apple-icon", destination: "/apple-icon.png", permanent: true },
+      { source: "/icon", destination: "/icon.svg", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
