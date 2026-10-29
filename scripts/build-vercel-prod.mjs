@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { negotiatedPrerenderConfigs, variesOnAccept } from "./negotiated-prerenders.mjs";
 
 // The Vercel builder adds every .env* file it can see to the function file map,
 // but .vercelignore keeps .env out of the upload, so the deploy dies on a missing
@@ -29,6 +30,20 @@ try {
   if (build.status !== 0) {
     process.exit(build.status ?? 1);
   }
+  let patched = 0;
+  for (const configPath of negotiatedPrerenderConfigs(join(repoRoot, ".vercel/output/functions"))) {
+    const prerender = JSON.parse(readFileSync(configPath, "utf-8"));
+    const vary = prerender.initialHeaders?.vary;
+    if (!variesOnAccept(vary)) {
+      prerender.initialHeaders = {
+        ...prerender.initialHeaders,
+        vary: vary ? `${vary}, Accept` : "Accept",
+      };
+      writeFileSync(configPath, JSON.stringify(prerender));
+      patched += 1;
+    }
+  }
+  process.stdout.write(`Added Vary: Accept to ${patched} negotiated prerenders\n`);
 } finally {
   if (hide) {
     renameSync(parked, localEnv);

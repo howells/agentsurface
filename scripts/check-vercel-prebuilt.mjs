@@ -1,5 +1,6 @@
 import { closeSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { negotiatedPrerenderConfigs, variesOnAccept } from "./negotiated-prerenders.mjs";
 
 const outputDir = ".vercel/output";
 const config = JSON.parse(readFileSync(`${outputDir}/config.json`, "utf-8"));
@@ -57,6 +58,16 @@ for (const filePath of nativeBinaries) {
     throw new Error(`${filePath} is not Linux ELF64 x86-64`);
   }
 }
+const negotiated = negotiatedPrerenderConfigs(`${outputDir}/functions`);
+if (negotiated.length === 0) {
+  throw new Error("artifact contains no negotiated prerenders; has the output layout changed?");
+}
+for (const configPath of negotiated) {
+  const { initialHeaders } = JSON.parse(readFileSync(configPath, "utf-8"));
+  if (!variesOnAccept(initialHeaders?.vary)) {
+    throw new Error(`${configPath} lacks Vary: Accept; build with pnpm deploy:prod:build`);
+  }
+}
 process.stdout.write(
-  `Build Output API v3; ${functionConfigs.length} functions; ${nativeBinaries.length} Linux ELF64 x86-64 native binaries\n`,
+  `Build Output API v3; ${functionConfigs.length} functions; ${nativeBinaries.length} Linux ELF64 x86-64 native binaries; ${negotiated.length} negotiated prerenders vary on Accept\n`,
 );
