@@ -29,7 +29,7 @@ const ENTRY_POINTS: string[] = [
   `- [OpenAPI specification](${SITE_ORIGIN}/openapi.json): Public documentation search and Markdown retrieval; no authentication required.`,
   `- [Access policy](${SITE_ORIGIN}/auth.md): Public, read-only access without credentials.`,
   `- [AGENTS.md](${SITE_ORIGIN}/AGENTS.md): Project context and working conventions for coding agents.`,
-  `- [surface skill](${SITE_ORIGIN}/skills/surface/SKILL.md): The operational workflow for guide, audit, scaffold, transform, and generate tasks.`,
+  `- [surface skill](${SITE_ORIGIN}/skills/surface/SKILL.md): The operational workflow for guide, audit, scaffold, transform, and generate tasks. Install it with \`npx skills add howells/agentsurface --skill surface\` (add \`-g -y\` to install globally without prompts).`,
   `- [Docs index](${SITE_ORIGIN}/docs/llms.txt): The docs page tree on its own, without these entry points.`,
   `- [API index](${SITE_ORIGIN}/api/llms.txt): The documentation API's two operations, with examples.`,
   `- [Build agents index](${SITE_ORIGIN}/docs/agents/llms.txt): Only the pages for teams building agents of their own.`,
