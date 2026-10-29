@@ -48,10 +48,11 @@ No preamble, no commentary, no explanation outside the block.
 
 Bar visualization:
 
-- 0/3: `[░░░]`
-- 1/3: `[█░░]`
-- 2/3: `[██░]`
-- 3/3: `[███]`
+- 0/3: `[...]`
+- 1/3: `[#..]`
+- 2/3: `[##.]`
+- 3/3: `[###]`
+- N/A: `[---]`
 
 ```
 <score_result>

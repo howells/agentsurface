@@ -30,15 +30,15 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 
 1. **Convert to OpenAPI 3.1 or later** if needed (3.0 uses its own schema dialect, not JSON Schema 2020-12). 3.2.1 is current; 3.1 is the safe compatibility target for generators and validators. Keep `operationId` unique on every operation (optional in the spec, required here)
 
-2. **Standardize operationIds** to verb_noun format:
-   - CRUD: createUser, listUsers, getUser, updateUser, deleteUser
-   - Domain: searchInvoices, getInvoiceById, createPaymentIntent
-   - Batch: batchUpdateUsers (not updateUsersMany)
+2. **Standardize operationIds** to lowercase snake_case verb_noun (the house convention in `references/api-surface.md`; OpenAPI only requires uniqueness):
+   - CRUD: create_user, list_users, get_user, update_user, delete_user
+   - Domain: search_invoices, get_invoice, create_payment_intent
+   - Batch: batch_update_users (not update_users_many)
 
-3. **Rewrite descriptions** with four-part pattern:
+3. **Rewrite descriptions** with this five-part pattern:
    - What it does (one sentence)
-   - When to use it (vs. related operations, e.g. getUser vs. searchUsers)
-   - Prerequisites (by operationId, e.g. "Call cancelSubscription first")
+   - When to use it (vs. related operations, e.g. get_user vs. search_users)
+   - Prerequisites (by operationId, e.g. "Call cancel_subscription first")
    - Returns (enumerate key fields)
    - Error conditions and recovery (tied to RFC 9457 types)
 
@@ -46,7 +46,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
    - ≤4 required params ideal, max 10 total
    - Flat objects over nested (max 2 levels deep)
    - Use format: date, date-time, uuid, email, uri, ipv4
-   - Enum for ALL constrained strings (no free text)
+   - Enum for every categorical string (a closed set of values); keep genuine free text as a string with length or pattern limits
    - .describe() on every field; example on all properties
    - Default values for optional params
 
@@ -55,6 +55,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
    ```yaml
    responses:
      "400":
+       description: Invalid input
        content:
          application/problem+json:
            schema:
@@ -68,11 +69,11 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
                is_retriable: { type: boolean }
                retry_after_ms: { type: integer }
                suggestions: { type: array, items: { type: string } }
-               trace_id: { type: string, format: uuid }
+               trace_id: { type: string } # e.g. a W3C trace ID, 32 lowercase hex characters
    ```
 
 6. **Add idempotency keys** on POST/PATCH (PUT and DELETE are idempotent by method definition, RFC 9110):
-   - Accept an `Idempotency-Key: <uuid>` header (IETF draft, widely used by payment APIs)
+   - Accept an `Idempotency-Key: "<uuid>"` header. draft-ietf-httpapi-idempotency-key-header-08 (22 October 2026, still a draft) makes the value a quoted Structured Field String and recommends a UUID or similar random identifier; document any legacy unquoted form you also accept
    - Return a replay marker such as `Idempotency-Replayed: true` (a convention, not a standard)
    - Document the key retention window you choose
 
@@ -98,7 +99,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
    - No nested objects >2 levels in request bodies
    - All response schemas documented
    - All error codes have RFC 9457 examples
-   - Idempotency-Key required on mutations
+   - Idempotency-Key supported on non-idempotent mutations (POST, and PATCH where it is not naturally idempotent)
    - At least one Arazzo workflow if API has multi-step patterns
 
 ## Outputs
@@ -115,14 +116,14 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 - RFC 9457 (Problem Details): https://datatracker.ietf.org/doc/html/rfc9457
 - RFC 9110 (HTTP Semantics, Idempotency): https://datatracker.ietf.org/doc/html/rfc9110
 - Arazzo 1.1.0 (Workflows): https://spec.openapis.org/arazzo/latest.html
-- MCP Tool Annotations: `/skills/surface/references/mcp-tool-annotations.md`
+- MCP tool annotations and safety: `references/tool-design.md` and https://agentsurface.dev/docs/tool-design/idempotency-and-safety
 
 ## Style Rules
 
 - TypeScript strict mode only; no `any`.
 - Describe every field as if teaching an agent: action, timing, constraints.
 - Errors are prompts: suggestions[] must contain concrete recovery steps.
-- Idempotency is not optional; all mutations must support Idempotency-Key.
+- Idempotency is not optional: every non-idempotent mutation must support Idempotency-Key. Read-only and naturally idempotent operations do not need it.
 - Prefer flat request bodies; nest only when semantically grouped.
 - Example values must be valid, realistic, and testable.
 
@@ -130,7 +131,7 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 
 - Do NOT write descriptions for humans (no "Please note…", "Feel free to…").
 - Do NOT omit error responses; assume the agent hits every error path.
-- Do NOT use deprecated OpenAPI 3.0 features (securitySchemes needs components.securitySchemes).
+- Do NOT carry OpenAPI 3.0-only schema features into 3.1 (such as `nullable: true` instead of adding `null` to the schema's `type`).
 - Do NOT create tools from every HTTP endpoint; curate <20 tools per dimension.
 - Do NOT forget Idempotency-Key on POST /resources; it is not optional.
 - Do NOT nest request bodies >2 levels; flatten or split into separate operations.

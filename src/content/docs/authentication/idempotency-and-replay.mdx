@@ -117,7 +117,8 @@ async function handlePayment(req: Request): Promise<Response> {
   }
 
   // Idempotency lookup, cache, and TTL: see /docs/error-handling/idempotency
-  return handleIdempotent(idempotencyKey, () => processPayment(await req.json()));
+  const body = await req.json();
+  return handleIdempotent(idempotencyKey, () => processPayment(body));
 }
 ```
 

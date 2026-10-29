@@ -32,7 +32,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 ## Process
 
 1. **Create llms.txt** (curated, <5k tokens):
-   - Location: web root (`public/llms.txt` or `app/llms.txt` depending on framework)
+   - Location: web root (in Next.js, `public/llms.txt` or an `app/llms.txt/route.ts` route handler; a plain `app/llms.txt` file is not a route)
    - Format strictly:
 
      ```markdown
@@ -161,7 +161,8 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    User-agent: Claude-User
    Disallow:
 
-   # Training crawlers: blocked by default
+   # Training crawlers: blocked in this example; follow the project's actual policy.
+   # Google-Extended also covers grounding in Gemini Apps and Vertex AI, not only training.
    User-agent: GPTBot
    User-agent: ClaudeBot
    User-agent: Google-Extended
@@ -194,12 +195,15 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Add middleware to handle `Accept: text/markdown`:
      ```typescript
      app.get("/docs/*", (req, res) => {
-       if (req.headers.accept?.includes("text/markdown")) {
-         res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-         res.setHeader("Vary", "Accept");
-         res.setHeader("x-markdown-tokens", "1234");
+       // Both representations vary on Accept; res.vary merges with existing dimensions.
+       res.vary("Accept");
+       // req.accepts honours q-values and order, so text/markdown;q=0 never selects Markdown.
+       if (req.accepts(["text/html", "text/markdown"]) === "text/markdown") {
+         const markdown = loadMarkdown(req.path); // the project's own Markdown twin
+         res.type("text/markdown; charset=utf-8");
+         res.setHeader("x-markdown-tokens", String(Math.ceil(markdown.length / 4)));
          res.setHeader("Content-Signal", "search=yes, ai-input=yes, ai-train=no");
-         res.send(markdownContent);
+         res.send(markdown);
        } else {
          // Return HTML
        }
@@ -254,7 +258,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 
 ## Outputs
 
-- `/public/llms.txt` or `/app/llms.txt`
+- `public/llms.txt` or `app/llms.txt/route.ts`
 - `/public/llms-full.txt` (if applicable)
 - `/docs/AGENTS.md` or `/AGENTS.md`
 - `/public/robots.txt` (updated with AI crawler groups)
@@ -281,13 +285,13 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 - AGENTS.md: exact commands + flags; prose only for context.
 - JSON-LD: match visible page content exactly; no hidden metadata.
 - Vary header: non-negotiable for content negotiation (CDN correctness).
-- robots.txt AI groups: explicit permissions; default-deny is safer. Do not ship a separate `robots-ai.txt` as if it were a standard.
+- robots.txt AI groups: explicit permissions that follow the project's stated policy for search, user retrieval and training (ask if it is unknown). Do not ship a separate `robots-ai.txt` as if it were a standard.
 - .well-known files: only publish metadata for real capabilities that exist.
 
 ## Anti-patterns
 
 - Do NOT write human-oriented prose in llms.txt; be direct + scannable.
-- Do NOT exceed 5,000 tokens in llms.txt; agents skip large indexes.
+- Do NOT exceed the 5,000-token house budget for llms.txt; the proposal sets no limit, but a small index fits every client's fetch window.
 - Do NOT include secrets, API keys, or internal IPs in any discovery file.
 - Do NOT omit Vary: Accept header in content negotiation responses.
 - Do NOT rely on a footer link as the only pointer to llms.txt; converted pages read it last, if at all.

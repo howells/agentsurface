@@ -50,7 +50,7 @@ scraping HTML or guessing at undocumented query parameters.
 
 3. **Expose freshness and identity:**
    - `Last-Modified`/`ETag` headers or an `updated_at` field on results.
-   - A `since`/cursor parameter so an agent can fetch only what changed.
+   - Where incremental sync is supported, a documented change token (`since` or a change feed) with its retention window and how deletions appear; otherwise document how to re-fetch and validate with ETag or `updated_at`. A pagination cursor is not a change token.
    - Stable, dereferenceable IDs or canonical URLs so a result can be re-fetched later and
      cited accurately.
 
@@ -66,8 +66,8 @@ scraping HTML or guessing at undocumented query parameters.
 
 6. **Verify with a representative query.** Run an actual query through the interface an agent
    would use (the API, not the admin UI) and confirm: results are typed and complete,
-   pagination works across at least two pages, an empty result and an invalid query are
-   handled explicitly, and freshness fields are accurate.
+   pagination works across at least two pages and while the dataset changes between pages,
+   an empty result, an invalid cursor and an invalid query are handled explicitly, and freshness fields are accurate.
 
 7. **Quality checks:**
    - Query and result schemas are documented (OpenAPI or equivalent), not implicit
@@ -97,7 +97,7 @@ scraping HTML or guessing at undocumented query parameters.
 
 - Prefer the project's existing API framework and response conventions over a new pattern.
 - Query and result schemas are typed and documented, not implicit in handler code.
-- Cursor-based pagination for any result set that can change between page requests.
+- Cursor-based pagination for any result set that can change between page requests, with its ordering and its behaviour under concurrent updates documented.
 - State freshness and bulk-limit behavior explicitly; do not leave it to be discovered by trial and error.
 
 ## Anti-patterns

@@ -68,7 +68,7 @@ Recommended top-to-bottom sections:
 
 ### Tool-specific overrides
 
-- **CLAUDE.md** (optional): only when Claude Code needs instructions no other tool should see - a different default model, trigger specific skills, session tips. Most repos don't need one. When you do add it, import `@AGENTS.md` - a prose "See AGENTS.md" line does not load it - then layer Claude-only lines below the import. Put the import on the first line as a house recommendation; Claude Code accepts imports anywhere in the file, and its `claude-md-and-agents-md` setting loads both files without one. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
+- **CLAUDE.md** (optional): only when Claude Code needs instructions no other tool should see - when to trigger specific skills, Claude-only workflow notes, session tips. Model choice and memory configuration belong in Claude Code settings, not instruction files. Most repos don't need one. When you do add it, import `@AGENTS.md` - a prose "See AGENTS.md" line does not load it - then layer Claude-only lines below the import. Put the import on the first line as a house recommendation; Claude Code accepts imports anywhere in the file, and its `claude-md-and-agents-md` setting loads both files without one. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
 - **.cursor/rules/\*.mdc**: Cursor-specific rules, scoped by `globs` or `alwaysApply`. Reference AGENTS.md for shared commands; override only where Cursor differs.
 - **.github/copilot-instructions.md**: GitHub Copilot custom instructions. Same pattern: reference AGENTS.md, add Copilot-only guidance.
 - **GEMINI.md** / **.windsurfrules** / **.windsurf/rules/**: Tool-specific variants. Keep as thin overlays.
@@ -207,7 +207,7 @@ Monorepo layout:
   packages/shared    pnpm --filter=@app/shared type-check
 ```
 
-Each package can override permission boundaries (e.g., API server can deploy, web package cannot). Turbo tasks should reference both global and per-package AGENTS.md files.
+Each package can override permission boundaries (e.g., API server can deploy, web package cannot). Which instruction files load is decided by each coding client, not by Turborepo: check how the clients you support discover nested AGENTS.md files, and document workspace-level commands (`turbo run test --filter=<pkg>`) in the files they do read.
 
 ## Cross-vendor notes
 
@@ -226,8 +226,7 @@ Each package can override permission boundaries (e.g., API server can deploy, we
 
 Tooling:
 
-- [agentskills.io](https://agentskills.io) - registry + validation.
-- `aicodecheck` - lint AGENTS.md for common issues (line count, missing commands).
+- [agentskills.io](https://agentskills.io) - the Agent Skills specification (for `SKILL.md` packages, not AGENTS.md).
 - `llm-context` - CLI to preview token cost of context files.
 - Simple npm scripts: `node scripts/validate-agents.js` (check presence, line count, command parsing).
 

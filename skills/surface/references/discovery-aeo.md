@@ -20,13 +20,13 @@ Treat AEO as practical discoverability engineering, not a promise that any speci
 
 When auditing a public website, evaluate the same categories that current agent-readiness scanners measure:
 
-| Category                  | Signals                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------------------------- |
-| Discoverability           | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs              |
+| Category                  | Signals                                                                                                                                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discoverability           | `robots.txt`, `sitemap.xml`, HTTP `Link` headers, stable URLs for docs and API specs                                                                                                                  |
 | Content accessibility     | `llms.txt`, `llms-full.txt`, Markdown content negotiation, `.md` URL fallbacks, token count hints, an llms.txt pointer on every page, HTML/Markdown parity, content before navigation in source order |
-| Bot access control        | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots                     |
-| Capability discovery      | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata         |
-| Commerce, when applicable | x402, MPP, UCP, ACP, product feeds - see `references/agentic-commerce.md`                         |
+| Bot access control        | Content Signals, explicit AI crawler policy, Web Bot Auth for high-trust bots                                                                                                                         |
+| Capability discovery      | API Catalog, OpenAPI, MCP Server Card or MCP metadata, Agent Skills index, OAuth metadata                                                                                                             |
+| Commerce, when applicable | x402, MPP, UCP, ACP, product feeds - see `references/agentic-commerce.md`                                                                                                                             |
 
 Use scanner results as timestamped outside-in evidence for Dimension 4. [Is Agentic](https://is-agentic.com/) is a Vercel public-site scanner powered by Ora; its completed reports are also available through a read-only API, CLI, and remote MCP server. Inspect the individual checks and observed journey rather than copying its headline score into the Surface score. Do not overfit to one vendor's methodology, and never submit private, authenticated, confidential, or pre-release URLs merely to get a score.
 
@@ -36,7 +36,7 @@ For documentation sites, the [Agent-Friendly Documentation Spec](https://agentdo
 
 ### Cloudflare comparison
 
-Verified 2026-09-10: Cloudflare's scanner exposes 22 checks, with A2A and AP2 excluded from the website's default selection. DNS-AID is additional to Ora's published 125-check catalog (contract 1.24.0). Content Signals has a separate Cloudflare check, while Ora already accepts it within crawler policy. Is Agentic uses Ora's checks. Do not add all scanner requirements to the Surface rubric or change its weights.
+Observed 2026-10-29: Cloudflare's scan API returned 23 checks (the page's script recognises 23 IDs, the form renders 22 checkboxes, and the default selection excludes A2A and AP2). DNS-AID is additional to Ora's published 132-check catalog (contract 1.38.0). Content Signals has a separate Cloudflare check; Ora's crawler-policy check (`robots-ai-policy-quality`) scores search-crawler access, says blocking training crawlers never lowers the score, and does not describe scoring Content Signals, so confirm its treatment before comparing. Is Agentic uses Ora's checks. Do not add all scanner requirements to the Surface rubric or change its weights.
 
 ### Optional DNS discovery
 
@@ -229,8 +229,9 @@ export const generateMetadata = () => ({
   // Standard meta tags...
 });
 
-// Generate JSON-LD for SoftwareApplication
-export const generateJsonLd = () => ({
+// Generate JSON-LD for SoftwareApplication. Keep this helper local (or in its own
+// module): a layout may only export Next.js's allowed names, such as generateMetadata.
+const generateJsonLd = () => ({
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Your Project Name',
@@ -357,7 +358,7 @@ Cloudflare's Markdown conversion (docs updated 2026-10-09) preserves an origin `
 
 - `GPTBot` (OpenAI training)
 - `ClaudeBot` (Anthropic training)
-- `Google-Extended` (Google training - a normal robots.txt user-agent token, not a Search Console setting; Google states disallowing it does not affect Search ranking or inclusion)
+- `Google-Extended` (a robots.txt product token with no separate HTTP user agent, not a Search Console setting; it controls use for Gemini training and for grounding in Gemini Apps and Grounding with Google Search on Vertex AI, and Google states disallowing it does not affect Search ranking or inclusion)
 - `Applebot-Extended` (Apple training - same pattern: disallowing it does not affect Search ranking)
 - `Meta-ExternalAgent` (Meta training)
 
@@ -406,7 +407,7 @@ Disallow: /
 Sitemap: https://example.com/sitemap.xml
 ```
 
-**Opt-out pattern:** To block all AI bots:
+**Opt-out pattern:** To block the OpenAI and Anthropic training crawlers (search and user-initiated fetch agents are listed separately and stay unaffected; robots.txt is a request, not access control):
 
 ```
 User-agent: GPTBot
@@ -442,7 +443,7 @@ Recommended default for public developer docs:
 Content-Signal: search=yes, ai-input=yes, ai-train=no
 ```
 
-Audit for consistency. A common bad state is `robots.txt` allowing retrieval bots while response headers or managed bot settings imply `ai-input=no`.
+Audit for consistency between the intended policy and every place it is declared. Fetch permission and use permission are separate, so `robots.txt` allowing retrieval bots alongside `ai-input=no` can be intentional; it is a defect only when it contradicts the owner's stated policy, or when two declarations of the same permission disagree.
 
 **RSL vs IETF aipref:** RSL 1.0 (rslstandard.org) is a ratified standard for attaching a price or licence condition (pay-per-crawl, subscription, pay-per-inference, attribution, free) via robots.txt, HTTP headers, HTML, RSS, or media files - use it when Content Signals' yes/no isn't enough. IETF aipref (`draft-ietf-aipref-vocab` -08, `draft-ietf-aipref-attach` -05) is still two pre-consensus Internet-Drafts defining a similar `Content-Usage` robots.txt rule and HTTP header - track it, don't require it yet.
 
@@ -476,7 +477,7 @@ Audit for consistency. A common bad state is `robots.txt` allowing retrieval bot
 
 **Deprecated (do not use):**
 
-- `/.well-known/ai-plugin.json` - ChatGPT plugin manifest. **REMOVED Jan 2025.** Do not implement.
+- `/.well-known/ai-plugin.json` - legacy ChatGPT plugin manifest. **Retired.** Do not implement.
 
 **A2A agent card example** (`/.well-known/agent-card.json`, A2A v1.0 shape). Declare credentials with `securitySchemes` and `securityRequirements` (v0.3 cards call the second field `security`); the old `authentication` object is obsolete:
 
@@ -642,35 +643,35 @@ Compare the hex result with the index's `sha256:` value. Hash the exact served b
 
 ### NLWeb
 
-**Project:** https://github.com/microsoft/NLWeb
+**Project:** https://github.com/nlweb-ai/NLWeb
 
 **Purpose:** REST endpoint (`/ask`) and MCP server mode (`/mcp`) for natural language queries over indexed content.
 
-**Pattern:** Agent sends natural language query, service returns JSON with answer + source citations using schema.org + vector DB.
+**Pattern:** Agent sends a natural language query; in the default `list` mode the service returns ranked schema.org-backed results. `summarize` and `generate` modes add a summary or generated answer.
 
-**Example `/ask` endpoint:**
+**Example `/ask` request** (per the reference REST API docs; `query` is required, `streaming` defaults to true):
 
 ```
-POST /ask
-Content-Type: application/json
-
-{
-  "query": "How do I authenticate with OAuth?",
-  "max_sources": 3
-}
+GET /ask?query=How+do+I+authenticate+with+OAuth&streaming=false
+Accept: application/json
 
 Response 200:
 {
-  "answer": "Use OAuth 2.1 client credentials...",
-  "sources": [
+  "query_id": "q-1234",
+  "results": [
     {
-      "title": "Authentication docs",
       "url": "https://example.com/docs/auth",
-      "snippet": "..."
+      "name": "Authentication docs",
+      "site": "example.com",
+      "score": 87,
+      "description": "How to authenticate API requests.",
+      "schema_object": {}
     }
   ]
 }
 ```
+
+Do not promise `answer` or `sources` fields unless you select `summarize` or `generate` and have checked what your pinned version returns. Treat `score` as implementation-defined relevance, not a probability.
 
 **Adoption:** Early stage (2025–2026). Pair with llms.txt and AGENTS.md for broader compatibility.
 
@@ -728,7 +729,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 
 1. The MCP Server Card at `<streamable-http-url>/server-card`, with `/.well-known/mcp/server-card.json` and `/.well-known/mcp.json` only as compatibility pointers when needed
 2. Clear AGENTS.md with OpenAI-specific notes
-3. OAuth 2.1 client credentials for agent authentication
+3. For user-specific data, OAuth 2.1 authorization code with PKCE (S256) and MCP authorization metadata; ChatGPT does not support machine-to-machine grants such as client credentials. Public read-only tools can stay unauthenticated.
 
 ---
 
@@ -739,8 +740,8 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - **llms.txt with only top-level page, no section annotations.** Agents can't locate sub-pages without H2 headers and links.
 - **Outdated schema.org types** (deprecated in 2024+). Audit JSON-LD for current specs.
 - **Using deprecated `/.well-known/ai-plugin.json`.** Removed; replaced by OpenAI Apps SDK. Delete any implementations.
-- **llms-full.txt >30k tokens without pagination hints.** Add comment like `<!-- llms-full-page-2-of-3 -->` or split into sections.
-- **No robots.txt policy for AI bots.** Default is opt-in; explicit rules signal curation.
+- **An unbounded llms-full.txt.** The llms.txt proposal sets no size limit or pagination protocol, but very large files exceed many clients' fetch limits. Pick a house budget (for example around 30k tokens), measure the clients you target, and split by section when you exceed it.
+- **No robots.txt policy for AI bots.** Without a matching rule, crawlers treat paths as allowed (RFC 9309), so the absence is a policy too. State search, user retrieval and training choices explicitly.
 - **Only publishing human docs for agent-facing APIs.** If a service has public APIs, publish an API Catalog and OpenAPI link.
 - **MCP endpoint hidden in prose.** If an MCP server exists, publish a Server Card or metadata under `.well-known`.
 - **Conflating access with content use.** Allowing a fetch while declining AI input can be intentional. Check each use against its declared policy; do not treat different permissions for search, AI input, and training as a contradiction.
@@ -767,10 +768,9 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 
 **Tooling (verify currency):**
 
-- `llmstxt-generator` - CLI to build llms.txt from docs structure
-- `@vercel/llms` - Vercel SDK helper (if exists; check npm)
-- `next-llmstxt` - Next.js plugin for auto-serving llms.txt
-- `a2a-agent-card-builder` - A2A schema validator
+- `afdocs` (npm) - Agent-Friendly Documentation Spec checker for llms.txt, Markdown delivery and page conversion
+- Generate `llms.txt` from the docs source in a route handler or build step rather than maintaining it by hand; check any third-party generator on npm before recommending it
+- Validate A2A Agent Cards against the pinned official A2A schema
 
 ---
 
@@ -780,7 +780,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 - https://agents.md - AGENTS.md specification (Agentic AI Foundation, Linux Foundation)
 - https://schema.org/SoftwareApplication - schema.org type definitions
 - https://a2a-protocol.org/latest/specification/ - A2A v1.0.1 agent card protocol
-- https://github.com/microsoft/NLWeb - NLWeb project
+- https://github.com/nlweb-ai/NLWeb - NLWeb project
 - https://modelcontextprotocol.io/specification/2026-07-28 - current MCP specification revision
 - https://webmachinelearning.github.io/webmcp/ - current WebMCP Community Group draft
 - https://is-agentic.com/methodology - Is Agentic scoring model and limitations
@@ -800,7 +800,7 @@ Built on MCP. Apps use MCP servers as transport layer for agent interaction. Com
 
 ## See also
 
-- `docs/discovery` - Agent discovery workflows (in Fumadocs site)
+- `/docs/discovery` - Agent discovery workflows (https://agentsurface.dev/docs/discovery)
 - `templates/discovery/llms.txt`, `templates/discovery/AGENTS.md`, `templates/discovery/json-ld-softwareapp.ts` - AEO templates
 - `references/context-files.md` - Detailed AGENTS.md curation guide
 - `references/authentication.md` - OAuth 2.1 and .well-known/oauth-protected-resource

@@ -156,7 +156,7 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      - Check TypeScript paths in `tsconfig.json`
 
      **Dev server won't start:**
-     - Kill existing process: `lsof -i :3000 | grep node | awk '{print $2}' | xargs kill`
+     - Find what holds the port: `lsof -nP -iTCP:3000 -sTCP:LISTEN`; stop it only if it is this project's own dev server
      - Check `.env.local` is present
 
      ```
@@ -265,11 +265,10 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
 
      # Base Rules
 
-     - Use TypeScript strict mode; no `any`
-     - Use Zod for all validation
-     - Add .describe() to every Zod field
-     - Write tests for every new function
-     - Commit messages: "verb: description" (e.g., "feat: add user deletion")
+     Follow AGENTS.md at the repo root; it is the source of truth for commands,
+     conventions and boundaries. Only Cursor-specific behaviour belongs here.
+
+     - Prefer the scoped rules in this folder over restating AGENTS.md
      ```
 
    - `nextjs.mdc`:
@@ -294,27 +293,17 @@ Enable agents to self-onboard in seconds: what commands work, what's off-limits,
      ```markdown
      # Copilot Instructions
 
-     ## Constraints
+     Follow AGENTS.md at the repo root for commands, conventions and boundaries.
+     This file only adds what is specific to Copilot.
 
-     - Never suggest `any` type; always use strict types
+     ## Copilot-specific
+
+     - Suggest a test alongside each new function, using the project's test command from AGENTS.md
      - Never suggest deleting files without explicit approval
-     - Always suggest tests alongside new code
-     - Always validate user input with Zod
-
-     ## Preferences
-
-     - Prefer functional components with hooks
-     - Prefer Zod schemas over TypeScript interfaces for runtime validation
-     - Prefer MCP tools over direct API calls where available
-     - Prefer async/await over Promises
-
-     ## Project Context
-
-     This is a production Next.js app running on Bun. See AGENTS.md for full context.
      ```
 
 6. **Validate all files**:
-   - Run all commands listed to ensure they work
+   - Run the listed checks that are safe to run (install, typecheck, lint, test) to confirm they work; never run deploy, migration, publish or other production-affecting commands just to validate the file
    - Check no secrets or production addresses
    - Verify boundaries are sensible (not over/under-protective)
    - Check line counts against the authoring target (AGENTS.md ~150 ideal / <300 max; CLAUDE.md <150)

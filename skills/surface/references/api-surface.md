@@ -33,7 +33,7 @@ Use these exact patterns and file paths when auditing Dimension 1:
 
 ### File discovery
 
-- **OpenAPI/Swagger specs:** `grep -r "openapi:" . --include="*.y*ml" --include="*.json"` in project root and `docs/`, `api/specs/`, `.openapi/`
+- **OpenAPI/Swagger specs:** `rg -l --glob "*.{yaml,yml,json}" -e '^\s*"?(openapi|swagger)"?\s*:'` across the repo (covers YAML and JSON, OpenAPI 3 and Swagger 2), then parse each match to confirm it is a spec
 - **Framework route files:**
   - Next.js: `app/**/route.ts`, `app/**/route.js`, `pages/api/**`
   - Express/Fastify: `src/routes/**`, `server.ts`, `index.ts` for `router.get()`, `router.post()`, etc.
@@ -49,7 +49,7 @@ Use these exact patterns and file paths when auditing Dimension 1:
 
 ```bash
 find app -name "route.ts" -o -name "route.js" | head -20
-# Each file contains: export async function GET/POST/PUT/DELETE(req, res)
+# Each file exports GET/POST/PUT/PATCH/DELETE(request: Request, context?: { params: Promise<...> }) returning a Response
 # Score operationId derivation: `{method}_{segment}` e.g., GET /app/users/[id]/route.ts → get_users_by_id
 ```
 
@@ -83,10 +83,10 @@ grep -r "HandleFunc\|GET\|POST\|PUT\|DELETE" --include="*.go"
 
 ### Checks for score determination
 
-- **operationId coverage:** `grep -c '"operationId"' openapi.yaml` vs total operations; >30% missing = score 1 max
+- **operationId coverage:** parse the spec (resolving `$ref`s and split files) and count operations with an `operationId` against all operations; >30% missing = score 1 max. Line greps miss unquoted YAML keys.
 - **Description depth:** Sample 5 operations; measure average word count and presence of "Use when", "Do not use"
-- **Examples:** `grep -c '"example"' openapi.yaml` / total properties; <50% = score 1 max
-- **Enums:** Find constrained strings: `grep -A 3 '"enum"'` and verify values are documented
+- **Examples:** from the parsed spec, properties with `example`/`examples` / total properties; <50% = score 1 max
+- **Enums:** find categorical strings with `enum` in the parsed spec and verify their values are documented
 - **Flat structure:** Check for nested parameter objects (deeply nested $ref chains = score 1-2 max)
 - **Arazzo presence:** `find . -name "*.arazzo.*"`; any matches = evidence for score 3
 
@@ -155,13 +155,13 @@ paths:
         "400":
           description: Invalid query parameters
           content:
-            application/json:
+            application/problem+json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Missing or invalid authentication
           content:
-            application/json:
+            application/problem+json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 components:
@@ -306,7 +306,7 @@ requestBody:
 
 ### Enums with documented values
 
-Every constrained string must have `enum` and `description` on each value:
+Every categorical string (a closed set of values) must have `enum` and a description of each value. Length, pattern and format constraints do not make a string categorical:
 
 ```yaml
 status:
@@ -360,25 +360,25 @@ responses:
   "400":
     description: Invalid input
     content:
-      application/json:
+      application/problem+json:
         schema:
           $ref: "#/components/schemas/ValidationError"
   "401":
     description: Missing or invalid authentication
     content:
-      application/json:
+      application/problem+json:
         schema:
           $ref: "#/components/schemas/AuthError"
   "409":
     description: Conflict (e.g., email already exists)
     content:
-      application/json:
+      application/problem+json:
         schema:
           $ref: "#/components/schemas/ConflictError"
   "429":
     description: Rate limited
     content:
-      application/json:
+      application/problem+json:
         schema:
           $ref: "#/components/schemas/RateLimitError"
 ```
@@ -411,17 +411,19 @@ Implement in middleware:
 
 ```typescript
 // Next.js
+// prefersMarkdown parses q-values (see the content negotiation example in discovery-aeo.md);
+// a substring test would serve Markdown to `text/markdown;q=0`.
 export async function GET(req: Request) {
-  const accept = req.headers.get('Accept') || 'application/json';
+  const accept = req.headers.get("Accept") || "application/json";
 
-  if (accept.includes('text/markdown')) {
+  if (prefersMarkdown(accept)) {
     const markdown = `# List Users\n\nRetrieve a paginated list...`;
     return new Response(markdown, {
-      headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+      headers: { "Content-Type": "text/markdown; charset=utf-8", Vary: "Accept" },
     });
   }
 
-  return Response.json({ data: [...] });
+  return Response.json({ data: await listUsers() }, { headers: { Vary: "Accept" } });
 }
 ```
 
@@ -532,7 +534,7 @@ Use open-source tools to generate MCP servers directly from OpenAPI specs:
 
 Check each tool's current docs for exact commands and flags; they change between releases.
 
-Generated MCP servers inherit operationId naming, descriptions, and examples from the spec. Keep OpenAPI as the source of truth; regenerate MCP after spec changes, and curate the generated tool set rather than shipping it unreviewed (see the MCP auto-generation page).
+Generated MCP servers usually derive tool names, descriptions and examples from operationIds and the spec, but generators differ in naming overrides, collision handling, body merging and output schemas, so inspect the generated tools rather than assuming the mapping. Keep OpenAPI as the source of truth; regenerate MCP after spec changes, and curate the generated tool set rather than shipping it unreviewed (see the MCP auto-generation page).
 
 ---
 
@@ -602,32 +604,32 @@ additionalProperties: false
 
 ### Gemini FunctionDeclaration and thought signatures
 
-Google Gemini 3 models require `thoughtSignature` on every call to preserve reasoning across agent steps ([Gemini 3 thought signatures](https://ai.google.dev/gemini-api/docs/thought-signatures)). This means:
+Gemini 3 models return a thought signature with their function-call parts so reasoning carries across agent steps ([thought signatures](https://ai.google.dev/gemini-api/docs/thought-signatures)). This means:
 
-1. **Tool arguments must be preserved exactly.** When an agent calls `list_users(limit=20, offset=0)`, the next request must include `"argument": {"limit": 20, "offset": 0}` to maintain coherent thought.
-2. **Schemas cannot change mid-agent.** Regenerating tool schemas mid-session breaks thought continuity. Pin OpenAPI versions per agent session.
-3. **FunctionDeclaration schema must match.** Gemini enforces schema validation at the tool definition level, not just at decode time:
+1. **Send the model's content back unchanged.** Return each `functionCall` part (its `name` and `args`, for example `{"limit": 20, "offset": 0}`) in history exactly as the model produced it, with its signature. Do not invent a signature or rebuild the part from logs; not every part carries one.
+2. **Pin schemas per session.** Keep tool declarations stable within an agent session (house advice) so earlier calls still match the declarations.
+3. **Declare tools in Gemini's shape.** A Gemini tool holds `functionDeclarations`; each has a name, description and `parameters` (OpenAPI subset) or `parametersJsonSchema`:
 
 ```typescript
-// google-generative-ai SDK
-const tool: Tool = {
-  name: "list_users",
-  description: "Retrieve a paginated list of users...",
-  inputSchema: {
-    type: "OBJECT",
-    properties: {
-      limit: {
-        type: "INTEGER",
-        description: "Number of results per page",
+// @google/genai SDK
+const tools = [
+  {
+    functionDeclarations: [
+      {
+        name: "list_users",
+        description: "Retrieve a paginated list of users...",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            limit: { type: "integer", description: "Number of results per page" },
+            offset: { type: "integer", description: "Pagination offset" },
+          },
+          required: ["limit"],
+        },
       },
-      offset: {
-        type: "INTEGER",
-        description: "Pagination offset",
-      },
-    },
-    required: ["limit"],
+    ],
   },
-};
+];
 ```
 
 Export OpenAPI-derived schemas to Gemini from a single source of truth (Zod 4's native `z.toJSONSchema()` or the OpenAPI schema itself) so the declarations stay aligned. The `zod-to-json-schema` package is no longer actively maintained and only handles Zod 3 schemas.
@@ -653,11 +655,11 @@ Export OpenAPI-derived schemas to Gemini from a single source of truth (Zod 4's 
 
 ### Shipped templates in the plugin
 
-The surface skill includes these template files under `/templates`:
+The Agent Surface repository (https://github.com/howells/agentsurface) ships these templates:
 
-- **`openapi-skeleton.yaml`** - Minimal valid OpenAPI 3.1 spec with common patterns (pagination, errors, enums)
-- **`arazzo-workflow.yaml`** - Example multi-step workflow for a common pattern (create, validate, notify)
-- **`error-types.ts`** - TypeScript types for RFC 9457 error responses (reusable in route handlers)
+- **`templates/mcp-and-api/openapi-skeleton.yaml`** - Minimal valid OpenAPI 3.1 spec with common patterns (pagination, errors, enums)
+- **`templates/mcp-and-api/arazzo-workflow.yaml`** - Example multi-step workflow for a common pattern (create, validate, notify)
+- **`templates/errors-and-auth/problem-details.ts`** - Zod schema and types for RFC 9457 error responses (reusable in route handlers)
 
 ### Recommended tooling ecosystem
 
@@ -677,13 +679,13 @@ The surface skill includes these template files under `/templates`:
 
 - **NestJS** - `@nestjs/swagger` decorators auto-generate OpenAPI from controller definitions
 - **FastAPI** - Native OpenAPI generation from Pydantic models + docstrings (no separate spec needed)
-- **Express/Fastify** - `swagger-jsdoc` (inline JSDoc comments) or `fastify-swagger` (Fastify plugin)
-- **Next.js** - `openapi-types` for type safety; use `openapi-ts` CLI to generate types from spec
+- **Express/Fastify** - `swagger-jsdoc` (inline JSDoc comments) or `@fastify/swagger` (Fastify plugin; match its major version to Fastify)
+- **Next.js** - `openapi-types` for type safety; generate types and clients from the spec with `@hey-api/openapi-ts` or `openapi-typescript`
 
 **Validation and linting:**
 
 - **Redocly CLI** - `redocly lint openapi.yaml` enforces agent-friendly rules
-- **Spectacle** - Simple OpenAPI linter; catches operationId gaps
+- **Spectral** (`@stoplight/spectral-cli`) - rule-based OpenAPI linter; its `operation-operationId` rule catches operationId gaps
 - **IBM OpenAPI Validator** - Comprehensive spec compliance checks
 
 ---

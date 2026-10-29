@@ -7,7 +7,7 @@ tools: Read, Glob, Grep, Write, Edit, Bash
 
 ## Summary
 
-Scaffold MCP servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with MCP behavioral hints, add OAuth protected-resource metadata for protected HTTP servers, and structure responses for streaming + batching.
+Scaffold MCP servers exposing domain functionality as agent tools. Implement both stdio and Streamable HTTP transports, annotate tools with MCP behavioral hints, add OAuth protected-resource metadata for protected HTTP servers, and return lean text plus typed `structuredContent`, with Tasks or progress notifications for long operations.
 
 Build against **2026-07-28**, the current revision supported by all Tier 1 SDKs. Keep cross-call state in explicit server-minted handles rather than connection or session identifiers. Do not build new functionality on roots, sampling, or logging, which the current revision deprecates. Add **2025-11-25** compatibility only when a client in scope still requires it.
 
@@ -39,7 +39,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Use the TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23): `StdioServerTransport` from `@modelcontextprotocol/server/stdio` and `createMcpHandler` for per-request Streamable HTTP, registering with `registerTool`/`registerResource`/`registerPrompt`. The monolithic `@modelcontextprotocol/sdk` 1.x (1.32.2) is maintained for v1 compatibility
 
 2. **Tool curation** (domain-driven):
-   - Do NOT expose every endpoint; max 15 tools per MCP server
+   - Do NOT expose every endpoint; keep the server's tool set under the house review threshold of about 20, and smaller where the tools load into one agent context
    - Group by domain verb (list, get, create, update, delete, search)
    - Use verb_noun format: `create_project`, `list_users`, `search_invoices`
    - Include tool input + output schemas (Zod)
@@ -84,15 +84,30 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Support OAuth Client ID Metadata Documents only when the authorization server advertises `client_id_metadata_document_supported`.
 
 6. **Return structured MCP content**:
-   - Use structured content blocks:
+   - Declare an `outputSchema` at registration and return matching `structuredContent`, with a short text summary for clients that only read `content`:
      ```typescript
-     return {
-       content: [
-         { type: "text", text: "Summary" },
-         { type: "resource", resource: { uri: "...", mimeType: "application/json", text: "..." } },
-       ],
-     };
+     server.registerTool(
+       "get_invoice",
+       {
+         description: "Get one invoice by ID. Use after search_invoices returns a match.",
+         inputSchema: z.object({ invoice_id: z.string() }),
+         outputSchema: z.object({
+           id: z.string(),
+           status: z.enum(["draft", "open", "paid"]),
+           total: z.number(),
+         }),
+         annotations: { readOnlyHint: true, openWorldHint: false },
+       },
+       async ({ invoice_id }) => {
+         const invoice = await getInvoice(invoice_id);
+         return {
+           content: [{ type: "text", text: `Invoice ${invoice.id}: ${invoice.status}` }],
+           structuredContent: invoice,
+         };
+       },
+     );
      ```
+   - Embedded resources (`type: "resource"`) and resource links are a separate content type for documents the client may read; they do not replace `structuredContent`
    - Include trace_id in error responses
 
 7. **Support the MCP Tasks extension when needed**:
@@ -184,4 +199,4 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 - Do NOT skip error examples in descriptions; agents will hit all paths.
 - Do NOT return raw stack traces; use RFC 9457 format.
 - Do NOT forget trace_id in errors; agents need audit trails.
-- Do NOT block tool execution for >5s; use async task pattern.
+- Do NOT hold a tool call open for long-running work (a house target is about 5 seconds, not a protocol limit); negotiate the Tasks extension or send progress notifications instead.

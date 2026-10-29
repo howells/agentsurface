@@ -492,15 +492,13 @@ function findHighSeverityIssues(scorecard: Scorecard): Finding[] {
 
 ## Storage & Versioning
 
-Scorecards are stored in the audited project:
+Store scorecards wherever the audited project keeps its working records, and keep every dated snapshot so trends can be compared. The Surface skill files them on the project's issue tracker by default: the audit is an issue and each scorecard is a comment on it, so nothing is written into the repository. A project that prefers to version scorecards in git can use a layout like this:
 
 ```
 docs/surface/scorecard-[YYYY-MM-DD].json  # Versioned snapshots
 docs/surface/scorecard-latest.json        # Current snapshot (symlink or copy)
 docs/surface/history.md                   # Human-readable changelog
 ```
-
-Store version history in git so you can track trends over time:
 
 ```bash
 git log docs/surface/scorecard-*.json

@@ -16,12 +16,12 @@ Errors are the agent's feedback loop. If they're opaque, the agent can't recover
 
 ## Scoring rubric
 
-| Score | Criteria                                                                                                                                                                                                                                                                                       | Detection                                                                                                                                                                                                                               |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail.                                                                                                                                                                                                    | Error responses return plain text or empty bodies. No consistent error schema.                                                                                                                                                          |
-| 1     | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't. Error shape varies across routes.                                                                                                                                                                    | Partial error schema (some endpoints have type/message, others don't). No is_retriable field. grep finds error responses without `type` or `status` on >30% of routes.                                                                  |
-| 2     | RFC 9457 Problem Details everywhere. `type`, `title`, `status`, `detail`, `instance` fields present. `is_retriable` boolean. `suggestions` array. `trace_id` for debugging. Rate-limit 429 includes `Retry-After`.                                                                             | Grep finds `application/problem+json` or consistent envelope. All error routes return shape with type/status/detail. `is_retriable` on error responses. Suggestions or recovery_hint populated. Trace ID correlates with observability. |
-| 3     | Full agent error design. `doc_uri` linking to RFC 9457 docs. Intent tracing on cancellation. Domain-specific error codes. `X-RateLimit-*` headers on every response (not just 429). CLI errors emit JSON to stderr with semantic exit codes. Tool errors return errors as output (not thrown). | `doc_uri` in error responses. Intent trace structure on abort/cancel. Rate limit headers on all responses. CLI produces `{ type, status, detail, trace_id }` JSON. MCP tools use `isError: true` convention.                            |
+| Score | Criteria                                                                                                                                                                                                                                                                                                                                   | Detection                                                                                                                                                                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Generic HTTP status codes only. No structured error body. "400 Bad Request" with no detail.                                                                                                                                                                                                                                                | Error responses return plain text or empty bodies. No consistent error schema.                                                                                                                                                          |
+| 1     | Some structured errors but inconsistent. Some endpoints return JSON errors, others don't. Error shape varies across routes.                                                                                                                                                                                                                | Partial error schema (some endpoints have type/message, others don't). No is_retriable field. grep finds error responses without `type` or `status` on >30% of routes.                                                                  |
+| 2     | RFC 9457 Problem Details everywhere. `type`, `title`, `status`, `detail`, `instance` fields present. `is_retriable` boolean. `suggestions` array. `trace_id` for debugging. Rate-limit 429 includes `Retry-After`.                                                                                                                         | Grep finds `application/problem+json` or consistent envelope. All error routes return shape with type/status/detail. `is_retriable` on error responses. Suggestions or recovery_hint populated. Trace ID correlates with observability. |
+| 3     | Full agent error design. `doc_uri` linking to RFC 9457 docs. Intent tracing on cancellation. Domain-specific error codes. Rate-limit headers (`X-RateLimit-*` or the IETF `RateLimit` fields) on every response (not just 429). CLI errors emit JSON to stderr with semantic exit codes. Tool errors return errors as output (not thrown). | `doc_uri` in error responses. Intent trace structure on abort/cancel. Rate limit headers on all responses. CLI produces `{ type, status, detail, trace_id }` JSON. MCP tools use `isError: true` convention.                            |
 
 ## Evidence to gather
 
@@ -85,14 +85,14 @@ The `type` URI should resolve to human-readable documentation explaining the err
 Build on the standard with these fields:
 
 - `code` (string) - Machine-readable domain code. e.g. "ERR_VALIDATION", "ERR_RATE_LIMITED", "ERR_AUTH_EXPIRED". Shorter than a type URI; useful for switch statements.
-- `is_retriable` (boolean) - True if the agent should retry the request (transient error: network, rate limit, 5xx). False for terminal errors (invalid input, not found, unauthorized).
-- `retry_after_seconds` (number) - Wait N seconds before retry. Preferred over Retry-After header for parsing consistency.
+- `is_retriable` (boolean) - True if retrying the same request unchanged might succeed (rate limit, temporary outage, a conflicting operation still in flight). False for terminal errors where the request itself is wrong (invalid input, not found, unauthorized). The explicit flag overrides any status-code heuristic, and retrying a mutation also needs an idempotency guarantee.
+- `retry_after_ms` (number) - Wait N milliseconds before retry. The body equivalent of the `Retry-After` header, preferred for parsing consistency.
 - `suggestions` (array of strings) - Human-readable recovery steps. e.g. ["Check the email format", "Wait 60 seconds and retry"]
 - `recovery_hint` (string) - Primary action to recover. e.g. "Increase your API quota" or "Re-authenticate with a new token"
 - `doc_uri` (string, URL) - Link to detailed error documentation, troubleshooting, and examples.
 - `trace_id` (string) - Correlation ID matching server logs and observability spans. Should match `X-Request-ID` or OpenTelemetry `trace_id`.
 - `fields` (array) - For validation errors only. Array of `{ path: "fieldName", rule: "maxLength", message: "..." }`. Lets agents fix form fields programmatically.
-- `errors` (array) - RFC 9457 supports aggregating multiple errors. Useful for batch operations or multi-field validation.
+- `errors` (array) - Nested Problem Details for batch operations (an extension; RFC 9457 itself shows an `errors` member only as an example). Field-level validation errors go in `fields`, not here.
 
 **TypeScript schema (Zod):**
 
@@ -107,7 +107,7 @@ const ProblemDetails = z.object({
   instance: z.string().optional(),
   code: z.string().optional(),
   is_retriable: z.boolean().optional(),
-  retry_after_seconds: z.number().optional(),
+  retry_after_ms: z.number().int().positive().optional(),
   suggestions: z.array(z.string()).optional(),
   recovery_hint: z.string().optional(),
   doc_uri: z.string().url().optional(),
@@ -121,7 +121,10 @@ const ProblemDetails = z.object({
       }),
     )
     .optional(),
-  errors: z.array(z.lazy(() => ProblemDetails)).optional(),
+  // Zod 4 recursive schema: a getter keeps z.infer working under strict TypeScript
+  get errors() {
+    return z.array(ProblemDetails).optional();
+  },
 });
 
 type ErrorResponse = z.infer<typeof ProblemDetails>;
@@ -150,58 +153,34 @@ When an agent cancels a request in-flight (e.g., user hits Ctrl-C, multi-step op
 
 ### Idempotency keys
 
-Safe idempotent retries require server deduplication. Use the `Idempotency-Key` header ([Stripe pattern](https://stripe.com/docs/api/idempotent_requests)):
+Naturally idempotent operations (GET, PUT, DELETE by method definition, RFC 9110) can be repeated safely without a key store. To make retries of non-idempotent effects such as POST safe, the server must deduplicate: use the `Idempotency-Key` header (draft-ietf-httpapi-idempotency-key-header-08, still a draft; see also [Stripe's implementation](https://docs.stripe.com/api/idempotent_requests)):
 
 **Client sends:**
 
 ```http
 POST /api/payments HTTP/1.1
-Idempotency-Key: my-unique-txn-id-12345
+Idempotency-Key: "8e03978e-40d5-43e8-bc93-6894a57f9324"
 Content-Type: application/json
 
 { "amount": 100, "currency": "USD" }
 ```
 
-**Server deduplicates within a window (24h typical):**
+The value is a quoted Structured Field String; document whether you also accept the legacy unquoted form.
 
-- First request: processes, stores result (amount, customer, timestamp)
-- Duplicate request (same Idempotency-Key): returns cached result without re-processing
+**Server contract** (deduplicate within a published window, 24h typical):
 
-**TypeScript middleware (Next.js):**
+- Authorise the caller first, then namespace the key by principal and operation.
+- Reserve the key atomically before doing any work, and fingerprint the request body.
+- First request: process it and store the outcome, including the original status and headers.
+- Same key and same body after completion: replay the stored response with its original status (not always 200).
+- Same key while the first request is still in flight: `409 Conflict`.
+- Same key with a different body: `422 Unprocessable Content`.
 
-```typescript
-import { NextRequest, NextResponse } from "next/server";
-
-const idempotencyCache = new Map<string, { response: any; expiresAt: number }>();
-
-export function middleware(req: NextRequest) {
-  if (["POST", "PATCH", "DELETE"].includes(req.method)) {
-    const key = req.headers.get("idempotency-key");
-    if (!key) {
-      return NextResponse.json(
-        {
-          type: "https://example.com/errors/missing-idempotency-key",
-          detail: "Idempotency-Key header required",
-        },
-        { status: 400 },
-      );
-    }
-
-    const cached = idempotencyCache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json(cached.response, {
-        status: 200,
-        headers: { "X-Idempotency-Cached": "true" },
-      });
-    }
-  }
-  return NextResponse.next();
-}
-```
+This needs a route-handler wrapper with a shared atomic store (such as Redis `SET NX`), not request middleware that can only short-circuit. The Agent Surface template [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements atomic reservation and fingerprinting; review its in-flight lease length and its handling of failed requests against your endpoint's guarantees before relying on it.
 
 ### Rate limiting
 
-Always emit rate-limit headers on every response - not just 429s. This signals remaining quota to agents before they exhaust it:
+Emit rate-limit headers on every response - not just 429s - so agents see remaining quota before they exhaust it. `X-RateLimit-*` is a widespread but unstandardised convention; the IETF `RateLimit` and `RateLimit-Policy` fields (draft-ietf-httpapi-ratelimit-headers, still a draft) are its emerging replacement, so consider sending both:
 
 **On every HTTP response:**
 
@@ -231,7 +210,7 @@ Content-Type: application/problem+json
   "status": 429,
   "detail": "You have exceeded your 1000 requests-per-minute quota.",
   "is_retriable": true,
-  "retry_after_seconds": 60,
+  "retry_after_ms": 60000,
   "recovery_hint": "Wait 60 seconds or upgrade your plan."
 }
 ```
@@ -242,13 +221,7 @@ Content-Type: application/problem+json
 
 CLIs must emit errors as structured JSON to stderr so parent scripts/agents can parse them:
 
-**stderr (human-readable summary):**
-
-```
-Error: Connection timeout to database
-```
-
-**stdout (structured JSON):**
+**stderr (structured JSON; stdout carries data only, and the command exits non-zero):**
 
 ```json
 {
@@ -258,23 +231,22 @@ Error: Connection timeout to database
   "detail": "Failed to connect to db.example.com:5432 after 30s",
   "trace_id": "cli-run-abc123",
   "is_retriable": true,
-  "retry_after_seconds": 5
+  "retry_after_ms": 5000
 }
 ```
 
-**Semantic exit codes:**
+**Semantic exit codes** (the 0-5 contract from `cli-design.md`; publish whichever contract your CLI uses):
 
 - `0` - Success
-- `1` - Generic error
-- `2` - Misuse/invalid CLI arguments
-- `64` - Not found (ERR_NOT_FOUND)
-- `66` - Conflict (ERR_CONFLICT)
-- `69` - Service unavailable (ERR_UNAVAILABLE)
-- `77` - Permission denied (ERR_PERMISSION)
+- `1` - Failure (unexpected error)
+- `2` - Usage error (invalid flags or arguments)
+- `3` - Not found
+- `4` - Permission denied
+- `5` - Conflict
 
 ### MCP tool errors
 
-MCP tools should return errors as tool output (not throw exceptions), preserving agent context:
+MCP tools should return recoverable execution errors as tool output with `isError: true` rather than throwing, so the model sees the error and can recover. Protocol errors (unknown tool, malformed request) are still JSON-RPC errors; see below:
 
 **Wrong (throws; agent loses context):**
 
@@ -324,50 +296,56 @@ If you define custom protocol errors, keep them in `-32000`..`-32019` and docume
 
 ### Tool-call errors (Agents SDK / Vercel AI SDK / LangGraph)
 
-Prefer returning errors as tool output so the agent can reason about recovery. Throwing aborts the agent loop and loses context (12-factor agents Factor #9: "Compact errors into context").
+Prefer returning errors as structured tool output so the model can reason about recovery (12-factor agents Factor #9: "Compact errors into context"). What a thrown exception does depends on the SDK: the AI SDK turns an `execute` exception into a tool-error part the model sees on the next step, and the OpenAI Agents SDK passes it through a configurable `errorFunction`. Choose the SDK's mechanism deliberately instead of assuming a throw aborts the loop.
 
 **Vercel AI SDK pattern:**
 
 ```typescript
-import { generateText } from 'ai';
+import { openai } from "@ai-sdk/openai";
+import { generateText, isStepCount, tool } from "ai";
+import { z } from "zod";
 
 const result = await generateText({
-  model: openai('gpt-6.1-terra'),
+  model: openai("gpt-6.1-terra"),
+  // Without more than one step, the model never sees the tool result to recover from it
+  stopWhen: isStepCount(3),
   tools: {
     fetch_data: tool({
-      description: 'Fetch data',
+      description: "Fetch data",
       inputSchema: z.object({ id: z.string() }),
       execute: async ({ id }) => {
-        if (!id) {
+        // A plain result object the model reads; this `error` shape is the app's own
+        // convention, not an AI SDK error marker (a thrown error becomes a tool-error part).
+        const record = await findRecord(id);
+        if (!record) {
           return {
-            isError: true,
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify({ type: 'validation_error', detail: 'ID required' }),
-              },
-            ],
+            error: {
+              type: "https://example.com/errors/not-found",
+              detail: `No record ${id}`,
+              is_retriable: false,
+              suggestions: ["Call search_records to find a valid ID"],
+            },
           };
         }
-        return { data: [...] };
+        return { data: record };
       },
     }),
   },
-  prompt: 'Fetch the user data.',
+  prompt: "Fetch the user data.",
 });
 
-// Agent sees the error and can retry/fallback
+// On the next step the model sees the error and can retry or fall back
 ```
 
 ## Cross-vendor notes
 
-**Anthropic Claude Code SDK:**
+**Claude Agent SDK:**
 
-- Tool errors returned as `{ isError: true, content: [...] }`. Include ProblemDetails JSON in the content string. Agent examines the error and recurses if `is_retriable: true`.
+- MCP and SDK tool errors are returned as `{ isError: true, content: [...] }`. Include ProblemDetails JSON in the content string. The model reads it and decides what to do; no SDK retries automatically on a custom `is_retriable` field, so any automatic retry policy is the application's own.
 
 **OpenAI Agents SDK (TypeScript):**
 
-- Strict function calling. Errors returned as tool result JSON, never thrown. Agents parse the result and decide retry logic.
+- Return expected failures as tool result JSON. Exceptions thrown by a tool go through the tool's `errorFunction` (which by default reports the error to the model, and can be set to rethrow). Strict schemas are a separate setting.
 
 **Google Gemini ADK:**
 
@@ -375,7 +353,7 @@ const result = await generateText({
 
 **MCP (Model Context Protocol):**
 
-- Tools return `{ isError: true, content: [{ type: 'text', text: '...' }] }`. Server errors should include trace IDs matching MCP request IDs. No exception throwing; all errors surface as tool outputs.
+- Tool execution errors return `{ isError: true, content: [{ type: 'text', text: '...' }] }`; protocol errors (unknown tool, invalid request) use JSON-RPC errors. Log the JSON-RPC request ID alongside the trace ID so the two can be mapped; they are different identifiers.
 
 ## Anti-patterns
 
@@ -385,8 +363,8 @@ const result = await generateText({
 - **Missing Retry-After on 429** - Agent cannot know how long to wait; may retry immediately and worsen congestion.
 - **Throwing inside tool handlers** - Aborts the agent loop. Return errors as output instead.
 - **Exposing stack traces to clients** - Leaks internals. Use `trace_id` to let clients correlate with server logs.
-- **Using `error` as the envelope key** - Conflicts with JavaScript reserved semantics and JSON Schema `error` keyword. Use RFC 9457 flat structure: `type`, `status`, `detail` at root.
-- **Missing `instance` (trace ID)** - Cannot correlate with server logs. Always include trace ID.
+- **Wrapping HTTP Problem Details in an envelope** - RFC 9457 bodies are flat: `type`, `status`, `detail` at the root, not under `error`. (A CLI's JSON envelope may use an `error` key; keep it consistent with its documented contract.)
+- **No correlation ID** - Without a `trace_id` (or an `instance` URI reference identifying the occurrence) the error cannot be matched to server logs. RFC 9457 makes `instance` optional; this skill's profile requires a correlation ID of some kind.
 
 ## Templates and tooling
 
@@ -400,7 +378,7 @@ Next.js App Router error boundary and API error middleware wrapper. Catches thro
 
 ### /templates/errors-and-auth/fastify-error-plugin.ts
 
-Fastify plugin that wraps all route handlers, catches errors, returns RFC 9457 JSON with 500 → 503 mapping for retryable faults.
+Fastify plugin that wraps all route handlers, catches errors and returns RFC 9457 JSON, keeping the error's own status code or falling back to 500.
 
 ### /templates/errors-and-auth/mcp-tool-error.ts
 
@@ -408,7 +386,7 @@ MCP tool wrapper that catches sync/async errors and returns `{ isError: true, co
 
 ### /templates/errors-and-auth/idempotency-middleware.ts
 
-Middleware for POST/PATCH/DELETE that deduplicates via Idempotency-Key header and in-memory cache (or Redis).
+Route wrapper that deduplicates POST/PATCH via the Idempotency-Key header with atomic reservation and request fingerprinting (in-memory or Redis). Review its in-flight lease and failure handling before production use.
 
 ### /templates/errors-and-auth/rate-limit-headers.ts
 
@@ -426,7 +404,7 @@ Parse `RateLimit-*` and `Retry-After` headers (delta-seconds and HTTP-date), com
 ## Citations
 
 - [RFC 9457 Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html) - Canonical spec, obsoletes RFC 7807
-- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/research/writing-tools-for-agents) - Factor #9: compact errors into context
+- [Anthropic: Writing Tools for Agents](https://www.anthropic.com/research/writing-tools-for-agents) - actionable, token-efficient error responses
 - [12-factor agents](https://github.com/humanlayer/12-factor-agents) - Factor #9 (errors) and tracing patterns
 - [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28/) - current error-code allocation policy
 - [Stripe API Error Handling](https://stripe.com/docs/api/errors) - Industry-standard error shape and Idempotency-Key

@@ -9,8 +9,8 @@ lastVerified: 2026-10-29
 The Idempotency-Key header enables safe retries on write operations. Client generates a unique key per logical operation and sends it on every retry. Server stores responses keyed by the caller, the operation and the idempotency key for a published retention window, and returns the cached result if the same key arrives again with the same payload.
 
 ```
-First request:  Idempotency-Key: abc123 → processes, stores response
-Retry:          Idempotency-Key: abc123 → returns cached response
+First request:  Idempotency-Key: "abc123" → processes, stores response
+Retry:          Idempotency-Key: "abc123" → returns cached response
                 (no duplicate resource created)
 ```
 
@@ -56,7 +56,7 @@ async function createInvoiceIdempotent(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": key, // Same key on every retry
+        "Idempotency-Key": `"${key}"`, // Quoted Structured Field String; same key on every retry
       },
       body: JSON.stringify(data),
     });

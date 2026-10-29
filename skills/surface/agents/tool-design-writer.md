@@ -83,18 +83,23 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - For OpenAI strict targets keep every property in `required` and make logical optionals nullable (`z.string().nullable()`); no unconstrained `z.any()` branches and no root-level `anyOf`
 
 5. **Add annotation coverage** on every MCP tool using the current 2026-07-28 fields:
-   - `readOnlyHint: true` - query-only, no side effects
-   - `destructiveHint: true` - mutates or deletes; any state-changing tool must carry this
-   - `idempotentHint: true` - safe to retry with same args (prefer upsert over create+update)
-   - `openWorldHint: false` - effects local to this API
+   - `readOnlyHint: true` - query-only, no side effects; `readOnlyHint: false` on every state-changing tool
+   - `destructiveHint` (only meaningful when `readOnlyHint` is false) - `true` when the tool can delete or overwrite data, `false` for purely additive writes
+   - `idempotentHint: true` - repeating the call with the same arguments has no further effect; needs a stable identity or deduplication key
+   - `openWorldHint` - `true` when the tool reaches an open external environment, `false` for a closed domain such as this API's own data
 
    ```typescript
    server.registerTool(
      "create_issue",
      {
        description: "Create a new issue in the tracker",
-       inputSchema: schema,
-       annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false },
+       inputSchema: schema, // includes request_id, which the server uses to deduplicate retries
+       annotations: {
+         readOnlyHint: false,
+         destructiveHint: false,
+         idempotentHint: true,
+         openWorldHint: false,
+       },
      },
      handler,
    );
@@ -104,7 +109,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - > 20 tools on one agent is a red flag; consolidate near-duplicates, split contexts, or gate by permission
    - Introduce or reuse a registry so tools are defined once (`/templates/tools/tool-registry.ts`)
    - Apply dynamic selection thresholds: `activeTools` / `defer_loading` / tool-search when the catalog is large; load full metadata on demand
-   - Collapse split `create_x` + `update_x` into idempotent `upsert_x`; add `_batch` variants for hot tools called 5+ times per task
+   - Collapse split `create_x` + `update_x` into `upsert_x` keyed by a stable identity (a natural key or a client-supplied ID), so retries address the same entity; without that key an upsert is not idempotent; add `_batch` variants for hot tools called 5+ times per task
 
 7. **Improve response shape and token budget:**
    - Return semantic names, not opaque IDs alone (`{ id, name, email }`, not `user_ids: [...]`)
@@ -117,7 +122,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 
 9. **Quality checks:**
    - Every tool name is `verb_noun`; parameter casing consistent across all tools
-   - Every description has What / When / When-not / Preconditions and is ≥50 words (unless purpose is trivially obvious)
+   - Every description has What / When / When-not / Preconditions and falls in the 30-200 word house range (around 30 is enough for a simple, unambiguous tool)
    - Every schema field has `.describe()`, an example, and format/enum/min-max where applicable
    - No request body nested >2 levels; `.strict()` present
    - Every tool carries the correct annotation set (read/destructive/idempotent/openWorld)
@@ -157,4 +162,4 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 - Do NOT return opaque IDs without a lookup tool or semantic fields.
 - Do NOT nest request bodies >2 levels (house limit; OpenAI strict mode's documented maximum is 10 levels).
 - Do NOT ship destructive tools without `destructiveHint`.
-- Do NOT throw errors from tools; return structured errors with recovery hints.
+- Do NOT throw recoverable errors from MCP tools; return `isError: true` results with recovery hints. In other SDKs, use that SDK's error mechanism (AI SDK tool-error parts, OpenAI Agents `errorFunction`) deliberately.

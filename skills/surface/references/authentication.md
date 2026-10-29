@@ -54,8 +54,8 @@ Key practices:
 
 Some services (Stripe, Anthropic, OpenAI) issue API keys instead of OAuth. Best practices:
 
-- **Scope per resource or operation.** Stripe's Restricted API Keys let you specify `allowed_apis: ["charges", "refunds"]`.
-- **Prefix-taggable for revocation.** If a key starts with `sk_live_` or `sk_test_`, you can rotate all test keys at once.
+- **Scope per resource or operation.** Stripe's restricted API keys, for example, grant read or write permission per resource type instead of full account access.
+- **Prefix-tagged keys.** A prefix such as `sk_live_` or `sk_test_` identifies a key's environment and type, which helps secret scanning and triage; bulk rotation still needs a key inventory and revoke/issue operations.
 - **Rotation API.** Offer a tool or endpoint to generate a new key and retire the old one.
 - **Not a replacement for OAuth** - but pragmatic for simple agent integrations.
 
@@ -87,7 +87,7 @@ What this changes in practice:
 - Authorization servers fetch and cache that document rather than minting per-client records.
 - Servers that already support DCR should keep it working for existing clients through the deprecation window and add Client ID Metadata Document support alongside.
 
-The 2026-07-28 revision also tightens related requirements: authorization servers validate `iss` per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html), `application_type` becomes required where DCR is still used, and credentials are bound to the issuing authorization server - keyed by issuer, and re-registered if the issuer changes.
+The 2026-07-28 revision also tightens related requirements: authorization servers return the `iss` parameter in authorization responses and clients validate it against the expected issuer per [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html), `application_type` becomes required where DCR is still used, and credentials are bound to the issuing authorization server - keyed by issuer, and re-registered if the issuer changes.
 
 ### auth.md for agentic registration
 
@@ -97,7 +97,7 @@ Use the current identity-method enum: `anonymous`, `identity_assertion`, and `se
 
 Keep registration and token exchange separate: the provider supplies an audience-bound ID-JAG to the identity endpoint; the service returns its own assertion for exchange at the OAuth token endpoint. For a user claim, the agent gives the person a verification URL and code to enter on the service's authenticated page. Do not ask the person to relay an email OTP to the agent. Respect polling intervals, expiry, account-linking confirmation, and revocation.
 
-Verify issuer trust, signature, audience, expiry, authentication freshness, and replay defenses. Enforce scopes on the API independently of registration. Follow the current canonical [auth.md guide](../../../src/content/docs/authentication/auth-md.mdx) and pin the [WorkOS reference](https://github.com/workos/auth.md) used by the integration. Fetch and exercise the complete discovery-to-action chain; endpoint existence alone is not proof.
+Verify issuer trust, signature, audience, expiry, authentication freshness, and replay defenses. Enforce scopes on the API independently of registration. Follow the current canonical [auth.md guide](https://agentsurface.dev/docs/authentication/auth-md) and pin the [WorkOS reference](https://github.com/workos/auth.md) used by the integration. Fetch and exercise the complete discovery-to-action chain; endpoint existence alone is not proof.
 
 ### Agent identity and delegation
 
@@ -105,11 +105,12 @@ Verify issuer trust, signature, audience, expiry, authentication freshness, and 
 
 ```
 POST /token
-subject_token=<user_jwt>
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+&subject_token=<user_jwt>
 &subject_token_type=urn:ietf:params:oauth:token-type:jwt
 &actor_token=<agent_jwt>
 &actor_token_type=urn:ietf:params:oauth:token-type:jwt
-&requested_token_use=access_token
+&requested_token_type=urn:ietf:params:oauth:token-type:access_token
 &audience=https://api.example.com
 &scope=users:read
 ```
@@ -117,10 +118,10 @@ subject_token=<user_jwt>
 The IdP returns a new access token with narrower scope and audience. JWT claims to track:
 
 - `iss` (issuer): which IdP issued the token.
-- `sub` (subject): the end user.
+- `sub` (subject): who the token is about - the end user in delegation, or a service for a service-owned token.
 - `aud` (audience): which service can use this token.
-- `azp` (authorized party): the agent acting on behalf of `sub`.
-- `act` (actor chain): for nested delegation (agent → agent → service).
+- `act` (actor): the party acting on behalf of `sub`, as `act.sub`; nested `act` claims record a delegation chain (agent → agent → service).
+- `client_id`: the OAuth client the token was issued to, where the token profile includes it (RFC 9068). Do not assume `azp` names the agent; its meaning depends on the issuer.
 - `scope`: which operations are allowed.
 - `exp` (expiry): UNIX timestamp; token expires at this time.
 
@@ -166,8 +167,8 @@ async function generateDPopProof(method: string, uri: string, accessToken: strin
 ([OAuth 2.1](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)) consolidates best practices. It is still an Internet-Draft - draft-16 was published 2026-09-03 (MCP `2026-07-28` itself cites draft-13). Never call it a final RFC in generated docs or implementation notes, and check the datatracker for a newer revision before pinning the number.
 
 - **PKCE mandatory** on all authorization-code flows (even confidential clients).
-- **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code only.
-- **Refresh token rotation.** Issue a new refresh token on each use; retire the old one.
+- **Implicit and Resource Owner Password Credential (ROPC) grants removed.** Authorization code (with PKCE), client credentials and refresh token remain.
+- **Refresh tokens for public clients must be sender-constrained or rotated.** Rotation issues a new refresh token on each use and retires the old one; DPoP binding is the other option.
 - **Exact-match redirect URIs.** No wildcard paths.
 - **Bearer tokens restricted to authenticated channels.** No query strings (tokens leak in logs).
 
@@ -202,6 +203,7 @@ async function validateToken(token: string, jwksUri: string) {
     issuer: "https://auth.example.com",
     audience: "https://api.example.com",
     algorithms: ["RS256", "ES256"], // whitelist safe algorithms
+    requiredClaims: ["exp"], // jwtVerify checks exp when present, but does not require it
   });
   return verified.payload;
 }
@@ -223,7 +225,7 @@ Support `.env` files (locally) and external secret managers:
 
 ```typescript
 import * as dotenv from "dotenv";
-import { readFileSync } from "fs";
+import { execSync } from "node:child_process";
 
 // Local dev: .env file
 dotenv.config({ path: ".env.local" });
@@ -238,36 +240,49 @@ const secret =
 **Protected Next.js App Router route handler with client-credentials JWT validation:**
 
 ```typescript
-import { jwtVerify } from "jose";
-import { createRemoteJWKSet } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 
 const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get("Authorization");
+  const challenge = { "WWW-Authenticate": 'Bearer realm="api", error="invalid_token"' };
   if (!authHeader?.startsWith("Bearer ")) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "WWW-Authenticate": 'Bearer realm="api"' } },
+    );
   }
 
   const token = authHeader.slice(7);
+  let payload: JWTPayload;
   try {
-    const verified = await jwtVerify(token, jwks, {
+    ({ payload } = await jwtVerify(token, jwks, {
       issuer: "https://auth.example.com",
       audience: "https://api.example.com",
-    });
-
-    const agentId = verified.payload.azp;
-    const scope = (verified.payload.scope as string)?.split(" ") || [];
-    const userId = verified.payload.sub;
-
-    // Log both agent and user for audit
-    console.log(`Agent ${agentId} acting on behalf of ${userId} with scopes [${scope.join(", ")}]`);
-
-    // Handle the request
-    return Response.json({ data: "authorized" });
-  } catch (err) {
-    return Response.json({ error: "Invalid token" }, { status: 403 });
+      algorithms: ["RS256", "ES256"],
+      requiredClaims: ["exp"],
+    }));
+  } catch {
+    // Invalid or expired credentials: 401 with a challenge, not 403
+    return Response.json({ error: "Invalid token" }, { status: 401, headers: challenge });
   }
+
+  // A client-credentials token is about the service itself: sub names the service,
+  // and there may be no human user. With delegation, act.sub names the actor.
+  const subject = payload.sub;
+  const actor = (payload.act as { sub?: string } | undefined)?.sub;
+  const scopes = typeof payload.scope === "string" ? payload.scope.split(" ") : [];
+
+  // Valid credentials without the needed authority: 403
+  if (!scopes.includes("reports:read")) {
+    return Response.json({ error: "insufficient_scope" }, { status: 403 });
+  }
+
+  // Log subject and actor for audit
+  console.log(`subject=${subject} actor=${actor ?? "none"} scopes=[${scopes.join(", ")}]`);
+
+  return Response.json({ data: await getReports(subject) });
 }
 ```
 
@@ -281,7 +296,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
     subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     actor_token: agentJwt,
     actor_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    requested_token_use: "access_token",
+    requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
     audience: audience,
     scope: "users:read",
   });
@@ -303,7 +318,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 
 **OpenAI Responses API:** Remote MCP tools require auth headers forwarded. Use `authorization` in the tool config. OAuth 2.0 Client Credentials is the recommended M2M pattern.
 
-**Google Vertex AI:** Uses IAM short-lived access tokens via Application Default Credentials (ADC). `gcloud auth application-default login` for dev; service account JSON for production. Agent Engine supports service accounts natively.
+**Google Vertex AI:** Uses IAM short-lived access tokens via Application Default Credentials (ADC). `gcloud auth application-default login` for dev; in production, an attached service account or workload identity federation through ADC, not a long-lived service account key file. Agent Engine supports service accounts natively.
 
 **MCP:** Remote protected servers publish `.well-known/oauth-protected-resource`. The client and server validate `iss`, `aud`, `exp`, resource, and scopes as appropriate. The current 2026-07-28 revision requires RFC 9207 `iss` validation, per-issuer credential binding, and deprecates RFC 7591 Dynamic Client Registration in favour of Client ID Metadata Documents.
 
@@ -319,7 +334,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - **Anonymous agent registration with full scopes.** Pre-claim credentials should be low-scope, expirable, revocable, and auditable.
 - **No token rotation.** Require token refresh every 1–2 hours. Auto-rotate on key rotation.
 - **Hardcoding secrets in code.** Always read from env vars or secret managers.
-- **Omitting agent identity from logs.** Track both `azp` (agent) and `sub` (user) for audit and debugging.
+- **Omitting agent identity from logs.** Track the subject (`sub`), any actor (`act.sub`) and the client (`client_id` where the profile has it) for audit and debugging.
 
 ## Templates and tooling
 
@@ -334,9 +349,9 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - `jose` - JWT signing + validation, JWKS fetching, all platforms.
 - `openid-client` - OIDC discovery, token exchange.
 - `better-auth` - drop-in auth framework for Next.js (supports OAuth + JWT).
-- `lucia` - lightweight session + JWT library.
-- `clerk/backend` - Clerk SDK for Node (auth + JWTs).
-- `workos-node` - WorkOS SDK for OAuth + SSO.
+- `lucia` - deprecated in March 2025; its site now teaches session handling from first principles. Do not add it to new projects.
+- `@clerk/backend` - Clerk SDK for Node (auth + JWTs).
+- `@workos-inc/node` - WorkOS SDK for OAuth + SSO.
 
 ## Citations
 
@@ -347,7 +362,7 @@ async function requestDelegatedToken(userJwt: string, agentJwt: string, audience
 - ([RFC 9449: OAuth 2.0 Demonstration of Proof-of-Possession Mechanisms](https://www.rfc-editor.org/rfc/rfc9449.html)) - DPoP, sender-constrained tokens.
 - ([RFC 7591: OAuth 2.0 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)) - deprecated by MCP 2026-07-28 in favour of Client ID Metadata Documents.
 - ([RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)) - `iss` validation required by MCP 2026-07-28.
-- ([OAuth 2.1 draft-ietf-oauth-v2-1-15](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-15)) - PKCE, removed insecure flows, refresh token rotation. Still an Internet-Draft; draft-15 published 2026-03-02.
+- ([OAuth 2.1 draft-ietf-oauth-v2-1-16](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-16)) - PKCE, removed insecure flows, refresh token protection. Still an Internet-Draft; draft-16 published 2026-09-03.
 - ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) - current authorization requirements.
 - ([WorkOS auth.md](https://workos.com/auth-md)) - agentic registration discovery.
 - ([workos/auth.md reference implementation](https://github.com/workos/auth.md)) - example service and provider implementations.

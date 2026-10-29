@@ -54,7 +54,7 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - Detect output with `process.stdout.isTTY` (stdout is what gets parsed); check `process.stdin.isTTY` separately before prompting or reading piped input
    - Non-TTY: suppress spinners, colors, interactive prompts; default to --format=json
    - Respect `NO_COLOR` env var (never output ANSI codes)
-   - Respect `NO_INTERACTIVE` env var (fail fast if input needed)
+   - Respect a `NO_INTERACTIVE` env var (an application convention, not a standard; fail fast if input needed)
 
 4. **Semantic exit codes** (a per-CLI contract, not a POSIX standard; publish it in `--help --json` and the skill file, since tools such as `gh` use different meanings for 2-5):
 
@@ -72,7 +72,16 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - When all required flags provided: do not prompt
    - When flags missing: return error with missing list:
      ```json
-     { "error": { "code": "MISSING_FLAGS", "missing": ["--name", "--email"] } }
+     {
+       "success": false,
+       "error": {
+         "code": "MISSING_FLAGS",
+         "message": "Missing required flags: --name, --email",
+         "details": { "missing": ["--name", "--email"] }
+       },
+       "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+       "timestamp": "2026-10-29T15:30:00Z"
+     }
      ```
 
 6. **--dry-run on mutations**:
@@ -107,23 +116,23 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    }
    ```
 
-8. **Input hardening** (all params):
+8. **Input hardening** (per field, matched to what each field holds):
    - Reject path traversal: resolve the real path (`fs.realpath` on the nearest existing ancestor) and reject anything outside the allowed directory, so symlinks cannot escape; also reject `../`, `..\\`, absolute paths (unless intentional)
-   - Reject control characters: ASCII < 0x20
-   - Reject percent-encoding tricks: `%2e`, `%2f`, `%00`
+   - Reject control characters (ASCII < 0x20) in identifiers, paths and flags; free-text and JSON fields may legitimately contain tab, newline and carriage return
+   - In identifier and path fields, reject percent-encoding tricks: `%2e`, `%2f`, `%00`
    - Reject embedded query params: `?`, `#` in resource IDs
-   - Reject double-encoded input: decode once, check result
+   - Reject double-encoded input: decode repeatedly until the value stops changing, then validate the result (or reject any residual encoding in identifier fields)
    - Return field-level error in envelope with suggestion
 
 9. **NDJSON streaming** (paginated results):
    - One JSON object per line; no array wrapper
-   - Cursor/offset in each line for resumption
-   - Final line is metadata: `{ "_final": true, "count": 42 }`
+   - Each record line carries a resumption point (the cursor for the next page) so an interrupted consumer can restart
+   - Final line is metadata (a house extension, not part of NDJSON): `{ "_final": true, "count": 42 }`
    - Example:
      ```
-     { "id": "1", "name": "Alice" }
-     { "id": "2", "name": "Bob" }
-     { "_final": true, "count": 2 }
+     { "id": "1", "name": "Alice", "cursor": "c_1" }
+     { "id": "2", "name": "Bob", "cursor": "c_2" }
+     { "_final": true, "count": 2, "next_cursor": null }
      ```
 
 10. **Quality checks**:
@@ -147,7 +156,7 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
 - POSIX exit status (only 0 = success and non-zero = failure are standard; the 0-5 meanings are this contract): https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_08_02
 - NDJSON: http://ndjson.org/
 - NO_COLOR: https://no-color.org/
-- Path Traversal Prevention: `/skills/surface/references/input-validation.md`
+- Input hardening and path traversal: https://agentsurface.dev/docs/cli-design/input-hardening
 
 ## Style Rules
 

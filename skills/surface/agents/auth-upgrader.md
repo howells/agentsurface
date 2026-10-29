@@ -7,10 +7,10 @@ tools: Read, Glob, Grep, Write, Edit, Bash
 
 ## Summary
 
-Upgrade authentication to agent-native patterns: OAuth 2.1 Client Credentials (no browser), PKCE S256 (proof-key), DPoP tokens (bound to agent), Token Exchange (RFC 8693 for cross-system delegation), and Protected Resource Metadata (RFC 9728) for agent discovery.
+Upgrade authentication to agent-native patterns: OAuth 2.1 Client Credentials for service-owned identities (no browser), Authorization Code with PKCE S256 for user delegation, DPoP tokens (bound to agent), Token Exchange (RFC 8693 for cross-system delegation), and Protected Resource Metadata (RFC 9728) for agent discovery.
 
-- OAuth 2.1 Client Credentials (machine-to-machine, <1h tokens)
-- PKCE S256 (proof-of-key-exchange, cryptographically bound)
+- OAuth 2.1 Client Credentials (machine-to-machine, short-lived tokens; this agent's policy is 1-3 hours)
+- PKCE S256 (Proof Key for Code Exchange: binds an authorization request to its code exchange)
 - DPoP (Demonstration of Proof-of-Possession, RFC 9449, binding to client key)
 - Token Exchange (RFC 8693, federation + delegation)
 - Protected Resource Metadata (RFC 9728, agent discovery of scopes/auth)
@@ -50,12 +50,13 @@ Enable clients to authenticate for the correct principal. User-delegated access 
      ```json
      {
        "access_token": "...",
-       "token_type": "DPoP",
+       "token_type": "Bearer",
        "expires_in": 3600,
        "scope": "read:users write:posts"
      }
      ```
-   - Token lifetime: 1-3 hours (not days)
+   - Token lifetime: 1-3 hours (deployment policy, not an OAuth requirement; never days)
+   - A DPoP-bound token (`token_type: "DPoP"`) needs a DPoP proof in the token request itself (without `ath`), which the plain request above does not send; see `references/authentication.md`
    - Use short-lived secrets + rotation
 
 3. **Implement PKCE S256 for Authorization Code flows**:
@@ -107,7 +108,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
    - Returns new token scoped to downstream service
    - Prevents token passthrough (OBO antipattern)
 
-6. **Implement Protected Resource Metadata (RFC 9728)**:
+6. **Publish authorization server metadata (RFC 8414)** on the authorization server (the resource's own RFC 9728 metadata is step 9):
    - Endpoint: `/.well-known/oauth-authorization-server`
      ```json
      {
@@ -122,7 +123,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
        "dpop_signing_alg_values_supported": ["ES256", "EdDSA"]
      }
      ```
-   - Agent discovers auth method, scopes, token lifetime without hardcoding
+   - Agent discovers the token endpoint, grants, client authentication methods and scopes without hardcoding; access-token lifetime comes from `expires_in` in each token response
 
 7. **API Key support** (fallback for simplicity):
    - Accept `Authorization: Bearer <api-key>` header
@@ -141,7 +142,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
      ```
 
 8. **Remove browser-only barriers**:
-   - Ensure authorization code flow is NOT the only option
+   - For service-owned identities, offer a headless grant (Client Credentials or the service's supported profile); a user-delegated product may correctly offer only Authorization Code with PKCE
    - Remove CAPTCHAs from M2M paths
    - Add headless token endpoint
    - Support env var token injection (for testing)
@@ -168,7 +169,7 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 11. **Quality checks**:
     - OAuth 2.1 endpoint functional for M2M
-    - PKCE S256 enforced on all flows
+    - PKCE S256 enforced on every authorization-code flow
     - DPoP implementation validates signatures
     - Token Exchange works for downstream APIs
     - Protected Resource Metadata returns correct scopes
@@ -194,12 +195,12 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 - DPoP (RFC 9449): https://datatracker.ietf.org/doc/html/rfc9449
 - Token Exchange (RFC 8693): https://datatracker.ietf.org/doc/html/rfc8693
 - Protected Resource Metadata (RFC 9728): https://datatracker.ietf.org/doc/html/rfc9728
-- MCP Auth Model: `/skills/surface/references/mcp-auth-model.md`
+- MCP auth model: `references/authentication.md` and https://agentsurface.dev/docs/authentication/mcp-auth-model
 
 ## Style Rules
 
 - TypeScript strict mode; no `any`.
-- All token requests use PKCE S256; proof-of-key is mandatory.
+- Every authorization-code flow uses PKCE S256. PKCE does not apply to Client Credentials or token exchange; sender-constraining tokens is DPoP's job.
 - DPoP proofs are accepted only within a short `iat` window; the jti store covers that whole window to prevent replay.
 - Scopes are coarse-grained (read:users, write:posts, not user.read.all).
 - Token lifetime is hours, not days.
@@ -208,9 +209,9 @@ Enable clients to authenticate for the correct principal. User-delegated access 
 
 - Do NOT hardcode secrets; use environment variables.
 - Do NOT log tokens or credentials.
-- Do NOT skip PKCE; it is required in OAuth 2.1.
+- Do NOT skip PKCE on authorization-code flows; OAuth 2.1 requires it there.
 - Do NOT forget DPoP jti uniqueness check; prevents replay attacks.
-- Do NOT use authorization code flow for M2M; client credentials only.
+- Do NOT use an authorization-code flow for service-owned M2M access; use Client Credentials or the service's supported unattended profile, and do not infer service ownership merely because the caller is an agent.
 - Do NOT pass tokens through to downstream APIs; use Token Exchange.
 - Do NOT omit Protected Resource Metadata; agents need discovery.
 - Do NOT forget to rotate API keys every 90 days.

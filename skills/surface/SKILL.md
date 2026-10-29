@@ -74,7 +74,7 @@ Scaffold modes:
 Use guide mode when the user wants agent information, standards context, or surface design guidance without asking to modify a project.
 
 1. Identify whether the user needs concepts, a decision, or implementation guidance.
-2. Prefer the docs site when available: `src/content/docs/` is the canonical Agent Surface guide.
+2. Prefer the docs site when available: `src/content/docs/` is the canonical Agent Surface guide in its source repository, published at https://agentsurface.dev/docs. Outside that repository, read the published pages; the docs paths below map to `/docs/...` routes.
 3. Read only the relevant docs pages. Start with section indexes, then load leaf pages as needed.
 4. Keep answers dense and decision-oriented. Name tradeoffs, failure modes, and adjacent surfaces.
 5. For fast-moving standards, tools, and vendor platforms, verify current primary sources before making "latest", "current", or "recommended" claims.
@@ -127,7 +127,7 @@ Gather these surfaces before scoring:
 - Stack files: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `deno.json`, `bun.lockb`, lockfiles.
 - API specs/routes: OpenAPI, Swagger, `app/api`, `pages/api`, route handlers, controllers.
 - CLI: `bin` field, command entrypoints, argument parsers, TTY/output handling.
-- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/sdk`, `mcp-handler`, server transports, protocol version, roots, sampling, elicitation, and task support.
+- MCP: `.mcp.json`, `.mcp/mcp.json`, `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (v2), `@modelcontextprotocol/sdk` (v1), `mcp-handler`, server transports, protocol version, roots, sampling, elicitation, and task support.
 - Discovery: `AGENTS.md`, `CLAUDE.md`, Cursor/Copilot/Windsurf rules, `llms.txt`, `llms-full.txt`, `robots.txt`, `sitemap.xml`, `.well-known`.
 - Agent web readiness: Markdown content negotiation, JSON-LD, OpenAPI links, API catalog, MCP metadata, OAuth protected-resource metadata.
 - Auth: OAuth, API keys, bearer/JWT validation, scopes, token exchange, env-var handling.
@@ -231,9 +231,9 @@ Use these defaults unless the project already has a better convention:
 - OAuth Protected Resource Metadata (RFC 9728): https://www.rfc-editor.org/rfc/rfc9728.html
 - DPoP (RFC 9449): https://www.rfc-editor.org/rfc/rfc9449.html
 - Claude Platform release notes: https://platform.claude.com/docs/en/release-notes/overview
-- Agent Surface retrievability guide: /docs/retrievability
-- Agent Surface agent-building inventory: /docs/agents, /docs/agent-retrieval
-- Agent Surface disciplines (longer-form design guidance): `disciplines/`
+- Agent Surface guide: https://agentsurface.dev/docs (every page is also available as Markdown; the index is at https://agentsurface.dev/llms.txt)
+- Agent Surface retrievability guide: https://agentsurface.dev/docs/retrievability
+- Agent Surface agent-building inventory: https://agentsurface.dev/docs/agents, https://agentsurface.dev/docs/agent-retrieval
 
 ## Skill Folder Structure
 

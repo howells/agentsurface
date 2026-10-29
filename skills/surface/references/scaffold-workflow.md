@@ -96,12 +96,12 @@ Ask:
 - What capability does the tool expose, and what does it do?
 - Inputs and outputs, with field-level descriptions.
 - Read/write/destructive/idempotent behavior.
-- Identity and permission handling (never accept user/tenant identity as a tool input parameter; resolve it server-side from the caller's authenticated context).
+- Identity and permission handling (never accept user/tenant identity as a tool input parameter; resolve it server-side from the caller's authenticated context; a target identifier, such as the ID of the user record being read, is a normal parameter, but the caller's own identity and authority are not).
 
 Generate:
 
 - Tool definition with a typed schema and field descriptions.
-- Output schema that whitelists safe fields (no internal IDs, secrets, or unrelated PII).
+- Output schema that whitelists safe fields: no secrets, unrelated personal data or private implementation identifiers, but keep the stable resource IDs an agent needs for follow-up calls.
 - MCP annotations when the tool is also exposed over MCP.
 - A confirmation-gate note for any write/destructive tool.
 - A test or fixture when the project has a test surface.

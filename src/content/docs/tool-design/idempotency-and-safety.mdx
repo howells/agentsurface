@@ -40,7 +40,7 @@ upsert_user(
 )
 ```
 
-The agent calls `upsert_user` once. If the call succeeds, the user exists with the provided data. If the call fails and the agent retries, the user ends up in the same state.
+The agent calls `upsert_user` once. If the call succeeds, the user exists with the provided data. If the call fails and the agent retries, the user ends up in the same state - provided the server treats `email` as a unique natural key, so a retry without `id` finds the record the first attempt created instead of creating a second one. Without a unique key, an upsert is no more idempotent than a create.
 
 **Idempotency keys:**
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema with structuredContent, resources, OAuth protected-resource metadata for protected HTTP servers, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts/tasks, roots, sampling/elicitation gates, consent policies, and dynamic tool loading.
+Dimension 3 scores MCP server implementation quality. MCP is the cross-vendor standard for agent-tool transport. Baseline is presence of tools with agent-oriented descriptions and structured error handling (isError: true). Production includes annotations (readOnlyHint, destructiveHint, idempotentHint), outputSchema with structuredContent, resources, OAuth protected-resource metadata for protected HTTP servers, pagination (cursor-based), and testing via InMemoryTransport. Advanced includes multiple transports (stdio + Streamable HTTP), prompts and negotiated Tasks, elicitation (via MRTR) with explicit gates, consent policies, and dynamic tool loading. Roots, sampling and logging are deprecated in 2026-07-28 and are not upgrade targets.
 
 - **0**: No MCP server, no .mcp.json (blocker)
 - **1**: Server exists but <5 tools, terse descriptions, no annotations, errors thrown
@@ -20,7 +20,7 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0     | No MCP server. No .mcp.json or .mcp/mcp.json. No SDK imports (@modelcontextprotocol/server, @modelcontextprotocol/sdk, mcp-handler, @mastra/mcp).                                                                                                                                                                                                                                                                                                                                                                                                  | grep -r "@modelcontextprotocol/" and grep -r "mcp-handler" both return nothing. No .mcp.json.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 1     | Basic MCP server exists but minimal. Fewer than 5 tools; descriptions are terse (<20 words); no annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint); no resources or prompts; errors thrown rather than structured with `isError: true`.                                                                                                                                                                                                                                                                                    | MCP server file imports sdk but: <5 tools defined; descriptions lack "when to use / when not to use"; no annotations object; no resources; errors not wrapped in `{ isError: true, content: [...] }`.                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 2     | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Spec compliance 2025-11-25 or later.                                                                                                                                                | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses the current TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23) or a maintained `@modelcontextprotocol/sdk` 1.x release (1.32.2); Python 2.3.0, Go 1.8.0, C# 2.3.0, Rust rmcp 3.8.0, and Ruby 1.8.2 are the other current Tier 1 SDKs. |
+| 2     | Well-structured MCP. Tools have proper annotations (readOnlyHint, destructiveHint, idempotentHint). Agent-oriented descriptions explaining when/why to use. Structured error handling with `isError: true`. outputSchema declared on tools returning structured data and results include structuredContent where supported. Resources exposed for static data. Implements the current 2026-07-28 revision (2025-11-25 only as an explicitly required compatibility mode).                                                                          | Tools decorated with `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` as appropriate. Descriptions include "Use when..." and "Do not use for...". Tools return `{ isError: true, content: [...] }` on recoverable errors. outputSchema and structuredContent present on structured tools. Resources with MIME types declared. Server uses the current TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23) or a maintained `@modelcontextprotocol/sdk` 1.x release (1.32.2); Python 2.3.0, Go 1.8.0, C# 2.3.0, Rust rmcp 3.8.0, and Ruby 1.8.2 are the other current Tier 1 SDKs. |
 | 3     | Production MCP. OAuth authorization via RFC 9728 `.well-known/oauth-protected-resource` metadata for protected HTTP servers. Pagination on list operations (cursor-based). Progress notifications for long-running operations. Multiple transports (stdio + Streamable HTTP). Tested with InMemoryTransport.createLinkedPair(). Tool count optimized (<20). Prompts or negotiated Tasks for workflow templates. Consent gates for destructive/authenticated/production tools. Deprecated roots, sampling, and logging are absent from new designs. | Auth: `.well-known/oauth-protected-resource` present for protected HTTP servers; bearer token validation and issuer/audience/resource/scope checks; authorization server discovery documented. Pagination: list operations return cursor via the MCP pagination pattern. HTTP transport via Streamable HTTP. Test coverage with InMemoryTransport. Tool count ≤20. Prompts or Tasks registered. Tasks use current extension negotiation with `tasks/get` and `tasks/update`. Consent policy exists for high-risk calls.                                                                                                              |
 
 ## Evidence to gather
@@ -52,9 +52,9 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 **Tool annotations presence:**
 
 - `readOnlyHint: true` on read-only tools
-- `destructiveHint: true` on operations that modify/delete
+- `readOnlyHint: false` on every tool that changes state, with `destructiveHint: true` only where the change can destroy or overwrite data (additive writes use `destructiveHint: false`)
 - `idempotentHint: true` on idempotent operations
-- `openWorldHint: true` on tools that accept arbitrary strings (not enums)
+- `openWorldHint: true` on tools that interact with an open external environment (the web, third-party systems), `false` for a closed domain such as the server's own database
 
 **Structured result patterns:**
 
@@ -66,7 +66,7 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 **Security and consent patterns:**
 
 - protocol version declared and validated
-- roots honored for filesystem/resource scope
+- filesystem and resource scope set by explicit tool parameters, resource URIs and server configuration (roots are deprecated; honour them only for a legacy 2025-11-25 client that sends them)
 - sampling and elicitation require explicit client/server policy
 - destructive, authenticated, production, browser, sandbox, and network tools require approval or a documented allowlist
 - bearer token validation checks issuer, audience/resource, expiry, and scopes
@@ -355,23 +355,32 @@ app.get("/.well-known/oauth-protected-resource", (req, res) => {
   });
 });
 
-// Validate JWT on every request
-async function validateToken(authHeader: string): Promise<{ clientId: string; scopes: string[] }> {
-  const token = authHeader.replace(/^Bearer /, "");
-  const decoded = jwt.verify(token, PUBLIC_KEY, {
+// Validate the access token on every request (a sketch: wire the error to a 401 with
+// WWW-Authenticate pointing at the metadata above, and enforce scopes per tool).
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const jwks = createRemoteJWKSet(new URL("https://auth.example.com/.well-known/jwks.json"));
+
+async function validateToken(authHeader: string | undefined) {
+  const match = /^Bearer (\S+)$/i.exec(authHeader ?? "");
+  if (!match) throw new UnauthorizedError("missing or non-Bearer credentials");
+  const { payload } = await jwtVerify(match[1], jwks, {
     issuer: "https://auth.example.com",
-    audience: "mcp-server",
+    audience: "https://mcp.example.com", // the resource advertised in the metadata above
     algorithms: ["RS256"],
+    requiredClaims: ["exp"],
   });
   return {
-    clientId: decoded.sub,
-    scopes: decoded.scope?.split(" ") || [],
+    subject: payload.sub, // who the token is about (a user or a service), not necessarily the client
+    clientId: typeof payload.client_id === "string" ? payload.client_id : undefined, // RFC 9068 profile
+    scopes: typeof payload.scope === "string" ? payload.scope.split(" ") : [],
   };
 }
 
 // Apply to HTTP stream handler
 app.post("/mcp", express.json(), async (req, res) => {
-  const auth = await validateToken(req.headers.authorization || "");
+  const auth = await validateToken(req.headers.authorization);
+  // Each tool handler checks auth.scopes for the operation it performs.
   // SDK v2: pass the verified identity through with
   // createMcpHandler(factory).fetch(request, { authInfo }); the handler does not verify tokens itself.
   // (SDK v1 equivalent: a per-request StreamableHTTPServerTransport with sessionIdGenerator: undefined.)
@@ -395,7 +404,7 @@ curl -X POST https://auth.example.com/oauth/token \
   -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
   -d "subject_token=USER_TOKEN&subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
   -d "actor_token=AGENT_TOKEN&actor_token_type=urn:ietf:params:oauth:token-type:jwt" \
-  -d "resource=mcp-server&audience=my-api"
+  -d "resource=https://mcp.example.com"
 ```
 
 Allows fine-grained delegation without exposing user credentials to the agent.
@@ -561,20 +570,20 @@ export default {
 
 **Anthropic:**
 
-- Claude Desktop: reads `.mcp.json` from `~/.claude/` or project root
-- Claude Code: native MCP support; servers specified via `.claude/mcpServers` or agent definition
-- claude-agent-sdk: `mcpServers` option in `Agent` config
+- Claude Desktop: servers configured in `claude_desktop_config.json` (or installed as extensions)
+- Claude Code: project servers in `.mcp.json` at the repo root, user and local servers in `~/.claude.json`; add them with `claude mcp add`
+- Claude Agent SDK: `query({ prompt, options: { mcpServers, allowedTools } })`
 
 **OpenAI:**
 
-- Responses API: `remote_mcp_tool` resource type (HTTP servers only)
-- Agents SDK: `tools.MCP { server: { type: "http", url: "..." } }`
+- Responses API: a tool entry `{ type: "mcp", server_label, server_url }`, with optional `authorization` (remote HTTP servers only)
+- Agents SDK (JS): `new MCPServerStreamableHttp({ url })` passed in the agent's `mcpServers`, or `hostedMcpTool(...)` for hosted invocation
 - ChatGPT Desktop: custom connectors directory
 
 **Google:**
 
-- Gemini: managed remote MCP (Google-hosted token exchange)
-- Gemini CLI: auto-discovers stdio servers in `PATH` or via `--mcp-server` flag
+- Gemini Enterprise: custom MCP server connectors, with the authorization modes that product documents
+- Gemini CLI: servers configured under `mcpServers` in `settings.json`, or added with `gemini mcp add`
 - Vertex AI Agent Engine: deploy MCP as managed service
 
 ---
@@ -585,8 +594,8 @@ export default {
 - **No annotations:** Tools without `readOnlyHint`, `destructiveHint`, etc. force agents to guess at safety. Always annotate.
 - **Throwing on error:** Exceptions are noisy and interrupt agent flow. Return `{ isError: true, content: [...] }` so agents can reason about recovery.
 - **No pagination:** List tools that return 1000s of items break agent context. Implement cursor-based pagination and default limits.
-- **Tool bloat (>20 tools):** Agents cannot reason over large tool sets - under 10 in a single agent context is ideal, and anything past 20 is a red flag. Split into multiple focused servers or use lazy loading.
-- **Missing OAuth metadata on HTTP servers:** Public remote MCP servers without `.well-known/oauth-protected-resource` cannot verify client credentials. Always publish auth metadata.
+- **Tool bloat (>20 tools):** Selection accuracy and context cost get worse as the active tool set grows. Treat about 20 tools in one agent context as a house review threshold (not a protocol limit), test representative tasks, and keep the set smaller where you can. Split into multiple focused servers or use lazy loading.
+- **Missing OAuth metadata on protected HTTP servers:** Without `.well-known/oauth-protected-resource`, clients cannot discover which authorization server issues tokens for the server. Metadata enables discovery; the server still validates every access token itself. Public read-only servers may need no authorization at all.
 - **No InMemoryTransport tests:** Untested MCP servers fail silently in production. Test every tool with linked transports.
 
 ---

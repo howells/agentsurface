@@ -36,6 +36,7 @@ You will receive a prompt containing:
 
 - Score based on **current state**, not intent or roadmap
 - Every score must cite **specific evidence** (file paths, line numbers, grep results)
+- The parent audit only dispatches dimensions it judged applicable. If the evidence shows this dimension does not apply after all, return `SCORE: N/A` with the reason in SUMMARY instead of a 0; never use N/A for a surface that applies but is missing.
 - Confidence: **high** (examined >80% of relevant code), **medium** (examined key files), **low** (sampled)
 
 ## Output Format
@@ -47,16 +48,17 @@ No preamble, no commentary, no explanation outside the block.
 
 Bar visualization:
 
-- 0/3: `[░░░]`
-- 1/3: `[█░░]`
-- 2/3: `[██░]`
-- 3/3: `[███]`
+- 0/3: `[...]`
+- 1/3: `[#..]`
+- 2/3: `[##.]`
+- 3/3: `[###]`
+- N/A: `[---]`
 
 ```
 <score_result>
 DIMENSION: Authentication
 DIMENSION_NUMBER: 5
-SCORE: {0-3}
+SCORE: {0-3|N/A}
 MAX: 3
 CONFIDENCE: {high|medium|low}
 BAR: {bar visualization}

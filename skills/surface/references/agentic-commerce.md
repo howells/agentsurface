@@ -48,7 +48,7 @@ Do not penalize a non-commerce product for missing any of this - record it not a
 **Orders and after purchase** (`orders-and-after-purchase.mdx`)
 
 - `get_order`-style status operation, not just an emailed receipt
-- Order/payment webhooks: discriminated `event_type`, `idempotency_key`, signed per Standard Webhooks for your own API (platform integrations use the provider's signature mechanism, and Shop MCP has no webhooks, so check `get_checkout` polling instead) - see `references/api-surface.md` for the general webhook rubric, applied here to order events
+- Order/payment webhooks: discriminated `event_type` and a unique `event_id` for deduplication (distinct from a checkout request's `Idempotency-Key`), signed per Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`) for your own API (platform integrations use the provider's signature mechanism, and Shop MCP has no webhooks, so check `get_checkout` polling instead) - see `references/api-surface.md` for the general webhook rubric, applied here to order events
 - Idempotent order creation - see `references/authentication.md` for the idempotency-key mechanics
 - Returns/refunds as a callable operation with a defined contract and structured errors, not a support-ticket fallback
 

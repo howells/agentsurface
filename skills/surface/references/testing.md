@@ -52,7 +52,7 @@ Agents require layered testing strategies. Build from deterministic at the base 
 
 Agents often discover valid solutions evaluators didn't anticipate. Agents that take 7 steps to solve a 3-step problem may still deliver correct output. This is a feature, not a bug.
 
-Reserve trajectory evals for post-mortem debugging ("why did it fail?"), not gating ("must take exactly 4 steps"). Grade outcomes. Cite [Anthropic's demystifying evals](https://www.anthropic.com/research/demystifying-evals-for-ai-agents).
+Do not gate on one arbitrary solution path ("must take exactly 4 steps"); use full trajectories for post-mortem debugging ("why did it fail?"). Grade outcomes, and gate on trajectory only where the workflow genuinely requires it: mandatory tool order, call budgets, or safety constraints such as never mutating before a confirmation step. Cite [Anthropic's demystifying evals](https://www.anthropic.com/research/demystifying-evals-for-ai-agents).
 
 ### Metrics
 
@@ -78,7 +78,7 @@ Cite [Chip Huyen's AI Engineering](https://www.oreilly.com/library/view/ai-engin
 ### Grader taxonomy
 
 - **Code-based graders** - deterministic checks: regex match, JSON schema validation, numeric tolerance, substring presence. Fast, reproducible, no LLM call. Ideal for "did the agent return valid JSON?" or "is the exit code 0?"
-- **Model-based graders (LLM-as-judge)** - flexible but biased. Use for subjective tasks (quality, coherence, helpfulness). **Always pair with ground truth and human calibration.**
+- **Model-based graders (LLM-as-judge)** - flexible but biased. Use for subjective tasks (quality, coherence, helpfulness). **Always give the judge a task rubric (and a reference answer where one exists) and calibrate it against human labels.**
 - **Human graders** - gold standard for nuanced evaluation (UX flows, tone, appropriateness). Expensive; reserve for 20–50 labelled samples to calibrate model judges.
 
 ### LLM-as-judge best practices
@@ -178,7 +178,7 @@ Traces are the source of truth for debugging failures. Instrument with OpenTelem
 **Key attributes** (cite https://github.com/open-telemetry/semantic-conventions-genai; the conventions are Development status and unversioned, so pin a commit):
 
 - `gen_ai.operation.name` - required, e.g. "chat", "invoke_agent", "execute_tool"
-- `gen_ai.provider.name` - required: "anthropic", "openai", "google"
+- `gen_ai.provider.name` - required on inference and client agent spans, conditionally required elsewhere; use the well-known values, e.g. "anthropic", "openai", "gcp.gemini", "gcp.vertex_ai", "gcp.gen_ai"
 - `gen_ai.request.model` - conditionally required, e.g. "claude-opus-5-5"
 - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` - recommended
 - `gen_ai.input.messages` / `gen_ai.output.messages` / `gen_ai.system_instructions` - opt-in structured content (role + parts); omit when sensitive
@@ -186,22 +186,22 @@ Traces are the source of truth for debugging failures. Instrument with OpenTelem
 
 **Span names:** model calls `chat {model}` (`{gen_ai.operation.name} {gen_ai.request.model}`), agents `invoke_agent {agent name}`, tool execution `execute_tool {tool name}` with `gen_ai.tool.name`, `gen_ai.tool.call.id` and opt-in `gen_ai.tool.call.arguments` / `gen_ai.tool.call.result`.
 
-Auto-instrument with [Traceloop](https://www.traceloop.com/) (`@traceloop/node-server-sdk`) or [OpenLLMetry](https://github.com/traceloop/openllmetry). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
+Auto-instrument with [OpenLLMetry](https://github.com/traceloop/openllmetry) (Traceloop's `@traceloop/node-server-sdk`). Export OTLP to Langfuse, Phoenix, Braintrust, or Datadog.
 
 ### Eval platforms
 
 - **Braintrust** ([braintrust.dev](https://www.braintrust.dev/)) - end-to-end eval loop, dataset management, prompt versioning, human review, traces. A good fit for TypeScript teams.
-- **LangSmith** - LangChain-native evals and tracing. Strong if using LangChain agent framework.
+- **LangSmith** - evals and tracing from the LangChain team; works with other frameworks and providers, and is the most convenient fit for LangChain/LangGraph agents.
 - **Arize Phoenix** ([arize.com/phoenix](https://arize.com/phoenix)) - OSS, OTEL-native, self-hostable. No vendor lock-in.
 - **Langfuse** ([langfuse.com](https://langfuse.com/)) - OSS backend + managed cloud. OTEL support, trace UI, eval API.
 - **Promptfoo** ([promptfoo.dev](https://www.promptfoo.dev/)) - CLI + YAML test configs, strong red-teaming, OpenAI agreed to acquire it (announced 2026-03-09).
-- **OpenAI Evals** ([platform.openai.com/evals](https://platform.openai.com/evals)) - tight Agents SDK integration, trace dashboard.
-- **Vertex AI Gen AI Evaluation** ([cloud.google.com/generative-ai-studio](https://cloud.google.com/generative-ai-studio)) - Google-side, autoraters (GROUNDING, SAFETY, TOOL_USE_QUALITY).
+- **OpenAI Evals** ([evals guide](https://developers.openai.com/api/docs/guides/evals), [trace grading](https://developers.openai.com/api/docs/guides/trace-grading)) - hosted evals and grading of Agents SDK traces.
+- **Google Gen AI evaluation service** ([evaluation overview](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/evaluation-overview)) - Google-side, model-based metrics including per-prompt adaptive rubrics.
 
 ### CI integration
 
 - **Run evals on every PR.** Baseline: previous main branch results.
-- **Gate on regression.** If any metric (pass@k, F1, groundedness) drops > 5%, fail the check.
+- **Gate on regression.** Fail the check when a metric (pass@k, F1, groundedness) drops past a published threshold against a baseline run on the same pinned dataset, model and prompt versions. State whether the threshold is absolute or relative, run enough trials to separate a real drop from noise, and keep fast deterministic PR gates separate from slower credentialed suites.
 - **Report deltas in PR comments.** Example: "Tool F1: 0.89 → 0.85 (-4%). Human review requested."
 - **Track history per commit.** Store results in time-series DB for trend analysis (e.g., "F1 degrading over 3 weeks").
 - **Slice by category.** Separate evals for happy path vs. adversarial vs. edge cases.
@@ -264,7 +264,7 @@ Cite Simon Willison + [arxiv 2506.08837](https://arxiv.org/abs/2506.08837) on de
 ### Anti-patterns
 
 - **Vibes-based iteration.** "It feels more accurate after my prompt rewrite." Ship evals first; measure before/after.
-- **Only testing happy path.** 70% of prod failures are edge cases. Slice evals by scenario.
+- **Only testing happy path.** Production failures concentrate in edge cases the happy path never reaches. Slice evals by scenario.
 - **LLM judge without calibration.** "GPT-6 Astra will grade my agent's outputs." LLM judges are biased and gamable. Validate on 20–30 human labels first.
 - **No regression gating.** Evals pass but metrics decline silently. CI gates prevent replay.
 - **Testing tool calls, not outcomes.** "Agent called delete_file." Did the file actually get deleted? Test outcomes.
@@ -294,14 +294,14 @@ See `/templates/` in the surface skill:
 - [Arize Phoenix](https://arize.com/phoenix)
 - [Langfuse](https://langfuse.com/)
 - [Promptfoo](https://www.promptfoo.dev/)
-- [OpenAI Evals Dashboard](https://platform.openai.com/evals)
-- [Vertex AI Gen AI Evaluation](https://cloud.google.com/generative-ai-studio)
-- [OpenTelemetry Traceloop](https://www.traceloop.com/)
+- [OpenAI evals guide](https://developers.openai.com/api/docs/guides/evals)
+- [Google Gen AI evaluation service](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/evaluation-overview)
+- [OpenLLMetry (Traceloop)](https://github.com/traceloop/openllmetry)
 
 ## See also
 
-- [docs/testing](/docs/testing) - extended testing guide
-- [references/tool-design.md](/references/tool-design.md) - tool routing test patterns
-- [references/context-files.md](/references/context-files.md) - testing context for agent SDKs
-- [templates/cli-and-evals/eval-braintrust.ts](/templates/cli-and-evals/eval-braintrust.ts)
-- [templates/cli-and-evals/mcp-test-harness.ts](/templates/cli-and-evals/mcp-test-harness.ts)
+- [Agent Surface testing guide](https://agentsurface.dev/docs/testing) - extended testing guide
+- [tool-design.md](tool-design.md) - tool routing test patterns
+- [context-files.md](context-files.md) - testing context for agent SDKs
+- [templates/cli-and-evals/eval-braintrust.ts](https://github.com/howells/agentsurface/blob/main/templates/cli-and-evals/eval-braintrust.ts)
+- [templates/cli-and-evals/mcp-test-harness.ts](https://github.com/howells/agentsurface/blob/main/templates/cli-and-evals/mcp-test-harness.ts)

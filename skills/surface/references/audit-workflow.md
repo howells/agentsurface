@@ -57,6 +57,11 @@ Failure handling:
 - If a dimension cannot be scored, mark `[???] ?/3 Scoring failed`.
 - Exclude failed dimensions from math.
 - Add a warning footer.
+- If no dimension could be scored, report the overall score as unavailable. Do not compute a scaled score or a rating, and do not treat failure as N/A.
+
+Live evidence: scoring subagents may only have read tools. For a deployed site or service, run the live checks (HTTP requests, AFDocs, MCP calls) in the parent or a runner that has shell and network access, and pass the dated results to the scorer.
+
+Before comparing scores across raters or over time, follow the calibration protocol at https://agentsurface.dev/docs/scoring/calibration and record the rubric version used.
 
 ## Scorecard Format
 
@@ -73,7 +78,7 @@ Use this exact shape for full scorecards. Keep dimensions in this order.
   2. CLI Design           [###]  3/3   Full JSON output, schema introspection, hardened
   3. MCP Server           [...]  0/3   No MCP server
   4. Discovery & AEO      [#..]  1/3   AGENTS.md exists, no public discovery
-  5. Authentication       [##.]  2/3   Scoped API keys, no token exchange
+  5. Authentication       [##.]  2/3   Scoped API keys, rotation untested
   6. Error Handling       [#..]  1/3   Structured errors are inconsistent
   7. Tool Design          [---]  N/A   No agent tools
   8. Context Files        [##.]  2/3   Curated AGENTS.md, no overlays
@@ -223,21 +228,36 @@ Delta format:
 
 ## JSON Output
 
-When `--format=json` is requested, include:
+When `--format=json` is requested, emit the published scorecard schema (https://agentsurface.dev/docs/scoring/scorecard-format): `version: "1.0"`, a `project` object, an ISO 8601 `date`, exactly ten `dimensions` records (`score` and `confidence` are `null` for N/A), `findingClusters`, and camelCase `overall` totals with a lower-case rating. Abridged:
 
 ```json
 {
-  "project": "name",
-  "date": "YYYY-MM-DD",
-  "raw_score": 11,
-  "max_applicable": 21,
-  "scaled_score": 16,
-  "rating": "Agent-ready",
-  "dimensions": [],
-  "findings": [],
-  "plans": []
+  "version": "1.0",
+  "project": { "name": "example-cli" },
+  "date": "2026-10-29T15:30:00Z",
+  "dimensions": [
+    { "name": "api-surface", "score": null, "confidence": null, "evidence": [], "findings": [] },
+    {
+      "name": "cli-design",
+      "score": 3,
+      "confidence": "high",
+      "evidence": [
+        {
+          "type": "file",
+          "description": "JSON envelope",
+          "location": "src/cli/output.ts:12",
+          "result": "--json emits { success, data }"
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "findingClusters": [],
+  "overall": { "rawScore": 11, "maxApplicable": 21, "scaledScore": 16, "rating": "agent-ready" }
 }
 ```
+
+The remaining eight dimension records are omitted above for length; a real scorecard always has all ten. Transformation plans stay in the tracker, not in the scorecard JSON.
 
 Do not omit the normal human-readable report unless the user asked for JSON only.
 

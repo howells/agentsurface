@@ -95,8 +95,8 @@ CLIs designed for AI agents look fundamentally different from human-oriented com
 
 10. **Test NDJSON streaming on list operations:**
     ```bash
-    <cli> list --ndjson
-    <cli> list --json | jq -c '.' | head -3  # Is each line valid JSON?
+    <cli> list --ndjson | head -3 | while IFS= read -r line; do printf '%s\n' "$line" | jq -e . >/dev/null || echo "not NDJSON: $line"; done
+    # Check the raw output: several records, one JSON value per line. Piping --json through jq -c proves nothing.
     ```
 
 ---
@@ -127,19 +127,21 @@ Example with `commander`:
 
 ```typescript
 import { Command, Option } from "commander";
-import { createWriteStream } from "fs";
-
 const program = new Command();
 
 program
   .command("list-users")
   .addOption(new Option("--json", "Output as JSON").default(false))
   .action(async (opts) => {
+    const started = performance.now();
     const users = await db.users.list();
     const response: CLIResponse<typeof users> = {
       success: true,
       data: users,
-      metadata: { duration_ms: Date.now() % 1000 },
+      metadata: {
+        duration_ms: Math.round(performance.now() - started),
+        timestamp: new Date().toISOString(),
+      },
     };
     console.log(JSON.stringify(response, null, opts.json ? 0 : 2));
   });
@@ -195,8 +197,8 @@ Example: `list-deployments --ndjson`:
 Node.js producer with `for await`:
 
 ```typescript
-import { createReadStream } from "fs";
-import { createInterface } from "readline";
+import { createWriteStream } from "node:fs";
+import { once } from "node:events";
 
 async function* generateNDJSON(query: string) {
   const results = await db.query(query);
@@ -209,7 +211,8 @@ export async function streamResults(query: string, output?: string) {
   const stream = output ? createWriteStream(output) : process.stdout;
 
   for await (const line of generateNDJSON(query)) {
-    stream.write(line + "\n");
+    // Respect backpressure on large outputs
+    if (!stream.write(line + "\n")) await once(stream, "drain");
   }
 
   if (output) stream.end();
@@ -296,7 +299,7 @@ Agents often pass user input through CLI arguments. Prevent injection attacks:
 - **Path traversal:** Resolve the real path (`fs.realpath`) and reject anything outside the allowed directory; also reject `../`, `..\\` and UNC paths (`\\server\share`) early for a clear error.
 - **URL encoding:** Reject `%2e`, `%2f`, `%5c` (encoded path separators).
 - **Control characters:** Reject `\0`, `\n`, `\r`, `\x1b` (ESC).
-- **Shell metacharacters:** Warn if input contains `$`, `` ` ``, `|`, `;`, `&` (agents should use `--` or stdin JSON instead).
+- **Shell metacharacters:** Warn if input contains `$`, `` ` ``, `|`, `;`, `&` (`--` only ends option parsing; it does not stop the shell expanding these. Agents should pass arguments without a shell, such as an argv array, quote correctly, or send stdin JSON).
 
 ```typescript
 function validateInput(value: string, fieldName: string): string {
@@ -333,7 +336,7 @@ import { isatty } from "tty";
 import chalk from "chalk";
 
 function shouldUseColour(): boolean {
-  return isatty(process.stdout.fd) && process.env.NO_COLOR !== "1";
+  return isatty(process.stdout.fd) && !process.env.NO_COLOR; // any non-empty NO_COLOR disables colour
 }
 
 function logStatus(message: string) {
@@ -389,23 +392,34 @@ import { defineCommand, runCommand } from "citty";
 
 const deleteUserCmd = defineCommand({
   meta: { name: "delete-user" },
-  args: { email: { type: "string" } },
-  flags: {
-    dryRun: { alias: "n", type: "boolean", description: "Preview without deleting" },
-    yes: { alias: "y", type: "boolean", description: "Skip confirmation" },
+  // citty declares flags under args too
+  args: {
+    email: { type: "positional", required: true },
+    "dry-run": { alias: "n", type: "boolean", description: "Preview without deleting" },
+    yes: { alias: "y", type: "boolean", description: "Confirm the deletion" },
     json: { type: "boolean" },
   },
-  async run({ args, flags }) {
+  async run({ args }) {
     const preview = await previewDeletion(args.email);
 
-    if (flags.dryRun) {
+    if (args["dry-run"]) {
       console.log(JSON.stringify({ dry_run: true, preview }));
       return;
     }
 
-    if (!flags.yes) {
-      console.log(`About to delete ${args.email}. Ctrl+C to cancel.`);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+    // No timer-based "confirmation": without --yes, fail with a structured error
+    if (!args.yes) {
+      console.error(
+        JSON.stringify({
+          success: false,
+          error: {
+            code: "confirmation_required",
+            message: `Deleting ${args.email} needs --yes. Run with --dry-run to preview.`,
+            details: { preview },
+          },
+        }),
+      );
+      process.exit(2); // usage error in the 0-5 contract
     }
 
     await executeDelete(args.email);
@@ -550,8 +564,8 @@ What carries over is the shape: structured output, a documented exit-code contra
 
 **Libraries (TypeScript):**
 
-- `commander` - Most popular. Mature, flexible, actively maintained.
-- `citty` - Modern, lightweight. Better for typed CLIs with Zod.
+- `commander` - Mature, flexible, actively maintained; subcommands, options and generated help.
+- `citty` - Lightweight, typed command definitions (`defineCommand`) from the UnJS ecosystem.
 - `oclif` - For large, plugin-able CLIs. Built-in JSON support.
 - `yargs` - Legacy but still useful. Good argument parsing.
 - `zod` - Runtime validation. Zod 4 converts to JSON Schema natively with `z.toJSONSchema()`; the third-party `zod-to-json-schema` is no longer actively maintained and only supports Zod 3.

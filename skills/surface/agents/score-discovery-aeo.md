@@ -27,7 +27,7 @@ You will receive a prompt containing:
 1. Read your reference file first
 2. Use the detected surfaces as starting points - do not re-discover from scratch
 3. Gather additional evidence using Glob and Grep as the reference file's "Evidence to gather" section directs
-4. Read key files to assess quality (not just presence) - for a deployed docs site, also run AFDocs for page-level evidence (see the reference file) - check llms.txt categorization, AGENTS.md depth, JSON-LD schema types, content negotiation, .well-known discovery endpoints
+4. Read key files to assess quality (not just presence) - for a deployed docs site, use the dated AFDocs and HTTP results the parent supplies for page-level evidence (this agent has no shell or network tools; see the reference file). If none were supplied, record live behaviour as untested and lower confidence rather than inferring it from code - check llms.txt categorization, AGENTS.md depth, JSON-LD schema types, content negotiation, .well-known discovery endpoints
 5. Match evidence against the rubric's 0-3 criteria
 6. Score conservatively - when uncertain, score lower
 7. Generate findings for any score below 3
@@ -36,6 +36,7 @@ You will receive a prompt containing:
 
 - Score based on **current state**, not intent or roadmap
 - Every score must cite **specific evidence** (file paths, line numbers, grep results)
+- The parent audit only dispatches dimensions it judged applicable. If the evidence shows this dimension does not apply after all, return `SCORE: N/A` with the reason in SUMMARY instead of a 0; never use N/A for a surface that applies but is missing.
 - Confidence: **high** (examined >80% of relevant code), **medium** (examined key files), **low** (sampled)
 
 ## Output Format
@@ -47,16 +48,17 @@ No preamble, no commentary, no explanation outside the block.
 
 Bar visualization:
 
-- 0/3: `[░░░]`
-- 1/3: `[█░░]`
-- 2/3: `[██░]`
-- 3/3: `[███]`
+- 0/3: `[...]`
+- 1/3: `[#..]`
+- 2/3: `[##.]`
+- 3/3: `[###]`
+- N/A: `[---]`
 
 ```
 <score_result>
 DIMENSION: Discovery & AEO
 DIMENSION_NUMBER: 4
-SCORE: {0-3}
+SCORE: {0-3|N/A}
 MAX: 3
 CONFIDENCE: {high|medium|low}
 BAR: {bar visualization}
