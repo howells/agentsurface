@@ -344,6 +344,32 @@ const searchDocsSchema = z
 
 type SearchDocsInput = z.infer<typeof searchDocsSchema>;
 
+// OpenAI strict mode: every field required, optional inputs nullable instead of defaulted
+export const searchDocsStrictSchema = searchDocsSchema.extend({
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .nullable()
+    .describe("Results per page; null for the default"),
+  offset: z.number().int().min(0).nullable().describe("Pagination offset; null for 0"),
+  format: z.enum(["concise", "detailed"]).nullable().describe("null for concise"),
+});
+
+const searchDocsOutputSchema = z.object({
+  results: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      url: z.string(),
+      snippet: z.string().optional(),
+    }),
+  ),
+  has_more: z.boolean(),
+  next_offset: z.number().int(),
+});
+
 export async function searchDocsHandler(input: SearchDocsInput) {
   // Call internal search API
   const { query, limit, offset, format } = input;
@@ -366,7 +392,7 @@ export const searchDocsTool = {
   description: `Search internal documentation by keyword. Use this to find setup guides, API references, and troubleshooting steps. 
 Do not use this for general knowledge (use web search instead) or to create new docs (use create_doc). Returns snippets ranked by relevance.`,
   schema: searchDocsSchema,
-  outputSchema: searchDocsOutputSchema, // z.object({ results, has_more, next_offset })
+  outputSchema: searchDocsOutputSchema,
   handler: searchDocsHandler,
 };
 ```

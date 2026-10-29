@@ -36,7 +36,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
      ```typescript
      import { Eval } from "braintrust";
      import { anthropic } from "@ai-sdk/anthropic";
-     import { generateText, isStepCount, tool } from "ai";
+     import { generateText, stepCountIs, tool } from "ai";
      import { z } from "zod";
 
      // Stub implementations: routing evals score which tools are called, not their effects.
@@ -76,7 +76,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
          const result = await generateText({
            model: anthropic(process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5"),
            tools,
-           stopWhen: isStepCount(5),
+           stopWhen: stepCountIs(5),
            prompt: input,
          });
          // Collect calls across every step, not only the last one
@@ -292,7 +292,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
      }
      ```
 
-5. **Create red-team test suite** (OWASP LLM Top 10). The sample below covers part of the list. Add active tests for every applicable category: LLM01, LLM02 (sensitive data disclosure), LLM05, LLM06, LLM07, LLM10 (unbounded consumption), and LLM08 where the product has retrieval. Record out-of-scope categories with a reason. See `/docs/testing/red-teaming` for the full mapping.
+5. **Create red-team test suite** (OWASP LLM Top 10). The sample reuses `runAgent` and assumes project-owned `projectTools(...)`, `sanitizeHtml` and `toolResponseSchema`. It covers part of the list. Add active tests for every applicable category: LLM01, LLM02 (sensitive data disclosure), LLM05, LLM06, LLM07, LLM10 (unbounded consumption), and LLM08 where the product has retrieval. Record out-of-scope categories with a reason. See `/docs/testing/red-teaming` for the full mapping.
 
    ```typescript
    describe("red-team: OWASP LLM Top 10 (2025)", () => {

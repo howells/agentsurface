@@ -302,13 +302,13 @@ Prefer returning errors as structured tool output so the model can reason about 
 
 ```typescript
 import { openai } from "@ai-sdk/openai";
-import { generateText, isStepCount, tool } from "ai";
+import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
 const result = await generateText({
   model: openai("gpt-6.1-terra"),
   // Without more than one step, the model never sees the tool result to recover from it
-  stopWhen: isStepCount(3),
+  stopWhen: stepCountIs(3),
   tools: {
     fetch_data: tool({
       description: "Fetch data",
