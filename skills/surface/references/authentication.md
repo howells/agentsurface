@@ -148,19 +148,32 @@ import { createHash, randomUUID } from "node:crypto";
 const { publicKey, privateKey } = await generateKeyPair("ES256");
 const { kty, crv, x, y } = await exportJWK(publicKey);
 
-async function generateDPopProof(method: string, uri: string, accessToken: string) {
+// accessToken is omitted for the token request itself; nonce comes from a DPoP-Nonce header
+async function generateDPopProof(
+  method: string,
+  uri: string,
+  accessToken?: string,
+  nonce?: string,
+) {
   const url = new URL(uri);
   return new SignJWT({
     jti: randomUUID(),
     htm: method,
     htu: `${url.origin}${url.pathname}`, // no query or fragment
     iat: Math.floor(Date.now() / 1000),
-    ath: createHash("sha256").update(accessToken).digest("base64url"),
+    ...(accessToken ? { ath: createHash("sha256").update(accessToken).digest("base64url") } : {}),
+    ...(nonce ? { nonce } : {}),
   })
     .setProtectedHeader({ alg: "ES256", typ: "dpop+jwt", jwk: { kty, crv, x, y } })
     .sign(privateKey);
 }
 ```
+
+**Getting a DPoP-bound token.** Send a proof (without `ath`) in the `DPoP` header of the token request itself; the authorization server binds the issued token to that key (`cnf.jkt`) and returns `token_type: "DPoP"`. A client that only signs resource requests can never obtain the token it expects.
+
+**Nonce recovery.** A server may require a server-issued nonce. The authorization server answers the token request with `400` and `error: "use_dpop_nonce"`; a resource server answers `401` with `WWW-Authenticate: DPoP error="use_dpop_nonce"`. Both send a `DPoP-Nonce` header: retry once with a fresh proof carrying that value in the `nonce` claim, and keep using the latest nonce each server sends.
+
+**Composing with idempotency.** Each retry of an operation sends a new DPoP proof (new `jti`) but the same `Idempotency-Key`. Validate the proof and authorise the caller before the idempotency lookup. Keep the DPoP `jti` store (minutes, the proof acceptance window) separate from the idempotency key store (the published retention window, often 24 hours). Canonical: `/docs/authentication/idempotency-and-replay`.
 
 ### OAuth 2.1
 

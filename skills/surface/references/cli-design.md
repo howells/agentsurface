@@ -23,6 +23,10 @@ CLIs designed for AI agents look fundamentally different from human-oriented com
 | **2/3** | Consistent JSON across all commands. Errors return structured JSON. Documented, distinct exit codes (e.g. the 0-5 contract proposed here). `--dry-run` on mutations. TTY detection. Non-interactive when flags provided.            | All commands produce JSON. Exit codes differentiate success/failure/usage/notfound/permission/conflict. `--dry-run` on all write operations. `isatty()` detection suppresses spinners when piped. |
 | **3/3** | NDJSON streaming for paginated results. Full schema introspection (`--schema` dumps params/types/required as JSON). Input hardening (path traversal, control chars, encoded segments). SKILL.md shipped. Agent knowledge packaging. | `--schema` or `--describe` command returns full machine-readable schema. NDJSON streaming. Input validation rejects `../`, `%2e`, control chars. SKILL.md or AGENTS.md ships with the CLI.        |
 
+**Level 3 also requires** raw payload input (`--payload` or piped stdin, API field names unchanged), context discipline (`--fields` on reads, default projections smaller than the full response, cursor/`has_more` metadata) and safety rails (`confirmation_required` without `--yes`, dry-run previews with counts and side effects). Do not award 3 on streaming, schema and hardening alone.
+
+This dimension score compresses the seven-axis, 0-21 [Agent DX CLI Scale](https://agentsurface.dev/docs/cli-design/cli-scale) (machine-readable output, raw payload input, schema introspection, context window discipline, input hardening, safety rails, agent knowledge packaging). For a CLI-centred product, score the seven axes too and report the weakest ones as findings.
+
 **Key files:** `bin/`, CLI entry points in `package.json`, `commander`/`yargs`/`oclif` configs
 
 **N/A when:** Project has no CLI tool and is not a CLI tool.

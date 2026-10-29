@@ -135,7 +135,28 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
      { "_final": true, "count": 2, "next_cursor": null }
      ```
 
-10. **Quality checks**:
+10. **Raw payload input** (mutating commands):
+    - Accept `--payload <json>` and piped JSON on stdin (detect `!isatty(0)`, never stdout), plus `-` as an explicit stdin marker
+    - Use the API's field names unchanged and accept every API field, including ones without a convenience flag
+    - Document one precedence rule (flags override payload fields) and apply it everywhere
+    - Invalid JSON is a usage error (exit 2); type mismatches return per-field structured errors, never silent coercion
+
+11. **Context budgets** (read commands):
+    - `--fields` with dot notation on list, get and search; a default projection smaller than the full response; `--full` to opt in
+    - Paginated output carries `total` (or `total_estimate`), cursor and `has_more`; `--all` pages automatically and streams NDJSON with `--json`, within a documented cap
+    - Document default and available fields in the schema output
+
+12. **Safety rails**:
+    - Without `--yes` in a non-interactive context, fail with `confirmation_required`; never hang or proceed on a timer
+    - Dry-run previews list affected records, the total count, cascades and warnings
+    - Optional confirmation tokens must be bound server-side to the previewed parameters and resolved targets, and re-checked on execution
+    - Treat string fields from the API as untrusted: sanitise where they reach an agent's context, and say plainly that sanitising is not a guarantee; authorisation stays outside the model
+
+13. **Agent knowledge packaging**:
+    - Ship `AGENTS.md` (setup, capabilities, guardrails) and a versioned `SKILL.md` with `name` and `description`, covering installation, authentication, exact commands, permission boundaries and "always use" invariants (`--json`, `--fields`, `--dry-run`)
+    - Point the schema output at the skill files and update them in the release pipeline
+
+14. **Quality checks**:
     - All commands produce valid JSON with --format=json
     - Exit codes match semantic meaning for all paths
     - No interactive prompts when NO_INTERACTIVE set
@@ -143,6 +164,8 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
     - Input validation rejects all path traversal patterns
     - --schema output is valid and complete
     - NDJSON has final metadata line
+    - Mutating commands accept a raw payload; read commands accept `--fields`
+    - Skill files ship with the release and match the current commands
 
 ## Outputs
 

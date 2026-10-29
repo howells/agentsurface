@@ -222,7 +222,7 @@ async function handleCreateInvoice(req: Request, res: Response) {
 }
 ```
 
-See `/templates/errors-and-auth/idempotency-middleware.ts` for a production Next.js middleware implementation.
+The sketch above doesn't cover a handler that runs longer than its reservation, or a crash after the effect but before the result is stored. The [Next.js template](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) handles both: it renews an owned in-flight lease while the handler runs, only the owner can record the outcome, and a thrown error is recorded as an outcome-unknown 500 instead of releasing the key. A handler that knows nothing happened can release the key explicitly so a retry runs again.
 
 ## When Idempotency Keys Are Required
 

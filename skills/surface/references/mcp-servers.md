@@ -76,6 +76,10 @@ Model Context Protocol (MCP) is the cross-vendor standard for agent tooling tran
 - `InMemoryTransport.createLinkedPair()` - canonical MCP server testing pattern
 - `client.callTool()` - invoking tools from test harness
 - Assertion on `isError` and `content` fields
+- Wire-level conformance tests: `server/discover`, per-request `_meta`, `Mcp-Method`/`Mcp-Name`, `resultType`, `InputRequiredResult` retries
+- `Origin`/`Host` validation in front of the HTTP handler, and a real-client test against a deployed URL
+- An end-to-end OAuth discovery test (RFC 8707 `resource`, RFC 9207 `iss`) and wrong-user, wrong-tenant, missing-scope and disallowed-actor negative tests
+- Extensions declared before use (Skills, Apps, Tasks); App resources declare `_meta.ui.csp` and the tool still returns `structuredContent`
 
 ---
 
@@ -298,7 +302,9 @@ server.registerResource(
 );
 ```
 
-A server can also publish Agent Skills as resources through the Skills extension (`io.modelcontextprotocol/skills`: `skills/list` and `skills/get`, files via `resources/read`). Reading `SKILL.md` does not activate a skill; the host decides.
+A server can also publish Agent Skills as resources through the Skills extension (`io.modelcontextprotocol/skills`: `skills/list` and `skills/get`, files via `resources/read`; `resources/directory/read` is optional). Declare the extension in the server's capabilities before serving it, and do not rely on `skills/*` with a client that has not negotiated it. Reading `SKILL.md` does not activate a skill; the host decides. Host support is still arriving, so check the client matrix for each client you target and keep the same skills installable another way.
+
+**MCP Apps.** Ship an MCP App only when removing the UI would remove the point of the tool (a form, a filterable list, a diff to accept); if the UI decorates data the model already has, return structured output. An App tool declares `_meta.ui.resourceUri` pointing at a `ui://` HTML resource; that resource declares every origin it touches in `_meta.ui.csp` (`connectDomains`, `resourceDomains`, `frameDomains`, `baseUriDomains`), because the host allows nothing else. Emit the standard `_meta.ui.*` keys, keep vendor keys such as `openai/*` only as compatibility shims, and always return `structuredContent` and a text summary so a client without Apps support still gets a usable result. Canonical: `/docs/agentic-ui/mcp-apps`.
 
 **Declare MIME types**. Serve `application/ld+json` for semantic data. Agents can then reason over structure.
 
@@ -409,6 +415,10 @@ curl -X POST https://auth.example.com/oauth/token \
 
 Allows fine-grained delegation without exposing user credentials to the agent.
 
+**Test the whole chain, end to end.** An unauthenticated request gets `401` with `WWW-Authenticate` naming `resource_metadata`; the client reads protected-resource metadata, then the authorization server's metadata; the authorization request and token request carry the `resource` parameter (RFC 8707); the client checks `iss` on the authorization response (RFC 9207); the issued token's audience is this server, and a token minted for another resource is rejected. A client that only works with a pasted token has not tested discovery.
+
+**Authorise the actor, the user and the tenant.** When a token carries `act`, check `act.sub` against the agents allowed to act for that subject (nested `act` claims are history, not authority). Enforce a scope per operation in each handler, not one scope for the whole server. Add negative tests: another user's token, another tenant's resource ID, a valid token missing the operation's scope (`403` with a `WWW-Authenticate` scope challenge), and an actor that is not allowed.
+
 ### Testing
 
 **InMemoryTransport (canonical pattern):**
@@ -460,7 +470,14 @@ test("delete_user returns error without confirmation", async () => {
 });
 ```
 
-Also add a conformance test that the server answers `server/discover`: servers must implement it even though clients may skip it.
+**Protocol conformance (2026-07-28).** SDKs supply much of this, so test the behaviour on the wire against the deployed endpoint rather than trusting the SDK:
+
+- `server/discover` answers with versions, capabilities and identity; servers must implement it even though clients may skip it.
+- Every request works without any `initialize` state: the handler reads protocol version and client capabilities from that request's `_meta`, and an unsupported version is rejected rather than silently served.
+- Streamable HTTP POSTs carry `Mcp-Method` and `Mcp-Name`, and any gateway policy keyed on them matches the JSON-RPC body it fronts.
+- Every result carries `resultType`; a tool that needs input returns an `InputRequiredResult` (`"input_required"`) and completes when the client retries the original request with `inputResponses`.
+
+**HTTP boundary.** Validate `Origin` and `Host` on every Streamable HTTP request (the SDK handler does neither; mount its middleware), bind local servers to `127.0.0.1`, and reject a mismatched origin. Then connect at least one real client you target (or the MCP Inspector) to the deployed URL: in-memory tests do not exercise transport, headers, CORS or auth.
 
 ### Observability
 
@@ -560,7 +577,7 @@ export default {
 
 **Discovery:**
 
-- Server Cards (SEP-2127, Final 2026-10-06; card format still draft in the extension repository) are optional: the extension recommends hosting a card at `<streamable-http-url>/server-card` and listing it in `/.well-known/ai-catalog.json`, and advises against `/.well-known/mcp/server-card`. Keep `/.well-known/mcp/server-card.json` and `.well-known/mcp.json` only as compatibility copies or pointers when a client you target still reads them
+- Server Cards (SEP-2127, Final 2026-10-06; card format still draft in the extension repository) are optional: the extension recommends hosting a card at `<streamable-http-url>/server-card` and listing it in `/.well-known/ai-catalog.json`, and advises against `/.well-known/mcp/server-card`. A card describes identity, endpoints and authentication; do not enumerate tools, resources or prompts in it, since clients list those at runtime and `server/discover` wins on any conflict. Keep `/.well-known/mcp/server-card.json` and `.well-known/mcp.json` only as compatibility copies or pointers when a client you target still reads them
 - Publish `/.well-known/agent-card.json` (if multi-agent; A2A v1.0.1 compatible)
 - Register in the ChatGPT app directory (OpenAI documents this under Plugins; the old Apps SDK URLs redirect), the official MCP Registry, and Google Gemini connectors
 

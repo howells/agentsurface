@@ -118,6 +118,8 @@ Examples:
 - MCP conformance tests using `InMemoryTransport.createLinkedPair()` covering tool
   selection, valid parameters, error recovery, and a multi-step sequence.
 - CLI contract tests asserting `--json` shape, exit codes, and `--dry-run` behavior.
+- Discovery and Markdown tests: `Accept: text/markdown` (and the `.md` twin, where offered) returns Markdown with `Vary: Accept`, the Markdown keeps the page's primary content without navigation chrome, every `llms.txt` link resolves, and `/.well-known/` files parse against their schemas.
+- MCP wire-level tests against a deployed URL: `server/discover`, `Origin` validation, the OAuth discovery chain, and wrong-user and wrong-tenant negative tests.
 - Retrievability evals: a representative query through the actual search/retrieval API,
   checking result shape, pagination across pages, and freshness fields.
 - A browser-driven task test that walks a real agent task through the deployed surface

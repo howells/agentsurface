@@ -78,8 +78,12 @@ const FindingCluster = z.object({
 
 const Dimension = z.object({
   name: DimensionName,
-  score: z.number().int().min(0).max(3).nullable().describe("null if N/A"),
-  confidence: ConfidenceLevel.nullable().describe("null if N/A"),
+  status: z
+    .enum(["scored", "not-applicable", "failed"])
+    .optional()
+    .describe("Omitted means scored, or not-applicable when score is null"),
+  score: z.number().int().min(0).max(3).nullable().describe("null if N/A or failed"),
+  confidence: ConfidenceLevel.nullable().describe("null if N/A or failed"),
   evidence: z.array(EvidenceItem),
   findings: z.array(z.string()).describe("Finding IDs referencing FindingCluster.findings"),
   notes: z.string().optional(),
@@ -122,6 +126,8 @@ const Scorecard = z.object({
 
 export type Scorecard = z.infer<typeof Scorecard>;
 ```
+
+A dimension that could not be scored (the scorer crashed, timed out or lacked access) has `status: "failed"` with a null score. Failed dimensions are excluded from `rawScore` and `maxApplicable` like N/A ones, but they are not N/A: say so in `notes` and re-run them. If no dimension could be scored, the overall score is unavailable: report the run as failed instead of emitting a scorecard, since `maxApplicable` would be zero. `status` is an optional, additive field, so version 1.0 scorecards without it remain valid.
 
 ## Example Scorecard
 

@@ -27,7 +27,11 @@ You will receive a prompt containing:
 1. Read your reference file first
 2. Use the detected surfaces as starting points - do not re-discover from scratch
 3. Gather additional evidence using Glob and Grep as the reference file's "Evidence to gather" section directs
-4. Read key files to assess quality (not just presence) - check tool annotations, descriptions, transports, auth, testing
+4. Read key files to assess quality (not just presence) - check tool annotations, descriptions, transports, auth, testing. Beyond presence, look for:
+   - wire-level conformance tests (`server/discover`, per-request `_meta`, `Mcp-Method`/`Mcp-Name`, `resultType`, `InputRequiredResult`); SDK defaults are not evidence that the deployed server behaves
+   - `Origin`/`Host` validation on HTTP, and a test with a real client against a deployed URL
+   - an end-to-end OAuth discovery test (RFC 8707, RFC 9207), per-operation scopes, `act.sub` checks, and wrong-user and wrong-tenant negative tests. Cap at 2 if a protected HTTP server has no authorisation negative tests; cap at 1 if any request can read another tenant's data
+   - extensions declared before use; MCP Apps with `_meta.ui.csp` and a structured fallback; Server Cards that do not enumerate tools
 5. Match evidence against the rubric's 0-3 criteria
 6. Score conservatively - when uncertain, score lower
 7. Generate findings for any score below 3

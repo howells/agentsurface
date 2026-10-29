@@ -156,7 +156,18 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    });
    ```
 
-10. **Quality checks**:
+10. **Conformance, boundary and authorisation tests** (see `references/mcp-servers.md`, Testing and Authentication):
+    - Wire-level tests against the deployed endpoint: `server/discover`, per-request `_meta` with no `initialize` state, `Mcp-Method`/`Mcp-Name`, `resultType`, `InputRequiredResult` retried with `inputResponses`. SDKs may supply these; verify the behaviour anyway
+    - `Origin` and `Host` validation in front of the HTTP handler, and one real target client connected to the deployed URL
+    - The OAuth discovery chain end to end (401, protected-resource metadata, authorization server metadata, RFC 8707 `resource`, RFC 9207 `iss`, audience check)
+    - Per-operation scopes, `act.sub` checked against allowed actors, and negative tests for another user, another tenant, a missing scope and a disallowed actor
+
+11. **Extensions** (only when they earn their place):
+    - Skills: declare `io.modelcontextprotocol/skills` before serving `skills/list`/`skills/get`; check the client matrix
+    - MCP Apps: only when the UI is the point of the tool; `_meta.ui.resourceUri`, a `ui://` resource with `_meta.ui.csp`, and `structuredContent` as the fallback
+    - Server Card: identity, endpoints and authentication only, never a list of tools, resources or prompts
+
+12. **Quality checks**:
     - All tools have descriptions >40 words (what/when/returns/errors)
     - All schema fields have .describe()
     - All relevant annotations set explicitly (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`)

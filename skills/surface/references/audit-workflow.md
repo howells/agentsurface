@@ -57,7 +57,8 @@ Failure handling:
 - If a dimension cannot be scored, mark `[???] ?/3 Scoring failed`.
 - Exclude failed dimensions from math.
 - Add a warning footer.
-- If no dimension could be scored, report the overall score as unavailable. Do not compute a scaled score or a rating, and do not treat failure as N/A.
+- In JSON output, give a failed dimension `status: "failed"` with a null score; never record it as N/A.
+- If no dimension could be scored, report the overall score as unavailable and the run as failed. Do not compute a scaled score or a rating, and do not emit a scorecard.
 
 Live evidence: scoring subagents may only have read tools. For a deployed site or service, run the live checks (HTTP requests, AFDocs, MCP calls) in the parent or a runner that has shell and network access, and pass the dated results to the scorer.
 

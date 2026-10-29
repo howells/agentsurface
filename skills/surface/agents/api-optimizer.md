@@ -87,20 +87,29 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
      description: "Agent-optimized variant"
    ```
 
+   - These are house extensions, not OpenAPI standards. Generators differ: an `x-agent-*` flag only becomes an MCP annotation (or an approval gate) if your generator or adapter maps it, so check the generated tools. Hints never replace authorization: enforce scopes and confirmation on the server.
+
 8. **Create Arazzo workflow** (if multi-step patterns exist):
    - Document tool sequencing (e.g. list before delete)
    - Include guard conditions (check before mutate)
    - Cite step operationIds by name through `$sourceDescriptions.<name>.<operationId>`; declare `successCriteria` on each step (Arazzo has no default HTTP success criterion) and list `workflows` as an array with `workflowId`
 
-9. **Quality checks**:
-   - Every operationId is verb_noun
-   - Every description ≥50 words + context
-   - Every parameter has description, example, format/enum
-   - No nested objects >2 levels in request bodies
-   - All response schemas documented
-   - All error codes have RFC 9457 examples
-   - Idempotency-Key supported on non-idempotent mutations (POST, and PATCH where it is not naturally idempotent)
-   - At least one Arazzo workflow if API has multi-step patterns
+9. **Versioning, events and onboarding**:
+   - Treat operationIds as immutable once released; breaking changes get a new major version or version date, and a description change that regresses agent routing is breaking
+   - Deprecated operations: `deprecated: true` plus `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) response headers, with a published timeline
+   - Webhooks in the OpenAPI `webhooks` field; every event carries `event_type`, `event_id` and `created_at`, a discriminator on the event union, a `schema_version`, Standard Webhooks signatures with a replay window, ordering rules separate from timestamps, and a state snapshot so the receiver needs no follow-up call
+   - Onboarding without a human: an official SDK generated from the spec (npm `repository` and `homepage` set), linked from the docs and `llms.txt`; self-serve keys and a sandbox or test-mode key that reach a first successful call without a sales call or approval gate
+
+10. **Quality checks**:
+
+- Every operationId is verb_noun
+- Every description ≥50 words + context
+- Every parameter has description, example, format/enum
+- No nested objects >2 levels in request bodies
+- All response schemas documented
+- All error codes have RFC 9457 examples
+- Idempotency-Key supported on non-idempotent mutations (POST, and PATCH where it is not naturally idempotent)
+- At least one Arazzo workflow if API has multi-step patterns
 
 ## Outputs
 

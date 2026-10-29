@@ -176,7 +176,18 @@ The value is a quoted Structured Field String; document whether you also accept 
 - Same key while the first request is still in flight: `409 Conflict`.
 - Same key with a different body: `422 Unprocessable Content`.
 
-This needs a route-handler wrapper with a shared atomic store (such as Redis `SET NX`), not request middleware that can only short-circuit. The Agent Surface template [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements atomic reservation and fingerprinting; review its in-flight lease length and its handling of failed requests against your endpoint's guarantees before relying on it.
+This needs a route-handler wrapper with a shared atomic store (such as Redis `SET NX`), not request middleware that can only short-circuit. The Agent Surface template [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements this contract with a renewed, fenced in-flight lease, and records a thrown error as an outcome-unknown result rather than releasing the key. Handlers that know a request had no effect can release the key explicitly. Still check that its retention window and release rules match your endpoint's guarantees.
+
+### Retry policy (client side)
+
+- Retry when `is_retriable` is true, or when it is absent and the status is 429 or 5xx; an explicit `is_retriable: false` wins over any status. Retry a mutation only when it carries an idempotency key, generated once per logical operation and reused on every attempt.
+- Exponential backoff with jitter (`base * 2^attempt + random(0, base)`), capped at 60 seconds, and honour `Retry-After` or `retry_after_ms` when present.
+- A retry budget per operation and a circuit breaker after consecutive failures, so many agents do not stampede a recovering service.
+- When the budget runs out, check a machine-readable status endpoint (linked from the API catalog) before escalating, to tell an outage from a broken integration.
+- After a timeout or outcome-unknown error on a mutation, check the resource's state (or replay with the same key) before sending a new operation.
+- Distinguish an automatic retry (same request, same key) from correcting the request after a non-retriable error, which is a new operation with a new key.
+
+Canonical: `/docs/error-handling/retry-patterns`.
 
 ### Rate limiting
 
@@ -386,7 +397,7 @@ MCP tool wrapper that catches sync/async errors and returns `{ isError: true, co
 
 ### /templates/errors-and-auth/idempotency-middleware.ts
 
-Route wrapper that deduplicates POST/PATCH via the Idempotency-Key header with atomic reservation and request fingerprinting (in-memory or Redis). Review its in-flight lease and failure handling before production use.
+Route wrapper that deduplicates POST/PATCH via the Idempotency-Key header (Redis): an atomic, renewed in-flight lease with fenced completion, request fingerprinting, every outcome recorded (a thrown error as outcome-unknown), an explicit release for requests that certainly had no effect, and byte-exact replay of status, headers and body.
 
 ### /templates/errors-and-auth/rate-limit-headers.ts
 

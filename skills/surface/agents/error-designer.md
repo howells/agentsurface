@@ -164,7 +164,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
    - Store the response with a request-body fingerprint for a published retention window (24h is common)
    - Same key, same body: return cached response + `Idempotency-Replayed: true`. Same key, different body: `422`. Still in flight: `409`
    - Authorise the request before looking up the key, and preserve the original status and headers on replay
-   - Starting point: [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements atomic reservation and fingerprinting. Before relying on it, check that its in-flight lease outlasts your slowest handler (or is renewed), and decide what a failed request that may already have had effects does to the stored key. Do not ship a simpler unscoped cache: atomic reservation and body matching are correctness properties, not production polish.
+   - Starting point: [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements atomic reservation, a renewed and fenced in-flight lease, fingerprinting, recorded failures (a thrown error is stored as outcome-unknown, not released) and byte-exact replay. Decide per endpoint which failures certainly had no effect and call `releaseIdempotencyKey` for those. Do not ship a simpler unscoped cache: atomic reservation and body matching are correctness properties, not production polish.
 
 5. **Recovery-oriented error messages** (suggestions as prompts):
    - **Tool order**: "Cannot delete active subscription. Call cancel_subscription first."

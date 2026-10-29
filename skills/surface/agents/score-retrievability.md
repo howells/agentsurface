@@ -32,7 +32,7 @@ You will receive a prompt containing:
 1. Read your reference file first
 2. Use the detected surfaces as starting points - do not re-discover from scratch
 3. Gather additional evidence using Glob and Grep as the reference file's "Evidence to gather" section directs
-4. Read key files to assess quality (not just presence) - check query/result schemas, pagination, filters, freshness metadata, stable identifiers
+4. Read key files to assess quality (not just presence) - check query/result schemas, pagination, filters, freshness metadata, stable identifiers. Confirm tenant and permission scope is enforced server-side before ranking (cap the score at 1 if results can leak across tenants), that any score's meaning is documented and not presented as confidence, and that pagination was tested with an invalid cursor and a dataset changing between pages
 5. Match evidence against the rubric's 0-3 criteria
 6. Score conservatively - when uncertain, score lower
 7. Generate findings for any score below 3

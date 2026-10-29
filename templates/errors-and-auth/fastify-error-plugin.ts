@@ -73,7 +73,7 @@ function mapFastifyErrorToProblemDetails(
       code: "ERR_VALIDATION",
       detail: "One or more validation errors occurred",
       doc_uri: "https://api.example.com/docs/errors#ERR_VALIDATION",
-      errors: validationErrors,
+      fields: validationErrors,
       status: 400,
       title: "Validation Failed",
       trace_id: traceId,

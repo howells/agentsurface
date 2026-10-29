@@ -40,16 +40,28 @@ scraping HTML or guessing at undocumented query parameters.
    whether a query interface exists today or content is only reachable by browsing.
 
 2. **Design or upgrade the query contract:**
+   - Mandatory scope (tenant, workspace, the caller's permissions) applied server-side
+     before ranking, never left to the caller to filter afterwards. A structured result that
+     leaks another tenant's record is a failure, not a partial pass.
    - Typed query parameters (not a single freeform `q` string when structured filters would
      serve better): field filters, date ranges, sort, facets.
    - Typed result schema: stable fields (`id`, `title`, `url`, `updated_at`, `excerpt`), not
-     rendered HTML fragments.
+     rendered HTML fragments. Return enough content per result that the agent does not need
+     one follow-up call per item.
+   - Relevance: expose a rank or score per result and document what the score measures, its
+     direction and whether it is comparable across queries. Never present similarity as
+     confidence or probability.
+   - Totals: label an estimated count as an estimate (`total_estimate`, not `total`).
    - Pagination: cursor-based for result sets that may change between pages; document
      `next_cursor`/`has_more`. See [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts)
      for the shared pattern.
 
 3. **Expose freshness and identity:**
-   - `Last-Modified`/`ETag` headers or an `updated_at` field on results.
+   - `Last-Modified`/`ETag` headers and an ISO 8601 `updated_at` on each record, plus a
+     documented staleness policy. Treat volatile decision facts (price, stock, slots)
+     differently from stable reference facts, and give a way to fetch the current value.
+   - Provenance: the source of each result, attribution for derived results, and a
+     citation-ready anchor (section, page or fragment) where the source supports one.
    - Where incremental sync is supported, a documented change token (`since` or a change feed) with its retention window and how deletions appear; otherwise document how to re-fetch and validate with ETag or `updated_at`. A pagination cursor is not a change token.
    - Stable, dereferenceable IDs or canonical URLs so a result can be re-fetched later and
      cited accurately.

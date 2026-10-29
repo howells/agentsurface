@@ -11,6 +11,14 @@
  *   can never replay another client's cached response
  * - The request body is fingerprinted; a reused key with a different body is
  *   rejected with 422, and a duplicate that arrives mid-flight gets 409
+ * - The in-flight reservation is a lease owned by one request and renewed while
+ *   the handler runs, so a slow handler cannot be overlapped by a retry. Only the
+ *   owner can record the outcome (a fenced compare-and-set)
+ * - Every outcome is recorded, failures included, so a retry never turns a
+ *   permanent error into a different result. A thrown error is recorded as an
+ *   unknown outcome, because effects may already have happened. A handler that
+ *   knows nothing happened can release the key with releaseIdempotencyKey()
+ * - Replays return the original status, headers and body bytes, JSON or not
  *
  * <CUSTOMISE>
  * - Set IDEMPOTENCY_TTL_SECONDS to your published retention window (24h is common)
@@ -19,15 +27,17 @@
  * </CUSTOMISE>
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { Redis } from "ioredis";
 
 const IDEMPOTENCY_TTL_SECONDS = 86_400; // published retention window
-const IN_FLIGHT_TTL_SECONDS = 60; // how long a crashed request blocks its key
+const LEASE_TTL_MS = 30_000; // how long a crashed request blocks its key
+const LEASE_RENEW_MS = 10_000; // renew well before the lease expires
 const IDEMPOTENCY_KEY_HEADER = "idempotency-key";
 const IDEMPOTENCY_REPLAY_HEADER = "x-idempotency-replayed";
+const RELEASE_HEADER = "x-idempotency-release"; // internal; stripped before responding
 
 /**
  * Initialize Redis client (or use your preferred cache)
@@ -60,14 +70,40 @@ function getPrincipalId(req: NextRequest): string {
 }
 
 type IdempotencyEntry =
-  | { state: "in_flight"; fingerprint: string }
+  | { state: "in_flight"; fingerprint: string; owner: string }
   | {
       state: "done";
       fingerprint: string;
       status: number;
       headers: Record<string, string>;
-      body: unknown;
+      bodyBase64: string;
     };
+
+/**
+ * Fenced writes: each script acts only while the stored entry is still the
+ * in-flight lease owned by ARGV[1]. A request whose lease expired (and was
+ * taken over) can no longer renew it or overwrite the new owner's result.
+ */
+const OWNED_BY = `
+  local raw = redis.call("GET", KEYS[1])
+  if not raw then return 0 end
+  local entry = cjson.decode(raw)
+  if entry.state ~= "in_flight" or entry.owner ~= ARGV[1] then return 0 end
+`;
+const RENEW_SCRIPT = `${OWNED_BY} return redis.call("PEXPIRE", KEYS[1], ARGV[2])`;
+const COMPLETE_SCRIPT = `${OWNED_BY} redis.call("SET", KEYS[1], ARGV[2], "EX", ARGV[3]) return 1`;
+const RELEASE_SCRIPT = `${OWNED_BY} return redis.call("DEL", KEYS[1])`;
+
+/**
+ * Call from a handler when the request certainly had no effect (for example,
+ * validation failed before any write, or an upstream refused the call). The
+ * wrapper then releases the key so a retry with the same key runs again,
+ * instead of replaying this response.
+ */
+export function releaseIdempotencyKey(response: NextResponse): NextResponse {
+  response.headers.set(RELEASE_HEADER, "1");
+  return response;
+}
 
 /**
  * The draft defines the header as a Structured Fields string ("..."); many
@@ -93,26 +129,34 @@ function problem(status: number, type: string, title: string, detail: string, re
 async function serializeResponse(response: NextResponse) {
   const headers: Record<string, string> = {};
   response.headers.forEach((value, key) => {
-    if (!key.startsWith("content-encoding")) {
+    if (key !== "content-encoding" && key !== "content-length" && key !== RELEASE_HEADER) {
       headers[key] = value;
     }
   });
 
-  const body = await response
-    .clone()
-    .json()
-    .catch(() => null);
+  // Store raw bytes so non-JSON bodies (text, CSV, binary) replay exactly
+  const bodyBase64 = Buffer.from(await response.clone().arrayBuffer()).toString("base64");
 
-  return { body, headers, status: response.status };
+  return { bodyBase64, headers, status: response.status };
 }
 
 function replayResponse(entry: Extract<IdempotencyEntry, { state: "done" }>): NextResponse {
-  const response = NextResponse.json(entry.body, { status: entry.status });
-  Object.entries(entry.headers).forEach(([key, value]) => {
-    response.headers.set(key, value);
+  const response = new NextResponse(Buffer.from(entry.bodyBase64, "base64"), {
+    headers: entry.headers,
+    status: entry.status,
   });
   response.headers.set(IDEMPOTENCY_REPLAY_HEADER, "true");
   return response;
+}
+
+function unknownOutcome(): NextResponse {
+  return problem(
+    500,
+    "https://api.example.com/errors/outcome-unknown",
+    "Outcome unknown",
+    "The request failed part-way and may have taken effect. Check the resource's state before sending a new request with a new Idempotency-Key.",
+    false,
+  );
 }
 
 /**
@@ -151,13 +195,14 @@ export function withIdempotency(
     const rawBody = await req.clone().text();
     const fingerprint = createHash("sha256").update(rawBody).digest("hex");
     const client = getRedisClient();
+    const owner = randomUUID();
 
-    // Atomically reserve the key; only one request can win
+    // Atomically reserve the key as a lease; only one request can win
     const reserved = await client.set(
       cacheKey,
-      JSON.stringify({ fingerprint, state: "in_flight" } satisfies IdempotencyEntry),
-      "EX",
-      IN_FLIGHT_TTL_SECONDS,
+      JSON.stringify({ fingerprint, owner, state: "in_flight" } satisfies IdempotencyEntry),
+      "PX",
+      LEASE_TTL_MS,
       "NX",
     );
 
@@ -186,26 +231,46 @@ export function withIdempotency(
       return replayResponse(entry);
     }
 
+    // Keep the lease alive while the handler runs
+    const renewal = setInterval(() => {
+      void client.eval(RENEW_SCRIPT, 1, cacheKey, owner, String(LEASE_TTL_MS));
+    }, LEASE_RENEW_MS);
+
     let response: NextResponse;
     try {
       response = await handler(req);
-    } catch (error) {
-      // Release the key so a retry can run; nothing was recorded as done
-      await client.del(cacheKey);
-      throw error;
+    } catch {
+      // Effects may already have happened, so do not release the key: record an
+      // unknown outcome that retries with this key replay.
+      response = unknownOutcome();
+    } finally {
+      clearInterval(renewal);
     }
 
-    // Record the outcome, success or failure, so a retry gets the same answer.
-    // 5xx are released instead: the operation may not have happened.
-    if (response.status >= 500) {
-      await client.del(cacheKey);
-    } else {
-      const entry: IdempotencyEntry = {
-        fingerprint,
-        state: "done",
-        ...(await serializeResponse(response)),
-      };
-      await client.set(cacheKey, JSON.stringify(entry), "EX", IDEMPOTENCY_TTL_SECONDS);
+    if (response.headers.get(RELEASE_HEADER)) {
+      await client.eval(RELEASE_SCRIPT, 1, cacheKey, owner);
+      response.headers.delete(RELEASE_HEADER);
+      return response;
+    }
+
+    // Record every outcome, failures included, so a retry gets the same answer
+    const entry: IdempotencyEntry = {
+      fingerprint,
+      state: "done",
+      ...(await serializeResponse(response)),
+    };
+    const recorded = await client.eval(
+      COMPLETE_SCRIPT,
+      1,
+      cacheKey,
+      owner,
+      JSON.stringify(entry),
+      String(IDEMPOTENCY_TTL_SECONDS),
+    );
+    if (recorded !== 1) {
+      // The lease was lost (for example, Redis evicted it). Another request may
+      // have run; surface that rather than claiming a clean result.
+      console.warn(`idempotency lease lost for ${cacheKey}`);
     }
 
     return response;
@@ -233,4 +298,6 @@ export function withIdempotency(
  * 2. Includes it on every attempt: `headers: { 'Idempotency-Key': `"${key}"` }`
  * 3. On 409, waits and retries with the same key
  * 4. On 422 (key reused with a different body), generates a new key
+ * 5. On an outcome-unknown 500, checks the resource's state before deciding
+ *    whether to send the operation again under a new key
  */

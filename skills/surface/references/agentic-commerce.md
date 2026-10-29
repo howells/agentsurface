@@ -25,6 +25,10 @@ Do not penalize a non-commerce product for missing any of this - record it not a
 - `Product`/`Offer` JSON-LD: required `price`, `priceCurrency` or `priceSpecification`; recommended `availability` (Google lists it as recommended, but a feed still needs it), `sku`/`gtin`/`mpn`/`brand`, `shippingDetails`, `hasMerchantReturnPolicy`, `aggregateRating`
 - Merchant feed files or generation jobs, and which spec they target (Google Merchant Center vs OpenAI product feed - the two overlap but are not the same file)
 - A catalog API (UCP catalog capability, or a platform-native one) versus a feed-only integration
+- Product and variant identity: a stable `item_id` per item or variant, and variants linked with `ProductGroup`/`hasVariant` (or `isVariantOf`/`inProductGroupWithID`), so an agent buys the exact size or colour it chose
+- OpenAI feed specifics: the nine required fields, the Stable (not Draft) schema, US-market default (other markets need confirmed setup), and a supported upload format (Parquet preferred; `jsonl.gz`, `csv.gz`, `tsv.gz`)
+- Currency units: OpenAI feeds use major units (`amount CURRENCY`); Shopify Catalog's `list_price` is in minor units. Convert explicitly
+- Checkout eligibility: ChatGPT now focuses on discovery, with purchase on the merchant's site or the merchant's own ChatGPT app; OpenAI's in-ChatGPT checkout guide describes the ACP spec, not a live surface. Shopify Catalog results with `eligible.native_checkout=false` check out on the brand's site
 - Whether the page, the feed, and the catalog API agree on price and availability for the same SKU - check one real item, don't just validate schema
 
 **Checkout** (`checkout-protocols.mdx`)
@@ -51,6 +55,8 @@ Do not penalize a non-commerce product for missing any of this - record it not a
 - Order/payment webhooks: discriminated `event_type` and a unique `event_id` for deduplication (distinct from a checkout request's `Idempotency-Key`), signed per Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`) for your own API (platform integrations use the provider's signature mechanism, and Shop MCP has no webhooks, so check `get_checkout` polling instead) - see `references/api-surface.md` for the general webhook rubric, applied here to order events
 - Idempotent order creation - see `references/authentication.md` for the idempotency-key mechanics
 - Returns/refunds as a callable operation with a defined contract and structured errors, not a support-ticket fallback
+
+Before any commitment (cart, checkout, payment), re-check price, stock and delivery eligibility against live state; a feed or cached page is a snapshot.
 
 ## Scoring notes
 

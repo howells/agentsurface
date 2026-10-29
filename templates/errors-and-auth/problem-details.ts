@@ -14,7 +14,8 @@ import { z } from "zod";
 
 /**
  * RFC 9457 core fields: type, title, status, detail, instance
- * Plus agent-oriented extensions: is_retriable, retry_after_ms, doc_uri, trace_id, suggestions, errors
+ * Plus agent-oriented extensions: is_retriable, retry_after_ms, doc_uri, trace_id, suggestions,
+ * fields (field-level validation errors) and errors (nested Problem Details for batches)
  */
 const ErrorSuggestion = z.object({
   action: z.string().describe("Recovery action the agent can take"),
@@ -27,47 +28,52 @@ const ErrorField = z.object({
   message: z.string().describe("Human-readable error message"),
 });
 
-export const ProblemDetails = z
-  .object({
-    // RFC 9457 core (5 members)
-    type: z
-      .string()
-      .url()
-      .default("about:blank")
-      .describe("URI reference identifying the error type"),
-    title: z.string().describe("Short human-readable summary"),
-    status: z.number().int().min(400).max(599).describe("HTTP status code"),
-    detail: z.string().describe("Instance-specific explanation"),
-    instance: z.string().optional().describe("Unique identifier for this occurrence (trace ID)"),
+export const ProblemDetails = z.strictObject({
+  // RFC 9457 core (5 members)
+  type: z
+    .string()
+    .url()
+    .default("about:blank")
+    .describe("URI reference identifying the error type"),
+  title: z.string().describe("Short human-readable summary"),
+  status: z.number().int().min(400).max(599).describe("HTTP status code"),
+  detail: z.string().describe("Instance-specific explanation"),
+  instance: z.string().optional().describe("URI reference identifying this occurrence"),
 
-    // Agent extensions
-    code: z
-      .enum([
-        "ERR_VALIDATION",
-        "ERR_NOT_FOUND",
-        "ERR_CONFLICT",
-        "ERR_UNAUTHORIZED",
-        "ERR_FORBIDDEN",
-        "ERR_RATE_LIMITED",
-        "ERR_UNAVAILABLE",
-        "ERR_TIMEOUT",
-        "ERR_UNPROCESSABLE",
-        "ERR_INTERNAL",
-      ])
-      .optional()
-      .describe("Machine-readable domain code"),
-    is_retriable: z.boolean().optional().describe("True if the agent should retry"),
-    retry_after_ms: z.number().int().positive().optional().describe("Wait N ms before retry"),
-    doc_uri: z.string().url().optional().describe("Link to detailed error documentation"),
-    trace_id: z.string().optional().describe("Correlation ID for server logs"),
+  // Agent extensions
+  code: z
+    .enum([
+      "ERR_VALIDATION",
+      "ERR_NOT_FOUND",
+      "ERR_CONFLICT",
+      "ERR_UNAUTHORIZED",
+      "ERR_FORBIDDEN",
+      "ERR_RATE_LIMITED",
+      "ERR_UNAVAILABLE",
+      "ERR_TIMEOUT",
+      "ERR_UNPROCESSABLE",
+      "ERR_INTERNAL",
+    ])
+    .optional()
+    .describe("Machine-readable domain code"),
+  is_retriable: z
+    .boolean()
+    .optional()
+    .describe("True if retrying the same request unchanged might succeed"),
+  retry_after_ms: z.number().int().positive().optional().describe("Wait N ms before retry"),
+  doc_uri: z.string().url().optional().describe("Link to detailed error documentation"),
+  trace_id: z.string().optional().describe("Correlation ID for server logs"),
 
-    suggestions: z
-      .array(ErrorSuggestion)
+  suggestions: z.array(ErrorSuggestion).optional().describe("Recovery actions the agent can take"),
+  fields: z.array(ErrorField).optional().describe("Validation errors for individual fields"),
+  // Zod 4 recursive schema: a getter keeps z.infer working under strict TypeScript
+  get errors() {
+    return z
+      .array(ProblemDetails)
       .optional()
-      .describe("Recovery actions the agent can take"),
-    errors: z.array(ErrorField).optional().describe("Validation errors for individual fields"),
-  })
-  .strict();
+      .describe("Nested Problem Details, one per failed item in a batch");
+  },
+});
 
 export type ProblemDetailsType = z.infer<typeof ProblemDetails>;
 
@@ -83,6 +89,7 @@ export function problemDetails(init: Partial<ProblemDetailsType>): ProblemDetail
     detail: init.detail ?? "",
     doc_uri: init.doc_uri,
     errors: init.errors,
+    fields: init.fields,
     instance: init.instance,
     is_retriable: init.is_retriable,
     retry_after_ms: init.retry_after_ms,

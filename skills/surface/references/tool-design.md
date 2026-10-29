@@ -298,6 +298,9 @@ Tool descriptions count toward every agent request. Trim aggressively:
 - **Claude forced tool choice:** Opus 5.5, Sonnet 5.5 and Fable 5.1 reject `tool_choice` `any` and `tool` (400); use `auto` plus `strict: true` or structured outputs.
 - **Gemini 3 thought signatures:** Preserve exact tool-call arguments across conversation turns; do not mutate them in logs.
 - **OpenAI strict mode:** a new schema can add first-request latency while it is processed; reuse identical schemas across requests and measure the actual latency rather than assuming a caching mechanism.
+- **Claude strict ceilings:** strict tool use is per tool (`strict: true`) and supports optional properties, but a request is capped at 20 strict tools, 24 optional parameters and 16 union-typed parameters across its strict schemas, with further grammar-complexity limits and a 180-second compilation timeout. Non-strict tools do not count toward the 20. Budget strictness for the tools where a malformed call is costly.
+- **Gemini schema subset:** function declarations use an OpenAPI-schema subset (`parameters`) or raw JSON Schema (`parametersJsonSchema`), mutually exclusive; very large or deep schemas can be rejected. Do not copy OpenAI's strict-object rules into Gemini adapters, and test each adapter's emitted schema against the provider.
+- **Claude capability gating:** read a model's capabilities from the Models API instead of hard-coding model names (`capabilities.server_tools.code_execution` for the server code-execution tool, top-level `capabilities.code_execution` for code calling the request's other tools). API version `2026-10-21`, the default in the new major SDKs, removes `temperature`, `top_p` and `top_k` (400 if sent), so adapters and test harnesses must stop sending them.
 
 ### Tool discovery heuristics
 

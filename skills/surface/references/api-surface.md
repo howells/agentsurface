@@ -717,6 +717,13 @@ The Agent Surface repository (https://github.com/howells/agentsurface) ships the
 - `/references/tool-design.md` - shared concerns with tool naming and descriptions
 - `/references/error-handling.md` - per-operation error schemas and recovery hints
 
+## Versioning, events and onboarding checks
+
+- **Versioning:** operationIds stable after release; breaking changes versioned (URL major or date header); deprecated operations marked `deprecated: true` and answered with `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) headers. Canonical: `/docs/api-surface/api-versioning`.
+- **Events:** webhooks declared in the OpenAPI `webhooks` field, discriminated by `event_type`, deduplicated by `event_id`, signed per Standard Webhooks with a replay window, versioned, and carrying state snapshots. Canonical: `/docs/api-surface/webhooks-events`.
+- **Onboarding:** an official SDK traceable to the API (npm `repository`/`homepage`), linked from docs and `llms.txt`; self-serve keys and a sandbox that let an agent reach a first successful call with no human step. Canonical: `/docs/api-surface/openapi-for-agents` (Publishing SDKs and Removing Onboarding Friction).
+- **Extensions:** `x-agent-*` and `x-category` are house conventions; credit them only where the generator or gateway actually maps them, and never as a substitute for server-side authorization. Canonical: `/docs/api-surface/openapi-extensions`.
+
 ## Retrieval and lifecycle checks
 
-For collection, long-running, or bulk operations, verify continuation, limits, ownership, partial failure, and terminal state. Compare declared success and error schemas with real responses. Canonical REST/GraphQL guidance is at `/docs/api-surface/retrieval-and-job-contracts`; use `product-journeys.md` to evaluate the operation within a real task.
+For collection, long-running, or bulk operations, gather evidence for ownership (who may read or cancel a job), continuation, limits, partial failure, and terminal state, and test two pages, an empty result, an invalid cursor and a changing dataset. Compare declared success and error schemas with real responses. Canonical REST/GraphQL guidance is at `/docs/api-surface/retrieval-and-job-contracts`; use `product-journeys.md` to evaluate the operation within a real task.

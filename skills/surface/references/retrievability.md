@@ -48,6 +48,9 @@ and guess?
 - **Search/query endpoints:** REST or GraphQL routes that accept a query, filters, sort, or facets and return structured results, not rendered pages.
 - **Pagination and cursors:** documented page/cursor contracts on result sets; see [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts) for the shared pagination and async-job pattern this dimension expects.
 - **Structured content:** JSON-LD or schema.org markup, typed API response objects, or a machine-readable feed (RSS/Atom/sitemap) that lets an agent read results without HTML scraping. See [Structured Data](/docs/discovery/structured-data) and [Content Structure](/docs/discovery/content-structure).
+- **Scope before ranking:** tenant, workspace and permission filters applied server-side before results are ranked; look for negative tests that another tenant's records never appear.
+- **Relevance semantics:** a rank or score per result with its meaning documented (metric, direction, cross-query comparability), never labelled as confidence; estimated totals labelled as estimates.
+- **Provenance:** source and citation-ready anchors per result, attribution for derived results.
 - **Freshness and versioning:** `Last-Modified`/`ETag` headers, `updated_at` fields, `since`/cursor query params, or a changelog feed.
 - **Stable identifiers:** results addressable by a durable ID or canonical URL that can be re-fetched later, not just a transient session-scoped index position.
 - **Bulk/export paths:** documented rate limits, page size caps, and an export or feed endpoint for retrieving many records.

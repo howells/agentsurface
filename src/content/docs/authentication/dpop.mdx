@@ -92,7 +92,7 @@ const res = await fetch(uri, {
 });
 ```
 
-The `jti` must be unique per request to prevent replay. Use a UUID. If the server answers `401` with a `DPoP-Nonce` header, retry once with that value in the `nonce` claim.
+The `jti` must be unique per request to prevent replay. Use a UUID. If the server answers `401` with a `DPoP-Nonce` header, retry once with that value in the `nonce` claim. RFC 9449 signals this with the `use_dpop_nonce` error: a `400` error response from the authorization server's token endpoint, or `WWW-Authenticate: DPoP error="use_dpop_nonce"` on a resource server's `401`.
 
 ## Server-Side: Validating DPoP Proofs
 
