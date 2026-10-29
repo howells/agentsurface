@@ -20,7 +20,7 @@
     "prepare": "howells-husky",
     "prepush": "pnpm typecheck && pnpm lint && pnpm test",
     "start": "next start",
-    "test": "node scripts/check-docs-integrity.mjs --no-freshness",
+    "test": "node scripts/check-docs-integrity.mjs --no-freshness && node scripts/runtime-contracts.mjs",
     "typecheck": "tsc --noEmit",
     "typography:check": "node scripts/check-typography.mjs"
   },
