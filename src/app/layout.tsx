@@ -69,8 +69,8 @@ export const metadata: Metadata = {
     type: "website",
   },
   title: {
-    default: "Agent Surface - Make Software Legible to Agents",
-    template: "%s - Agent Surface",
+    default: "Agent Surface",
+    template: "Agent Surface · %s",
   },
   twitter: {
     card: "summary_large_image",

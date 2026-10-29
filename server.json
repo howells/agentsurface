@@ -11,7 +11,7 @@
   },
   "icons": [
     {
-      "src": "https://agentsurface.dev/apple-icon",
+      "src": "https://agentsurface.dev/apple-icon.png",
       "mimeType": "image/png",
       "sizes": ["180x180"]
     }
