@@ -191,8 +191,10 @@ export function RecommendationList({ stage }: { stage: GuideStage }) {
                     className="size-1.5 rounded-full bg-fd-accent-foreground"
                   />
                 )}
-                {group.label}
-                <span className="tabular-nums text-fd-muted-foreground">{group.cards.length}</span>
+                {group.label}{" "}
+                <span data-markdown-ignore className="tabular-nums text-fd-muted-foreground">
+                  {group.cards.length}
+                </span>
               </h3>
             )}
             <ul className="divide-y divide-fd-border">

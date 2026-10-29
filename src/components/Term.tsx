@@ -10,6 +10,7 @@ import { useId, useState } from "react";
 export function Term({ id, children }: { id: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const popoverId = useId();
+  const termId = useId();
   const entry = glossaryTermIndex[id];
 
   if (!entry) {
@@ -17,46 +18,57 @@ export function Term({ id, children }: { id: string; children: React.ReactNode }
   }
 
   // The term and its arrow stay on one line so the arrow never wraps on its own.
+  // The term itself is ordinary text, with the trigger laid over it: HTML-to-Markdown
+  // converters drop button contents, which would delete the word from the sentence.
   return (
     <span className="whitespace-nowrap">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-describedby={popoverId}
-            className="inline cursor-help rounded-sm border-0 bg-transparent p-0 font-inherit text-inherit underline decoration-dotted decoration-fd-muted-foreground/60 underline-offset-4 focus-ring"
-            onMouseEnter={() => {
-              setOpen(true);
-            }}
-            onMouseLeave={() => {
-              setOpen(false);
-            }}
-            onFocus={() => {
-              setOpen(true);
-            }}
-            onBlur={() => {
-              setOpen(false);
-            }}
-            onClick={() => {
-              setOpen((value) => !value);
+      <span className="relative">
+        {/* Read by converters; assistive technology hears it once, as the button's name. */}
+        <span
+          id={termId}
+          aria-hidden="true"
+          className="underline decoration-dotted decoration-fd-muted-foreground/60 underline-offset-4"
+        >
+          {children}
+        </span>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-labelledby={termId}
+              aria-describedby={popoverId}
+              className="absolute inset-0 cursor-help rounded-sm border-0 bg-transparent p-0 focus-ring"
+              onMouseEnter={() => {
+                setOpen(true);
+              }}
+              onMouseLeave={() => {
+                setOpen(false);
+              }}
+              onFocus={() => {
+                setOpen(true);
+              }}
+              onBlur={() => {
+                setOpen(false);
+              }}
+              onClick={() => {
+                setOpen((value) => !value);
+              }}
+            />
+          </PopoverTrigger>
+          <PopoverContent
+            id={popoverId}
+            role="tooltip"
+            align="start"
+            className="w-72 text-left"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
             }}
           >
-            {children}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          id={popoverId}
-          role="tooltip"
-          align="start"
-          className="w-72 text-left"
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-          }}
-        >
-          <p className="type-small font-medium text-fd-foreground">{entry.name}</p>
-          <p className="mt-1 type-small text-fd-muted-foreground">{entry.definition}</p>
-        </PopoverContent>
-      </Popover>
+            <p className="type-small font-medium text-fd-foreground">{entry.name}</p>
+            <p className="mt-1 type-small text-fd-muted-foreground">{entry.definition}</p>
+          </PopoverContent>
+        </Popover>
+      </span>
       {entry.href && (
         <Link
           href={entry.href}

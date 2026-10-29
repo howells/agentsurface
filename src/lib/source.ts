@@ -41,10 +41,55 @@ async function renderPage(page: SourcePage): Promise<string> {
   return `---\n${lines.join("\n")}\n---\n\n${portableMarkdown(body, `${SITE_ORIGIN}${page.url}`)}`;
 }
 
-/** Resolve prose links without changing examples in fenced code blocks or inline code. */
+const CALLOUT_LABELS: Record<string, string> = { info: "Note", warn: "Warning" };
+
+/**
+ * `<Callout>` survives into the processed MDX as raw JSX. CommonMark reads that as an
+ * HTML block, so Markdown inside it (links, emphasis, code) is never parsed. Rewrite
+ * each callout as a labelled blockquote, which every Markdown reader understands.
+ */
+function calloutsAsBlockquotes(body: string): string {
+  const output: string[] = [];
+  let fenced = false;
+  let callout: { label: string; lines: string[]; raw: string } | null = null;
+  for (const line of body.split("\n")) {
+    if (!callout && /^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+    }
+    const open = fenced ? null : /^\s*<Callout(?:\s+type="(\w+)")?\s*>\s*$/.exec(line);
+    if (!callout && open) {
+      callout = { label: CALLOUT_LABELS[open[1] ?? "info"] ?? "Note", lines: [], raw: line };
+    } else if (callout && /^\s*<\/Callout>\s*$/.test(line)) {
+      const indent = Math.min(
+        ...callout.lines
+          .filter((text) => text.trim())
+          .map((text) => /^\s*/.exec(text)?.[0].length ?? 0),
+      );
+      output.push(`> **${callout.label}:**`, ">");
+      for (const text of callout.lines) {
+        output.push(text.trim() ? `> ${text.slice(Number.isFinite(indent) ? indent : 0)}` : ">");
+      }
+      callout = null;
+    } else if (callout) {
+      callout.lines.push(line);
+    } else {
+      output.push(line);
+    }
+  }
+  if (callout) {
+    // Unclosed: keep the original text rather than drop it.
+    output.push(callout.raw, ...callout.lines);
+  }
+  return output.join("\n");
+}
+
+/**
+ * Make processed MDX portable: callouts become blockquotes, and prose links resolve
+ * against the page URL, without changing examples in fenced code blocks or inline code.
+ */
 export function portableMarkdown(body: string, canonical: string): string {
   let fenced = false;
-  return body
+  return calloutsAsBlockquotes(body)
     .split("\n")
     .map((line) => {
       if (/^\s*(```|~~~)/.test(line)) {

@@ -97,6 +97,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="flex flex-col min-h-screen antialiased">
+        {/* For agents that read the HTML: the first text on every page says where the
+            index and Markdown live. Hidden visually and from assistive technology. */}
+        <p className="sr-only" aria-hidden="true">
+          For AI agents: the documentation index is at{" "}
+          <a href="/llms.txt" tabIndex={-1}>
+            /llms.txt
+          </a>
+          . Every page is also available as Markdown: send Accept: text/markdown, or add .md to a
+          docs URL.
+        </p>
         <RootProvider>
           <DocumentationTools />
           {children}

@@ -1,3 +1,4 @@
+import { DocsGridSidebarLast } from "@/components/DocsGridSidebarLast";
 import { EmptyNavTitle } from "@/components/EmptyNavTitle";
 import { SiteHeader } from "@/components/SiteHeader";
 import { source } from "@/lib/source";
@@ -17,7 +18,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         nav={{ children: <FullSearchTrigger className="w-full min-w-0 flex-1" /> }}
         searchToggle={{ enabled: false }}
         themeSwitch={{ enabled: false }}
-        slots={{ navTitle: EmptyNavTitle }}
+        slots={{ container: DocsGridSidebarLast, navTitle: EmptyNavTitle }}
       >
         {children}
       </DocsLayout>

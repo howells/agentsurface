@@ -7,54 +7,38 @@ import { RecommendationList } from "@/components/RecommendationList";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TextGrid } from "@/components/TextGrid";
 import { glossaryTerms } from "@/data/glossary";
+import { homepageCopy, numberWord } from "@/data/homepage-copy";
 import { guideStages } from "@/data/homepage-guide";
 import { guideSource, readingMinutes } from "@/lib/guide-source";
-
-const NUMBER_WORDS = [
-  "zero",
-  "one",
-  "two",
-  "three",
-  "four",
-  "five",
-  "six",
-  "seven",
-  "eight",
-  "nine",
-  "ten",
-];
-
-/** Spell out a small count, e.g. for "the eight areas". Falls back to the digit past ten. */
-function numberWord(count: number): string {
-  return NUMBER_WORDS[count] ?? String(count);
-}
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: { "text/markdown": "/index.md" } },
   title: "Make your website and app work with AI agents",
-  description:
-    "A practical guide to agent-ready websites and apps. Explore discovery, understanding, connections, permissions, usability, reliability, payments, and measurement, with clear recommendations and detailed implementation docs.",
+  description: homepageCopy.description,
 };
 
 function AreaOverview() {
+  // A jump list to the sections below, so it is navigation, not content.
   return (
-    <TextGrid
-      numbered
-      items={guideStages.map((stage) => ({
-        eyebrow: stage.name,
-        href: `#${stage.id}`,
-        meta: (
-          <>
-            {stage.cards.length} recommendations
-            <ArrowDown
-              aria-hidden="true"
-              className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
-            />
-          </>
-        ),
-        title: stage.question,
-      }))}
-    />
+    <nav aria-label="Areas">
+      <TextGrid
+        numbered
+        items={guideStages.map((stage) => ({
+          eyebrow: stage.name,
+          href: `#${stage.id}`,
+          meta: (
+            <>
+              {stage.cards.length} recommendations
+              <ArrowDown
+                aria-hidden="true"
+                className="size-3.5 transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none"
+              />
+            </>
+          ),
+          title: stage.question,
+        }))}
+      />
+    </nav>
   );
 }
 
@@ -73,8 +57,8 @@ export default async function HomePage() {
       <main id="main" className="bg-fd-background text-fd-foreground">
         <PageIntro
           className="pb-14 pt-16 sm:pt-20"
-          eyebrow="A practical guide to agent-ready products"
-          title="Make your website and app work with AI agents."
+          eyebrow={homepageCopy.eyebrow}
+          title={homepageCopy.title}
           actions={
             <>
               <a
@@ -93,8 +77,7 @@ export default async function HomePage() {
             </>
           }
         >
-          Help agents find your product, understand what it offers, and use it on a customer’s
-          behalf. Here’s what to consider, why it matters, and where to start.
+          {homepageCopy.intro}
         </PageIntro>
 
         <section
@@ -168,11 +151,11 @@ export default async function HomePage() {
             <div className="flex flex-wrap items-baseline justify-between gap-4">
               <div>
                 <h2 id="glossary-heading" className="type-heading">
-                  The language of agents
+                  {homepageCopy.glossary.heading}
                 </h2>
                 <p className="mt-2 type-body text-fd-muted-foreground">
-                  Plain-language definitions of the terms in this guide. Choose a card to learn
-                  more.
+                  {homepageCopy.glossary.intro}{" "}
+                  <span data-markdown-ignore>Choose a card to learn more.</span>
                 </p>
               </div>
               <Link href="/glossary" className="type-body underline underline-offset-4 focus-ring">
@@ -188,47 +171,37 @@ export default async function HomePage() {
             <div className="grid gap-10 md:grid-cols-2 md:gap-16">
               <div>
                 <h2 id="next-heading" className="type-heading">
-                  Put the guide to work
+                  {homepageCopy.next.heading}
                 </h2>
-                <p className="mt-3 type-body text-fd-muted-foreground">
-                  Choose a task a customer wants to complete and follow it from discovery to the
-                  final result. Use the docs for implementation detail, examples, and the tradeoffs
-                  behind each recommendation.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 type-body">
+                <p className="mt-3 type-body text-fd-muted-foreground">{homepageCopy.next.body}</p>
+                <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-3 type-body">
+                  {homepageCopy.next.links.map((link) => (
+                    <li key={link.href}>
+                      <Link href={link.href} className="underline underline-offset-4 focus-ring">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-5 type-small text-fd-muted-foreground">
+                  {homepageCopy.next.builders.before}
                   <Link
-                    href="/docs/scoring/product-journeys"
+                    href={homepageCopy.next.builders.href}
                     className="underline underline-offset-4 focus-ring"
                   >
-                    Evaluate a customer task
+                    {homepageCopy.next.builders.link}
                   </Link>
-                  <Link href="/docs" className="underline underline-offset-4 focus-ring">
-                    Browse the docs
-                  </Link>
-                  <Link href="/glossary" className="underline underline-offset-4 focus-ring">
-                    Explore the glossary
-                  </Link>
-                </div>
-                <p className="mt-5 type-small text-fd-muted-foreground">
-                  This guide covers making your product work for agents. Building your own agents
-                  instead?{" "}
-                  <Link href="/docs/agents" className="underline underline-offset-4 focus-ring">
-                    See the agent-building guide
-                  </Link>
-                  .
+                  {homepageCopy.next.builders.after}
                 </p>
               </div>
               <div id="skill" className="min-w-0 scroll-mt-20">
-                <h3 className="type-body">Work through it with your coding agent</h3>
-                <p className="mt-3 type-body text-fd-muted-foreground">
-                  Install the Surface skill to apply this guidance to your codebase: explain a
-                  topic, assess what exists, or turn the findings into an implementation plan.
-                </p>
+                <h3 className="type-body">{homepageCopy.skill.heading}</h3>
+                <p className="mt-3 type-body text-fd-muted-foreground">{homepageCopy.skill.body}</p>
                 <pre className="mt-5 overflow-x-auto rounded-lg border border-fd-border bg-fd-muted/40 p-4 type-small font-mono">
-                  <code>npx skills add https://github.com/howells/agentsurface</code>
+                  <code>{homepageCopy.skill.command}</code>
                 </pre>
                 <p className="mt-3 type-small text-fd-muted-foreground">
-                  For Codex, Claude Code, Cursor, and other agents that support skills.
+                  {homepageCopy.skill.note}
                 </p>
               </div>
             </div>
