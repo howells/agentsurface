@@ -5,7 +5,7 @@ import { PageIntro } from "@/components/PageIntro";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/contact" },
+  alternates: { canonical: "/contact", types: { "text/markdown": "/contact.md" } },
   description: "How to report a mistake, suggest a change or get in touch about Agent Surface.",
   title: "Contact",
 };

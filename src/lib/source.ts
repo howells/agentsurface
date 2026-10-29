@@ -23,6 +23,7 @@ async function renderPage(page: SourcePage): Promise<string> {
     `title: ${yamlString(data.title)}`,
     `description: ${yamlString(data.description ?? "")}`,
     `url: ${yamlString(`${SITE_ORIGIN}${page.url}`)}`,
+    `index: ${SITE_ORIGIN}/llms.txt`,
   ];
   if (data.lastVerified) {
     lines.push(`lastVerified: ${data.lastVerified}`);
@@ -37,7 +38,42 @@ async function renderPage(page: SourcePage): Promise<string> {
   // `<Glossary />` element).
   const body = page.url === "/docs/glossary" ? glossaryMarkdown() : await data.getText("processed");
 
-  return `---\n${lines.join("\n")}\n---\n\n${body}`;
+  return `---\n${lines.join("\n")}\n---\n\n${portableMarkdown(body, `${SITE_ORIGIN}${page.url}`)}`;
+}
+
+/** Resolve prose links without changing examples in fenced code blocks or inline code. */
+export function portableMarkdown(body: string, canonical: string): string {
+  let fenced = false;
+  return body
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced;
+        return line;
+      }
+      if (fenced) {
+        return line;
+      }
+      return line
+        .split(/(`+[^`]*`+)/)
+        .map((part, index) =>
+          index % 2
+            ? part
+            : part
+                .replace(
+                  /(\]\()([^\s)]+)(\))/g,
+                  (_match, before: string, target: string, after: string) =>
+                    `${before}${new URL(target, canonical).href}${after}`,
+                )
+                .replace(
+                  /^(\s*\[[^\]]+\]:\s*)([^\s]+)/,
+                  (_match, before: string, target: string) =>
+                    `${before}${new URL(target, canonical).href}`,
+                ),
+        )
+        .join("");
+    })
+    .join("\n");
 }
 
 /** Fumadocs' Markdown-for-LLMs renderer: backs `llms.txt`, `llms-full.txt`, and per-page `.md` routes. */

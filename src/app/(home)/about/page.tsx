@@ -5,7 +5,7 @@ import { PageIntro } from "@/components/PageIntro";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/about" },
+  alternates: { canonical: "/about", types: { "text/markdown": "/about.md" } },
   description:
     "What Agent Surface is, what it covers, who makes it, and how the guide is kept current.",
   title: "About",

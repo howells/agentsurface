@@ -1,3 +1,6 @@
+import { apiError } from "@/lib/api-error";
+import { source } from "@/lib/source";
+import { guideSource } from "@/lib/guide-source";
 import { markdownHeaders, notFoundMarkdown } from "@/lib/markdown";
 import { isMarkdownPreferred, rewritePath } from "fumadocs-core/negotiation";
 import type { NextRequest } from "next/server";
@@ -10,8 +13,7 @@ const CONTENT_SIGNAL = "search=yes, ai-input=yes, ai-train=yes";
 // suffix (via next.config.mjs) resolve to.
 const docsMarkdownRewriter = rewritePath("/docs{/*path}", "/llms.mdx/docs{/*path}/content.md");
 
-// Real HTML pages outside `/docs` that don't (yet) have a negotiated Markdown twin.
-// Requests here with Accept: text/markdown fall through to the ordinary HTML response.
+// Informational pages with negotiated Markdown twins.
 const KNOWN_HTML_ROUTES = new Set([
   "/",
   "/glossary",
@@ -59,7 +61,37 @@ function discoveryLinkHeader(markdownPath: string): string {
 export function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const response = NextResponse.next();
+  response.headers.set("Vary", "Accept");
   response.headers.set("Content-Signal", CONTENT_SIGNAL);
+
+  if (
+    pathname.endsWith(".md") &&
+    !["/AGENTS.md", "/auth.md", "/index.md"].includes(pathname) &&
+    !pathname.startsWith("/skills/") &&
+    !pathname.startsWith("/api/") &&
+    !pathname.startsWith("/llms.mdx/")
+  ) {
+    const base = pathname.slice(0, -3);
+    if (base === "/docs" || base.startsWith("/docs/") || base.startsWith("/guide/")) {
+      response.headers.set("Link", discoveryLinkHeader(pathname));
+    }
+    if (KNOWN_HTML_ROUTES.has(base)) {
+      response.headers.set("Link", discoveryLinkHeader(pathname));
+      return NextResponse.rewrite(new URL(`/site-text/${base.slice(1)}`, request.url), {
+        headers: response.headers,
+      });
+    }
+    if (base !== "/docs" && !base.startsWith("/docs/") && !base.startsWith("/guide/")) {
+      return new NextResponse(notFoundMarkdown(pathname), {
+        status: 404,
+        headers: markdownHeaders(notFoundMarkdown(pathname), { "Cache-Control": "no-store" }),
+      });
+    }
+  }
+
+  if (pathname === "/index.md") {
+    response.headers.set("Link", discoveryLinkHeader(pathname));
+  }
 
   if (isExcludedFromNegotiation(pathname)) {
     return response;
@@ -68,6 +100,29 @@ export function proxy(request: NextRequest) {
   if (pathname === "/") {
     response.headers.set("Link", discoveryLinkHeader("/index.md"));
   } else if (pathname === "/docs" || pathname.startsWith("/docs/")) {
+    response.headers.set("Link", discoveryLinkHeader(`${pathname}.md`));
+  }
+
+  const exists =
+    KNOWN_HTML_ROUTES.has(pathname) ||
+    Boolean(source.getPageByUrl(pathname)) ||
+    Boolean(guideSource.getPageByUrl(pathname));
+  const accepts = request.headers.get("accept") ?? "";
+  if (
+    !exists &&
+    /application\/(?:problem\+)?json/.test(accepts) &&
+    !accepts.includes("text/html")
+  ) {
+    return apiError(
+      404,
+      "PAGE_NOT_FOUND",
+      "Page not found",
+      "Browse https://agentsurface.dev/llms.txt or search /api/docs/search?query=discovery.",
+      pathname + request.nextUrl.search,
+    );
+  }
+
+  if (KNOWN_HTML_ROUTES.has(pathname) && pathname !== "/") {
     response.headers.set("Link", discoveryLinkHeader(`${pathname}.md`));
   }
 
@@ -81,6 +136,7 @@ export function proxy(request: NextRequest) {
     const rewritten = NextResponse.rewrite(new URL("/index.md", request.url));
     rewritten.headers.set("Content-Signal", CONTENT_SIGNAL);
     rewritten.headers.set("Vary", "Accept");
+    rewritten.headers.set("Link", discoveryLinkHeader("/index.md"));
     return rewritten;
   }
 
@@ -90,12 +146,25 @@ export function proxy(request: NextRequest) {
       const rewritten = NextResponse.rewrite(new URL(target, request.url));
       rewritten.headers.set("Content-Signal", CONTENT_SIGNAL);
       rewritten.headers.set("Vary", "Accept");
+      rewritten.headers.set("Link", discoveryLinkHeader(`${pathname}.md`));
       return rewritten;
     }
   }
 
+  if (pathname.startsWith("/guide/") && exists) {
+    response.headers.set("Link", discoveryLinkHeader(`${pathname}.md`));
+    return NextResponse.rewrite(new URL(`/llms.mdx${pathname}/content.md`, request.url), {
+      headers: response.headers,
+    });
+  }
+
   if (KNOWN_HTML_ROUTES.has(pathname)) {
-    return response;
+    const rewritten = NextResponse.rewrite(
+      new URL(`/site-text/${pathname.slice(1)}`, request.url),
+      { headers: response.headers },
+    );
+    rewritten.headers.set("Link", discoveryLinkHeader(`${pathname}.md`));
+    return rewritten;
   }
 
   // Everything else under this matcher is a path with no page: agents asking for

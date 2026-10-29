@@ -4,7 +4,7 @@ import { PageIntro } from "@/components/PageIntro";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/privacy" },
+  alternates: { canonical: "/privacy", types: { "text/markdown": "/privacy.md" } },
   description:
     "What Agent Surface collects: no accounts, no analytics, no cookies, and only the request logs its host keeps.",
   title: "Privacy",

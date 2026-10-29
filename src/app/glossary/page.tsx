@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import Link from "next/link";
 
 export const metadata = {
-  alternates: { canonical: "/glossary" },
+  alternates: { canonical: "/glossary", types: { "text/markdown": "/glossary.md" } },
   description: `Plain-language definitions of ${glossaryTerms.length} terms covering AI agents, APIs, discovery, identity, reliability, and payments.`,
   title: "Agentic Glossary",
 };

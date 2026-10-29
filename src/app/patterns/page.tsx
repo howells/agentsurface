@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { RILEY_DEFAULTS, decodeRiley } from "@/lib/riley";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/patterns" },
+  alternates: { canonical: "/patterns", types: { "text/markdown": "/patterns.md" } },
   description:
     "Draw the line fields used across Agent Surface: one repeated curve, shaped by progression, drift and ribbon. Download the result as SVG.",
   title: "Pattern studio",

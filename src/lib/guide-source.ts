@@ -1,3 +1,4 @@
+import { portableMarkdown } from "@/lib/source";
 import { guide } from "@/.source/server";
 import { guideStages } from "@/data/homepage-guide";
 import { loader } from "fumadocs-core/source";
@@ -30,6 +31,7 @@ export async function renderGuidePage(page: GuidePage): Promise<string> {
     `title: ${JSON.stringify(data.title)}`,
     `description: ${JSON.stringify(data.description ?? "")}`,
     `url: ${JSON.stringify(`${SITE_ORIGIN}${page.url}`)}`,
+    `index: ${SITE_ORIGIN}/llms.txt`,
   ];
   if (data.lastModified) {
     lines.push(`lastModified: ${new Date(data.lastModified).toISOString()}`);
@@ -47,5 +49,5 @@ export async function renderGuidePage(page: GuidePage): Promise<string> {
       ].join("\n")
     : "";
 
-  return `---\n${lines.join("\n")}\n---\n\n${body}${recommendations}\n`;
+  return `---\n${lines.join("\n")}\n---\n\n${portableMarkdown(body, `${SITE_ORIGIN}${page.url}`)}${recommendations}\n`;
 }

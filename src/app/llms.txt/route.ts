@@ -1,6 +1,6 @@
 import { estimateTokens } from "@/lib/markdown";
 import { guideSource } from "@/lib/guide-source";
-import { docsLlms } from "@/lib/source";
+import { source } from "@/lib/source";
 import { NextResponse } from "next/server";
 
 export const revalidate = false;
@@ -20,7 +20,7 @@ const WHEN_TO_USE = [
   "- Get the `surface` skill installed in a coding agent to audit, score, or scaffold an agent-readable surface directly in a repository.",
   "- Search or read this documentation over MCP instead of fetching pages one at a time.",
   "",
-  `Fetch [/llms.txt](${SITE_ORIGIN}/llms.txt) for this index or [/llms-full.txt](${SITE_ORIGIN}/llms-full.txt) for every page in one file, request any docs page with \`Accept: text/markdown\` or its \`.md\` URL, or connect an MCP client to [${SITE_ORIGIN}/mcp](${SITE_ORIGIN}/mcp) and call \`search\`, \`list_pages\`, or \`get_page\`.`,
+  `Fetch [/llms.txt](${SITE_ORIGIN}/llms.txt) for this index or [/llms-full.txt](${SITE_ORIGIN}/llms-full.txt) for every page in one file, request any docs page with \`Accept: text/markdown\` or its \`.md\` URL, or follow the [MCP connection guide](${SITE_ORIGIN}/docs/mcp-servers/transports.md) to connect to POST /mcp and call \`search\`, \`list_pages\`, or \`get_page\`.`,
 ].join("\n");
 
 // Static, hand-written entry points. These are surfaces, not docs pages, so they
@@ -33,11 +33,11 @@ const ENTRY_POINTS: string[] = [
   `- [Docs index](${SITE_ORIGIN}/docs/llms.txt): The docs page tree on its own, without these entry points.`,
   `- [API index](${SITE_ORIGIN}/api/llms.txt): The documentation API's two operations, with examples.`,
   `- [Build agents index](${SITE_ORIGIN}/docs/agents/llms.txt): Only the pages for teams building agents of their own.`,
-  `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Every documentation page as Markdown, in one file.`,
+  `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Opt-in bulk export for offline indexing, roughly 1.9 MB and 470,000 estimated tokens (characters / 4). Prefer search or individual pages for normal reading.`,
   `- [Homepage as Markdown](${SITE_ORIGIN}/index.md): The homepage guide (also served for \`Accept: text/markdown\` or \`/?mode=agent\`).`,
   `- [Any docs page as Markdown](${SITE_ORIGIN}/docs.md): Append \`.md\` to a docs URL, e.g. \`/docs/discovery/llms-txt.md\`, or send \`Accept: text/markdown\`.`,
   `- [Markdown API](${SITE_ORIGIN}/api/md/index): Raw Markdown endpoint. Replace \`index\` with any docs slug, for example \`discovery/llms-txt\`.`,
-  `- [MCP endpoint](${SITE_ORIGIN}/mcp): Agent Surface docs tools: \`search\`, \`list_pages\`, and \`get_page\`.`,
+  `- [MCP connection guide](${SITE_ORIGIN}/docs/mcp-servers/transports.md): Connect to POST /mcp to search and read documentation.`,
   `- [MCP Registry entry](https://registry.modelcontextprotocol.io/v0/servers/dev.agentsurface%2Fdocs/versions/latest): The MCP server's listing in the official registry, as \`dev.agentsurface/docs\`.`,
   `- [MCP server card](${SITE_ORIGIN}/mcp/server-card): Identity and transport of the MCP endpoint; the tools come from the live server.`,
   `- [Agent skills index](${SITE_ORIGIN}/.well-known/agent-skills/index.json): Discovery record for the surface skill.`,
@@ -48,7 +48,14 @@ const ENTRY_POINTS: string[] = [
 export async function GET() {
   // Strip the auto-generated "# Agent Surface" title; we render our own
   // title, summary, and entry points above the page tree.
-  const pages = (await docsLlms.index()).replace(/^#[^\n]*\n+/, "");
+  const pages = source
+    .getPages()
+    .filter((page) => page.slugs.length <= 1)
+    .map(
+      (page) =>
+        `- [${page.data.title}](${SITE_ORIGIN}${page.url}.md): ${page.data.description ?? ""}`,
+    )
+    .join("\n");
 
   // Only essays that have actually been written land here; the other writer
   // finishes them one at a time, so this list can be a subset of the eight areas.
