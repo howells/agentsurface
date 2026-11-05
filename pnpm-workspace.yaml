@@ -7,7 +7,6 @@ allowBuilds:
 
 catalog:
   "@howells/envy": "^0.3.7"
-  "@howells/husky": "^0.2.6"
   "@howells/lint": "^0.5.0"
   "@modelcontextprotocol/server": "^2.4.0"
   "@radix-ui/react-scroll-area": "^1.4.0"
@@ -21,6 +20,7 @@ catalog:
   "fumadocs-core": "^16.17.9"
   "fumadocs-mdx": "^15.4.10"
   "fumadocs-ui": "^16.17.9"
+  "husky": "^9.1.7"
   "lint-staged": "^17.6.0"
   "lucide-react": "^1.63.0"
   "motion": "^13.5.1"

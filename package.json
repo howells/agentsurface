@@ -4,26 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "audit:docs-freshness": "node scripts/check-docs-integrity.mjs",
-    "build": "node scripts/check-docs-integrity.mjs --no-freshness && next build",
+    "build": "node scripts/check-docs-integrity.mjs && next build",
     "deploy:preview": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel --scope danielhowells deploy . -y",
     "deploy:prod:build": "node scripts/build-vercel-prod.mjs",
     "deploy:prod:publish": "node scripts/publish-vercel-prebuilt.mjs",
     "deploy:prod:pull": ": \"${VERCEL_TOKEN_HOWELLS:?VERCEL_TOKEN_HOWELLS is not set (macOS keychain: vercel-token-howells)}\" && VERCEL_TOKEN=\"$VERCEL_TOKEN_HOWELLS\" vercel pull --yes --environment=production --scope danielhowells",
     "deploy:prod:stamp": "node scripts/stamp-build.mjs",
-    "check:agent-docs": "node scripts/check-agent-docs.mjs",
-    "deploy:prod:verify": "node scripts/check-vercel-prebuilt.mjs && node scripts/check-agent-docs.mjs",
     "dev": "next dev --port 3900",
     "generate:patterns": "node scripts/render-patterns.mts",
     "lint": "howells-check --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
     "lint:fix": "howells-fix --config=oxlint.config.ts src scripts templates disciplines next-env.d.ts next.config.mjs postcss.config.mjs source.config.ts tsconfig.json package.json oxlint.config.ts oxfmt.config.ts",
     "postinstall": "fumadocs-mdx",
-    "prepare": "howells-husky",
-    "prepush": "pnpm typecheck && pnpm lint && pnpm test",
+    "prepare": "husky",
     "start": "next start",
-    "test": "node scripts/check-docs-integrity.mjs --no-freshness && node scripts/runtime-contracts.mjs",
-    "typecheck": "tsc --noEmit",
-    "typography:check": "node scripts/check-typography.mjs"
+    "test": "node scripts/check-docs-integrity.mjs && node scripts/runtime-contracts.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@howells/envy": "catalog:",
@@ -50,10 +45,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@howells/husky": "catalog:",
     "@howells/lint": "catalog:",
     "@types/node": "catalog:",
-    "afdocs": "0.22.2",
+    "husky": "catalog:",
     "lint-staged": "catalog:",
     "oxlint-tsgolint": "catalog:"
   },

@@ -362,7 +362,6 @@ try {
     assert.doesNotMatch(sitemap, /<loc>https:\/\/agentsurface.dev\/about<\/loc>\s*<lastmod>/);
     assert.match(sitemap, /<lastmod>2026-/);
     const context = await (await get("/AGENTS.md")).text();
-    assert.match(context, /pnpm prepush/);
     assert.match(context, /pnpm build/);
     assert.doesNotMatch(context, /linear.app/);
     const markdown = await (await get("/docs/discovery/aeo-checklist.md")).text();

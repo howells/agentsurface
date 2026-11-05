@@ -16,12 +16,11 @@ Use pnpm with the lockfile. Run these from the repository root:
 - Typecheck: \`pnpm typecheck\`
 - Lint and formatting: \`pnpm lint\`
 - Integrity and runtime contract tests: \`pnpm test\`
-- Full local gate: \`pnpm prepush\`
 - Production build: \`pnpm build\`
 
 ## Boundaries
 
-Read the checkout's AGENTS.md before editing. Preserve existing work and keep one writer per checkout. Read the installed Next.js guides in node_modules/next/dist/docs before changing routing or framework code. Request interception lives in src/proxy.ts.
+Read the checkout's AGENTS.md before editing. Read the installed Next.js guides in node_modules/next/dist/docs before changing routing or framework code. Request interception lives in src/proxy.ts.
 
 The published guidance is in src/content/docs. Keep APIs, schemas, discovery files and tests consistent. Use British English and spaced hyphens in prose. Do not invent authentication, commerce or other protocols just to satisfy a scanner. Public documentation, search and MCP are read-only and require no credentials.
 

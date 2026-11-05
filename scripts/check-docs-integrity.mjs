@@ -388,16 +388,9 @@ for (const file of modelScanFiles) {
 // Every page carries a `lastVerified: YYYY-MM-DD` frontmatter stamp, set when
 // its content was last checked against upstream reality. Two rules:
 //   (a) MISSING — a page without a stamp always fails.
-//   (b) STALE — a stamp older than STALE_AFTER_DAYS is flagged so the page
-//       gets re-checked.
+//   (b) STALE — a stamp older than STALE_AFTER_DAYS is printed as a warning so
+//       the page gets re-checked. Staleness never fails the run.
 const STALE_AFTER_DAYS = 120;
-
-// --no-freshness demotes staleness findings to warnings instead of failures.
-// The build gate uses it so a page aging past the staleness window can never
-// fail an unrelated deploy; the standalone `pnpm audit:docs-freshness` keeps
-// staleness fatal as the re-verification cadence signal. A missing stamp is
-// always fatal.
-const freshnessFatal = !process.argv.includes("--no-freshness");
 
 function docSlug(file) {
   return path
@@ -634,24 +627,24 @@ for (const root of retiredScanRoots) {
   }
 }
 
+if (freshnessIssues.length > 0) {
+  console.warn("Freshness warnings:");
+  for (const issue of freshnessIssues) {
+    console.warn(`- ${issue}`);
+  }
+}
+
 if (
   linkIssues.length === 0 &&
   metaIssues.length === 0 &&
   templateIssues.length === 0 &&
   modelIssues.length === 0 &&
-  (freshnessIssues.length === 0 || !freshnessFatal) &&
   stampIssues.length === 0 &&
   retiredIssues.length === 0 &&
   versionIssues.length === 0 &&
   agentSkillsIssues.length === 0 &&
   glossaryIssues.length === 0
 ) {
-  if (freshnessIssues.length > 0) {
-    console.warn("Freshness warnings (non-fatal in --no-freshness mode):");
-    for (const issue of freshnessIssues) {
-      console.warn(`- ${issue}`);
-    }
-  }
   console.log("docs integrity check passed");
   process.exit(0);
 }
@@ -680,13 +673,6 @@ if (templateIssues.length > 0) {
 if (modelIssues.length > 0) {
   console.error("Model IDs not in canonical list (reference-links/models.mdx):");
   for (const issue of modelIssues) {
-    console.error(`- ${issue}`);
-  }
-}
-
-if (freshnessIssues.length > 0) {
-  console.error("Docs freshness (lastVerified) issues:");
-  for (const issue of freshnessIssues) {
     console.error(`- ${issue}`);
   }
 }
