@@ -100,7 +100,7 @@ Only publish skills that are real, reviewed, and kept current with the product. 
 
 ## Runtime Consumption
 
-Skills started as a coding-CLI convention: a folder an assistant reads off disk while you work in a repository. That is no longer the only consumer. The [Agent Skills specification](https://agentskills.io) is now loaded at runtime by agent frameworks, which point a workspace at one or more skill directories and expose them to the agent as tools, and by hosted model platforms, which attach skill folders directly to a platform-managed execution environment and unpack them server-side.
+Skills started as a coding-CLI convention: a folder an assistant reads off disk while you work in a repository. That is no longer the only consumer. The [Agent Skills specification](https://agentskills.io/home) is now loaded at runtime by agent frameworks, which point a workspace at one or more skill directories and expose them to the agent as tools, and by hosted model platforms, which attach skill folders directly to a platform-managed execution environment and unpack them server-side.
 
 Only the catalog - each skill's `name` and `description` - goes into the system message; the body of a skill and its supporting files are loaded when the agent calls for them. The catalog still occupies context on every turn, and loading or running a skill's assets has implementation-dependent costs, so the saving is large but not zero. That is the same progressive-disclosure economics described above, and it is why `description` has to work as a routing instruction for a running agent, not only as a label a human scans.
 
