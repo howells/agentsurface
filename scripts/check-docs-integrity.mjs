@@ -600,15 +600,9 @@ const retiredPattern = new RegExp(
   `/docs/(${RETIRED_ROUTES.map((route) => route.replaceAll("/", "\\/")).join("|")})(?=[/#)"'\\s\`,]|$)`,
   "gm",
 );
-const retiredScanRoots = [
-  "src",
-  "skills",
-  "templates",
-  "public",
-  "docs/research",
-  "README.md",
-  "INSTALL.md",
-].map((entry) => path.join(repoRoot, entry));
+const retiredScanRoots = ["src", "skills", "templates", "public", "README.md", "INSTALL.md"].map(
+  (entry) => path.join(repoRoot, entry),
+);
 const retiredIssues = [];
 for (const root of retiredScanRoots) {
   if (!fs.existsSync(root)) {

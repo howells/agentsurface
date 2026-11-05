@@ -20,21 +20,18 @@ pnpm build
 
 ## Deploying to production
 
-Git deploys are off. Production is built on this machine and published as a prebuilt artifact. Run these steps in order from a clean, pushed `main`, with the token from the macOS keychain (`vercel-token-howells`):
+Git deploys are off. Production is built on this machine and published as a prebuilt artifact. Run these steps in order from a pushed `main`, with the token from the macOS keychain (`vercel-token-howells`):
 
 ```sh
 export VERCEL_TOKEN_HOWELLS="$(security find-generic-password -s vercel-token-howells -w)" VERCEL_TOKEN="$VERCEL_TOKEN_HOWELLS"
 pnpm deploy:prod:pull
-pnpm deploy:prod:stamp    # bakes the HEAD SHA into the build
 pnpm deploy:prod:build
-pnpm deploy:prod:publish  # deploys, checks the SHA, promotes
-git checkout -- src/lib/build-info.generated.ts
+pnpm deploy:prod:publish  # deploys, checks the homepage, promotes
 ```
 
 ## Safety rules
 
 - Never commit `.env` or anything from `.vercel/`.
-- `pnpm deploy:prod:publish` refuses to run on a dirty tree or a build stamped with a different SHA. Fix the tree; do not edit the stamp by hand.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

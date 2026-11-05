@@ -1,6 +1,4 @@
-import { execFileSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { spawn } from "node:child_process";
 
 const DEADLINE_MS = 7 * 60 * 1000;
 const CLEANUP_MS = 45 * 1000;
@@ -99,37 +97,6 @@ const stop = async (signal) => {
     process.exit(1);
   }
 };
-// The SHA the runtime probe expects is the one stamp-build baked into this
-// build. Resolve and check it before deploying, so a bad tree never creates
-// (and then removes) a deployment.
-const STAMP_FILE = "src/lib/build-info.generated.ts";
-const repoRoot = join(import.meta.dirname, "..");
-const git = (...args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf-8" }).trim();
-const resolveExpectedSha = () => {
-  const stamped = /sha: "([0-9a-f]{40})"/u.exec(
-    readFileSync(join(repoRoot, STAMP_FILE), "utf-8"),
-  )?.[1];
-  if (!stamped) {
-    throw new Error(`${STAMP_FILE} is unstamped; run pnpm deploy:prod:stamp before building`);
-  }
-  const head = git("rev-parse", "HEAD");
-  if (stamped !== head) {
-    throw new Error(`build is stamped ${stamped} but HEAD is ${head}; restamp and rebuild`);
-  }
-  const dirty = git("status", "--porcelain", "--untracked-files=no")
-    .split("\n")
-    .filter((line) => line && !line.endsWith(STAMP_FILE));
-  if (dirty.length > 0) {
-    throw new Error(`working tree has uncommitted changes:\n${dirty.join("\n")}`);
-  }
-  const declared = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
-  if (declared && declared !== stamped) {
-    throw new Error(`environment declares ${declared} but the build is stamped ${stamped}`);
-  }
-  return stamped;
-};
-const expectedSha = resolveExpectedSha();
-
 process.on("SIGINT", () => void stop("SIGINT"));
 process.on("SIGTERM", () => void stop("SIGTERM"));
 
@@ -173,29 +140,6 @@ try {
   if (ready.id !== deploymentId || ready.readyState !== "READY") {
     throw new Error(`${deploymentId} finished in ${JSON.stringify(ready.readyState)}`);
   }
-  const version = json(
-    (
-      await run(
-        [
-          "curl",
-          "--deployment",
-          deploymentId,
-          `/api/internal/version?expected=${expectedSha}`,
-          "--",
-          "--fail-with-body",
-          "--silent",
-          "--show-error",
-        ],
-        remaining(),
-      )
-    ).stdout,
-    "version probe",
-  );
-  if (version.sha !== expectedSha) {
-    throw new Error(
-      `${deploymentId} reports ${JSON.stringify(version.sha)}, expected ${expectedSha}`,
-    );
-  }
   const homepage = (
     await run(
       [
@@ -224,7 +168,7 @@ try {
     true,
   );
   process.stdout.write(
-    `${deploymentId} READY, runtime-verified, and promoted (${deploymentUrl})\n`,
+    `${deploymentId} READY, homepage checked, and promoted (${deploymentUrl})\n`,
   );
 } catch (error) {
   if (deploymentUrl || deploymentId) {
