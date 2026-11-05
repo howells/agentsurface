@@ -1,85 +1,107 @@
 # Agentic Commerce
 
-## Summary
+Not a dimension: the ten dimensions applied to a purchase task. Use it when
+agent-mediated buying is a real surface (a storefront, a marketplace, anything
+a shopping agent could buy). Otherwise record commerce as not applicable.
 
-Agentic commerce is not a scorecard dimension - it is the existing ten dimensions (mainly Discovery & AEO, API Surface/MCP Server/Tool Design, Authentication, Error Handling, Testing) applied to a purchase task. Use this reference when auditing or scaffolding a merchant, marketplace, or commerce-platform surface. The canonical explanation for every claim here is `src/content/docs/agentic-commerce/` - read the relevant page before writing findings or generating code; this file is the condensed, audit-oriented version.
+Five layers, each depending on the one before: product data an agent can trust,
+checkout it can complete, payment authority, trust and risk, after the order.
+A gap low down breaks everything above it: don't grade checkout when the feed
+has the wrong price.
 
-Five layers, each depending on the one before it: product data agents can find and trust → checkout agents can complete → payment authority → trust and risk → after the order. A gap in an earlier layer breaks everything above it - don't score checkout integration quality if the product feed carries the wrong price.
+## Detect
 
-## Detecting a commerce surface
+- `schema.org/Product` and `Offer` JSON-LD on product pages
+- A Google Merchant Center or OpenAI product feed, or the code that builds it
+- Shopify (`@shopify/*`, Liquid, Hydrogen) or another platform SDK
+- UCP (`/.well-known/ucp`), ACP (`/checkout_sessions`), Stripe Shared Payment
+  Tokens, the Onelink Agent Wallet
+- Cart, checkout and order routes or tools; order and payment webhooks
 
-Activate this reference only when agent-mediated commerce is a real product surface - an ecommerce storefront, marketplace, or a product/service a shopping agent could plausibly buy. Detect it via:
+## Product data
 
-- `schema.org/Product` + `Offer` JSON-LD on product pages
-- A product feed for Google Merchant Center or OpenAI/ChatGPT commerce (feed files, feed-generation code, or upload jobs to `developers.openai.com/commerce`)
-- Shopify (`@shopify/*` packages, `shopify.dev` references, Liquid/Hydrogen storefront), or another commerce platform's SDK
-- Checkout session code referencing UCP (`ucp.dev`), ACP (`agenticcommerce.dev`, `/checkout_sessions`), or a payment provider's agent primitives (Stripe Shared Payment Tokens, the Onelink Agent Wallet)
-- Cart, checkout, or order API routes/tools, and order-lifecycle webhooks (`order.created`, `payment.succeeded`)
+- `Offer` needs `price` with `priceCurrency` (or `priceSpecification`). Include
+  `availability` (Google calls it recommended; feeds need it), `sku`/`gtin`/
+  `mpn`/`brand`, `shippingDetails`, `hasMerchantReturnPolicy`.
+- A stable `item_id` per variant, with variants linked through `ProductGroup`
+  and `hasVariant` (or `isVariantOf`, `inProductGroupWithID`), so the agent buys
+  the exact size it chose.
+- Google and OpenAI feeds overlap but are different files. OpenAI's feed: nine
+  required fields, the Stable (not Draft) schema, US by default (other markets
+  need confirmed setup), Parquet preferred (`jsonl.gz`, `csv.gz`, `tsv.gz`
+  accepted), prices in major units (`amount CURRENCY`). Shopify Catalog's
+  `list_price` is in minor units, so convert explicitly.
+- ChatGPT now focuses on discovery; purchase happens on the merchant's site or
+  the merchant's own ChatGPT app. OpenAI's in-ChatGPT checkout guide describes
+  the ACP spec, not a live surface.
+- Check that the page, the feed and the catalog API agree on price and stock for
+  one real SKU. Schema validation alone doesn't show that.
+- Re-check price, stock and delivery eligibility against live state before any
+  commitment; a feed or cached page is a snapshot.
 
-Do not penalize a non-commerce product for missing any of this - record it not applicable.
+## Checkout
 
-## Evidence to gather, by layer
+- Which protocol: UCP, ACP (the 2026-04-17 release defines no discovery
+  document), a platform SDK such as Shopify Checkout Kit, or a hand-rolled flow.
+  A custom checkout competing with an existing platform integration is a red
+  flag.
+- `Idempotency-Key` on session and order creation; capability negotiation before
+  payment; structured cancellation reasons where supported (ACP's optional
+  `intent_trace`).
 
-**Product data** (`src/content/docs/agentic-commerce/product-data.mdx`)
+## Payment authority
 
-- `Product`/`Offer` JSON-LD: required `price`, `priceCurrency` or `priceSpecification`; recommended `availability` (Google lists it as recommended, but a feed still needs it), `sku`/`gtin`/`mpn`/`brand`, `shippingDetails`, `hasMerchantReturnPolicy`, `aggregateRating`
-- Merchant feed files or generation jobs, and which spec they target (Google Merchant Center vs OpenAI product feed - the two overlap but are not the same file)
-- A catalog API (UCP catalog capability, or a platform-native one) versus a feed-only integration
-- Product and variant identity: a stable `item_id` per item or variant, and variants linked with `ProductGroup`/`hasVariant` (or `isVariantOf`/`inProductGroupWithID`), so an agent buys the exact size or colour it chose
-- OpenAI feed specifics: the nine required fields, the Stable (not Draft) schema, US-market default (other markets need confirmed setup), and a supported upload format (Parquet preferred; `jsonl.gz`, `csv.gz`, `tsv.gz`)
-- Currency units: OpenAI feeds use major units (`amount CURRENCY`); Shopify Catalog's `list_price` is in minor units. Convert explicitly
-- Checkout eligibility: ChatGPT now focuses on discovery, with purchase on the merchant's site or the merchant's own ChatGPT app; OpenAI's in-ChatGPT checkout guide describes the ACP spec, not a live surface. Shopify Catalog results with `eligible.native_checkout=false` check out on the brand's site
-- Whether the page, the feed, and the catalog API agree on price and availability for the same SKU - check one real item, don't just validate schema
+- Spending authority should be a signed, scoped, revocable mandate (amount cap,
+  merchant scope, expiry), not an ambient stored card.
+- Rails: AP2 mandates, Visa Trusted Agent Protocol, Mastercard Agent Pay, Stripe
+  Shared Payment Tokens, or MPP/x402 for per-request payment.
+- Match the controls to the shape: an approval step when a human is present,
+  mandate scoping when not.
 
-**Checkout** (`checkout-protocols.mdx`)
+## Trust and risk
 
-- Which protocol is implemented: UCP (`/.well-known/ucp`), ACP (`checkout_sessions` flow; the released 2026-04-17 spec defines no discovery document), a platform SDK (e.g. Shopify Checkout Kit), or a hand-rolled flow
-- `Idempotency-Key` on session/order creation; structured cancellation reasons where the protocol supports them (ACP's optional `intent_trace`); capability negotiation before payment is attempted
-- Whether the integration rides an existing platform feature versus a custom-built competing checkout surface (a red flag when a platform integration already exists)
+- Verify signed agents rather than blanket-blocking automation: Web Bot Auth
+  (`Signature-Input`, `Signature`, and `Signature-Agent` as a Structured Fields
+  dictionary in the current draft), Visa TAP, or Cloudflare's signed-agents
+  category.
+- Approval thresholds tied to the authorization shape, not a generic bot score.
+- A published agent terms-of-use page, separate from the general terms and from
+  robots.txt.
 
-**Payments** (`payments.mdx`)
+## After the order
 
-- The mandate model: is spending authority a signed, scoped, revocable object (amount cap, merchant scope, expiry), or an ambient stored credential?
-- Which rail: AP2 mandate, a card-network scheme (Visa Trusted Agent Protocol / Mastercard Agent Pay), Stripe Shared Payment Tokens, or MPP/x402 for per-request payment
-- Human-present vs human-not-present: does the control tightness (approval step vs mandate scoping) match which shape the flow actually is?
+- A `get_order` status operation, not only an emailed receipt.
+- Order and payment webhooks with a discriminated `event_type` and a unique
+  `event_id` (distinct from the checkout `Idempotency-Key`), signed per Standard
+  Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`) on your own
+  API. Platform integrations use the provider's signing; Shop MCP has no
+  webhooks, so poll `get_checkout`.
+- Returns and refunds as a callable operation with structured errors, not a
+  support ticket.
 
-**Trust and risk** (`trust-and-risk.mdx`)
+## Where findings go
 
-- Signed-agent verification at checkout: Web Bot Auth headers (`Signature-Input`/`Signature`, and `Signature-Agent` where used, as a Structured Fields dictionary in the current draft), Visa Trusted Agent Protocol, or Cloudflare's signed-agents category - versus bot management that blanket-blocks all automated traffic
-- Approval thresholds tied to authorization shape (human-present vs not), not to a generic bot score alone
-- A published agent terms-of-use page, separate from general ToS and from `robots.txt`
+| Finding                                                        | Dimension                                     |
+| -------------------------------------------------------------- | --------------------------------------------- |
+| Page, feed and API disagree on price or stock                  | Retrievability (Discovery if data is missing) |
+| Only an HTML checkout; no callable cart, checkout or order     | API Surface, MCP Server or Tool Design        |
+| Ambient credential instead of a scoped mandate                 | Authentication                                |
+| Non-idempotent checkout, or no recovery after a failed payment | Error Handling                                |
+| No sandbox for checkout and payment failures                   | Testing                                       |
+| Feed absent, stale or unlinked from discovery                  | Discovery & AEO                               |
 
-**Orders and after purchase** (`orders-and-after-purchase.mdx`)
+## Shopify
 
-- `get_order`-style status operation, not just an emailed receipt
-- Order/payment webhooks: discriminated `event_type` and a unique `event_id` for deduplication (distinct from a checkout request's `Idempotency-Key`), signed per Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`) for your own API (platform integrations use the provider's signature mechanism, and Shop MCP has no webhooks, so check `get_checkout` polling instead) - see `references/api-surface.md` for the general webhook rubric, applied here to order events
-- Idempotent order creation - see `references/authentication.md` for the idempotency-key mechanics
-- Returns/refunds as a callable operation with a defined contract and structured errors, not a support-ticket fallback
+Shopify ships much of this: UCP, the Catalog, Cart, Checkout, Order and Shop MCP
+servers, WebMCP on Liquid and Hydrogen, and a product-page audit. Treat feature
+existence, developer access, merchant eligibility and buyer authorization as
+separate statuses. A Catalog listing doesn't imply native checkout: results with
+`eligible.native_checkout=false` check out on the brand's site. On Shopify, most
+"missing" commerce surface is configuration or data quality, not a build task.
 
-Before any commitment (cart, checkout, payment), re-check price, stock and delivery eligibility against live state; a feed or cached page is a snapshot.
+The Global Catalog REST API (`discover.shopifyapps.com/global/...`) stopped
+serving on 2026-11-02, saved catalogs included. Flag any caller and move it to
+Global Catalog MCP (`https://catalog.shopify.com/api/ucp/mcp`, with
+`meta.ucp-agent.profile` on every request).
 
-## Scoring notes
-
-Score findings against the dimension that owns the root cause, not a separate commerce score:
-
-| Finding                                                                                | Dimension                                                           |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Product page, feed, and catalog API disagree on price/availability                     | Retrievability (or Discovery & AEO if the data is missing outright) |
-| No callable checkout/cart/order operation, only an HTML flow                           | API Surface / MCP Server / Tool Design                              |
-| Spending authority is an ambient credential, not a scoped mandate                      | Authentication                                                      |
-| Checkout session creation isn't idempotent, or a failed payment gives no recovery path | Error Handling                                                      |
-| No sandbox/test environment for checkout and payment failure                           | Testing                                                             |
-| Product feed absent, stale, or not linked from discovery surfaces                      | Discovery & AEO                                                     |
-
-## Platform note: Shopify
-
-Shopify ships much of this as platform features (`shopify.mdx`): UCP support, the Catalog, Cart, Checkout, Order, and Shop MCP servers, WebMCP on Liquid and Hydrogen, and the product-page audit. Treat platform feature existence, developer access, merchant eligibility, and buyer authorization as separate statuses; Catalog listing does not imply native checkout (external-brand Catalog results are discovery only). When auditing a Shopify-based project, check platform feature status and data accuracy first rather than assuming a gap needs custom implementation - much "missing" commerce surface on Shopify is a configuration or data-quality problem, not a build task.
-
-Shopify's Global Catalog REST API (`discover.shopifyapps.com/global/...`) stops serving traffic on 2026-11-02, including saved catalogs. Flag any caller still using it and point to Global Catalog MCP (`https://catalog.shopify.com/api/ucp/mcp`, with `meta.ucp-agent.profile` on every request).
-
-## Related references
-
-- `references/api-surface.md` - webhook and idempotency-key design generally
-- `references/authentication.md` - the mandate as a specialization of scoped agent identity
-- `references/discovery-aeo.md` - commerce signal detection within Dimension 4
-- Canonical docs: `src/content/docs/agentic-commerce/`
+Canonical detail: https://agentsurface.dev/docs/agentic-commerce.

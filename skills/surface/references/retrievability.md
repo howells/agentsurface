@@ -1,67 +1,47 @@
 # Retrievability
 
-## Summary
+Dimension 10: whether an outside agent can look up and pull the product's own
+data through a documented query surface, rather than scraping pages.
 
-Dimension 10 scores whether agents can find and pull the product's own data and content
-through a query-able, well-specified surface: search APIs, retrieval contracts, and
-structured content. It does not score whether the product runs a retrieval-augmented
-generation (RAG) pipeline for its own AI features - that is agent-internal architecture and
-belongs to the agent-building inventory, not this dimension. See "Not this dimension" below.
+Not this dimension: vector databases, embeddings, chunking, reranking and RAG
+used by the product's own AI features. Those are agent internals
+(https://agentsurface.dev/docs/agent-retrieval).
 
-- **0**: No queryable retrieval surface. Content is reachable only by reading whole pages or
-  files; no search endpoint, no filters, no structured result schema.
-- **1**: Basic search or lookup exists (a search box, a `/search` route, a grep-style query)
-  but has no pagination contract, no typed/structured results, no freshness signal, and is
-  undocumented.
-- **2**: A documented search or retrieval API: typed query and result schemas, pagination,
-  filters or facets, and structured content (JSON-LD/schema.org markup or typed API objects)
-  so results are usable without scraping rendered HTML.
-- **3**: A full retrieval contract: query refinement (sort, filter, facet), source/citation
-  metadata on results, freshness and versioning exposed (last-modified, ETag, and a documented change token
-  where incremental sync is supported, kept separate from the pagination cursor), stable identifiers for re-fetch, and documented rate/size limits for bulk retrieval.
+## Score
 
-## Not this dimension
+- **0**: No search endpoint, structured feed or markup; content can only be read
+  whole, page by page.
+- **1**: A search box or endpoint returning HTML or free text, with no
+  documented parameters, pagination or result schema.
+- **2**: A documented search or retrieval API (or feed) with typed query and
+  result schemas, pagination, documented filters, and results carrying stable
+  fields (`id`, `title`, `url`, `updated_at`).
+- **3**: Level 2 plus sort, filter and facet refinement; source and citation
+  metadata per result; freshness (`Last-Modified`, `ETag`, and a change token for
+  incremental sync where supported, separate from the page cursor); stable IDs to
+  re-fetch; documented page, rate and bulk limits; and pagination whose ordering
+  and snapshot behaviour are stated and tested with changes between pages.
 
-Vector databases, embeddings, chunking, reranking, knowledge graphs, and RAG pattern
-selection are how an agent finds and uses knowledge for _its own_ work. That is the
-agent-building inventory's concern (`/docs/agent-retrieval`), not a property of the product
-being scored. This dimension asks a narrower question: when an external agent needs to look
-something up in this product, does the product expose a way to do that reliably - a search
-API, a structured feed, a documented query contract - or does the agent have to scrape pages
-and guess?
-
-## Scoring rubric
-
-| Score | Criteria                                                                                                                                                                                                                                                                                                                 | Detection                                                                                                                                                                                                                                                                                                  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No queryable retrieval surface. No search endpoint, index, or structured feed; content is reachable only by browsing/reading whole documents.                                                                                                                                                                            | No `/search` route, no OpenAPI path with query parameters, no sitemap/feed, no structured data markup.                                                                                                                                                                                                     |
-| 1     | Basic search or lookup exists but is undocumented or unstructured. Results are HTML fragments or free text, not typed records.                                                                                                                                                                                           | A search box or endpoint exists but returns rendered HTML, has no documented query parameters, no pagination, and no result schema.                                                                                                                                                                        |
-| 2     | Documented search/retrieval API or content surface. Typed query and result schemas. Pagination and filters. Structured content (JSON-LD/schema.org, typed API objects, or a machine-readable feed) so an agent can consume results directly.                                                                             | OpenAPI or equivalent spec documents the search endpoint's parameters and response schema. Results carry stable fields (id, title, url, updated_at). Filters/facets are documented.                                                                                                                        |
-| 3     | Full retrieval contract. Query refinement (sort/filter/facet) beyond keyword match. Citations or source metadata on results. Freshness/versioning exposed (last-modified, ETag, a documented change token where incremental sync is supported). Stable IDs for re-fetch. Documented limits for bulk/paginated retrieval. | Response includes freshness metadata. Pagination states its ordering and whether traversal is snapshot-stable or reflects current data, and is tested with changes between pages. Bulk export or feed endpoint documented with size/rate limits. Result objects are individually addressable by stable ID. |
-
-**Key files:** search route handlers, `/search` or `/query` API definitions, OpenAPI paths with query parameters, sitemap/feed generators, structured-data (JSON-LD) templates, docs-site search index config.
-
-**N/A when:** The project exposes no searchable corpus or dataset at all (for example, a pure single-purpose CLI utility with no content or records to look up).
+N/A when there is no corpus, dataset or record set to look up.
 
 ## Evidence to gather
 
-- **Search/query endpoints:** REST or GraphQL routes that accept a query, filters, sort, or facets and return structured results, not rendered pages.
-- **Pagination and cursors:** documented page/cursor contracts on result sets; see [Retrieval and Job Contracts](/docs/api-surface/retrieval-and-job-contracts) for the shared pagination and async-job pattern this dimension expects.
-- **Structured content:** JSON-LD or schema.org markup, typed API response objects, or a machine-readable feed (RSS/Atom/sitemap) that lets an agent read results without HTML scraping. See [Structured Data](/docs/discovery/structured-data) and [Content Structure](/docs/discovery/content-structure).
-- **Scope before ranking:** tenant, workspace and permission filters applied server-side before results are ranked; look for negative tests that another tenant's records never appear.
-- **Relevance semantics:** a rank or score per result with its meaning documented (metric, direction, cross-query comparability), never labelled as confidence; estimated totals labelled as estimates.
-- **Provenance:** source and citation-ready anchors per result, attribution for derived results.
-- **Freshness and versioning:** `Last-Modified`/`ETag` headers, `updated_at` fields, `since`/cursor query params, or a changelog feed.
-- **Stable identifiers:** results addressable by a durable ID or canonical URL that can be re-fetched later, not just a transient session-scoped index position.
-- **Bulk/export paths:** documented rate limits, page size caps, and an export or feed endpoint for retrieving many records.
+- Search or query routes, and their entries in OpenAPI or the GraphQL schema.
+- Run a real query: result shape, two pages, an empty result, an invalid
+  cursor, and a record changed between page fetches.
+- Tenant, workspace and permission filters applied server-side before ranking,
+  with a negative test that another tenant's records never appear.
+- Relevance: a rank or score whose meaning is documented (metric, direction,
+  whether it compares across queries), never called confidence. Estimated
+  totals labelled as estimates.
+- Provenance: a source and citation anchor per result; attribution on derived
+  results.
+- Freshness: `updated_at`, `since` parameters, `ETag`/`Last-Modified`, a
+  changelog or change feed.
+- Bulk: an export or feed endpoint with size and rate limits.
+- JSON-LD, typed objects, RSS/Atom or sitemaps that let an agent read results
+  without parsing HTML.
 
-## Related dimensions
-
-- [Discovery & AEO](/docs/discovery) covers whether an agent can _find_ the software and its capabilities at all (llms.txt, AGENTS.md, sitemaps, robots.txt, `.well-known`). Retrievability assumes discovery already succeeded and asks whether the agent can then query and pull specific data reliably.
-- [API Surface](/docs/api-surface) and its [retrieval and job contracts](/docs/api-surface/retrieval-and-job-contracts) page cover the general pagination/async-job shape this dimension's evidence draws on.
-
-## See also
-
-- `/docs/retrievability` - the product-side retrieval guide this dimension scores against.
-- `agents/retrievability-engineer.md` - specialist prompt for scaffolding or upgrading this surface (search/retrieval APIs, retrieval contracts, structured content).
-- `/docs/agent-retrieval` - vector databases, embeddings, RAG patterns, and knowledge graphs for teams building their own agents. Out of scope for this dimension; that inventory is scored and improved separately from the surface skill.
+Discovery & AEO covers whether an agent can find the product at all; this
+dimension starts once it has. Pagination and job contracts are shared with API
+Surface: https://agentsurface.dev/docs/api-surface/retrieval-and-job-contracts.

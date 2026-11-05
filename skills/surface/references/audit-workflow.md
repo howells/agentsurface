@@ -1,72 +1,82 @@
-# Surface Audit Workflow
+# Audit Workflow
 
-Use this reference for `/surface`, score, plan, transform, and single-dimension audits.
+Detection, applicability, scoring rules and every output format for `score`,
+`plan`, `transform` and `--dimension` runs. Each dimension's 0-3 rubric lives in
+its own reference.
 
-## Phase 0: Project Detection
+## Detect
 
-Phase 0 must complete before scoring. Read the project; do not guess.
+Read the project before scoring. Record stack, runtime, deployment target and
+which surfaces exist: HTTP API, CLI, MCP server, public web/docs, auth, error
+shapes, tool definitions, context files, tests, searchable data. Show the
+inventory before the scorecard.
 
-Detect:
+| Dimension       | In the denominator when                                                      |
+| --------------- | ---------------------------------------------------------------------------- |
+| API Surface     | The project exposes HTTP endpoints or an API spec                            |
+| CLI Design      | The project is or ships a CLI                                                |
+| MCP Server      | Usually; any useful product can expose one. Go easy on tiny internal scripts |
+| Discovery & AEO | Public docs, website, package docs or a web API                              |
+| Authentication  | Protected APIs, hosted services or secrets                                   |
+| Error Handling  | Always                                                                       |
+| Tool Design     | It defines agent tools or has operations that could be tools                 |
+| Context Files   | Always                                                                       |
+| Testing         | Always                                                                       |
+| Retrievability  | It holds a corpus, dataset or records an agent might query                   |
 
-1. Stack, package manager, framework, runtime, deployment target.
-2. Surfaces: API, CLI, MCP, discovery, auth, errors, tools, context files, tests, retrievability.
-3. Applicable dimensions.
-4. Previous `Surface audit` issues on the repo's Linear team.
+Applicability works at two levels. A dimension can apply while some of its
+signals don't: a public docs site activates core discovery checks but not MCP,
+OAuth, Agent Skills, WebMCP, commerce or bot-identity checks unless those
+capabilities exist. List inactive signals as `not applicable` in the evidence;
+never count them as passes or failures. A capability that exists only in a
+roadmap, placeholder manifest or stale doc is not detected.
 
-Applicability has two levels:
+## Score
 
-- **Dimension applicability** decides whether the dimension belongs in the score denominator.
-- **Signal applicability** decides which checks inside an applicable dimension are activated by the detected product surface.
+- Score the current state with file:line evidence or dated command output. When
+  unsure, score lower.
+- Confidence: high (examined >80% of the relevant code), medium (key files),
+  low (sampled).
+- N/A dimensions leave the denominator. A dimension that applies but is missing
+  scores 0, not N/A.
+- A dimension that couldn't be scored shows `[???] ?/3 Scoring failed`, is
+  excluded from the totals, and gets a warning footer. In JSON it is
+  `status: "failed"` with a null score. If nothing could be scored, report the
+  run as failed with no total, rating or scorecard.
+- Scoring helpers may have read-only tools. Run live checks (HTTP fetches,
+  AFDocs, MCP calls against a deployed URL) yourself and pass the dated results
+  to them.
+- Assign each defect to the dimension that owns its root cause. One broken
+  endpoint is one finding, however many dimensions it touches.
 
-Do not penalize an applicable dimension for an unrelated optional capability. A public docs site activates core discovery checks, but it does not activate MCP, OAuth, Agent Skills, WebMCP, commerce, or bot-identity checks unless those capabilities are detected. Record inactive signals as `not applicable` in the evidence rather than silently treating them as passes.
+Each dimension result has: number and name, score/3, confidence, bar, evidence
+with paths, applicable and not-applicable signals where the dimension has
+optional ones, a one-sentence summary, and findings when below 3.
 
-Applicability:
+### Product journeys (public products and integrations)
 
-| Dimension       | Applies when                                                                                             |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| API Surface     | Project exposes HTTP endpoints or API specs                                                              |
-| CLI Design      | Project is or ships a CLI                                                                                |
-| MCP Server      | Usually applicable; any useful project can expose one, but do not penalize tiny/internal scripts harshly |
-| Discovery & AEO | Project has public docs, website, package docs, or a web API                                             |
-| Authentication  | Project has protected APIs, hosted services, or secrets                                                  |
-| Error Handling  | Always                                                                                                   |
-| Tool Design     | Project defines agent tools/functions or can expose operations as tools                                  |
-| Context Files   | Always                                                                                                   |
-| Testing         | Always                                                                                                   |
-| Retrievability  | Project exposes a searchable corpus, dataset, or documents an agent might query                          |
+Score with a representative task as the lens, not a second scoring system:
 
-Present detected surfaces before scoring.
+1. Name the task, intended client, acting identity, authorized boundary and
+   observable completion condition.
+2. Start from the public entry point and follow discovery links. Note any
+   private knowledge needed to reach the capability.
+3. Check decision facts (identity, price, units, availability, limits, terms)
+   against the owned source; compare the visible and machine-readable versions
+   of one real item.
+4. Exercise the chosen API, CLI, MCP or browser path, then one meaningful
+   failure and its recovery. Reconcile interrupted mutations by stable ID.
+5. Observe the authoritative final state. Keep acceptance, completion, payment
+   and fulfilment separate where they differ.
 
-## Phase 1: Dimension Scoring
+External scanner reports are leads to reproduce: keep their date and observed
+behaviour, judge applicability, and never import their weights or
+platform-listing assumptions. `templates/discovery/product-journey-audit.md`
+holds the fields.
 
-Score each applicable dimension 0-3 using its reference file. If subagents are available and allowed by the current runtime, dispatch independent dimensions in parallel; otherwise score locally.
+## Scorecard
 
-Each dimension result must contain:
-
-- Dimension number and name
-- Score and max
-- Confidence: high, medium, or low
-- Bar visualization
-- Evidence with paths/lines
-- Applicable and not-applicable signals when a dimension contains optional capabilities
-- One-sentence summary
-- Findings when score is below 3
-
-Failure handling:
-
-- If a dimension cannot be scored, mark `[???] ?/3 Scoring failed`.
-- Exclude failed dimensions from math.
-- Add a warning footer.
-- In JSON output, give a failed dimension `status: "failed"` with a null score; never record it as N/A.
-- If no dimension could be scored, report the overall score as unavailable and the run as failed. Do not compute a scaled score or a rating, and do not emit a scorecard.
-
-Live evidence: scoring subagents may only have read tools. For a deployed site or service, run the live checks (HTTP requests, AFDocs, MCP calls) in the parent or a runner that has shell and network access, and pass the dated results to the scorer.
-
-Before comparing scores across raters or over time, follow the calibration protocol at https://agentsurface.dev/docs/scoring/calibration and record the rubric version used.
-
-## Scorecard Format
-
-Use this exact shape for full scorecards. Keep dimensions in this order.
+Use this shape for a full score, dimensions in this order:
 
 ```text
 ==============================================================================
@@ -95,122 +105,47 @@ Use this exact shape for full scorecards. Keep dimensions in this order.
 ==============================================================================
 ```
 
-Bars:
+Bars: `[...]` 0, `[#..]` 1, `[##.]` 2, `[###]` 3, `[---]` N/A. Scaled score is
+`round(raw / max_applicable * 30)`. Ratings: 0-7 Human-only, 8-14
+Agent-tolerant, 15-22 Agent-ready, 23-30 Agent-first.
 
-- 0/3: `[...]`
-- 1/3: `[#..]`
-- 2/3: `[##.]`
-- 3/3: `[###]`
-- N/A: `[---]`
+A single-dimension run prints the dimension's line under a
+`SURFACE DIMENSION SCORE` header (`[Project] - [Dimension]`, date), followed by
+an `EVIDENCE` list of paths and observations.
 
-Rating bands, based on scaled score:
+## Findings
 
-| Range | Rating         |
-| ----- | -------------- |
-| 0-7   | Human-only     |
-| 8-14  | Agent-tolerant |
-| 15-22 | Agent-ready    |
-| 23-30 | Agent-first    |
-
-Scaled score:
-
-```text
-round((raw_score / max_applicable) * 30)
-```
-
-## Single-Dimension Format
-
-```text
-==============================================================================
-                       SURFACE DIMENSION SCORE
-                       [Project Name] - [Dimension Name]
-                       [YYYY-MM-DD]
-==============================================================================
-
-  6. Error Handling       [##.]  2/3   RFC 9457 plus retry hints, missing docs
-
-------------------------------------------------------------------------------
-  EVIDENCE
-  - src/lib/errors.ts:12 defines Problem Details fields.
-  - src/http/rate-limit.ts:44 includes Retry-After.
-  - No doc_uri field found.
-==============================================================================
-```
-
-## Phase 2: Findings Report
-
-File the full findings as a Linear issue titled `Surface audit: <repo> <YYYY-MM-DD>` on the repo's team. Nothing is written into the repo.
-
-Every finding must include:
-
-| Field    | Content                                     |
-| -------- | ------------------------------------------- |
-| What     | Specific issue with path/line when possible |
-| Why      | Why this matters for agent consumption      |
-| Fix      | Concrete steps                              |
-| Impact   | Dimension and current-to-target score       |
-| Severity | Critical, High, Medium, Low                 |
-
-Cluster findings by what should be fixed together, not by scoring dimension.
-
-Cluster format:
-
-- Name
-- One-sentence rationale
-- Findings table: severity, file, issue, dimension
-- Suggested approach
-- Dependencies
-
-Severity:
+Each finding has What (with path/line), Why (the effect on an agent), Fix
+(concrete steps), Impact (dimension, current → target score) and Severity:
 
 - Critical: blocks agent use entirely.
-- High: significant friction or safety risk.
-- Medium: suboptimal but functional.
-- Low: polish or completeness issue.
+- High: significant friction or a safety risk.
+- Medium: works, but badly.
+- Low: polish.
 
-## Phase 3: Transformation Plan
+Cluster findings by what gets fixed together, not by dimension. Each cluster has
+a name, a one-sentence rationale, a table (severity, file, issue, dimension), the
+approach and its dependencies.
 
-File the plan as a Linear issue with one sub-issue per task.
+## Plan
 
-Each task includes:
+One task per fix: ID, description, files, size (S/M/L), score impact,
+dependencies, and the writer prompt in `agents/` that fits it. Default order:
+context files, discovery, error handling, API descriptions, CLI
+output/schema/exit codes, authentication, MCP server, structured data,
+retrievability, testing.
 
-- ID
-- Description
-- Files to create/modify
-- Complexity: S, M, or L
-- Score impact
-- Dependencies
-- Suggested owner/agent type
-- Verification command or manual check
+## Report
 
-Default priority:
+Put the scorecard, findings and plan in your reply. Write nothing into the
+repo. File to a tracker only when the user asks and has one: the audit as one
+item with the scorecard, the plan as one item per task. A re-audit compares with
+the previous scorecard the user gives you or that the tracker holds.
 
-1. Context files
-2. Discovery
-3. Error handling
-4. API descriptions
-5. CLI output/schema/exit codes
-6. Authentication
-7. MCP server
-8. Structured data
-9. Retrievability
-10. Testing/evals
+## Transform
 
-## Phase 4: Execution
-
-Transform mode requires explicit user confirmation after presenting the plan summary.
-
-Execution steps:
-
-1. Group tasks by file ownership.
-2. Identify parallel-safe groups.
-3. Apply changes with narrow diffs.
-4. Run targeted verification.
-5. Re-score affected dimensions.
-6. Post the new scorecard as a comment on the audit issue.
-7. Present a delta scorecard.
-
-Delta format:
+After the user approves the plan, make the changes, re-score the affected
+dimensions and show the delta:
 
 ```text
 ==============================================================================
@@ -227,9 +162,13 @@ Delta format:
 ==============================================================================
 ```
 
-## JSON Output
+## JSON
 
-When `--format=json` is requested, emit the published scorecard schema (https://agentsurface.dev/docs/scoring/scorecard-format): `version: "1.0"`, a `project` object, an ISO 8601 `date`, exactly ten `dimensions` records (`score` and `confidence` are `null` for N/A), `findingClusters`, and camelCase `overall` totals with a lower-case rating. Abridged:
+`--format=json` emits the published schema
+(https://agentsurface.dev/docs/scoring/scorecard-format): `version: "1.0"`, a
+`project` object, an ISO 8601 `date`, exactly ten `dimensions` records (`score`
+and `confidence` are `null` for N/A), `findingClusters`, and camelCase `overall`
+totals with a lower-case rating.
 
 ```json
 {
@@ -258,10 +197,6 @@ When `--format=json` is requested, emit the published scorecard schema (https://
 }
 ```
 
-The remaining eight dimension records are omitted above for length; a real scorecard always has all ten. Transformation plans stay in the tracker, not in the scorecard JSON.
-
-Do not omit the normal human-readable report unless the user asked for JSON only.
-
-## Product journey evidence
-
-For a public product or integration, read `product-journeys.md` during detection. Define an intended task and client, then connect discovery, authoritative facts, access, action, recovery, and the final result. Assign root causes to existing dimensions and avoid duplicate penalties. External reports supply leads to reproduce, with their observation date and applicability recorded separately.
+The example omits eight dimension records; a real scorecard has all ten. Plans
+never go in the JSON. Print the normal report as well unless the user asked for
+JSON only.

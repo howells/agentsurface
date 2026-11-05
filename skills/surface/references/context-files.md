@@ -1,334 +1,98 @@
 # Context Files
 
-## Summary
+Dimension 8: AGENTS.md and any tool-specific overlays. A well-curated AGENTS.md
+alone can score 3.
 
-Dimension 8 scores presence and quality of AGENTS.md and any tool-specific overlays. AGENTS.md is the cross-tool baseline, and a well-curated AGENTS.md is enough on its own for a top score; CLAUDE.md, .cursor/rules, and Copilot instructions are added only where a tool needs something AGENTS.md can't give it, and each must defer to AGENTS.md rather than restate it. Well-curated files (hand-written, within the <370-line audit tolerance, commands-first, permission boundaries explicit) scale knowledge across agents. Quality vs. presence: auto-generated files score low; iteratively maintained files from friction score high.
+## Score
 
-- **0**: No AGENTS.md or context files (blocker)
-- **1**: Generic/auto-generated, >500 lines, no actionable commands
-- **2**: Hand-curated, commands at top with flags, permission boundaries, <370 lines
-- **3**: Curated AGENTS.md as the single source, tool-specific overlays only where needed (each deferring to AGENTS.md), progressive disclosure, evolved from use
-- **Evidence**: File presence, line count, command sections, permission tiers, recency
+- **0**: No AGENTS.md, CLAUDE.md or equivalent.
+- **1**: A file exists but is generic, uncurated `/init` output, prose
+  architecture without commands, or over 500 lines.
+- **2**: Hand-curated; exact commands first; testing expectations; always /
+  ask-first / never boundaries; non-obvious conventions with file references;
+  under 370 lines.
+- **3**: AGENTS.md is the single source. Overlays (CLAUDE.md, Cursor rules,
+  Copilot instructions) exist only for what AGENTS.md can't give that tool, and
+  defer to it rather than restate it. Nested files where the repo needs them.
+  Clearly maintained from real friction.
 
----
-
-Context files are the foundational onboarding layer for AI coding agents. They define what an agent can and cannot do, where to find key files and commands, and how to navigate architectural decisions. A well-curated AGENTS.md beats ten generic prompts - it scales your knowledge across all agents and tools that read it, from Claude Code to Cursor to GitHub Copilot. This dimension assesses both presence and quality: Do context files exist? Are they curated or auto-generated? Do they follow the AGENTS.md standard?
-
-## Scoring rubric
-
-| Score | Criteria                                                                                                                                                                                                                                                                                                 | Detection                                                                                                                                                                                                                                 |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No AGENTS.md, CLAUDE.md, or equivalent.                                                                                                                                                                                                                                                                  | No agent context files found.                                                                                                                                                                                                             |
-| 1     | Context file exists but generic or auto-generated. Prose paragraphs. No actionable commands.                                                                                                                                                                                                             | AGENTS.md or CLAUDE.md present but: >500 lines, or contains architecture overview without commands, or was clearly auto-generated (/init without curation).                                                                               |
-| 2     | Hand-curated context files. Commands with exact flags first. Testing expectations. Three-tier permission boundaries (always/ask-first/never). Code examples.                                                                                                                                             | Commands section at top with exact invocations. Permission boundaries defined. Within the <370-line audit tolerance. Non-obvious conventions documented with examples.                                                                    |
-| 3     | Curated AGENTS.md as the single source. Tool-specific overlays (CLAUDE.md, .cursor/rules, Copilot instructions) exist only where a tool needs something AGENTS.md can't give it, each deferring to AGENTS.md rather than restating it. Progressive/nested disclosure. Updated iteratively from friction. | AGENTS.md hand-curated; any CLAUDE.md imports `@AGENTS.md`; .cursor/rules and Copilot instructions reference AGENTS.md rather than duplicating it. Permission boundaries enforced. Files clearly evolved from usage (not auto-generated). |
-
-### Two length numbers, two jobs
-
-Do not collapse these - they answer different questions.
-
-| Number                         | Role                                                                                                                           | Applies to                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
-| **<370 lines**                 | **Audit tolerance.** The ceiling an existing file is scored against. Files under it pass; files over it lose points for bloat. | Scoring a repo you did not write  |
-| **~150 lines ideal, <300 max** | **Authoring target.** What a freshly generated context file should aim for.                                                    | Writing or scaffolding a new file |
-
-A repo whose AGENTS.md sits at 340 lines is not failing the rubric, but you would not generate a 340-line file from scratch.
+Two length numbers, two jobs: under 370 lines is the audit tolerance for a file
+you didn't write; about 150 lines (300 at most) is the target for a file you
+generate. A 340-line file passes, but don't write one.
 
 ## Evidence to gather
 
-- **Presence**: AGENTS.md in project root (highest priority, and sufficient on its own); CLAUDE.md (optional overlay), .claude/agents/, .claude/CLAUDE.md
-- **Format variants**: .cursor/rules/\*.mdc, .github/copilot-instructions.md, .windsurf/rules/, GEMINI.md
-- **Quality heuristics**:
-  - Line count (50–370 ideal; >500 is a red flag)
-  - Commands section at top with exact invocations (pnpm, npm, cargo, python -m, etc.)
-  - Permission boundaries explicitly stated (always / ask-first / never)
-  - Architecture links rather than prose (references to /docs/arc/decisions/, not paragraphs)
-  - Recency: timestamps or git history show active maintenance
-  - Absence of generic template language ("This project uses..."; auto-generated footprints)
+- `AGENTS.md` at the root and in packages; `CLAUDE.md`, `.claude/CLAUDE.md`,
+  `CLAUDE.local.md`; `.cursor/rules/*.mdc`; `.github/copilot-instructions.md`
+  and `.github/instructions/*.instructions.md`; `GEMINI.md`;
+  `.windsurf/rules/`.
+- Line counts, whether commands are exact and current (run one or two), and
+  whether boundaries are rules ("Never…") or aspirations ("We try not to…").
+- Duplication between AGENTS.md and the overlays.
+- Git history: edited over time, or generated once.
 
-## Deep dive
+## How the clients load these files
 
-### AGENTS.md as the unified baseline
+- **Claude Code** (v2.1.277+) reads AGENTS.md only when no `CLAUDE.md`,
+  `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the directory or above it.
+  If one does, it reads that instead: one or the other, not both. A CLAUDE.md
+  loads AGENTS.md only with an `@AGENTS.md` import (a prose "see AGENTS.md"
+  doesn't), or when the per-person Project instructions setting
+  (`claude-md-and-agents-md`) is on. That setting is ignored in project settings,
+  so a repo can't set it for contributors.
+- Keep a CLAUDE.md containing `@AGENTS.md` anyway when contributors may run
+  Claude Code before v2.1.277; before v2.1.281 on some sessions (Amazon Bedrock,
+  telemetry disabled); with the built-in AGENTS.md plugin disabled; or in the
+  first session after upgrading from v2.1.276 or earlier. Newer versions never
+  load it twice. A personal `CLAUDE.local.md` hides AGENTS.md for that developer
+  unless it imports it too.
+- Put `@AGENTS.md` on the first line (house rule; imports work anywhere), then
+  only Claude-specific lines. Check what loaded with `/context` → Memory files;
+  `/memory` manages files but doesn't confirm loading.
+- Rules that must hold whatever the model decides belong in
+  `.claude/settings.json` permissions or a `PreToolUse` hook, not prose. Model
+  choice and memory belong in settings, not instruction files.
+- **Cursor** reads AGENTS.md and `.cursor/rules/*.mdc` (scoped by `globs` or
+  `alwaysApply`). Nested AGENTS.md files combine with their parents; the more
+  specific wins on conflict.
+- **GitHub Copilot** reads AGENTS.md, `.github/copilot-instructions.md` and
+  path-scoped `.github/instructions/*.instructions.md` (`excludeAgent:
+"code-review"` or `"cloud-agent"` keeps one away from that surface).
+- **Gemini CLI** reads the filenames in `context.fileName`, default `GEMINI.md`.
+  AGENTS.md loads only if added there; it isn't a fallback.
+- AGENTS.md is plain Markdown with no schema, frontmatter or parser
+  (agents.md, Agentic AI Foundation under the Linux Foundation).
 
-AGENTS.md is governed by the [Agentic AI Foundation (Linux Foundation)](https://agents.md). It is read by Claude Code, Cursor, Windsurf, Kilo, GitHub Copilot, JetBrains Codex, Aider, Jules, Zed, Warp, RooCode, and many others. The agents.md site reports 60k+ open-source projects using it. The format is **ordinary markdown with no mandated schema or parser**; YAML frontmatter and JSON are not part of it. This simplicity is intentional, so readability and structural consistency matter more than strict formats.
+## What a good AGENTS.md holds
 
-Recommended top-to-bottom sections:
+In this order:
 
-1. **Project purpose** (1–3 sentences). Why does this repo exist? What does it do?
-2. **Common commands with exact invocations** (pnpm, npm, turbo, make, etc.). `pnpm dev`, not "run dev". Include `--verbose`, `--json` variants.
-3. **Tech stack / key files / directory map**. Link to src/, tests/, docs/. No generic descriptions.
-4. **Coding conventions**. Naming (kebab-case filenames; camelCase functions). Import style. Tools used (ESLint, Prettier, LSP).
-5. **Testing expectations**. `pnpm test`, `pnpm test:watch`, `pnpm test:coverage`. Which tests block merge? CI integration.
-6. **Permission boundaries** (always / ask-first / never).
-   - Always: read files, run tests, open PRs via `gh`.
-   - Ask first: install dependencies, run migrations, modify DB schema.
-   - Never: production deploys, rotate credentials, delete branches.
-7. **Non-obvious gotchas with code references**. "Do not modify package.json directly; use changesets" (reference `/CONTRIBUTING.md`). "pnpm install may fail if Node <18.12" (reference `.nvmrc`).
-8. **Links to deeper docs**. Point to ADRs, architecture diagrams, runbooks, onboarding guides.
+1. Purpose in one to three sentences.
+2. Exact commands with flags (`pnpm test --filter=@app/api`, not "run the
+   tests"), marked fast or slow, and which ones gate CI.
+3. A map of key directories, as paths, not descriptions.
+4. Conventions an agent would get wrong, each with a file reference.
+5. How to verify a change.
+6. Boundaries in three tiers:
 
-### Tool-specific overrides
-
-- **CLAUDE.md** (optional): only when Claude Code needs instructions no other tool should see - when to trigger specific skills, Claude-only workflow notes, session tips. Model choice and memory configuration belong in Claude Code settings, not instruction files. Most repos don't need one. When you do add it, import `@AGENTS.md` - a prose "See AGENTS.md" line does not load it - then layer Claude-only lines below the import. Put the import on the first line as a house recommendation; Claude Code accepts imports anywhere in the file, and its `claude-md-and-agents-md` setting loads both files without one. Enforced tool rules and permission mode belong in `.claude/settings.json`, not here.
-- **When to keep `CLAUDE.md` with `@AGENTS.md` anyway:** some sessions still read only `CLAUDE.md`: Claude Code before v2.1.277; before v2.1.281, some sessions such as Amazon Bedrock or with telemetry disabled; the built-in AGENTS.md plugin disabled in `/plugin`; and sometimes the first session after upgrading from v2.1.276 or earlier. If contributors or automation run in any of these, keep the import; on newer versions it never loads `AGENTS.md` twice. A personal `CLAUDE.local.md` also hides `AGENTS.md` for that developer unless it starts with `@AGENTS.md`. Do not remove an import on the strength of the v2.1.277 default alone.
-- **Verifying what loaded:** run `/context` and check **Memory files** (`/memory` manages files, it does not confirm loading). **Project instructions** is a per-person setting in user or managed settings; Claude Code ignores it in a project's settings, so a repository cannot set it for contributors.
-- **Hard stops:** a rule that must hold whatever the model decides belongs in a hook (`PreToolUse`) or permission setting, not in prose.
-- **.cursor/rules/\*.mdc**: Cursor-specific rules, scoped by `globs` or `alwaysApply`. Reference AGENTS.md for shared commands; override only where Cursor differs.
-- **.github/copilot-instructions.md**: GitHub Copilot custom instructions. Same pattern: reference AGENTS.md, add Copilot-only guidance.
-- **GEMINI.md** / **.windsurfrules** / **.windsurf/rules/**: Tool-specific variants. Keep as thin overlays.
-
-### Progressive disclosure
-
-Large repos need a hierarchy:
-
-- AGENTS.md at root = overview, commands, boundaries. Tight - the authoring target is ~150 lines ideal, <300 max.
-- Per-package AGENTS.md in monorepos (e.g., packages/api/AGENTS.md, packages/web/AGENTS.md) = scoped detail.
-- Link out to deeper docs: `/docs/arc/decisions/` for ADRs, `/docs/architecture.md` for diagrams, `/docs/CONTRIBUTING.md` for full flow.
-
-This lets an agent start with the root AGENTS.md, then drill down only if needed.
-
-### Permission boundaries (three-tier)
-
-Make boundaries explicit and enforceable:
-
-```
-Always:
-- Read files in src/, tests/, docs/
-- Run tests: pnpm test
-- Open PRs: gh pr create --draft
-- Review lint errors
-
-Ask first:
-- Install new dependencies (pnpm add ...)
-- Run migrations (pnpm db:migrate)
-- Modify TypeScript config
-- Commit directly to main (use PR instead)
-
-Never:
-- Deploy to production
-- Rotate API keys or secrets
-- Delete branches or tags
-- Modify .env in git
+```text
+Always: read src/ and tests/, run pnpm test, open draft PRs
+Ask first: add dependencies, run migrations, change tsconfig
+Never: deploy to production, rotate secrets, delete branches
 ```
 
-### Commands with exact invocations
-
-Ship the actual command lines, not prose. Denote which commands are fast (<5s) vs slow (minutes). Include flags that affect agent behavior (--json, --dry-run, --force).
-
-**Development** (fast):
-
-```
-pnpm dev          # Start dev server (http://localhost:3000)
-pnpm test         # Run all tests (~8s)
-pnpm test:watch   # Watch mode (blocks on first failure)
-pnpm lint         # ESLint + Prettier check (~3s)
-pnpm type-check   # TypeScript full check (~5s)
-```
-
-**Build** (slow):
-
-```
-pnpm build        # Production bundle (~2m)
-pnpm build:preview  # Local server preview (http://localhost:4173)
-turbo run test --filter=@app/* -- --coverage  # Monorepo subset
-```
-
-**Monorepo commands**:
-
-```
-turbo run build    # All packages in dependency order
-turbo run test --parallel -- --watch  # Parallel test watch
-changeset add      # Stage version bump (required before release)
-changeset version  # Update versions from changesets
-```
-
-**Database / migrations** (ask-first):
-
-```
-pnpm db:migrate    # Apply pending migrations (~30s)
-pnpm db:migrate:rollback  # Undo last migration
-pnpm db:seed       # Populate test data
-```
-
-Include timing (fast <5s, slow >30s), whether they require user input (--yes flag to bypass), and which commands block CI/CD.
-
-### Writing style
-
-- **Imperative voice**: "Run pnpm dev", not "running the dev server".
-- **Headings short**; bullets tight. Aim for scannability.
-- **Cite file paths** with relative root. `src/lib/`, not `~/projects/my-app/src/lib/`.
-- **Never describe what code does in prose** when a file reference suffices. Instead of "We use Zod for schema validation," write: "See `src/schemas/` for Zod types."
-- **Update iteratively**. When an agent gets something wrong, update the file. AGENTS.md is live documentation, not a snapshot.
-
-### Anti-patterns to avoid
-
-- **Auto-generated CLAUDE.md from `/init`** that nobody curated. Delete it; write by hand.
-- **Prose-heavy architecture paragraphs** with no commands. If you're explaining a pattern, include a code reference.
-- **1500-line files** that exhaust context budget. Split into multiple files or link to /docs/.
-- **Stale content**. Commands that no longer exist, removed directories, deprecated flags. Tag entries with last-verified date if >6 months old.
-- **Duplication across AGENTS.md, CLAUDE.md, .cursor/rules/**. Single source of truth: AGENTS.md. CLAUDE.md imports it with an `@AGENTS.md` line; .cursor/rules and Copilot instructions reference it in prose.
-- **Boundaries written as aspirations**, not rules. "We try not to..." should be "Never...". Agents follow rules, not culture.
-
-### Multi-file strategy
-
-- **Single source of truth**: AGENTS.md.
-- **CLAUDE.md** (optional): imports `@AGENTS.md` on the first line, then Claude-specific additions: [list].
-- **.cursor/rules/\*.mdc**: Reference AGENTS.md section headers. Add Cursor-scoped rules (e.g., per-file globs).
-- **.github/copilot-instructions.md**: Same pattern. Copilot overrides only.
-
-Resist sprawl. Every tool should link to the canonical AGENTS.md.
-
-### Memory patterns (cross-session)
-
-Claude Code carries its own memory across sessions (CLAUDE.md files and auto memory; see the [Claude Code memory docs](https://code.claude.com/docs/en/memory)). The Claude API memory tool (beta `context-management-2025-06-27`) is a separate, client-side tool that persists a `/memories` directory for agents you build. Either way, use memory for "learned" constraints that came from friction:
-
-```
-# memories/AGENTS.md-lessons.md
-- pnpm install needs Node 18.12+ (added to .nvmrc)
-- changesets required for version bumps; ci blocks merge without them
-- Always run pnpm type-check before commit (blocks CI otherwise)
-- Database migrations require approval; never run auto-migrate in CI without explicit gate
-```
-
-Update AGENTS.md when a memory becomes stable; use memory for transient lessons or session-specific constraints discovered during work.
-
-### Monorepo-specific patterns
-
-Monorepos (pnpm workspaces, Yarn workspaces, Lerna, Turbo) need per-package AGENTS.md files:
-
-```
-packages/api/AGENTS.md         # API server conventions, env vars, test setup
-packages/web/AGENTS.md         # Frontend commands, build targets
-packages/shared/AGENTS.md      # Shared types, publishing flow
-```
-
-Root AGENTS.md should reference the monorepo structure:
-
-```
-Monorepo layout:
-  packages/api       pnpm --filter=@app/api dev
-  packages/web       pnpm --filter=@app/web dev
-  packages/shared    pnpm --filter=@app/shared type-check
-```
-
-Each package can override permission boundaries (e.g., API server can deploy, web package cannot). Which instruction files load is decided by each coding client, not by Turborepo: check how the clients you support discover nested AGENTS.md files, and document workspace-level commands (`turbo run test --filter=<pkg>`) in the files they do read.
-
-## Cross-vendor notes
-
-- **Anthropic**: Claude Code reads `AGENTS.md` directly (v2.1.277+) when no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the working directory or above it; if one of those CLAUDE files is present, Claude reads that instead by default, unless the `CLAUDE.md` explicitly imports the `AGENTS.md` with an `@path` import, or the **Project instructions** setting is changed to read both. A repository that wants both files loaded unconditionally should either add the import or set `claude-md-and-agents-md`. Do not assume CLAUDE.md "takes precedence" while AGENTS.md still loads alongside it - by default, one or the other loads, not both. See [Claude Code project memory docs](https://code.claude.com/docs/en/memory).
-- **Cursor** reads AGENTS.md + .cursor/rules/. Nested AGENTS.md files are combined with their parents, and the more specific instructions win on conflict. See [Cursor rules docs](https://cursor.com/docs/rules).
-- **GitHub Copilot** reads AGENTS.md and .github/copilot-instructions.md, plus path-scoped `.github/instructions/*.instructions.md` files (use `excludeAgent: "code-review"` or `"cloud-agent"` in their frontmatter to keep one away from that surface). Keep instructions terse; check the limits of the specific Copilot surface you target.
-- **Google Gemini CLI** reads context files from a configurable filename list (`context.fileName`), which defaults to `GEMINI.md` and can include `AGENTS.md`; it is not an automatic fallback.
-
-## Templates and tooling
-
-- `/templates/discovery/AGENTS.md` - universal baseline; trim to the authoring target of ~150 lines ideal, <300 max.
-- `/templates/discovery/CLAUDE.md` - optional Claude Code overlay template; most repos won't need it.
-- `/templates/discovery/cursor-rules.mdc` - Cursor rule example.
-- `/templates/discovery/copilot-instructions.md` - GitHub Copilot template.
-- `/templates/discovery/monorepo-AGENTS.md` - per-package pattern for pnpm/turbo workspaces.
-
-Tooling:
-
-- [agentskills.io](https://agentskills.io) - the Agent Skills specification (for `SKILL.md` packages, not AGENTS.md).
-- `llm-context` - CLI to preview token cost of context files.
-- Simple npm scripts: `node scripts/validate-agents.js` (check presence, line count, command parsing).
-
-### Real-world example structure
-
-A minimal AGENTS.md for a TypeScript Next.js monorepo:
-
-```markdown
-# AGENTS.md
-
-Monorepo for SaaS platform: API (Node + Fastify), Web (Next.js 15), Shared types.
-
-## Quick start
-
-Development:
-pnpm dev # Both API + Web
-pnpm test # All packages
-pnpm lint # ESLint + Prettier
-
-Build & release:
-pnpm build # Production builds (~2m)
-changeset add # Stage version bump
-pnpm release # Publish to npm
-
-## Commands by package
-
-API server (packages/api):
-pnpm --filter=@app/api dev # http://localhost:3001
-pnpm --filter=@app/api test:watch
-pnpm --filter=@app/api db:migrate # Ask before running
-
-Web (packages/web):
-pnpm --filter=@app/web dev # http://localhost:3000
-pnpm --filter=@app/web build # Static export to out/
-
-Shared (packages/shared):
-pnpm --filter=@app/shared type-check
-pnpm --filter=@app/shared build # Emits TS + ESM
-
-## Conventions
-
-- Filenames: kebab-case
-- Functions: camelCase
-- API routes: /api/v1/...
-- Environment: .env.example tracked; .env.local ignored
-- Git: changesets required for version bumps (no hand-edit package.json)
-
-## Testing
-
-Unit tests: vitest (--coverage flag for reports)
-Integration: playwright in packages/web, e2e agent tests in ci
-
-pnpm test passes before merge.
-
-## Boundaries
-
-Always:
-
-- Read files, run tests, open PRs (gh pr create --draft)
-
-Ask first:
-
-- New dependencies (pnpm add ...)
-- Database migrations (pnpm db:migrate)
-- Merge to main (use PR instead)
-
-Never:
-
-- Deploy to production
-- Modify secrets or env vars
-- Delete branches or tags
-
-## Gotchas
-
-- pnpm install requires Node 18.12+ (.nvmrc enforced)
-- TS errors block build; use // @ts-expect-error with comment
-- Changesets required for npm publish (ci gate)
-- Database: migrations are append-only; rollback only in dev
-
-## Links
-
-- Architecture: docs/ARCHITECTURE.md
-- API: packages/api/README.md
-- Contributing: CONTRIBUTING.md
-```
-
-This example is ~90 lines, command-first, boundary-explicit, and ready to ship.
-
-## Citations
-
-- [agents.md](https://agents.md) - Agentic AI Foundation (Linux Foundation).
-- [Claude Code docs on CLAUDE.md](https://code.claude.com/docs/en/memory).
-- [Cursor rules docs](https://cursor.com/docs/rules).
-- [GitHub Copilot custom-instruction support](https://docs.github.com/en/copilot/reference/custom-instructions-support).
-- Simon Willison: [Context Engineering](https://simonwillison.net/2025/Jun/27/context-engineering/) (essay on agent context design).
-- Anthropic: [Effective Context Engineering for AI Agents](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents).
-
-## See also
-
-- `docs/context-files` (project-specific deep dive)
-- `templates/discovery/AGENTS.md` (starter file), `templates/discovery/CLAUDE.md` (optional overlay starter)
-- `references/tool-design.md` (tool descriptions inform AGENTS.md examples)
+7. Gotchas with file references ("Node 18.12+ required; see .nvmrc").
+8. Links to deeper docs (ADRs, runbooks) rather than pasted content.
+
+Write imperatives and relative paths. Point to files instead of describing
+code. In a monorepo the root file maps packages and their filtered commands,
+and each package has its own AGENTS.md with its own boundaries. Which nested
+files load is up to each client, so check the clients the team uses.
+
+## Templates
+
+- `templates/discovery/AGENTS.md`
+- `templates/discovery/monorepo-AGENTS.md`
+- `templates/discovery/CLAUDE.md` (only when Claude needs something extra)
+- `templates/discovery/cursor-rules.mdc`
+- `templates/discovery/copilot-instructions.md`

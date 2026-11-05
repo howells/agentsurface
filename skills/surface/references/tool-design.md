@@ -1,526 +1,120 @@
 # Tool Design
 
-## Summary
+Dimension 7: the quality of tool definitions an agent chooses between and
+calls, in any framework.
 
-Dimension 7 scores tool definition quality. Agent tool quality is the single highest-leverage investment in an agent application. Baseline is verb_noun naming, agent-oriented descriptions ("when to use, when not to use"), flat typed schemas with field descriptions. Production includes toModelOutput for token reduction, annotations (readOnly, destructive, idempotent), dynamic selection support, and cross-framework portability (single definition works in MCP + AI SDK + LangChain + OpenAI). Scores 0–3 based on naming clarity, description quality, schema completeness, and framework support.
+## Score
 
-- **0**: No formal tool definitions (blocker)
-- **1**: Basic schemas, terse descriptions (<20 words), no examples
-- **2**: verb_noun naming, "Use when..." clarity, field descriptions, <10 tools
-- **3**: toModelOutput optimization, annotations, activeTools patterns, cross-framework
-- **Evidence**: tool definition patterns, description word count, schema annotations, pagination support
-
----
-
-Agent tool quality is the single highest-leverage investment in an agent application. Anthropic, OpenAI, and Gemini publish broadly similar guidance: name clearly, describe as if onboarding a teammate, keep schemas flat and typed, return semantic content, and fail informatively. Tools that are well-designed for AI consumption reduce agent hallucination, lower token spend, and enable reliable multi-step reasoning.
-
-## Scoring rubric
-
-| Score | Criteria                                                                                                                                                                                                                                                                                | Detection                                                                                                                                                         |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | No formal tool definitions. Functions exist but no schema, no description.                                                                                                                                                                                                              | No `tool()` calls, no `@tool` decorators, no `createTool()`, no MCP tool registrations.                                                                           |
-| 1     | Basic tool schemas exist but descriptions are terse or missing. No examples.                                                                                                                                                                                                            | Tool definitions present but descriptions <20 words. No `.describe()` on Zod fields. No inputExamples.                                                            |
-| 2     | Good tool design. `verb_noun` naming. Agent-oriented descriptions with "when to use" and disambiguation. Typed schemas with field descriptions.                                                                                                                                         | Descriptions include "Use when..." and "Do not use for...". All schema fields have descriptions. enum values on constrained strings. <10 tools per agent/context. |
-| 3     | Excellent tool design. `toModelOutput` reducing token usage. Tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`). Dynamic tool selection support (`activeTools`, `defer_loading`). Cross-framework definitions (works in MCP + AI SDK + LangChain). | `toModelOutput` defined. annotations object present. `activeTools` or `defer_loading` patterns. Tool definitions portable across frameworks.                      |
+- **0**: Functions with no tool schema or description (no `registerTool`,
+  `tool()`, `createTool()`, `@tool`).
+- **1**: Schemas exist but descriptions are terse (<20 words) or missing, fields
+  are undescribed, no examples.
+- **2**: Clear verb-noun names; descriptions that say when to use the tool and
+  what to use instead; every field described; enums on closed sets; a small set
+  per agent context (under about 10).
+- **3**: Level 2 plus compressed model-facing output (`toModelOutput` or the
+  equivalent), annotations, dynamic selection for large sets (tool search,
+  `activeTools`), and one definition emitted to several frameworks.
 
 ## Evidence to gather
 
-- **Tool definition locations:** MCP `server.registerTool(...)` (legacy v1 `server.tool(...)`), Vercel AI SDK `tools: {...}`, OpenAI Agents SDK `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`.
-- **Description quality:** Grep for descriptions <20 words (red flag). Scan for "Use when..." and "Do not use for..." patterns.
-- **Schema annotations:** `.describe()` or `description` field on every parameter; `additionalProperties: false` on objects.
-- **Tool count:** >20 tools on a single agent is a red flag; agent struggles to reason over large tool sets.
-- **Response shape:** Check for opaque IDs in responses. Look for `next_cursor`, `has_more`, pagination support.
-- **Annotations:** MCP tools should carry `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`.
-- **Cross-framework portability:** Single schema definition exported as MCP tool, Vercel AI SDK tool, OpenAI tool, and LangChain tool.
-
-## Deep dive
-
-### Naming conventions
-
-Default to lowercase `snake_case` with a verb and an ordinary task noun: `read_paint`, `find_palette_ideas`, `add_samples_to_cart`. This is Agent Surface's convention, not an MCP requirement. The [MCP tool-name rules](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#tool-names) also permit other case styles and separators; target model adapters may be stricter.
-
-Keep provider abbreviations, cache choices and connectivity checks inside application code unless the agent's job is to manage them. Namespaces are useful when the agent must distinguish real services or destinations; do not add one merely to expose a backend. Assess routing with representative tasks rather than claiming one casing or namespace order is universally best.
-
-Match public registration keys and tool IDs. Update executable references together when renaming, and preserve historical records. Keep filenames and language-native variable names in the repository's normal style.
-
-The canonical explanation and current primary sources are in [Naming and Descriptions](https://agentsurface.dev/docs/tool-design/naming-and-descriptions) (`src/content/docs/tool-design/naming-and-descriptions.mdx` in the source repository), verified 2026-10-29.
-
-### Descriptions: the single biggest lever
-
-([Anthropic writing-tools-for-agents](https://www.anthropic.com/research/writing-tools-for-agents))
-
-Write descriptions as if onboarding a new engineer. Include four elements:
-
-1. **What it does:** Concise single sentence.
-2. **When to use it:** Clarify the triggering condition or use case.
-3. **When NOT to use it:** Disambiguate from related tools. "Do not use this for X; use `other_tool` instead."
-4. **Preconditions and side effects:** Mention required authentication, rate limits, or mutations (creation, deletion, side effects on external systems).
-
-**Typical length:** 30–200 words. Around 30 is fine for a simple, unambiguous tool; add words only where they carry guidance the model needs.
-
-Example (good):
-
-```
-Search Jira for issues by text, assignee, status, or custom query. Use this when the user asks
-to find open bugs, pull all "high-priority" tickets, or list all issues assigned to a person.
-Do not use this for creating new issues (use `jira_create_issue` instead) or updating existing
-ones (use `jira_update_issue`). Requires `JIRA_API_KEY` env var. Returns up to 50 results by default;
-use `limit` and `offset` for pagination.
-```
-
-Example (weak):
-
-```
-Searches for Jira issues.
-```
-
-Anthropic's [Writing tools for agents](https://www.anthropic.com/research/writing-tools-for-agents) reports that small refinements to descriptions can produce large accuracy gains. House guidance: put what the tool does and when to use it first, because that is what a model weighs most when choosing between tools.
-
-### Schemas: flat, typed, annotated
-
-**Flat structure preferred.** Avoid deep nesting; one or two levels maximum (house advice). Deeply nested objects are harder for agents to reason about; OpenAI strict mode allows nesting up to 10 levels and 5,000 properties in total.
-
-**Every field must have a description.** Use `.describe()` in Zod:
-
-```typescript
-const searchIssuesSchema = z
-  .object({
-    query: z.string().describe('Free text search (supports "status:Open" syntax)'),
-    assignee: z.string().optional().describe("Filter by assignee name or email"),
-    status: z.enum(["Open", "In Progress", "Done"]).describe("Issue workflow state"),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(50)
-      .describe("Max results to return (default 50, capped at 100)"),
-  })
-  .strict();
-```
-
-**Enums over free text.** Constrain values wherever the server enforces them:
-
-```typescript
-priority: z.enum(["low", "medium", "high", "critical"]).describe(
-  "Severity: low=cosmetic, medium=feature, high=blocker, critical=outage",
-);
-```
-
-**Examples on every field.** Include concrete values:
-
-```typescript
-query: z.string()
-  .describe('Search query. Examples: "status:Open", "assignee:alice@company.com", "label:bug"'),
-```
-
-**`additionalProperties: false` for strict OpenAI mode.** Required when strict mode is on (the OpenAI Agents SDK enables it by default for schema-validated tools; the API also supports `strict: false`). In strict mode every property must also be listed in `required`, with optional values made nullable:
-
-```typescript
-.strict() // Zod
-// or
-{ additionalProperties: false } // JSON Schema
-```
-
-### Response shape: semantic content and pagination
-
-**Return semantic names, not opaque IDs alone.** If a tool returns a list of users, include names, not just user IDs:
-
-```typescript
-// Bad:
-{
-  user_ids: ["usr_123", "usr_456"];
-}
-
-// Good:
-{
-  users: [
-    { id: "usr_123", name: "Alice", email: "alice@company.com" },
-    { id: "usr_456", name: "Bob", email: "bob@company.com" },
-  ];
-}
-```
-
-**Support `view` or `response_format` for concise vs detailed output:**
-
-```typescript
-response_format: z.enum(['concise', 'detailed'])
-  .describe('concise: name + ID only. detailed: include all metadata (slower, higher tokens)'),
-```
-
-**Paginate by default; cap results.** Include `next_cursor`, `has_more`:
-
-```typescript
-{
-  results: [...],
-  next_cursor: 'ghi789',
-  has_more: true,
-  total_count: 1240
-}
-```
-
-**Compressing large payloads (`toModelOutput` in the AI SDK):** The AI SDK's `tool()` accepts a `toModelOutput` function that maps the full tool result to a smaller value shown to the model; with other stacks, do the same compression in your own `tool_result`. Return a summary string + structured refs. For example, a large search result list becomes:
-
-```typescript
-// Instead of returning 50 full objects:
-{
-  summary: "Found 50 public repositories matching 'claude-agent'. Top 3: anthropic/anthropic-sdk-python (5.2k stars), anthropic-sdk-js (3.1k stars), anthropic-sdk-go (1.8k stars). Use repositories[].id to fetch details.",
-  repositories: [
-    { id: 'repo-123', name: 'anthropic-sdk-python', stars: 5200 },
-    // ... top results only
-  ],
-  pagination: { next_cursor: 'xyz', total: 1240 }
-}
-```
-
-### Annotations (MCP)
-
-([MCP spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/)) - annotations remain part of the current revision.
-
-Every tool should declare its access level and side effects:
-
-```typescript
-server.registerTool(
-  "create_issue",
-  {
-    description: "Create a new issue in the tracker",
-    inputSchema: schema, // includes a client-supplied request_id used to deduplicate retries
-    annotations: {
-      readOnlyHint: false, // Changes state
-      destructiveHint: false, // Additive: creates a record, never overwrites or deletes
-      idempotentHint: true, // Only because request_id deduplicates; a plain create is not idempotent
-      openWorldHint: false, // Closed domain: this tracker only
-    },
-  },
-  handler,
-);
-```
-
-`registerTool` is the TypeScript SDK v2 form (`@modelcontextprotocol/server`); the v1 positional `server.tool()` is removed in v2. Annotations are hints a client may use, not an authorization boundary.
-
-- `readOnlyHint: true` - Query-only, no side effects.
-- `destructiveHint: true` - Mutates or deletes data; requires careful use.
-- `idempotentHint: true` - Safe to call multiple times with same args; upsert preferred over create+update.
-- `openWorldHint: false` - All effects are local to this API; no side effects on external systems.
-
-### Idempotency and batching
-
-**Idempotent tools whenever possible.** Replace split create+update with single upsert:
-
-```typescript
-// Bad (two separate tools):
-create_user(name, email)
-update_user(id, name, email)
-
-// Good (idempotent):
-upsert_user(name, email, id?: string)  // Create if missing, update if exists
-```
-
-**Batch versions of hot tools** reduce loop iterations. If agents frequently call `search_doc` 5+ times per task, offer:
-
-```typescript
-search_docs(query: string)           // Single
-search_docs_batch(queries: string[]) // Batch
-```
-
-### Error design
-
-Errors must be returned in the tool output, not thrown (`isError: true` on MCP results; other SDKs have their own error handlers or exception-to-result conversion). `is_retriable` means the same call is safe to repeat unchanged, so validation errors are `false`. Include recovery hints:
-
-```typescript
-{
-  success: false,
-  error: {
-    message: 'Jira API returned 401 Unauthorized',
-    code: 'AUTH_FAILED',
-    is_retriable: false,
-    suggestions: [
-      'Check that JIRA_API_KEY is set and not expired',
-      'Regenerate the API key in Jira settings'
-    ],
-    doc_uri: 'https://docs.company.com/jira-auth'
-  }
-}
-```
-
-See `/references/error-handling.md` for full error patterns.
-
-### Cross-framework portability
-
-Define tool metadata once in a framework-neutral module; emit adapters for each framework:
-
-```typescript
-// tools/registry.ts — shared schema + metadata
-export const issueSearchTool = {
-  name: "jira_search_issues",
-  description: "Search Jira for issues...",
-  schema: searchIssuesSchema,
-  outputSchema: searchIssuesOutputSchema,
-  handler: searchIssuesHandler,
-};
-
-// Export framework-specific adapters:
-export const toMCP = (server, t) =>
-  server.registerTool(
-    t.name,
-    {
-      description: t.description,
-      inputSchema: t.schema,
-      outputSchema: t.outputSchema, // declare it so clients can validate structuredContent
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      const data = await t.handler(input);
-      return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
-    },
-  );
-
-// AI SDK 7: tools are a record keyed by name; the schema goes in `inputSchema`
-export const toVercelAI = (t) => ({
-  [t.name]: tool({ description: t.description, inputSchema: t.schema, execute: t.handler }),
-});
-
-// OpenAI Agents SDK (JS): `tool()` with the Zod schema as `parameters`
-export const toOpenAIAgents = (t) =>
-  tool({ name: t.name, description: t.description, parameters: t.schema, execute: t.handler });
-```
-
-This pattern keeps tool logic centralized and ensures consistency across frameworks.
-
-### Token efficiency
-
-Tool descriptions count toward every agent request. Trim aggressively:
-
-- Use references (`doc_uri`) for longer docs rather than inlining.
-- MCP has no built-in per-tool lazy loading: `tools/list` returns full definitions. Deferred loading is provider- or client-side.
-- Anthropic and OpenAI both support **tool search** (`defer_loading: true` plus a search tool; `deferLoading` / `toolSearchTool()` in OpenAI Agents JS): with many tools, the model searches for matching tools rather than loading all. Only loaded definitions count as input tokens. Claude's inline tool definitions (beta, `inline-tools-2026-09-15`) add a tool mid-conversation without breaking the cached prefix.
-- **Programmatic tool calling** (Claude `code_execution_20260120` or later with `allowed_callers`; OpenAI Agents JS `programmaticToolCallingTool()` with `allowedCallers`) keeps intermediate tool results out of the model's context.
-- **Claude forced tool choice:** Opus 5.5, Sonnet 5.5 and Fable 5.1 reject `tool_choice` `any` and `tool` (400); use `auto` plus `strict: true` or structured outputs.
-- **Gemini 3 thought signatures:** Preserve exact tool-call arguments across conversation turns; do not mutate them in logs.
-- **OpenAI strict mode:** a new schema can add first-request latency while it is processed; reuse identical schemas across requests and measure the actual latency rather than assuming a caching mechanism.
-- **Claude strict ceilings:** strict tool use is per tool (`strict: true`) and supports optional properties, but a request is capped at 20 strict tools, 24 optional parameters and 16 union-typed parameters across its strict schemas, with further grammar-complexity limits and a 180-second compilation timeout. Non-strict tools do not count toward the 20. Budget strictness for the tools where a malformed call is costly.
-- **Gemini schema subset:** function declarations use an OpenAPI-schema subset (`parameters`) or raw JSON Schema (`parametersJsonSchema`), mutually exclusive; very large or deep schemas can be rejected. Do not copy OpenAI's strict-object rules into Gemini adapters, and test each adapter's emitted schema against the provider.
-- **Claude capability gating:** read a model's capabilities from the Models API instead of hard-coding model names (`capabilities.server_tools.code_execution` for the server code-execution tool, top-level `capabilities.code_execution` for code calling the request's other tools). API version `2026-10-21`, the default in the new major SDKs, removes `temperature`, `top_p` and `top_k` (400 if sent), so adapters and test harnesses must stop sending them.
-
-### Tool discovery heuristics
-
-Include "Use this for..." and "Do not use this for..." lines in descriptions (see Descriptions section above).
-
-If two tools are near-siblings, explicitly note the choosing criterion:
-
-```
-search_issues: For querying existing tickets. Use for finding open bugs, filtering by status, listing assigned work.
-create_issue: For submitting new work. Use when the user describes a new bug or feature request.
-update_issue: For modifying existing tickets. Use to change status, assignee, or description of a ticket already tracked.
-```
-
-## Worked example: cross-framework tool
-
-Below is a single `search_docs` tool defined for MCP, Vercel AI SDK, and OpenAI Agents SDK. All three frameworks share the same Zod schema.
-
-**Shared schema and handler (tools/registry.ts):**
-
-```typescript
-import { z } from "zod";
-
-const searchDocsSchema = z
-  .object({
-    query: z
-      .string()
-      .describe(
-        'Free text search query. Examples: "authentication", "API rate limits", "error 429"',
-      ),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(10)
-      .describe("Max results to return (default 10, max 100)"),
-    offset: z.number().int().min(0).default(0).describe("Pagination offset for large result sets"),
-    format: z
-      .enum(["concise", "detailed"])
-      .default("concise")
-      .describe("concise: title + URL only. detailed: include full snippet (slower, more tokens)"),
-  })
-  .strict();
-
-type SearchDocsInput = z.infer<typeof searchDocsSchema>;
-
-// OpenAI strict mode: every field required, optional inputs nullable instead of defaulted
-export const searchDocsStrictSchema = searchDocsSchema.extend({
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .nullable()
-    .describe("Results per page; null for the default"),
-  offset: z.number().int().min(0).nullable().describe("Pagination offset; null for 0"),
-  format: z.enum(["concise", "detailed"]).nullable().describe("null for concise"),
-});
-
-const searchDocsOutputSchema = z.object({
-  results: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      url: z.string(),
-      snippet: z.string().optional(),
-    }),
-  ),
-  has_more: z.boolean(),
-  next_offset: z.number().int(),
-});
-
-export async function searchDocsHandler(input: SearchDocsInput) {
-  // Call internal search API
-  const { query, limit, offset, format } = input;
-  const results = await internal.search(query, { limit, offset });
-
-  return {
-    results: results.map((doc) => ({
-      id: doc.id,
-      title: doc.title,
-      url: doc.url,
-      ...(format === "detailed" && { snippet: doc.snippet }),
-    })),
-    has_more: results.length === limit,
-    next_offset: offset + limit,
-  };
-}
-
-export const searchDocsTool = {
-  name: "search_docs",
-  description: `Search internal documentation by keyword. Use this to find setup guides, API references, and troubleshooting steps. 
-Do not use this for general knowledge (use web search instead) or to create new docs (use create_doc). Returns snippets ranked by relevance.`,
-  schema: searchDocsSchema,
-  outputSchema: searchDocsOutputSchema,
-  handler: searchDocsHandler,
-};
-```
-
-**MCP adapter (tools/mcp.ts):**
-
-```typescript
-import { McpServer } from "@modelcontextprotocol/server";
-import { searchDocsTool } from "./registry";
-
-const server = new McpServer({
-  name: "docs-mcp",
-  version: "1.0.0",
-});
-
-// MCP needs a CallToolResult, so wrap the handler's plain data
-server.registerTool(
-  searchDocsTool.name,
-  {
-    description: searchDocsTool.description,
-    inputSchema: searchDocsTool.schema,
-    outputSchema: searchDocsTool.outputSchema,
-    annotations: {
-      readOnlyHint: true,
-      openWorldHint: false, // searches this product's own docs, a closed domain
-    },
-  },
-  async (input) => {
-    const data = await searchDocsTool.handler(input);
-    return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
-  },
-);
-
-export default server;
-```
-
-**Vercel AI SDK adapter (tools/vercel-ai.ts):**
-
-```typescript
-import { tool } from "ai";
-import { searchDocsTool } from "./registry";
-
-// AI SDK 7: pass the Zod schema as `inputSchema`; use the result as a record entry,
-// e.g. generateText({ model, tools: { search_docs: searchDocsVercel }, prompt })
-export const searchDocsVercel = tool({
-  description: searchDocsTool.description,
-  inputSchema: searchDocsTool.schema,
-  execute: searchDocsTool.handler,
-});
-```
-
-**OpenAI Agents SDK adapter (tools/openai-agents.ts):**
-
-```typescript
-import { tool } from "@openai/agents";
-import { searchDocsTool, searchDocsStrictSchema } from "./registry";
-
-// `tool()` creates the function tool; run it with run(agent, input).
-// Strict mode is on by default and requires every field to be required, with optional
-// inputs expressed as nullable. searchDocsTool.schema uses .default(), so pass a strict
-// variant (or set strict: false and validate inside execute).
-export const searchDocsOpenAI = tool({
-  name: searchDocsTool.name,
-  description: searchDocsTool.description,
-  parameters: searchDocsStrictSchema,
-  execute: searchDocsTool.handler,
-});
-```
-
-All three adapters wrap the same handler and schema; only the frame changes. Tool calling for GPT-6 models requires the OpenAI Responses API, and the open-source Agents SDK is a different product from the OpenAI Agents API (public beta since 2026-09-10).
-
-## Cross-vendor capability table
-
-| Capability                           | Anthropic tool                           | MCP                                                                  | OpenAI strict tool                                 | Gemini FunctionDeclaration      | Vercel AI SDK                   |
-| ------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------- | ------------------------------- |
-| Naming                               | `verb_noun` preferred                    | Yes                                                                  | `verb_noun` + `strict:true`                        | Yes                             | Yes                             |
-| Descriptions                         | Full prose; first paragraph critical     | Yes                                                                  | Full prose; <500 tokens per tool                   | Yes                             | Yes                             |
-| Schema validation                    | Zod `.parse()` on input                  | Zod or JSON Schema                                                   | JSON Schema; `additionalProperties:false` required | JSON Schema                     | Zod native                      |
-| Field descriptions                   | `.describe()` on every field             | Optional in the protocol; expected by this rubric                    | `description` on every property                    | Required                        | `.describe()` on every field    |
-| Examples                             | Input examples in description or param   | Supported                                                            | Via `examples` array in schema                     | Via `example` in property       | Via `.describe()`               |
-| Enums                                | Enforced at parse                        | Enforced                                                             | Tokens masked at decode time (CFG)                 | Yes                             | Enforced at parse               |
-| Pagination                           | Explicit `next_cursor`, `has_more`       | Supported                                                            | Supported                                          | Supported                       | Supported                       |
-| toModelOutput / response compression | Not native (compress in the tool_result) | Not native                                                           | Not native                                         | Not native                      | `toModelOutput` on `tool()`     |
-| Annotations                          | None (Claude-specific)                   | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` | None                                               | None                            | None                            |
-| Thought signature preservation       | N/A                                      | N/A                                                                  | N/A                                                | Required (pass back in history) | N/A                             |
-| Lazy loading                         | Tool search (`defer_loading`)            | Not native (`tools/list` returns everything)                         | Tool search (`defer_loading`, Responses API)       | Not native                      | Not native                      |
-| Error output                         | Structured; returned not thrown          | Structured; isError pattern                                          | Structured in tool_result                          | Structured                      | Structured; returned not thrown |
-
-## Anti-patterns to avoid
-
-- **Terse descriptions** ("Creates a thing"). Takes no effort to write, compounds agent confusion.
-- **More than 20 tools on one agent.** Treat about 20 tools in one agent context as a house review threshold, not a hard limit: selection accuracy and context cost worsen as the set grows, so test representative tasks and use dynamic selection (tool search, `activeTools`) when the set is large.
-- **Opaque IDs in response without lookup tool.** If a tool returns `user_id: 123`, agent must have a `lookup_user` tool to resolve it.
-- **Unconstrained or root-level unions** (e.g., a `z.any()` branch inside `result`, or a root `anyOf`). OpenAI strict mode supports nested `anyOf` when every branch is in the supported subset, but rejects a root-level `anyOf` and unbounded `any`. Use constrained shapes, flat fields or separate tools.
-- **Optional fields under OpenAI strict mode.** Strict mode requires every property in `required`, so express "optional" as nullable (`assignee: z.string().nullable()`) and have the caller pass `null`. Anthropic strict tool use supports genuinely optional properties.
-- **Inconsistent naming across tools.** Use `user_id` everywhere, not `user_id` in one tool and `userId` in another.
-- **Side-effectful tools that throw errors instead of returning.** Always return errors in the response body so the agent can reason about recovery.
-- **Write tools without annotations.** Any tool that changes state must carry `readOnlyHint: false`, and `destructiveHint: true` where it can destroy or overwrite data (MCP), or be called out in the description.
-- **No disambiguation in descriptions.** If two tools are similar, explicitly state when to use each.
-
-## Templates and tooling
-
-- `/templates/tools/tool-definition.ts` - Shared schema + cross-framework adapters (MCP, Vercel AI SDK, OpenAI Agents SDK)
-- `/templates/tools/tool-registry.ts` - Registry pattern for managing >10 tools
-- **Libraries:**
-  - `zod` - Type-safe schema definition
-  - `zod` 4 `z.toJSONSchema()` - Compile Zod to JSON Schema natively (the third-party `zod-to-json-schema` is no longer actively maintained and only supports Zod 3 schemas)
-  - `@modelcontextprotocol/server` and `@modelcontextprotocol/client` - MCP SDK v2 (the monolithic `@modelcontextprotocol/sdk` 1.x is maintained for compatibility)
-  - `@openai/agents` - OpenAI Agents SDK (TS)
-  - `ai` (Vercel) - Vercel AI SDK
-
-## Citations
-
-- ([Anthropic writing-tools-for-agents](https://www.anthropic.com/research/writing-tools-for-agents))
-- ([MCP specification, 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/)) - current revision
-- ([OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling))
-- ([OpenAI Agents SDK](https://openai.github.io/openai-agents-js/))
-- ([Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling))
-- ([Vercel AI SDK tools](https://ai-sdk.dev/docs/reference/ai-sdk-core/))
-- ([12-factor agents Factor 4 & 7](https://github.com/humanlayer/12-factor-agents))
-
-## See also
-
-- `/docs/tool-design` - Detailed patterns and case studies
-- `/references/mcp-servers.md` - MCP server implementation
-- `/references/error-handling.md` - RFC 9457 error patterns
-- `/references/testing.md` - Tool routing, parameter correctness evals
-- `/templates/tools/tool-definition.ts` - Starter template with adapters
+- Definitions: MCP `registerTool` (v1 `server.tool`), AI SDK `tools: {}`, OpenAI
+  Agents `tool()`, Mastra `createTool()`, LangChain, Gemini
+  `functionDeclarations`.
+- Description word counts; "use when" and "do not use" content; sibling tools
+  without a stated choosing rule.
+- `.describe()` or `description` on every field; `additionalProperties: false`
+  where strict mode is on.
+- Responses: bare IDs with no lookup tool, unbounded lists, missing
+  `next_cursor`/`has_more`.
+- Tool count per agent context.
+
+## The house way
+
+**Names.** Lowercase snake_case: a verb and the noun a user would say
+(`find_palette_ideas`, `add_samples_to_cart`). This is the house convention;
+MCP allows other casings and some model adapters are stricter. Namespace only
+when the agent must tell real services or destinations apart, not to mirror a
+backend. Keep provider abbreviations, cache choices and connectivity checks out
+of tool names unless managing them is the agent's job. Rename registration
+keys and every executable reference together. Canonical:
+https://agentsurface.dev/docs/tool-design/naming-and-descriptions.
+
+**Descriptions** carry the most weight. Lead with what it does and when to use
+it, then what to use instead, then preconditions and side effects (auth,
+limits, mutations, pagination). 30 words suits a simple tool; add words only
+where they carry guidance. For near-siblings, state the choosing rule in each.
+
+**Schemas.** One or two levels of nesting at most (house advice; OpenAI strict
+allows 10 levels and 5,000 properties). Every field described, with example
+values. Enums wherever the server enforces a closed set, with meanings
+(`low=cosmetic, critical=outage`). The same name for the same thing everywhere
+(`user_id`, never `userId` in one tool).
+
+**Output.** Names alongside IDs, so the agent needn't look each one up. Paginate
+by default with `next_cursor`/`has_more`; offer `response_format: concise |
+detailed` on heavy reads. Compress large results into a summary plus
+structured refs (the AI SDK's `toModelOutput`; elsewhere do it in the tool
+result). Errors are returned, not thrown, with `is_retriable` false for
+validation failures (error-handling.md).
+
+**Shape.** Prefer one idempotent `upsert` over create-plus-update, and add a
+batch variant of a tool agents call five or more times per task.
+
+**Annotations** (MCP): a create deduplicated by a client `request_id` is
+`readOnlyHint: false, destructiveHint: false, idempotentHint: true`; without
+the dedup key it isn't idempotent. Rules are in mcp-servers.md. Annotations are
+hints, never authorization.
+
+**One definition, many adapters.** Keep name, description, Zod schema, output
+schema and handler in a neutral registry and emit adapters: MCP
+`registerTool(name, { description, inputSchema, outputSchema, annotations })`
+returning `structuredContent`; AI SDK `tool({ description, inputSchema,
+execute })` in a record keyed by name; OpenAI Agents `tool({ name, description,
+parameters, execute })`.
+
+## Provider gotchas
+
+- **OpenAI strict mode** is on by default in the Agents SDK. Every property must
+  be in `required`, so `.default()` and `.optional()` fields need a strict
+  variant with `.nullable()` (or `strict: false` and validation in `execute`).
+  It rejects root-level `anyOf` and unbounded `any`; nested `anyOf` is fine. A
+  new schema can add first-request latency, so reuse identical schemas. GPT-6
+  tool calling needs the Responses API; the open-source Agents SDK is not the
+  OpenAI Agents API (public beta since 2026-09-10).
+- **Claude strict tool use** is per tool and allows genuinely optional
+  properties, but a request caps at 20 strict tools, 24 optional parameters and
+  16 union-typed parameters across strict schemas, with a 180 s compile timeout.
+  Spend strictness where a malformed call is costly.
+- **Claude forced tool choice:** Opus 5.5, Sonnet 5.5 and Fable 5.1 reject
+  `tool_choice` `any` and `tool` with a 400; use `auto` with `strict: true` or
+  structured outputs.
+- **Claude API version `2026-10-21`** (the default in the new major SDKs)
+  removes `temperature`, `top_p` and `top_k`; sending them is a 400.
+- **Claude capabilities** come from the Models API, not model names:
+  `capabilities.server_tools.code_execution` for the server tool, top-level
+  `capabilities.code_execution` for programmatic calling of the request's other
+  tools.
+- **Tool search** (`defer_loading: true`; `deferLoading` and `toolSearchTool()`
+  in OpenAI Agents JS) loads only matching definitions, and only loaded ones
+  cost tokens. MCP itself has no lazy loading: `tools/list` returns everything.
+  Claude inline tool definitions (beta `inline-tools-2026-09-15`) add a tool
+  mid-conversation without breaking the cache.
+- **Programmatic tool calling** (Claude `code_execution_20260120` or later with
+  `allowed_callers`; OpenAI Agents JS `programmaticToolCallingTool()` with
+  `allowedCallers`) keeps intermediate results out of context.
+- **Gemini** takes an OpenAPI subset (`parameters`) or raw JSON Schema
+  (`parametersJsonSchema`), never both; very large or deep schemas are
+  rejected. Don't copy OpenAI's strict rules into a Gemini adapter. Return
+  function-call parts with their thought signatures unchanged.
+- **Zod to JSON Schema:** Zod 4's `z.toJSONSchema()`. `zod-to-json-schema` is
+  unmaintained and Zod 3 only.
+
+About 20 tools in one agent context is a house review threshold, not a limit;
+beyond it, test routing on representative tasks and use dynamic selection.
+
+## Templates
+
+- `templates/tools/tool-definition.ts` (shared schema with MCP, AI SDK and
+  OpenAI Agents adapters)
+- `templates/tools/tool-registry.ts`
