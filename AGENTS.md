@@ -1,6 +1,6 @@
 # agentsurface
 
-Agent Surface (https://agentsurface.dev) is a Next.js and Fumadocs guide to making software legible to AI agents, plus the installable `surface` skill. Project documentation and issues are in Linear (howells, AGE): [agentsurface — project documentation](https://linear.app/howells/document/agentsurface-project-documentation-8729bfeb67ab).
+Agent Surface (https://agentsurface.dev) is a Next.js and Fumadocs guide to making software legible to AI agents, plus the installable `surface` skill.
 
 ## Terms
 
@@ -32,6 +32,20 @@ pnpm deploy:prod:publish  # deploys, checks the homepage, promotes
 ## Safety rules
 
 - Never commit `.env` or anything from `.vercel/`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in Linear (howells, AGE). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context. See `docs/agents/domain.md`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
