@@ -8,22 +8,27 @@
  * - The key is reserved atomically (SET NX) before the handler runs, so two
  *   concurrent requests with the same key cannot both execute
  * - Keys are namespaced by authenticated principal and route, so one client
- *   can never replay another client's cached response
- * - The request body is fingerprinted; a reused key with a different body is
- *   rejected with 422, and a duplicate that arrives mid-flight gets 409
+ *   can never replay another client's cached response. The principal comes from
+ *   a resolver you pass in, backed by verified auth, never from a request header
+ *   the client controls
+ * - The query string and body are fingerprinted; a reused key with a different
+ *   request is rejected with 422, and a duplicate that arrives mid-flight gets 409
  * - The in-flight reservation is a lease owned by one request and renewed while
  *   the handler runs, so a slow handler cannot be overlapped by a retry. Only the
  *   owner can record the outcome (a fenced compare-and-set)
- * - Every outcome is recorded, failures included, so a retry never turns a
- *   permanent error into a different result. A thrown error is recorded as an
- *   unknown outcome, because effects may already have happened. A handler that
- *   knows nothing happened can release the key with releaseIdempotencyKey()
+ * - Outcomes are recorded, failures included, so a retry never turns a
+ *   permanent error into a different result. A thrown error is logged and
+ *   recorded as an unknown outcome, because effects may already have happened.
+ *   A handler that knows nothing happened can release the key with
+ *   releaseIdempotencyKey(). 429 and 503 are released automatically: they tell
+ *   the client to retry the same request, so the retry has to run
  * - Replays return the original status, headers and body bytes, JSON or not
  *
  * <CUSTOMISE>
  * - Set IDEMPOTENCY_TTL_SECONDS to your published retention window (24h is common)
- * - Implement getPrincipalId() from your auth layer (run auth before this wrapper)
- * - Configure the Redis client connection
+ * - Pass getPrincipalId, resolving the caller from your verified auth (a validated
+ *   JWT's `sub`, a session). Run auth before this wrapper
+ * - Set REDIS_URL
  * </CUSTOMISE>
  */
 
@@ -38,36 +43,27 @@ const LEASE_RENEW_MS = 10_000; // renew well before the lease expires
 const IDEMPOTENCY_KEY_HEADER = "idempotency-key";
 const IDEMPOTENCY_REPLAY_HEADER = "x-idempotency-replayed";
 const RELEASE_HEADER = "x-idempotency-release"; // internal; stripped before responding
+const RETRY_STATUSES = new Set([429, 503]); // never recorded: the retry must run
 
-/**
- * Initialize Redis client (or use your preferred cache)
- * <CUSTOMISE> Update connection config
- */
 let redis: Redis | null = null;
 
 function getRedisClient(): Redis {
   if (!redis) {
-    redis = new Redis({
-      host: process.env.REDIS_HOST || "localhost",
-      password: process.env.REDIS_PASSWORD,
-      port: Number.parseInt(process.env.REDIS_PORT || "6379", 10),
-      retryStrategy: (times) => Math.min(times * 50, 2000),
-    });
+    const url = process.env.REDIS_URL;
+    if (!url) {
+      throw new Error("REDIS_URL is not set; idempotency needs a Redis connection string");
+    }
+    redis = new Redis(url, { retryStrategy: (times) => Math.min(times * 50, 2000) });
   }
   return redis;
 }
 
 /**
- * <CUSTOMISE> Return the authenticated caller (user, client or tenant id).
- * Authorization must run before the idempotency lookup.
+ * Returns the authenticated caller (user, client or tenant id) from verified
+ * credentials. Reading it from a header the client sends lets any caller claim
+ * another principal and replay their responses.
  */
-function getPrincipalId(req: NextRequest): string {
-  const principal = req.headers.get("x-principal-id");
-  if (!principal) {
-    throw new Error("idempotency requires an authenticated principal");
-  }
-  return principal;
-}
+export type PrincipalResolver = (req: NextRequest) => string | Promise<string>;
 
 type IdempotencyEntry =
   | { state: "in_flight"; fingerprint: string; owner: string }
@@ -140,8 +136,14 @@ async function serializeResponse(response: NextResponse) {
   return { bodyBase64, headers, status: response.status };
 }
 
+/** Statuses whose responses must not carry a body; `new Response(body, { status })` throws for them. */
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
 function replayResponse(entry: Extract<IdempotencyEntry, { state: "done" }>): NextResponse {
-  const response = new NextResponse(Buffer.from(entry.bodyBase64, "base64"), {
+  const body = NULL_BODY_STATUSES.has(entry.status)
+    ? null
+    : Buffer.from(entry.bodyBase64, "base64");
+  const response = new NextResponse(body, {
     headers: entry.headers,
     status: entry.status,
   });
@@ -164,15 +166,19 @@ function unknownOutcome(): NextResponse {
  *
  * Usage:
  * ```typescript
- * export const POST = withIdempotency(async (req: NextRequest) => {
- *   const body = await req.json();
- *   const result = await createResource(body);
- *   return NextResponse.json(result, { status: 201 });
- * });
+ * export const POST = withIdempotency(
+ *   async (req: NextRequest) => {
+ *     const body = await req.json();
+ *     const result = await createResource(body);
+ *     return NextResponse.json(result, { status: 201 });
+ *   },
+ *   { getPrincipalId: async (req) => (await verifyAccessToken(req)).sub },
+ * );
  * ```
  */
 export function withIdempotency(
   handler: (req: NextRequest) => Promise<NextResponse>,
+  options: { getPrincipalId: PrincipalResolver },
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
     if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
@@ -185,15 +191,21 @@ export function withIdempotency(
         400,
         "https://api.example.com/errors/missing-idempotency-key",
         "Missing Idempotency Key",
-        `${IDEMPOTENCY_KEY_HEADER} header is required for ${req.method} requests`,
+        `The Idempotency-Key header is required for ${req.method} requests`,
         false,
       );
     }
 
     const route = `${req.method} ${req.nextUrl.pathname}`;
-    const cacheKey = `idempotency:${getPrincipalId(req)}:${route}:${idempotencyKey}`;
+    const principal = await options.getPrincipalId(req);
+    const cacheKey = `idempotency:${principal}:${route}:${idempotencyKey}`;
     const rawBody = await req.clone().text();
-    const fingerprint = createHash("sha256").update(rawBody).digest("hex");
+    // The query string is part of the request: ?dry_run=true is not the same operation
+    const fingerprint = createHash("sha256")
+      .update(req.nextUrl.search)
+      .update("\n")
+      .update(rawBody)
+      .digest("hex");
     const client = getRedisClient();
     const owner = randomUUID();
 
@@ -215,7 +227,7 @@ export function withIdempotency(
           422,
           "https://api.example.com/errors/idempotency-key-reused",
           "Idempotency key reused",
-          "This Idempotency-Key was already used with a different request body",
+          "This Idempotency-Key was already used with a different query string or request body",
           false,
         );
       }
@@ -233,21 +245,30 @@ export function withIdempotency(
 
     // Keep the lease alive while the handler runs
     const renewal = setInterval(() => {
-      void client.eval(RENEW_SCRIPT, 1, cacheKey, owner, String(LEASE_TTL_MS));
+      client
+        .eval(RENEW_SCRIPT, 1, cacheKey, owner, String(LEASE_TTL_MS))
+        .catch((error: unknown) => {
+          // A failed renewal must not crash the process; the fenced write below
+          // reports a lost lease if the key expired meanwhile.
+          console.error(`idempotency lease renewal failed for ${cacheKey}`, error);
+        });
     }, LEASE_RENEW_MS);
 
     let response: NextResponse;
     try {
       response = await handler(req);
-    } catch {
+    } catch (error) {
       // Effects may already have happened, so do not release the key: record an
       // unknown outcome that retries with this key replay.
+      console.error(`handler threw under idempotency key ${cacheKey}`, error);
       response = unknownOutcome();
     } finally {
       clearInterval(renewal);
     }
 
-    if (response.headers.get(RELEASE_HEADER)) {
+    // 429 and 503 ask the client to retry the same request, so replaying them
+    // would make the documented retry-with-the-same-key flow impossible.
+    if (response.headers.get(RELEASE_HEADER) || RETRY_STATUSES.has(response.status)) {
       await client.eval(RELEASE_SCRIPT, 1, cacheKey, owner);
       response.headers.delete(RELEASE_HEADER);
       return response;
@@ -270,7 +291,7 @@ export function withIdempotency(
     if (recorded !== 1) {
       // The lease was lost (for example, Redis evicted it). Another request may
       // have run; surface that rather than claiming a clean result.
-      console.warn(`idempotency lease lost for ${cacheKey}`);
+      console.error(`idempotency lease lost for ${cacheKey}`);
     }
 
     return response;
@@ -290,14 +311,14 @@ export function withIdempotency(
  * - Duplicate user account
  * - Duplicate task or message
  *
- * Idempotency-Key ensures: same key + same body → same response, for as long
+ * Idempotency-Key ensures: same key + same request → same response, for as long
  * as the published retention window. Once a key expires, it may execute again.
  *
  * Agent usage:
  * 1. Agent generates a random key once per logical operation: `crypto.randomUUID()`
  * 2. Includes it on every attempt: `headers: { 'Idempotency-Key': `"${key}"` }`
- * 3. On 409, waits and retries with the same key
- * 4. On 422 (key reused with a different body), generates a new key
+ * 3. On 409, 429 or 503, waits and retries with the same key
+ * 4. On 422 (key reused with a different request), generates a new key
  * 5. On an outcome-unknown 500, checks the resource's state before deciding
  *    whether to send the operation again under a new key
  */

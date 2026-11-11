@@ -30,8 +30,9 @@ export class DPoP {
   private readonly privateKeyPEM: string;
   private publicJwk: { kty: string; crv: string; x: string; y: string } | null = null;
   private privateKey: CryptoKey | null = null;
-  // Last DPoP-Nonce the server sent, if it requires nonces (RFC 9449 §8)
-  private nonce: string | undefined;
+  // Last DPoP-Nonce each server sent, by origin. The authorization server and
+  // every resource server issue their own nonces (RFC 9449 §8 and §9).
+  private readonly nonces = new Map<string, string>();
 
   constructor(opts: { publicKeyPEM: string; privateKeyPEM: string }) {
     this.publicKeyPEM = opts.publicKeyPEM;
@@ -85,6 +86,7 @@ export class DPoP {
     }
 
     const url = new URL(uri);
+    const nonce = this.nonces.get(url.origin);
     return new SignJWT({
       htm: method.toUpperCase(),
       htu: `${url.origin}${url.pathname}`,
@@ -93,10 +95,61 @@ export class DPoP {
       ...(accessToken && {
         ath: createHash("sha256").update(accessToken).digest("base64url"),
       }),
-      ...(this.nonce && { nonce: this.nonce }),
+      ...(nonce && { nonce }),
     })
       .setProtectedHeader({ alg: "ES256", jwk: await this.getPublicJwk(), typ: "dpop+jwt" })
       .sign(this.privateKey);
+  }
+
+  /** Remember the nonce a response carried. Returns true if there was one. */
+  private rememberNonce(url: string, response: Response): boolean {
+    const nonce = response.headers.get("DPoP-Nonce");
+    if (nonce) {
+      this.nonces.set(new URL(url).origin, nonce);
+    }
+    return nonce !== null;
+  }
+
+  /**
+   * Request a DPoP-bound token from the authorization server's token endpoint.
+   * The proof carries no `ath`; the server binds the token to this key (cnf.jkt).
+   *
+   * Pass the grant parameters as `body` and the client authentication in
+   * `headers`. Retries once if the server demands a nonce, which it signals with
+   * 400, `error: "use_dpop_nonce"` and a DPoP-Nonce header (RFC 9449 §8).
+   */
+  async requestToken<T = unknown>(
+    tokenEndpoint: string,
+    body: URLSearchParams,
+    headers?: HeadersInit,
+  ): Promise<T> {
+    const send = async () => {
+      const requestHeaders = new Headers(headers);
+      requestHeaders.set("Content-Type", "application/x-www-form-urlencoded");
+      requestHeaders.set("DPoP", await this.generateProof("POST", tokenEndpoint));
+      return fetch(tokenEndpoint, {
+        body: body.toString(),
+        headers: requestHeaders,
+        method: "POST",
+      });
+    };
+
+    let response = await send();
+    if (this.rememberNonce(tokenEndpoint, response) && response.status === 400) {
+      const error = (await response.clone().json()) as { error?: string };
+      if (error.error === "use_dpop_nonce") {
+        response = await send();
+        this.rememberNonce(tokenEndpoint, response);
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Token endpoint returned ${response.status}: ${(await response.text()).slice(0, 200)}`,
+      );
+    }
+
+    return (await response.json()) as T;
   }
 
   /**
@@ -106,32 +159,26 @@ export class DPoP {
    * - Authorization: DPoP <access_token>   (the DPoP scheme, not Bearer)
    * - DPoP: <proof_jwt>
    *
-   * Retries once if the server demands a fresh nonce.
+   * Retries once if the resource server demands a fresh nonce.
    */
-  async request<T = unknown>(
-    url: string,
-    accessToken: string,
-    options?: RequestInit & { method?: string },
-  ): Promise<T> {
+  async request<T = unknown>(url: string, accessToken: string, options?: RequestInit): Promise<T> {
     const method = options?.method ?? "GET";
 
     const send = async () => {
-      const headers = new Headers(options?.headers || {});
+      const headers = new Headers(options?.headers);
       headers.set("Authorization", `DPoP ${accessToken}`);
       headers.set("DPoP", await this.generateProof(method, url, accessToken));
       return fetch(url, { ...options, headers, method });
     };
 
     let response = await send();
-    const serverNonce = response.headers.get("DPoP-Nonce");
-    if (serverNonce) {
-      this.nonce = serverNonce;
-      if (
-        response.status === 401 &&
-        response.headers.get("WWW-Authenticate")?.includes("use_dpop_nonce")
-      ) {
-        response = await send();
-      }
+    if (
+      this.rememberNonce(url, response) &&
+      response.status === 401 &&
+      response.headers.get("WWW-Authenticate")?.includes("use_dpop_nonce")
+    ) {
+      response = await send();
+      this.rememberNonce(url, response);
     }
 
     if (!response.ok) {
@@ -144,25 +191,21 @@ export class DPoP {
 }
 
 /**
- * Global DPoP instance
+ * Process-wide DPoP instance, built from the DPOP_PUBLIC_KEY and
+ * DPOP_PRIVATE_KEY environment variables. Construct `new DPoP(...)` yourself to
+ * load the keypair from somewhere else.
  */
 let globalDPoP: DPoP | null = null;
 
-/**
- * Initialize DPoP with a stored keypair
- */
-export function initializeDPoP(opts: { publicKeyPEM?: string; privateKeyPEM?: string } = {}): DPoP {
+export function initializeDPoP(): DPoP {
   if (!globalDPoP) {
-    const publicKeyPEM = opts.publicKeyPEM || process.env.DPOP_PUBLIC_KEY || "";
-    const privateKeyPEM = opts.privateKeyPEM || process.env.DPOP_PRIVATE_KEY || "";
-
+    const publicKeyPEM = process.env.DPOP_PUBLIC_KEY;
+    const privateKeyPEM = process.env.DPOP_PRIVATE_KEY;
     if (!publicKeyPEM || !privateKeyPEM) {
       throw new Error("DPOP_PUBLIC_KEY and DPOP_PRIVATE_KEY environment variables required");
     }
-
     globalDPoP = new DPoP({ privateKeyPEM, publicKeyPEM });
   }
-
   return globalDPoP;
 }
 
@@ -186,11 +229,15 @@ export function initializeDPoP(opts: { publicKeyPEM?: string; privateKeyPEM?: st
  *
  * // The token request itself must carry a DPoP proof (no ath) so the
  * // authorization server binds the token to this key (cnf.jkt)
- * const token = await getDpopBoundToken(dpop);
+ * const { access_token } = await dpop.requestToken<{ access_token: string }>(
+ *   "https://auth.example.com/token",
+ *   new URLSearchParams({ grant_type: "client_credentials", scope: "users:read" }),
+ *   { Authorization: `Basic ${clientCredentials}` },
+ * );
  *
  * const data = await dpop.request<{ users: unknown[] }>(
  *   "https://api.example.com/users?active=true",
- *   token,
+ *   access_token,
  * );
  * ```
  */
@@ -219,6 +266,6 @@ export function initializeDPoP(opts: { publicKeyPEM?: string; privateKeyPEM?: st
  * ✓ For every request: a fresh proof with jti, htm, htu (no query), iat, ath
  * ✓ Set typ=dpop+jwt and embed the public JWK in the header
  * ✓ Send Authorization: DPoP <token>, not Bearer
- * ✓ Honour DPoP-Nonce when the server sends one
+ * ✓ Honour DPoP-Nonce when a server sends one, and keep one nonce per server
  * ✓ Server validates: signature, typ, htm/htu, iat window, ath, jti replay, cnf.jkt
  */

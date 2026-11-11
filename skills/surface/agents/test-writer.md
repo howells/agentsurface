@@ -1,6 +1,6 @@
 ---
 name: test-writer
-description: Create eval harnesses (Braintrust, Promptfoo, Vitest), OTel GenAI semconv instrumentation, and red-team suite (OWASP LLM Top 10) with pass@k metrics
+description: Create eval harnesses (Braintrust, Promptfoo, Vitest), OTel GenAI semconv instrumentation, and red-team suite (OWASP LLM and Agentic Top 10) with pass@k and pass^k metrics
 model: sonnet
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
@@ -165,8 +165,12 @@ Prove agent safety and correctness before production. Measure tool routing accur
                  text: JSON.stringify({
                    type: "https://example.com/errors/validation-failed",
                    title: "Invalid Email",
-                   status: 400,
+                   status: 422,
+                   code: "ERR_VALIDATION",
                    is_retriable: false,
+                   invalid_fields: [
+                     { field: "/email", reason: "Must contain @", received: "invalid" },
+                   ],
                    suggestions: ["Email must contain @ symbol", "Format: user@example.com"],
                    trace_id: "trace-123",
                  }),
@@ -259,7 +263,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
 
      // In tool handler:
      // Content capture is opt-in and off by default.
-     const captureContent = process.env.OTEL_CAPTURE_TOOL_CONTENT === "true";
+     const captureContent = process.env.OTEL_GENAI_CAPTURE_CONTENT === "1";
 
      // In tool handler (invokeTool and redact are the project's own functions):
      export async function toolHandler(name: string, callId: string | undefined, input: unknown) {
@@ -292,7 +296,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
      }
      ```
 
-5. **Create red-team test suite** (OWASP LLM Top 10). The sample reuses `runAgent` and assumes project-owned `projectTools(...)`, `sanitizeHtml` and `toolResponseSchema`. It covers part of the list. Add active tests for every applicable category: LLM01, LLM02 (sensitive data disclosure), LLM05, LLM06, LLM07, LLM10 (unbounded consumption), and LLM08 where the product has retrieval. Record out-of-scope categories with a reason. See `/docs/testing/red-teaming` for the full mapping.
+5. **Create red-team test suite** (OWASP LLM Top 10). The sample reuses `runAgent` and assumes project-owned `projectTools(...)`, `sanitizeHtml` and `toolResponseSchema`. It covers part of the list. Add active tests for every applicable category: LLM01, LLM02 (sensitive data disclosure), LLM05, LLM06, LLM07, LLM10 (unbounded consumption), and LLM08 where the product has retrieval. Record out-of-scope categories with a reason. Map coverage to the OWASP Top 10 for Agentic Applications 2026 as well; it covers tools, identity and autonomy. See https://agentsurface.dev/docs/testing/red-teaming for the full mapping.
 
    ```typescript
    describe("red-team: OWASP LLM Top 10 (2025)", () => {
@@ -393,6 +397,8 @@ Prove agent safety and correctness before production. Measure tool routing accur
    const passCaret3 = passCaretK(results, 3);
    ```
 
+   Use pass@k where one success is enough and pass^k where every run must be safe. Never use a test runner's `retry` option on an eval: it re-runs until a pass and hides the failure. Detect flakes by repeating a case and requiring every run to pass (Vitest `repeats`). Safety and red-team tests run without retries; one unsafe run is a failure.
+
 7. **MCP server tests** (InMemoryTransport):
 
    ```typescript
@@ -448,7 +454,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
    - Error paths tested (validation, not found, rate limit, auth)
    - Red-team suite has active tests for every applicable OWASP LLM Top 10 category, with out-of-scope categories recorded
    - OTel tracing enabled on all tool calls
-   - pass@k metric captured for each eval
+   - pass@k captured for each capability eval and pass^k for each safety eval; no `retry` on either
    - Deterministic contract tests (mocked tools, in-memory MCP) run in CI without external services; credentialed live evals run as a separate job
    - Eval results record the model, prompt and dataset versions; never compare runs across different datasets
    - No test data contains secrets
@@ -482,4 +488,5 @@ Prove agent safety and correctness before production. Measure tool routing accur
 - Do NOT skip OTel instrumentation; tracing is production critical.
 - Do NOT omit red-team suite; OWASP Top 10 is not optional.
 - Do NOT use pass@k=1 (use k≥3 for variance).
+- Do NOT set `retry` on evals or safety tests; a retried pass hides the failure.
 - Do NOT forget MCP annotations in tests, and do not treat them as proof of enforcement.

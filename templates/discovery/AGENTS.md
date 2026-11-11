@@ -54,7 +54,7 @@ pnpm publish      # Push to npm
 ```sh
 pnpm --filter=@acme/sdk dev          # SDK docs (http://localhost:3000)
 pnpm --filter=@acme/sdk test:watch
-pnpm --filter=@acme/dashboard build  # Next.js static export
+pnpm --filter=@acme/dashboard build  # Next.js production build
 pnpm --filter=@acme/mcp-server start # MCP server on stdio
 ```
 
@@ -74,15 +74,17 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 │   │   ├── AGENTS.md         # Package-specific commands
 │   │   └── vitest.config.ts
 │   │
-│   ├── dashboard/            # Next.js 15 app (agent introspection UI)
+│   ├── dashboard/            # Next.js 16 app (agent introspection UI)
 │   │   ├── app/
 │   │   │   ├── layout.tsx    # Root + JSON-LD (SoftwareApplication)
 │   │   │   ├── page.tsx      # Landing
 │   │   │   ├── api/
-│   │   │   │   ├── ask/      # NLWeb-style /ask endpoint
-│   │   │   │   └── mcp/      # /.well-known/mcp.json handler
-│   │   │   └── docs/
-│   │   │       └── [slug]/   # Content negotiation (text/markdown support)
+│   │   │   │   └── ask/      # NLWeb-style /ask endpoint
+│   │   │   ├── docs/
+│   │   │   │   └── [slug]/   # Docs pages (HTML)
+│   │   │   └── md/
+│   │   │       └── [...slug]/ # Markdown twin of each docs page
+│   │   ├── proxy.ts          # Content negotiation (Accept: text/markdown)
 │   │   ├── AGENTS.md
 │   │   └── next.config.ts
 │   │
@@ -120,7 +122,7 @@ pnpm --filter=@acme/mcp-server start # MCP server on stdio
 ├── docs/                     # Detailed documentation (referenced from AGENTS.md)
 │   ├── ARCHITECTURE.md       # System design + dataflow
 │   ├── ADRs/
-│   │   ├── 001-mcp-2025.md   # Decision: Adopt MCP 2025-11-25
+│   │   ├── 001-mcp-2026.md   # Decision: Adopt MCP 2026-07-28
 │   │   └── 002-schema-validation.md
 │   ├── api/                  # API reference
 │   │   └── tools.md          # Tool design guide
@@ -170,12 +172,15 @@ import { executeAgent } from "./execute";
 import { validateInput } from "../utils";
 ```
 
-**Error handling:** Use RFC 9457 `Problem+JSON` shape; return via tool result, not thrown.
+**Error handling:** HTTP handlers throw typed errors; one error handler maps them to RFC 9457 problem details (`application/problem+json`) with `code`, `is_retriable`, `retry_after_ms`, `suggestions`, and `invalid_fields` (`[{ field, reason, received?, expected? }]`, `field` a JSON Pointer) on a 422 validation failure. Tool handlers return errors as data, not thrown, with the same member names:
 
 ```typescript
 type ToolResult =
   | { success: true; data: T }
-  | { success: false; type: string; status: number; detail: string };
+  | {
+      success: false;
+      error: { code: string; message: string; is_retriable: boolean; suggestions: string[] };
+    };
 ```
 
 **Schema validation:** All tool inputs validated with Zod `.parse()` at entry; return detailed error messages in tool result.
@@ -294,7 +299,7 @@ pnpm test:coverage     # Generate coverage reports (targets >80%)
 
 - [agents.md specification](https://agents.md)
 - [MCP 2026-07-28 spec](https://modelcontextprotocol.io/specification/2026-07-28)
-- [Next.js 15 App Router](https://nextjs.org/docs)
+- [Next.js 16 App Router](https://nextjs.org/docs)
 - [pnpm workspaces](https://pnpm.io/workspaces)
 - [Turbo docs](https://turbo.build)
 - [Zod documentation](https://zod.dev)

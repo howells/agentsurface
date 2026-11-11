@@ -4,17 +4,15 @@
  * Use: Catch thrown errors in route handlers, format to Problem Details, return JSON
  *
  * <CUSTOMISE>
- * - Update error domain URLs to your service
+ * - Set the error domain and doc URLs in problem-details.ts
  * - Add custom error classes for domain-specific exceptions
- * - Set your service's doc_uri base URL
  * </CUSTOMISE>
  */
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import type { NextApiRequest, NextApiResponse } from "next";
-import type { ProblemCode, ProblemDetailsType } from "./problem-details";
-import { problemDetails, toProblemResponse } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
+import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
 
 /**
  * Domain error hierarchy for type-safe error handling
@@ -73,7 +71,7 @@ export class RateLimitError extends DomainError {
 export class ValidationError extends DomainError {
   constructor(
     message: string,
-    public fields?: { field: string; code: string; message: string }[],
+    public invalidFields?: InvalidField[],
   ) {
     super("ERR_VALIDATION", 422, message);
     this.name = "ValidationError";
@@ -92,36 +90,28 @@ function getTraceId(req: NextRequest | Request): string {
 }
 
 /**
- * Map thrown errors to RFC 9457 ProblemDetails
+ * Map thrown errors to RFC 9457 ProblemDetails.
+ * A DomainError's message is written for callers, so it is returned as `detail`.
+ * Anything else is unexpected: it is logged under the trace id and the body stays generic.
  */
-function mapErrorToProblemDetails(
-  err: DomainError | Error | unknown,
-  traceId: string,
-): ProblemDetailsType {
+function mapErrorToProblemDetails(err: unknown, traceId: string): ProblemDetailsType {
   if (err instanceof DomainError) {
-    const baseProblem = problemDetails({
+    return problemDetails({
       code: err.code,
       detail: err.message,
-      doc_uri: `https://api.example.com/docs/errors#${err.code}`,
+      doc_uri: problemDocUri(err.code),
+      invalid_fields: err instanceof ValidationError ? err.invalidFields : undefined,
+      is_retriable: err instanceof RateLimitError,
+      retry_after_ms: err instanceof RateLimitError ? err.retryAfterMs : undefined,
       status: err.statusCode,
       title: err.code.replace("ERR_", "").replace(/_/g, " "),
       trace_id: traceId,
-      type: `https://api.example.com/errors/${err.code.toLowerCase()}`,
+      type: problemType(err.code),
     });
-
-    if (err instanceof RateLimitError) {
-      baseProblem.is_retriable = true;
-      baseProblem.retry_after_ms = err.retryAfterMs;
-    } else if (err instanceof ValidationError && err.fields) {
-      baseProblem.errors = err.fields;
-    }
-
-    return baseProblem;
   }
 
-  // Generic error fallback
-  const genericErr = toProblemResponse(err, { traceId });
-  return genericErr;
+  console.error(`[${traceId}] unhandled error in route handler`, err);
+  return internalProblem(traceId);
 }
 
 /**
@@ -130,7 +120,12 @@ function mapErrorToProblemDetails(
  * Usage:
  * ```typescript
  * export const POST = withProblemDetails(async (req) => {
- *   if (!req.body.email) throw new ValidationError('Email required');
+ *   const body = await req.json();
+ *   if (!body.email) {
+ *     throw new ValidationError('Email required', [
+ *       { field: '/email', reason: 'Required field is missing', expected: 'An email address' },
+ *     ]);
+ *   }
  *   return NextResponse.json({ ok: true });
  * });
  * ```
@@ -144,18 +139,17 @@ export function withProblemDetails(
     try {
       return await handler(req);
     } catch (error) {
-      const problemDetails = mapErrorToProblemDetails(error, traceId);
-      const status = problemDetails.status ?? 500;
+      const problem = mapErrorToProblemDetails(error, traceId);
 
-      return NextResponse.json(problemDetails, {
+      return NextResponse.json(problem, {
         headers: {
           "Content-Type": "application/problem+json",
           "X-Request-ID": traceId,
-          ...(problemDetails.is_retriable && problemDetails.retry_after_ms
-            ? { "Retry-After": String(Math.ceil(problemDetails.retry_after_ms / 1000)) }
+          ...(problem.is_retriable && problem.retry_after_ms
+            ? { "Retry-After": String(Math.ceil(problem.retry_after_ms / 1000)) }
             : {}),
         },
-        status,
+        status: problem.status,
       });
     }
   };
@@ -208,7 +202,6 @@ export function errorMiddleware(req: NextRequest): NextResponse {
  *   return (
  *     <div>
  *       <h1>Something went wrong</h1>
- *       <p>{error.message}</p>
  *       <p>Request ID: {error.digest}</p>
  *       <button onClick={reset}>Try again</button>
  *     </div>

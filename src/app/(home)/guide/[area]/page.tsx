@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,8 +10,6 @@ import { RecommendationList } from "@/components/RecommendationList";
 import { guideStages } from "@/data/homepage-guide";
 import { guideSource } from "@/lib/guide-source";
 import { cn } from "@/lib/utils";
-
-const BASE_URL = "https://agentsurface.dev";
 
 function stageForArea(area: string) {
   return guideStages.find((stage) => stage.id === area);
@@ -42,7 +41,7 @@ export async function generateMetadata(props: { params: Promise<{ area: string }
 
   return {
     alternates: {
-      canonical: `${BASE_URL}${page.url}`,
+      canonical: `${SITE_ORIGIN}${page.url}`,
       types: { "text/markdown": `${page.url}.md` },
     },
     description: page.data.description,

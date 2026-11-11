@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 /** Rough approximation: 1 token ≈ 4 characters for English prose. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -14,8 +15,6 @@ export function markdownHeaders(content: string, extra?: Record<string, string>)
     ...extra,
   };
 }
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 /** Markdown body for a missing page, served with a 404 status to Markdown-preferring clients. */
 export function notFoundMarkdown(path: string): string {

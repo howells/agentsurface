@@ -1,4 +1,5 @@
 import { searchInput, searchOutput, pageSummary } from "./retrieval-contract.ts";
+import { SITE_ORIGIN } from "./site.ts";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
@@ -94,7 +95,7 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
           id: page.url,
           title: page.data.title,
           description: page.data.description ?? "",
-          url: `https://agentsurface.dev${page.url}`,
+          url: `${SITE_ORIGIN}${page.url}`,
           slug: page.slugs.join("/") || "index",
           ...(page.data.lastModified || page.data.lastVerified
             ? {
@@ -131,12 +132,12 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
       }),
     },
     async ({ url }) => {
-      const parsed = URL.parse(url, "https://agentsurface.dev");
+      const parsed = URL.parse(url, SITE_ORIGIN);
+      // Accept the forms agents actually paste: a trailing slash or the `.md` twin.
+      const path = parsed?.pathname.replace(/\/$/, "").replace(/\.md$/, "");
       const page =
-        parsed?.origin === "https://agentsurface.dev"
-          ? backend
-              .pages()
-              .find((candidate) => candidate.url === parsed.pathname.replace(/\.md$/, ""))
+        parsed?.origin === SITE_ORIGIN
+          ? backend.pages().find((candidate) => candidate.url === path)
           : undefined;
       if (!page) {
         return {
@@ -150,7 +151,7 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
                 is_retriable: false,
                 suggestions: [
                   "Call search with topic keywords or list_pages for valid URLs.",
-                  "Browse https://agentsurface.dev/llms.txt",
+                  `Browse ${SITE_ORIGIN}/llms.txt`,
                 ],
               }),
             },
@@ -159,7 +160,7 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
       }
       return structured({
         id: page.url,
-        url: `https://agentsurface.dev${page.url}`,
+        url: `${SITE_ORIGIN}${page.url}`,
         markdown: await backend.markdown(page),
         ...(page.data.lastModified || page.data.lastVerified
           ? {

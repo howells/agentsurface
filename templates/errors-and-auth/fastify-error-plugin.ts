@@ -4,16 +4,15 @@
  * Use: Decorate Fastify with automatic error formatting to application/problem+json
  *
  * <CUSTOMISE>
- * - Update error domain URLs to your service
+ * - Set the error domain and doc URLs in problem-details.ts
  * - Map your custom FastifyError subclasses to appropriate status codes
- * - Set your doc_uri base URL
  * </CUSTOMISE>
  */
 
 import fastifyPlugin from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from "fastify";
-import type { ProblemCode, ProblemDetailsType } from "./problem-details";
-import { problemDetails } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
+import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
 
 /**
  * Fastify error hierarchy
@@ -38,7 +37,7 @@ export class FastifyDomainError extends Error implements FastifyError {
 export class ValidationErrorFastify extends FastifyDomainError {
   constructor(
     message: string,
-    public fields?: { field: string; code: string; message: string }[],
+    public invalidFields?: InvalidField[],
   ) {
     super("ERR_VALIDATION", 422, message);
     this.name = "ValidationErrorFastify";
@@ -60,69 +59,54 @@ function mapFastifyErrorToProblemDetails(
   traceId: string,
 ): ProblemDetailsType {
   // Handle validation errors from Fastify's built-in validator
-  if ("validation" in err && Array.isArray((err as any).validation)) {
-    const validationErrors = (err as any).validation.map(
-      (v: { instancePath: string; keyword: string; message: string }) => ({
-        code: v.keyword,
-        field: v.instancePath || "root",
-        message: v.message,
-      }),
-    );
+  if ("validation" in err && Array.isArray(err.validation)) {
+    const invalidFields: InvalidField[] = err.validation.map((v) => ({
+      field: v.instancePath || "/",
+      reason: v.message ?? "Invalid value",
+    }));
 
     return problemDetails({
       code: "ERR_VALIDATION",
       detail: "One or more validation errors occurred",
-      doc_uri: "https://api.example.com/docs/errors#ERR_VALIDATION",
-      fields: validationErrors,
-      status: 400,
+      doc_uri: problemDocUri("ERR_VALIDATION"),
+      invalid_fields: invalidFields,
+      is_retriable: false,
+      status: 422,
       title: "Validation Failed",
       trace_id: traceId,
-      type: "https://api.example.com/errors/ERR_VALIDATION",
+      type: problemType("ERR_VALIDATION"),
     });
   }
 
-  // Handle custom domain errors
+  // Handle custom domain errors. Their messages are written for callers, so they are safe to return.
   if (err instanceof FastifyDomainError) {
-    const response = problemDetails({
+    return problemDetails({
       code: err.code,
       detail: err.message,
-      doc_uri: `https://api.example.com/docs/errors#${err.code}`,
+      doc_uri: problemDocUri(err.code),
+      invalid_fields: err instanceof ValidationErrorFastify ? err.invalidFields : undefined,
+      is_retriable: false,
       status: err.statusCode,
       title: err.code.replace("ERR_", "").replace(/_/g, " "),
       trace_id: traceId,
-      type: `https://api.example.com/errors/${err.code.toLowerCase()}`,
+      type: problemType(err.code),
     });
-
-    if (err instanceof ValidationErrorFastify && err.fields) {
-      response.errors = err.fields;
-    }
-
-    return response;
   }
 
-  // Handle FastifyError with statusCode
-  if ("statusCode" in err) {
-    const fastErr = err as FastifyError;
+  // Fastify's own 4xx errors (malformed JSON, unsupported media type, body too large)
+  // describe the request, not the server, so their message is safe to return.
+  if ("statusCode" in err && err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
     return problemDetails({
-      detail: fastErr.message,
-      is_retriable: (fastErr.statusCode ?? 500) >= 500,
-      status: fastErr.statusCode || 500,
-      title: "HTTP Error",
+      detail: err.message,
+      is_retriable: false,
+      status: err.statusCode,
+      title: "Bad Request",
       trace_id: traceId,
-      type: `https://api.example.com/errors/fastify_error`,
     });
   }
 
-  // Fallback for generic errors
-  return problemDetails({
-    detail: err.message || "An unexpected error occurred",
-    is_retriable: true,
-    retry_after_ms: 1000,
-    status: 500,
-    title: "Internal Server Error",
-    trace_id: traceId,
-    type: "https://api.example.com/errors/internal_error",
-  });
+  // Anything else is unexpected: the handler logs it, the body stays generic.
+  return internalProblem(traceId);
 }
 
 /**
@@ -162,8 +146,8 @@ const errorPlugin = fastifyPlugin(
     });
 
     // Decorator: helper to throw domain errors
-    fastify.decorate("throwValidationError", (message: string, fields?: any) => {
-      throw new ValidationErrorFastify(message, fields);
+    fastify.decorate("throwValidationError", (message: string, invalidFields?: InvalidField[]) => {
+      throw new ValidationErrorFastify(message, invalidFields);
     });
 
     fastify.decorate(
@@ -185,7 +169,7 @@ export default errorPlugin;
  */
 declare module "fastify" {
   interface FastifyInstance {
-    throwValidationError: (message: string, fields?: any) => never;
+    throwValidationError: (message: string, invalidFields?: InvalidField[]) => never;
     throwDomainError: (code: ProblemCode, statusCode: number, message: string) => never;
   }
 }
@@ -198,7 +182,7 @@ declare module "fastify" {
  *   const { email } = request.body;
  *   if (!email) {
  *     fastify.throwValidationError('Email is required', [
- *       { field: 'email', code: 'required', message: 'Email is required' },
+ *       { field: '/email', reason: 'Required field is missing', expected: 'An email address' },
  *     ]);
  *   }
  *   return { ok: true };

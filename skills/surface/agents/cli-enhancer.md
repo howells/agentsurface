@@ -1,18 +1,18 @@
 ---
 name: cli-enhancer
-description: Add JSON/NDJSON output, schema introspection, semantic exit codes, envelope format, and input hardening to CLI tools
+description: Add JSON/NDJSON output, schema introspection, semantic exit codes, structured errors, and input hardening to CLI tools
 model: sonnet
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Transform CLIs into agent-consumable tools with deterministic machine-readable output. Add `--format=json|ndjson` flags, semantic exit codes, schema introspection, envelope responses, and guard against path traversal and command injection.
+Transform CLIs into agent-consumable tools with deterministic machine-readable output. Add `--json` on every command, semantic exit codes, schema introspection, structured errors, and guard against path traversal and command injection. The contract is the one in `references/cli-design.md`.
 
-- Envelope format: { success, data|error, trace_id, timestamp }
-- `--format=json|ndjson` on all commands; NDJSON for streams
+- Stdout carries the data object itself; a failure writes `{ error, message, suggestions, failing_input }` to stderr
+- `--json` on all commands, automatic when stdout isn't a TTY; `--all --json` streams NDJSON
 - Documented exit codes (this contract: 0=ok, 1=failure, 2=usage, 3=notfound, 4=perm, 5=conflict; only 0 and non-zero are universal)
-- `--schema` to introspect all commands, parameters, constraints
+- `--help --json` per command and a `describe` command to introspect commands, flags and types
 - Input validation rejects path traversal, control chars, percent-encoded
 - TTY detection + NO_COLOR respect + NO_INTERACTIVE mode
 
@@ -29,34 +29,32 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
 
 ## Process
 
-1. **Add --format flag** to ALL commands:
-   - `--format=json` (default for non-TTY): single JSON object
-   - `--format=ndjson`: newline-delimited JSON (for streams/pagination)
-   - Human-readable text is stderr only
+1. **Add `--json`** to ALL commands:
+   - `--json` (and automatically when stdout isn't a TTY): the data object itself on stdout, the one the API would return, with no wrapper
+   - `--all --json` on list commands: newline-delimited JSON, one record per line
+   - Optional fields are present as `null`; empty collections are `[]`
+   - Progress, warnings and logs go to stderr
 
-2. **Implement envelope format**:
+2. **Implement structured errors**. A failure writes nothing to stdout, one object to stderr, and exits non-zero:
 
    ```typescript
-   interface CommandResponse {
-     success: boolean; // true=success, false=error
-     data?: unknown; // Returned on success
-     error?: {
-       code: string; // e.g. "INVALID_INPUT", "NOT_FOUND"
-       message: string; // Human summary
-       details?: Record<string, unknown>; // Field-level errors
-     };
-     trace_id: string; // UUID for debugging
-     timestamp: string; // ISO 8601
+   interface CliError {
+     error: string; // Stable snake_case code, e.g. "not_found", "validation_error"
+     message: string; // Human summary; may change between releases
+     suggestions: string[]; // Runnable next commands, most likely first
+     failing_input?: Record<string, unknown>; // The values that caused the failure
+     invalid_args?: { arg: string; reason: string; received?: string; expected?: string }[]; // Validation only
+     trace_id?: string; // Unhandled failures only; log the details internally
    }
    ```
 
 3. **TTY detection and defaults**:
    - Detect output with `process.stdout.isTTY` (stdout is what gets parsed); check `process.stdin.isTTY` separately before prompting or reading piped input
-   - Non-TTY: suppress spinners, colors, interactive prompts; default to --format=json
+   - Non-TTY: suppress spinners, colors, interactive prompts; emit the `--json` output
    - Respect `NO_COLOR` env var (never output ANSI codes)
    - Respect a `NO_INTERACTIVE` env var (an application convention, not a standard; fail fast if input needed)
 
-4. **Semantic exit codes** (a per-CLI contract, not a POSIX standard; publish it in `--help --json` and the skill file, since tools such as `gh` use different meanings for 2-5):
+4. **Semantic exit codes** (a per-CLI contract, not a POSIX standard; publish it in the `describe` output and the skill file, since tools such as `gh` use different meanings for 2-5):
 
    ```
    0 — success
@@ -73,48 +71,49 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - When flags missing: return error with missing list:
      ```json
      {
-       "success": false,
-       "error": {
-         "code": "MISSING_FLAGS",
-         "message": "Missing required flags: --name, --email",
-         "details": { "missing": ["--name", "--email"] }
-       },
-       "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-       "timestamp": "2026-10-29T15:30:00Z"
+       "error": "missing_flags",
+       "message": "Missing required flags: --name, --email",
+       "suggestions": ["Run: cli-tool user create --name <name> --email <email>"],
+       "failing_input": { "missing": ["--name", "--email"] }
      }
      ```
 
 6. **--dry-run on mutations**:
    - Add to all create/update/delete commands
    - Show what would happen without side effects
-   - Return unchanged envelope format
-   - Include `"dry_run": true` in data
+   - Return the same output shape as the real run
+   - Include `"dry_run": true` in the output
 
-7. **Schema introspection** (new command):
+7. **Schema introspection**:
 
    ```bash
-   cli-tool schema  # or --schema
+   cli-tool user create --help --json   # one command
+   cli-tool describe                    # the whole tree
    ```
 
-   Output all commands, parameters, constraints, scopes:
+   `--help --json` prints one command; `describe` nests the same objects under `commands` and adds `name`, `version` and the exit-code contract:
 
    ```json
    {
-     "commands": {
-       "user create": {
-         "description": "Create a new user account",
-         "params": {
-           "name": { "type": "string", "required": true, "minLength": 1 },
-           "email": { "type": "string", "format": "email", "required": true },
-           "role": { "type": "string", "enum": ["admin", "user"], "default": "user" }
-         },
-         "scopes": ["users:write"],
-         "idempotent": false,
-         "destructive": false
+     "command": "user create",
+     "description": "Create a new user account",
+     "flags": [
+       { "name": "name", "type": "string", "required": true, "description": "Display name" },
+       {
+         "name": "role",
+         "type": "string",
+         "enum": ["admin", "user"],
+         "default": "user",
+         "required": false,
+         "description": "User role"
        }
-     }
+     ],
+     "args": [],
+     "returns": { "$ref": "#/components/schemas/User" }
    }
    ```
+
+   Add required scopes and whether the command is destructive where the CLI knows them.
 
 8. **Input hardening** (per field, matched to what each field holds):
    - Reject path traversal: resolve the real path (`fs.realpath` on the nearest existing ancestor) and reject anything outside the allowed directory, so symlinks cannot escape; also reject `../`, `..\\`, absolute paths (unless intentional)
@@ -122,17 +121,16 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
    - In identifier and path fields, reject percent-encoding tricks: `%2e`, `%2f`, `%00`
    - Reject embedded query params: `?`, `#` in resource IDs
    - Reject double-encoded input: decode repeatedly until the value stops changing, then validate the result (or reject any residual encoding in identifier fields)
-   - Return field-level error in envelope with suggestion
+   - Return a per-argument error (`invalid_args`) with a suggestion
 
-9. **NDJSON streaming** (paginated results):
-   - One JSON object per line; no array wrapper
-   - Each record line carries a resumption point (the cursor for the next page) so an interrupted consumer can restart
-   - Final line is metadata (a house extension, not part of NDJSON): `{ "_final": true, "count": 42 }`
+9. **NDJSON streaming** (`--all --json` on list commands):
+   - One JSON object per line, written as soon as it is fetched; no array wrapper and no summary line
+   - Progress goes to stderr
+   - A stream that fails part-way keeps the lines already written, writes the structured error to stderr and exits non-zero, so consumers check the exit code
    - Example:
      ```
-     { "id": "1", "name": "Alice", "cursor": "c_1" }
-     { "id": "2", "name": "Bob", "cursor": "c_2" }
-     { "_final": true, "count": 2, "next_cursor": null }
+     { "id": "1", "name": "Alice" }
+     { "id": "2", "name": "Bob" }
      ```
 
 10. **Raw payload input** (mutating commands):
@@ -157,22 +155,22 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
     - Point the schema output at the skill files and update them in the release pipeline
 
 14. **Quality checks**:
-    - All commands produce valid JSON with --format=json
+    - All commands produce valid JSON with `--json`
     - Exit codes match semantic meaning for all paths
     - No interactive prompts when NO_INTERACTIVE set
     - --dry-run available on all mutations
     - Input validation rejects all path traversal patterns
-    - --schema output is valid and complete
-    - NDJSON has final metadata line
+    - `describe` and `--help --json` output is valid and complete
+    - NDJSON output is records only, one per line; a failed stream exits non-zero
     - Mutating commands accept a raw payload; read commands accept `--fields`
     - Skill files ship with the release and match the current commands
 
 ## Outputs
 
 - Updated command implementations (TypeScript)
-- Updated CLI help/docs referencing --format flag
-- `docs/cli-schema.json` (schema introspection output)
-- Examples of each exit code + envelope format
+- Updated CLI help/docs referencing the `--json` flag
+- A `describe` command and `--help --json` on every command
+- Examples of each exit code with its structured error
 
 ## Spec References
 
@@ -184,16 +182,16 @@ Emit CLI interactions as structured, deterministic data. No colored output, spin
 ## Style Rules
 
 - TypeScript strict mode; no `any`.
-- All envelope responses must include trace_id (UUID).
+- Every error for an unhandled failure carries a `trace_id`; never a stack trace.
 - Errors are suggestions: suggest recovery action or next command.
-- NDJSON stream must have final metadata; no trailing partial objects.
+- NDJSON streams carry records only; no trailing partial objects.
 - Dry-run must be non-destructive; same output format as real run.
 
 ## Anti-patterns
 
-- Do NOT output colored ANSI codes when --format=json (breaks parsing).
+- Do NOT output colored ANSI codes under `--json` (breaks parsing).
 - Do NOT prompt for input in non-interactive mode; fail fast with error.
 - Do NOT omit exit codes; every command must exit with semantic code.
 - Do NOT mix human text and JSON on stdout; use stderr for logging.
-- Do NOT forget final metadata line in NDJSON streams.
+- Do NOT add a wrapper, array or summary line to an NDJSON stream.
 - Do NOT validate without suggesting correction (errors are prompts).

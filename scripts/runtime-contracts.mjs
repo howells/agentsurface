@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { createDocsMcpServer } from "../src/lib/docs-mcp.ts";
+import { FULL_EXPORT_BYTES, FULL_EXPORT_TOKENS } from "../src/lib/site.ts";
+import { negotiatedPrerenderConfigs, variesOnAccept } from "./negotiated-prerenders.mjs";
 
 async function test(name, run) {
   try {
@@ -108,15 +113,53 @@ try {
         const response = await get(path, accept);
         assert.equal(response.status, 200);
         assert.match(response.headers.get("content-type"), new RegExp(accept));
-        assert.match(response.headers.get("vary"), /accept/i);
         assert.match(response.headers.get("link"), /rel="describedby"/);
+        if (accept === "text/markdown") {
+          // The Accept token itself: Accept-Encoding does not make a response negotiate.
+          assert.ok(variesOnAccept(response.headers.get("vary")), response.headers.get("vary"));
+        }
         if (accept === "text/html") {
+          // Next writes the Vary of a rendered page itself and drops the proxy's
+          // Accept, so on HTML it is added to the prerender configs at build time.
+          // That step is covered by the "production build" test below.
           assert.match(response.headers.get("vary"), /rsc/i);
           const html = await response.text();
           assert.match(html, /rel="canonical"/);
           assert.match(html, /type="text\/markdown"/);
         }
       }
+    }
+  });
+  await test("production build adds Vary: Accept to negotiated prerenders only", () => {
+    assert.ok(variesOnAccept("rsc, Accept"));
+    assert.ok(variesOnAccept("accept"));
+    assert.ok(!variesOnAccept("rsc, Accept-Encoding"));
+    assert.ok(!variesOnAccept(null));
+    const functions = mkdtempSync(join(tmpdir(), "negotiated-prerenders-"));
+    try {
+      const negotiated = [
+        "index",
+        "index.md",
+        "about",
+        "docs",
+        "docs/discovery/llms-txt",
+        "guide/discoverability",
+        "llms.mdx/docs/content.md",
+      ];
+      const fixed = ["index.rsc", "docs/discovery/llms-txt.rsc", "llms.txt", "og/title"];
+      for (const route of [...negotiated, ...fixed]) {
+        const file = join(functions, `${route}.prerender-config.json`);
+        mkdirSync(join(file, ".."), { recursive: true });
+        writeFileSync(file, "{}");
+      }
+      mkdirSync(join(functions, "docs.segments"));
+      writeFileSync(join(functions, "docs.segments/_tree.prerender-config.json"), "{}");
+      assert.deepEqual(
+        negotiatedPrerenderConfigs(functions).toSorted(),
+        negotiated.map((route) => join(functions, `${route}.prerender-config.json`)).toSorted(),
+      );
+    } finally {
+      rmSync(functions, { recursive: true });
     }
   });
   await test("REST and modern MCP share bounded page retrieval and recovery", async () => {
@@ -166,6 +209,13 @@ try {
     const found = await rpc("tools/call", "get_page", { url: rest.results[0].url });
     assert.ok(found.structuredContent.markdown.includes("llms.txt"));
     assert.equal(found.isError, undefined);
+    for (const suffix of ["/", ".md"]) {
+      const variant = await rpc("tools/call", "get_page", {
+        url: `${rest.results[0].url}${suffix}`,
+      });
+      assert.equal(variant.isError, undefined, suffix);
+      assert.equal(variant.structuredContent.id, found.structuredContent.id);
+    }
     const empty = await (await get("/api/docs/search?query=zzzznonexistentcontract")).json();
     assert.deepEqual(empty.results, []);
     assert.equal(empty.has_more, false);
@@ -255,6 +305,7 @@ try {
     for (const path of [
       "/contract-missing",
       "/docs/contract-missing",
+      "/api",
       "/api/contract-missing",
       "/api/docs/search?query=x",
       "/api/docs/search?query=content&limit=0",
@@ -294,9 +345,11 @@ try {
       assert.equal(await twin.text(), body);
       assert.ok(body.length > 200);
     }
-    const missing = await get("/contract-missing.md");
-    assert.equal(missing.status, 404);
-    assert.match(missing.headers.get("content-type"), /text\/markdown/);
+    for (const path of ["/contract-missing.md", "/.md"]) {
+      const missing = await get(path);
+      assert.equal(missing.status, 404, path);
+      assert.match(missing.headers.get("content-type"), /text\/markdown/, path);
+    }
     const missingHtml = await get("/contract-missing", "text/html");
     assert.equal(missingHtml.status, 404);
     assert.match(missingHtml.headers.get("content-type"), /text\/html/);
@@ -319,12 +372,17 @@ try {
     }
   });
   await test("indexes fit their budget and discovery artefacts match", async () => {
-    for (const path of ["/llms.txt", "/docs/llms.txt"]) {
+    for (const path of ["/llms.txt", "/docs/llms.txt", "/docs/agents/llms.txt", "/index.md"]) {
       const response = await get(path);
-      assert.ok(Number(response.headers.get("x-markdown-tokens")) < 5000);
+      if (path.endsWith("/llms.txt")) {
+        assert.ok(Number(response.headers.get("x-markdown-tokens")) < 5000, path);
+      }
       const body = await response.text();
       console.log(`${path}: ${response.headers.get("x-markdown-tokens")} estimated tokens`);
-      assert.doesNotMatch(body, /\]\(https:\/\/agentsurface.dev\/mcp\)/);
+      // Every link is absolute, so the index reads the same wherever it is fetched from.
+      assert.doesNotMatch(body, /\]\((?!https?:\/\/)/, path);
+      // POST-only: a link to it is a 405 for anything that follows links.
+      assert.doesNotMatch(body, /\]\(https:\/\/agentsurface.dev\/mcp\)/, path);
       for (const match of body.matchAll(/\]\((https:\/\/agentsurface.dev[^)]+)\)/g)) {
         const target = await get(new URL(match[1]).pathname);
         assert.equal(target.status, 200, match[1]);
@@ -334,6 +392,17 @@ try {
         }
       }
     }
+    const full = await get("/llms-full.txt");
+    const fullBytes = Buffer.byteLength(await full.text());
+    const fullTokens = Number(full.headers.get("x-markdown-tokens"));
+    assert.ok(
+      Math.abs(fullBytes - FULL_EXPORT_BYTES) / FULL_EXPORT_BYTES < 0.1,
+      `${fullBytes} bytes`,
+    );
+    assert.ok(
+      Math.abs(fullTokens - FULL_EXPORT_TOKENS) / FULL_EXPORT_TOKENS < 0.1,
+      `${fullTokens} tokens`,
+    );
     const index = await (await get("/.well-known/agent-skills/index.json")).json();
     const skill = await (await get("/skills/surface/SKILL.md")).text();
     assert.ok(JSON.stringify(index).includes(createHash("sha256").update(skill).digest("hex")));
@@ -343,6 +412,14 @@ try {
       const response = await get(new URL(entry.url).pathname);
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("content-type").split(";")[0], entry.type.split(";")[0]);
+    }
+  });
+  await test("social images render any title once and stay cached", async () => {
+    for (const path of ["/og/100%25%20coverage", "/og/CI%2FCD", "/og/Discovery%20%26%20AEO"]) {
+      const response = await get(path);
+      assert.equal(response.status, 200, path);
+      assert.match(response.headers.get("content-type"), /image\/png/);
+      assert.match(response.headers.get("cache-control"), /public.*immutable/, path);
     }
   });
   await test("metadata, public context and portable Markdown preserve source meaning", async () => {

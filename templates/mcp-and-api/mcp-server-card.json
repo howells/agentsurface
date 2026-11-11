@@ -11,6 +11,6 @@
     "endpoint": "https://example.com/mcp"
   },
   "authentication": {
-    "required": false
+    "required": true
   }
 }

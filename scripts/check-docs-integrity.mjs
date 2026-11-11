@@ -208,9 +208,6 @@ for (const file of mdxFiles) {
 
 const glossaryHeadingScanRoots = [docsRoot, referencesRoot];
 for (const root of glossaryHeadingScanRoots) {
-  if (!fs.existsSync(root)) {
-    continue;
-  }
   for (const file of walk(root)) {
     if (!/\.mdx?$/.test(file)) {
       continue;
@@ -240,9 +237,6 @@ for (const root of glossaryHeadingScanRoots) {
 const TEMPLATE_CITATION = /\btemplates\/[A-Za-z0-9._/-]+\.(?:ts|tsx|yaml|json|md|txt|mdc)\b/gi;
 
 function collectFiles(root, extensions) {
-  if (!fs.existsSync(root)) {
-    return [];
-  }
   return walk(root).filter((file) => extensions.some((ext) => file.endsWith(ext)));
 }
 
@@ -299,16 +293,14 @@ const modelsDocPath = path.join(docsRoot, "reference-links/models.mdx");
 // spans and fenced ```code``` blocks), so prose mentions of retired IDs do not
 // silently allowlist them.
 const modelAllowlist = new Set();
-if (fs.existsSync(modelsDocPath)) {
-  const modelsDoc = fs.readFileSync(modelsDocPath, "utf-8");
-  const codeSpans = [
-    ...modelsDoc.matchAll(/```[\s\S]*?```/g),
-    ...modelsDoc.matchAll(/`([^`\n]+)`/g),
-  ].map((match) => match[0]);
-  for (const span of codeSpans) {
-    for (const idMatch of span.matchAll(MODEL_ID)) {
-      modelAllowlist.add(idMatch[0].toLowerCase());
-    }
+const modelsDoc = fs.readFileSync(modelsDocPath, "utf-8");
+const codeSpans = [
+  ...modelsDoc.matchAll(/```[\s\S]*?```/g),
+  ...modelsDoc.matchAll(/`([^`\n]+)`/g),
+].map((match) => match[0]);
+for (const span of codeSpans) {
+  for (const idMatch of span.matchAll(MODEL_ID)) {
+    modelAllowlist.add(idMatch[0].toLowerCase());
   }
 }
 
@@ -392,13 +384,6 @@ for (const file of modelScanFiles) {
 //       the page gets re-checked. Staleness never fails the run.
 const STALE_AFTER_DAYS = 120;
 
-function docSlug(file) {
-  return path
-    .relative(docsRoot, file)
-    .replaceAll(path.sep, "/")
-    .replace(/\.mdx$/, "");
-}
-
 function parseLastVerified(content) {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) {
@@ -415,7 +400,6 @@ const today = new Date();
 for (const file of mdxFiles) {
   const content = fs.readFileSync(file, "utf-8");
   const lastVerified = parseLastVerified(content);
-  const slug = docSlug(file);
 
   if (!lastVerified) {
     stampIssues.push(`${path.relative(repoRoot, file)} — missing lastVerified`);
@@ -431,49 +415,38 @@ for (const file of mdxFiles) {
 
 // Release version parity check.
 //
-// The package, distributable skill, Claude plugin, and public MCP metadata are
-// one release surface. Keep their versions aligned so installs and discovery
+// The package, distributable skill, Claude plugin, MCP Registry entry and public
+// MCP metadata are one release surface. Keep their versions aligned so installs and discovery
 // never advertise different releases.
 const packageJsonPath = path.join(repoRoot, "package.json");
 const serverCardPath = path.join(repoRoot, "public/.well-known/mcp/server-card.json");
 const skillManifestPath = path.join(repoRoot, ".skill.yaml");
 const pluginManifestPath = path.join(repoRoot, ".claude-plugin/plugin.json");
 
+const serverJsonPath = path.join(repoRoot, "server.json");
+
+// Every manifest is required: a missing file throws here rather than skipping its check.
 const versionIssues = [];
-if (fs.existsSync(packageJsonPath)) {
-  const packageVersion = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")).version;
-
-  if (fs.existsSync(serverCardPath)) {
-    const serverCard = JSON.parse(fs.readFileSync(serverCardPath, "utf-8"));
-    for (const [field, value] of [
-      ["version", serverCard.version],
-      ["serverInfo.version", serverCard.serverInfo?.version],
-    ]) {
-      if (packageVersion !== value) {
-        versionIssues.push(
-          `public/.well-known/mcp/server-card.json ${field} (${value}) does not match package.json version (${packageVersion})`,
-        );
-      }
-    }
-  }
-
-  if (fs.existsSync(skillManifestPath)) {
-    const skillManifest = fs.readFileSync(skillManifestPath, "utf-8");
-    const skillVersion = /^version:\s*([^\s#]+)\s*$/m.exec(skillManifest)?.[1];
-    if (packageVersion !== skillVersion) {
-      versionIssues.push(
-        `.skill.yaml version (${skillVersion}) does not match package.json version (${packageVersion})`,
-      );
-    }
-  }
-
-  if (fs.existsSync(pluginManifestPath)) {
-    const pluginVersion = JSON.parse(fs.readFileSync(pluginManifestPath, "utf-8")).version;
-    if (packageVersion !== pluginVersion) {
-      versionIssues.push(
-        `.claude-plugin/plugin.json version (${pluginVersion}) does not match package.json version (${packageVersion})`,
-      );
-    }
+const packageVersion = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")).version;
+const serverCard = JSON.parse(fs.readFileSync(serverCardPath, "utf-8"));
+const manifestVersions = [
+  ["public/.well-known/mcp/server-card.json version", serverCard.version],
+  ["public/.well-known/mcp/server-card.json serverInfo.version", serverCard.serverInfo?.version],
+  ["server.json version", JSON.parse(fs.readFileSync(serverJsonPath, "utf-8")).version],
+  [
+    ".skill.yaml version",
+    /^version:\s*([^\s#]+)\s*$/m.exec(fs.readFileSync(skillManifestPath, "utf-8"))?.[1],
+  ],
+  [
+    ".claude-plugin/plugin.json version",
+    JSON.parse(fs.readFileSync(pluginManifestPath, "utf-8")).version,
+  ],
+];
+for (const [label, value] of manifestVersions) {
+  if (packageVersion !== value) {
+    versionIssues.push(
+      `${label} (${value}) does not match package.json version (${packageVersion})`,
+    );
   }
 }
 
@@ -485,93 +458,88 @@ if (fs.existsSync(packageJsonPath)) {
 const agentSkillsIndexPath = path.join(repoRoot, "public/.well-known/agent-skills/index.json");
 const agentSkillsIssues = [];
 
-if (fs.existsSync(agentSkillsIndexPath)) {
-  try {
-    const index = JSON.parse(fs.readFileSync(agentSkillsIndexPath, "utf-8"));
-    // The proposal's schema host (schemas.agentskills.io) does not resolve, so the
-    // index omits `$schema`. If one is declared it must at least be a string URL.
-    if (index.$schema !== undefined && typeof index.$schema !== "string") {
-      agentSkillsIssues.push("public/.well-known/agent-skills/index.json $schema must be a string");
-    }
+try {
+  const index = JSON.parse(fs.readFileSync(agentSkillsIndexPath, "utf-8"));
+  // The proposal's schema host (schemas.agentskills.io) does not resolve, so the
+  // index omits `$schema`. If one is declared it must at least be a string URL.
+  if (index.$schema !== undefined && typeof index.$schema !== "string") {
+    agentSkillsIssues.push("public/.well-known/agent-skills/index.json $schema must be a string");
+  }
 
-    if (!Array.isArray(index.skills) || index.skills.length === 0) {
-      agentSkillsIssues.push(
-        "public/.well-known/agent-skills/index.json must contain at least one skill",
-      );
-    } else {
-      const seenNames = new Set();
-      const seenUrls = new Set();
+  if (!Array.isArray(index.skills) || index.skills.length === 0) {
+    agentSkillsIssues.push(
+      "public/.well-known/agent-skills/index.json must contain at least one skill",
+    );
+  } else {
+    const seenNames = new Set();
+    const seenUrls = new Set();
 
-      for (const [position, skill] of index.skills.entries()) {
-        const label = `public/.well-known/agent-skills/index.json skills[${position}]`;
-        if (typeof skill.name !== "string" || skill.name.trim() === "") {
-          agentSkillsIssues.push(`${label} requires a non-empty name`);
-        } else if (seenNames.has(skill.name)) {
-          agentSkillsIssues.push(`${label} duplicates skill name ${skill.name}`);
-        } else {
-          seenNames.add(skill.name);
-        }
+    for (const [position, skill] of index.skills.entries()) {
+      const label = `public/.well-known/agent-skills/index.json skills[${position}]`;
+      if (typeof skill.name !== "string" || skill.name.trim() === "") {
+        agentSkillsIssues.push(`${label} requires a non-empty name`);
+      } else if (seenNames.has(skill.name)) {
+        agentSkillsIssues.push(`${label} duplicates skill name ${skill.name}`);
+      } else {
+        seenNames.add(skill.name);
+      }
 
-        if (skill.type !== "skill-md") {
-          agentSkillsIssues.push(`${label} must use type "skill-md"`);
-        }
-        if (typeof skill.description !== "string" || !/\buse when\b/i.test(skill.description)) {
-          agentSkillsIssues.push(`${label} description must explain when to use the skill`);
-        }
-        if (typeof skill.url !== "string") {
-          agentSkillsIssues.push(`${label} requires a canonical URL`);
-          continue;
-        }
-        if (seenUrls.has(skill.url)) {
-          agentSkillsIssues.push(`${label} duplicates skill URL ${skill.url}`);
-        } else {
-          seenUrls.add(skill.url);
-        }
-        if (!/^sha256:[a-f0-9]{64}$/.test(skill.digest ?? "")) {
-          agentSkillsIssues.push(`${label} requires a lowercase sha256 digest`);
-          continue;
-        }
+      if (skill.type !== "skill-md") {
+        agentSkillsIssues.push(`${label} must use type "skill-md"`);
+      }
+      if (typeof skill.description !== "string" || !/\buse when\b/i.test(skill.description)) {
+        agentSkillsIssues.push(`${label} description must explain when to use the skill`);
+      }
+      if (typeof skill.url !== "string") {
+        agentSkillsIssues.push(`${label} requires a canonical URL`);
+        continue;
+      }
+      if (seenUrls.has(skill.url)) {
+        agentSkillsIssues.push(`${label} duplicates skill URL ${skill.url}`);
+      } else {
+        seenUrls.add(skill.url);
+      }
+      if (!/^sha256:[a-f0-9]{64}$/.test(skill.digest ?? "")) {
+        agentSkillsIssues.push(`${label} requires a lowercase sha256 digest`);
+        continue;
+      }
 
-        let skillUrl;
-        try {
-          skillUrl = new URL(skill.url);
-        } catch {
-          agentSkillsIssues.push(`${label} has an invalid URL: ${skill.url}`);
-          continue;
-        }
-        if (skillUrl.origin !== "https://agentsurface.dev") {
-          continue;
-        }
+      let skillUrl;
+      try {
+        skillUrl = new URL(skill.url);
+      } catch {
+        agentSkillsIssues.push(`${label} has an invalid URL: ${skill.url}`);
+        continue;
+      }
+      if (skillUrl.origin !== "https://agentsurface.dev") {
+        continue;
+      }
 
-        const localMatch = /^\/skills\/(.+)\/SKILL\.md$/.exec(skillUrl.pathname);
-        if (!localMatch) {
-          agentSkillsIssues.push(`${label} URL does not map to a local skill: ${skill.url}`);
-          continue;
-        }
-        const skillPath = path.resolve(publishedSkillsRoot, localMatch[1], "SKILL.md");
-        if (
-          !skillPath.startsWith(`${publishedSkillsRoot}${path.sep}`) ||
-          !fs.existsSync(skillPath)
-        ) {
-          agentSkillsIssues.push(`${label} points to a missing local skill: ${skill.url}`);
-          continue;
-        }
+      const localMatch = /^\/skills\/(.+)\/SKILL\.md$/.exec(skillUrl.pathname);
+      if (!localMatch) {
+        agentSkillsIssues.push(`${label} URL does not map to a local skill: ${skill.url}`);
+        continue;
+      }
+      const skillPath = path.resolve(publishedSkillsRoot, localMatch[1], "SKILL.md");
+      if (!skillPath.startsWith(`${publishedSkillsRoot}${path.sep}`) || !fs.existsSync(skillPath)) {
+        agentSkillsIssues.push(`${label} points to a missing local skill: ${skill.url}`);
+        continue;
+      }
 
-        const actualDigest = `sha256:${createHash("sha256")
-          .update(fs.readFileSync(skillPath))
-          .digest("hex")}`;
-        if (actualDigest !== skill.digest) {
-          agentSkillsIssues.push(
-            `${label} digest (${skill.digest}) does not match ${path.relative(repoRoot, skillPath)} (${actualDigest})`,
-          );
-        }
+      const actualDigest = `sha256:${createHash("sha256")
+        .update(fs.readFileSync(skillPath))
+        .digest("hex")}`;
+      if (actualDigest !== skill.digest) {
+        agentSkillsIssues.push(
+          `${label} digest (${skill.digest}) does not match ${path.relative(repoRoot, skillPath)} (${actualDigest})`,
+        );
       }
     }
-  } catch (error) {
-    agentSkillsIssues.push(
-      `public/.well-known/agent-skills/index.json is not valid JSON: ${error.message}`,
-    );
   }
+} catch (error) {
+  agentSkillsIssues.push(
+    `public/.well-known/agent-skills/index.json could not be read or parsed: ${error.message}`,
+  );
 }
 
 // Retired sections check.
@@ -600,14 +568,11 @@ const retiredPattern = new RegExp(
   `/docs/(${RETIRED_ROUTES.map((route) => route.replaceAll("/", "\\/")).join("|")})(?=[/#)"'\\s\`,]|$)`,
   "gm",
 );
-const retiredScanRoots = ["src", "skills", "templates", "public", "README.md", "INSTALL.md"].map(
-  (entry) => path.join(repoRoot, entry),
+const retiredScanRoots = ["src", "skills", "templates", "public", "README.md"].map((entry) =>
+  path.join(repoRoot, entry),
 );
 const retiredIssues = [];
 for (const root of retiredScanRoots) {
-  if (!fs.existsSync(root)) {
-    continue;
-  }
   const files = fs.statSync(root).isDirectory() ? walk(root) : [root];
   for (const file of files) {
     if (!/\.(mdx?|tsx?|json|ya?ml|txt)$/.test(file)) {

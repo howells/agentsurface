@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { apiError } from "@/lib/api-error";
 import { source } from "@/lib/source";
 import { guideSource } from "@/lib/guide-source";
@@ -75,7 +76,8 @@ export function proxy(request: NextRequest) {
     if (base === "/docs" || base.startsWith("/docs/") || base.startsWith("/guide/")) {
       response.headers.set("Link", discoveryLinkHeader(pathname));
     }
-    if (KNOWN_HTML_ROUTES.has(base)) {
+    // The homepage twin is /index.md; "/.md" is not a page.
+    if (base !== "/" && KNOWN_HTML_ROUTES.has(base)) {
       response.headers.set("Link", discoveryLinkHeader(pathname));
       return NextResponse.rewrite(new URL(`/site-text/${base.slice(1)}`, request.url), {
         headers: response.headers,
@@ -117,7 +119,7 @@ export function proxy(request: NextRequest) {
       404,
       "PAGE_NOT_FOUND",
       "Page not found",
-      "Browse https://agentsurface.dev/llms.txt or search /api/docs/search?query=discovery.",
+      `Browse ${SITE_ORIGIN}/llms.txt or search /api/docs/search?query=discovery.`,
       pathname + request.nextUrl.search,
     );
   }

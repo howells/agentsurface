@@ -4,14 +4,14 @@
  * Use: Return structured errors from MCP tools as { isError: true, content: [...] }
  *
  * <CUSTOMISE>
- * - Update error domain URLs to your service
- * - Map your custom error classes to problem detail types
+ * - Set the error domain and doc URLs in problem-details.ts
+ * - Throw ToolError from your handlers for every failure the model should act on
  * </CUSTOMISE>
  */
 
 import type { TextContent } from "@modelcontextprotocol/server";
-import type { ProblemCode, ProblemDetailsType } from "./problem-details";
-import { problemDetails } from "./problem-details";
+import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
+import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
 
 /**
  * Tool result with error flag
@@ -35,51 +35,64 @@ function generateTraceId(): string {
   return `tool-${crypto.randomUUID().slice(0, 12)}`;
 }
 
+const STATUS_BY_CODE: Record<ProblemCode, number> = {
+  ERR_CONFLICT: 409,
+  ERR_FORBIDDEN: 403,
+  ERR_INTERNAL: 500,
+  ERR_NOT_FOUND: 404,
+  ERR_RATE_LIMITED: 429,
+  ERR_TIMEOUT: 504,
+  ERR_UNAUTHORIZED: 401,
+  ERR_UNAVAILABLE: 503,
+  ERR_UNPROCESSABLE: 422,
+  ERR_VALIDATION: 422,
+};
+
 /**
- * Map thrown errors to RFC 9457 ProblemDetails JSON
+ * An error the model can act on. Throw this from a tool handler; its message is
+ * returned to the model, so write it for the caller and keep internals out of it.
+ * The category comes from `code`, never from matching words in a message.
  */
-function mapErrorToProblemDetails(err: Error | unknown, traceId: string): ProblemDetailsType {
-  const message = err instanceof Error ? err.message : String(err);
+export class ToolError extends Error {
+  constructor(
+    public code: ProblemCode,
+    message: string,
+    public options: {
+      invalidFields?: InvalidField[];
+      /** Set when retrying the same call unchanged can succeed. */
+      retryAfterMs?: number;
+      suggestions?: string[];
+    } = {},
+  ) {
+    super(message);
+    this.name = "ToolError";
+  }
+}
 
-  // Detect error patterns
-  const isValidation = /validation|invalid|required/i.exec(message);
-  const isNotFound = /not found|not exist|404/i.exec(message);
-  const isNetwork = /timeout|econnrefused|network/i.exec(message);
-  const isAuth = /unauthorized|forbidden|auth/i.exec(message);
-
-  let statusCode = 500;
-  let code: ProblemCode = "ERR_INTERNAL";
-  let type = "https://api.example.com/errors/internal_error";
-
-  if (isValidation) {
-    statusCode = 422;
-    code = "ERR_VALIDATION";
-    type = "https://api.example.com/errors/ERR_VALIDATION";
-  } else if (isNotFound) {
-    statusCode = 404;
-    code = "ERR_NOT_FOUND";
-    type = "https://api.example.com/errors/ERR_NOT_FOUND";
-  } else if (isAuth) {
-    statusCode = 401;
-    code = "ERR_UNAUTHORIZED";
-    type = "https://api.example.com/errors/ERR_UNAUTHORIZED";
-  } else if (isNetwork) {
-    statusCode = 503;
-    code = "ERR_UNAVAILABLE";
-    type = "https://api.example.com/errors/ERR_UNAVAILABLE";
+/**
+ * Map thrown errors to RFC 9457 ProblemDetails JSON.
+ * Anything that is not a ToolError is unexpected: it is logged to stderr (stdout
+ * is the protocol channel under stdio) and the model sees a generic problem.
+ */
+function mapErrorToProblemDetails(err: unknown, traceId: string): ProblemDetailsType {
+  if (err instanceof ToolError) {
+    return problemDetails({
+      code: err.code,
+      detail: err.message,
+      doc_uri: problemDocUri(err.code),
+      invalid_fields: err.options.invalidFields,
+      is_retriable: err.options.retryAfterMs !== undefined,
+      retry_after_ms: err.options.retryAfterMs,
+      status: STATUS_BY_CODE[err.code],
+      suggestions: err.options.suggestions,
+      title: err.code.replace("ERR_", "").replace(/_/g, " "),
+      trace_id: traceId,
+      type: problemType(err.code),
+    });
   }
 
-  return problemDetails({
-    code,
-    detail: message,
-    doc_uri: `https://api.example.com/docs/errors#${code}`,
-    is_retriable: statusCode >= 500 || Boolean(isNetwork),
-    retry_after_ms: isNetwork ? 5000 : undefined,
-    status: statusCode,
-    title: code.replace("ERR_", "").replace(/_/g, " "),
-    trace_id: traceId,
-    type,
-  });
+  console.error(`[${traceId}] unhandled error in tool handler`, err);
+  return internalProblem(traceId);
 }
 
 /**
@@ -93,8 +106,8 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
  *   inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
  *   execute: async (input: any) => {
  *     try {
- *       if (!input.id) throw new Error('ID is required');
  *       const user = await db.getUser(input.id);
+ *       if (!user) throw new ToolError('ERR_NOT_FOUND', `No user has id ${input.id}`);
  *       return toolOk({ user });
  *     } catch (err) {
  *       return toolError({ error: err });
@@ -103,7 +116,7 @@ function mapErrorToProblemDetails(err: Error | unknown, traceId: string): Proble
  * };
  * ```
  */
-export function toolError(opts: { error: Error | unknown; traceId?: string }): MCPToolErrorResult {
+export function toolError(opts: { error: unknown; traceId?: string }): MCPToolErrorResult {
   const traceId = opts.traceId || generateTraceId();
   const problemDetail = mapErrorToProblemDetails(opts.error, traceId);
 
@@ -126,12 +139,13 @@ export function toolError(opts: { error: Error | unknown; traceId?: string }): M
  * return toolOk({ user });
  * ```
  */
-export function toolOk(data: unknown, opts?: { traceId?: string }): MCPToolOkResult {
+export function toolOk(data: unknown): MCPToolOkResult {
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify(data),
+        // A handler that returns nothing still needs text: JSON.stringify(undefined) is undefined
+        text: JSON.stringify(data ?? null),
       },
     ],
     isError: false,
@@ -151,15 +165,12 @@ export function toolOk(data: unknown, opts?: { traceId?: string }): MCPToolOkRes
  */
 export function withToolErrorHandling(
   handler: (input: any) => Promise<unknown> | unknown,
-  traceId?: string,
 ): (input: any) => Promise<MCPToolResult> {
   return async (input: any) => {
-    const id = traceId || generateTraceId();
     try {
-      const result = await handler(input);
-      return toolOk(result, { traceId: id });
+      return toolOk(await handler(input));
     } catch (error) {
-      return toolError({ error, traceId: id });
+      return toolError({ error });
     }
   };
 }
@@ -172,7 +183,7 @@ export function withToolErrorHandling(
  * ```typescript
  * import { McpServer } from '@modelcontextprotocol/server';
  * import { z } from 'zod';
- * import { withToolErrorHandling } from './mcp-tool-error';
+ * import { ToolError, withToolErrorHandling } from './mcp-tool-error';
  *
  * const server = new McpServer({ name: 'example', version: '1.0.0' });
  *
@@ -184,8 +195,9 @@ export function withToolErrorHandling(
  *   },
  *   // The wrapper builds the MCP content envelope itself: return plain data, not toolOk(...)
  *   withToolErrorHandling(async (input: { id: string }) => {
- *     if (!input.id) throw new Error('ID is required');
- *     return { data: await fetchData(input.id) };
+ *     const data = await fetchData(input.id);
+ *     if (!data) throw new ToolError('ERR_NOT_FOUND', `Nothing has id ${input.id}`);
+ *     return { data };
  *   }),
  * );
  * ```

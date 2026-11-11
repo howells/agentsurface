@@ -1,11 +1,10 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { guideSource } from "@/lib/guide-source";
 import { source } from "@/lib/source";
 import type { MetadataRoute } from "next";
 
-const BASE_URL = "https://agentsurface.dev";
-
-// Built by another writer; list them here regardless of whether their pages exist yet
-// so the sitemap doesn't need another pass once they ship.
+// Pages outside the docs and guide collections. They carry no lastmod: nothing
+// records when their copy last changed.
 const STATIC_PAGES = ["/glossary", "/patterns", "/about", "/contact", "/privacy"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -15,17 +14,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       : page.data.lastModified
         ? { lastModified: new Date(page.data.lastModified) }
         : {}),
-    url: `${BASE_URL}${page.url}`,
+    url: `${SITE_ORIGIN}${page.url}`,
   }));
 
   const guide = guideSource.getPages().map((page) => ({
     ...(page.data.lastModified ? { lastModified: new Date(page.data.lastModified) } : {}),
-    url: `${BASE_URL}${page.url}`,
+    url: `${SITE_ORIGIN}${page.url}`,
   }));
 
   const staticPages = STATIC_PAGES.map((path) => ({
-    url: `${BASE_URL}${path}`,
+    url: `${SITE_ORIGIN}${path}`,
   }));
 
-  return [{ url: BASE_URL }, ...staticPages, ...guide, ...docs];
+  return [{ url: SITE_ORIGIN }, ...staticPages, ...guide, ...docs];
 }

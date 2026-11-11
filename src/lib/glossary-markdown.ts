@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { glossaryByCategory } from "@/data/glossary";
 
 /** Markdown body for /docs/glossary.md and llms-full.txt: the same data the docs page and cards render, so nothing drifts. */
@@ -8,7 +9,7 @@ export function glossaryMarkdown(): string {
         const title = term.acronym === term.name ? term.name : `${term.name} (${term.acronym})`;
         const lines = [`### ${title}`, "", term.definition, "", term.detail];
         if (term.href) {
-          lines.push("", `Read more: https://agentsurface.dev${term.href}`);
+          lines.push("", `Read more: ${SITE_ORIGIN}${term.href}`);
         }
         return lines.join("\n");
       });

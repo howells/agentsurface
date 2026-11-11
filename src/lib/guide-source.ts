@@ -1,9 +1,8 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { portableMarkdown } from "@/lib/source";
 import { guide } from "@/.source/server";
 import { guideStages } from "@/data/homepage-guide";
 import { loader } from "fumadocs-core/source";
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 /**
  * One editorial essay per homepage area (see src/data/homepage-guide.ts). Flat

@@ -1,12 +1,12 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import "fumadocs-ui/style.css";
 import "./global.css";
 import { DocumentationTools } from "@/components/DocumentationTools";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Link from "next/link";
 import type { ReactNode } from "react";
-
-const BASE_URL = "https://agentsurface.dev";
 
 const inter = localFont({
   display: "swap",
@@ -42,24 +42,24 @@ const jsonLd = {
       },
       operatingSystem: "Any",
       sameAs: ["https://github.com/howells/agentsurface"],
-      url: BASE_URL,
+      url: SITE_ORIGIN,
     },
     {
       "@type": "WebSite",
       name: "Agent Surface",
-      url: BASE_URL,
+      url: SITE_ORIGIN,
     },
   ],
 };
 
 export const metadata: Metadata = {
   alternates: {
-    canonical: BASE_URL,
+    canonical: SITE_ORIGIN,
     types: { "text/markdown": "/index.md" },
   },
   description:
     "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
-  metadataBase: new URL(BASE_URL),
+  metadataBase: new URL(SITE_ORIGIN),
   openGraph: {
     description:
       "A dense guide to agent-readable software, production agent systems, protocols, tooling, retrieval, evaluation, and the surface skill.",
@@ -101,9 +101,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             index and Markdown live. Hidden visually and from assistive technology. */}
         <p className="sr-only" aria-hidden="true">
           For AI agents: the documentation index is at{" "}
-          <a href="/llms.txt" tabIndex={-1}>
+          <Link href="/llms.txt" prefetch={false} tabIndex={-1}>
             /llms.txt
-          </a>
+          </Link>
           . Every page is also available as Markdown: send Accept: text/markdown, or add .md to a
           docs URL.
         </p>

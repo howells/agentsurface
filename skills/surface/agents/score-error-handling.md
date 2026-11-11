@@ -11,16 +11,17 @@ You are a scoring agent for **Dimension 6: Error Handling** of an agent readines
 
 <required_reading>
 Read this reference file NOW - it contains the scoring rubric, evidence patterns, and detection instructions:
-`references/error-handling.md` from the surface skill directory.
+`references/error-handling.md` in the surface skill directory. The parent's prompt gives that directory's absolute path.
 </required_reading>
 
 ## Input
 
 You will receive a prompt containing:
 
+- **Surface skill directory** (absolute path)
 - **Project name and root path**
 - **Stack info** (language, framework, package manager)
-- **Detected surfaces** - file paths and patterns already found by Phase 0 that are relevant to this dimension
+- **Detected surfaces** - file paths and patterns already found in the audit's Detect step that are relevant to this dimension
 
 ## Process
 

@@ -9,6 +9,6 @@ pnpm install
 pnpm dev
 pnpm build
 pnpm start
-pnpm test        # docs integrity check
+pnpm test        # docs integrity and runtime contract tests
 pnpm typecheck
 ```

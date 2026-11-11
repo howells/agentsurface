@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { DocsPager } from "@/components/DocsPager";
 import { GlossaryList } from "@/components/GlossaryList";
 import { IntroText } from "@/components/PageIntro";
@@ -13,7 +14,6 @@ import defaultMdxComponents from "fumadocs-ui/mdx";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-const BASE_URL = "https://agentsurface.dev";
 const GITHUB_REPO = "howells/agentsurface";
 
 /** The nearest section above the page, or the part it sits in when the page is the section's own index. */
@@ -61,7 +61,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
         "@type": "TechArticle",
         headline: page.data.title,
         description: page.data.description,
-        url: `${BASE_URL}${page.url}`,
+        url: `${SITE_ORIGIN}${page.url}`,
         ...(page.data.lastModified
           ? { dateModified: new Date(page.data.lastModified).toISOString() }
           : {}),
@@ -73,7 +73,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
           "@type": "ListItem",
           position: index + 1,
           name: item.name,
-          ...(item.url ? { item: `${BASE_URL}${item.url}` } : {}),
+          ...(item.url ? { item: `${SITE_ORIGIN}${item.url}` } : {}),
         })),
       },
     ],
@@ -150,7 +150,7 @@ export async function generateMetadata(props: { params: Promise<{ slug?: string[
 
   return {
     alternates: {
-      canonical: `${BASE_URL}${page.url}`,
+      canonical: `${SITE_ORIGIN}${page.url}`,
       types: { "text/markdown": `${page.url}.md` },
     },
     description: page.data.description,

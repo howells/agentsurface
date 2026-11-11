@@ -21,7 +21,8 @@ const PLATE_TOP = -60;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
-  const title = slug.map(decodeURIComponent).join(" / ");
+  // Next has already percent-decoded each segment; decoding again throws on a literal "%".
+  const title = slug.join(" / ");
   const fontSize = title.length > 44 ? 50 : title.length > 26 ? 60 : 68;
 
   return new ImageResponse(
@@ -86,6 +87,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     </div>,
     {
       fonts: [{ data: await interFont, name: "Inter", style: "normal", weight: 400 }],
+      // The image is a pure function of the title in the URL, so let the CDN keep it.
+      headers: { "Cache-Control": "public, max-age=86400, s-maxage=31536000, immutable" },
       height: 630,
       width: 1200,
     },

@@ -56,10 +56,12 @@ const searchDocsSchema = z
   })
   .strict();
 
-async function searchDocsHandler(input: unknown) {
-  const parsed = searchDocsSchema.parse(input);
+// The handlers below validate their input and then throw until you implement them, so an
+// unfinished tool can never report success.
+async function searchDocsHandler(input: unknown): Promise<unknown> {
+  searchDocsSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { results: [], success: true };
+  throw new Error("search_docs is not implemented");
 }
 
 const createIssueSchema = z
@@ -70,10 +72,10 @@ const createIssueSchema = z
   })
   .strict();
 
-async function createIssueHandler(input: unknown) {
-  const parsed = createIssueSchema.parse(input);
+async function createIssueHandler(input: unknown): Promise<unknown> {
+  createIssueSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { id: "issue-123", success: true };
+  throw new Error("create_issue is not implemented");
 }
 
 const deleteIssueSchema = z
@@ -82,10 +84,10 @@ const deleteIssueSchema = z
   })
   .strict();
 
-async function deleteIssueHandler(input: unknown) {
-  const parsed = deleteIssueSchema.parse(input);
+async function deleteIssueHandler(input: unknown): Promise<unknown> {
+  deleteIssueSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { success: true };
+  throw new Error("delete_issue is not implemented");
 }
 
 const listEnvironmentsSchema = z
@@ -94,9 +96,10 @@ const listEnvironmentsSchema = z
   })
   .strict();
 
-async function listEnvironmentsHandler(input: unknown) {
+async function listEnvironmentsHandler(input: unknown): Promise<unknown> {
+  listEnvironmentsSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { environments: [], success: true };
+  throw new Error("list_environments is not implemented");
 }
 
 const deployToProductionSchema = z
@@ -106,9 +109,10 @@ const deployToProductionSchema = z
   })
   .strict();
 
-async function deployToProductionHandler(input: unknown) {
+async function deployToProductionHandler(input: unknown): Promise<unknown> {
+  deployToProductionSchema.parse(input);
   // <CUSTOMISE> Your actual implementation
-  return { deployment_id: "deploy-456", success: true };
+  throw new Error("deploy_to_production is not implemented");
 }
 
 // ============================================================================
@@ -127,9 +131,9 @@ export class ToolRegistry {
       throw new Error(`Tool "${tool.name}" already registered. Tool names must be unique.`);
     }
     // Validate verb_noun naming convention
-    if (!/^[a-z_]+$/.test(tool.name)) {
+    if (!/^[a-z][a-z0-9_]*$/.test(tool.name)) {
       throw new Error(
-        `Tool name "${tool.name}" violates naming. Use lowercase + underscores (e.g. search_docs, create_issue)`,
+        `Tool name "${tool.name}" violates naming. Use lowercase letters, digits and underscores (e.g. search_docs, get_v2_user)`,
       );
     }
     this.tools.set(tool.name, tool);
@@ -234,14 +238,16 @@ export class ToolRegistry {
   }
 
   /**
-   * Convert all tools to OpenAI format (strict mode compatible).
-   * Useful for passing to @openai/agents or other frameworks.
+   * Convert all tools to OpenAI function definitions.
+   * These are not strict-mode definitions: strict mode needs every property listed as
+   * required, and the schemas here have optional and defaulted fields.
    */
   toOpenAIFormat(tools: ToolDefinition[] = [...this.tools.values()]) {
     return tools.map((tool) => ({
       description: tool.description,
       name: tool.name,
       parameters: z.toJSONSchema(tool.schema),
+      type: "function" as const,
     }));
   }
 

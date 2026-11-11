@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { estimateTokens } from "@/lib/markdown";
 import { docsLlms, source } from "@/lib/source";
 import { NextResponse } from "next/server";
@@ -6,7 +7,7 @@ export const revalidate = false;
 
 export async function GET() {
   const pageCount = source.getPages().length;
-  const header = `# Agent Surface: full documentation\n\nEvery Agent Surface documentation page (${pageCount} pages), concatenated as Markdown. See https://agentsurface.dev/llms.txt for the curated index.\n\n`;
+  const header = `# Agent Surface: full documentation\n\nEvery Agent Surface documentation page (${pageCount} pages), concatenated as Markdown. See ${SITE_ORIGIN}/llms.txt for the curated index.\n\n`;
   const content = header + (await docsLlms.full());
 
   return new NextResponse(content, {

@@ -1,11 +1,10 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { estimateTokens } from "@/lib/markdown";
 import { source } from "@/lib/source";
 import type { Node } from "fumadocs-core/page-tree";
 import { NextResponse } from "next/server";
 
 export const revalidate = false;
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 const byUrl = new Map(source.getPages().map((page) => [page.url, page]));
 
@@ -29,7 +28,9 @@ export function GET() {
     .flatMap((url) => {
       const page = byUrl.get(url);
       return page
-        ? [`- [${page.data.title}](${url}): ${page.data.description ?? ""}`.trimEnd()]
+        ? [
+            `- [${page.data.title}](${SITE_ORIGIN}${url}.md): ${page.data.description ?? ""}`.trimEnd(),
+          ]
         : [];
     });
 

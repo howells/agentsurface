@@ -62,24 +62,26 @@ Modes: `score` (scorecard only), `plan` (scorecard, findings and plan),
 2. Before scoring a dimension, read its reference. Each holds that dimension's
    0-3 rubric, the evidence to gather and the fixes:
 
-   | Dimension       | Reference                      |
-   | --------------- | ------------------------------ |
-   | API Surface     | `references/api-surface.md`    |
-   | CLI Design      | `references/cli-design.md`     |
-   | MCP Server      | `references/mcp-servers.md`    |
-   | Discovery & AEO | `references/discovery-aeo.md`  |
-   | Authentication  | `references/authentication.md` |
-   | Error Handling  | `references/error-handling.md` |
-   | Tool Design     | `references/tool-design.md`    |
-   | Context Files   | `references/context-files.md`  |
-   | Testing         | `references/testing.md`        |
-   | Retrievability  | `references/retrievability.md` |
+   | Dimension       | Reference                      | Helper prompt                    |
+   | --------------- | ------------------------------ | -------------------------------- |
+   | API Surface     | `references/api-surface.md`    | `agents/score-api-surface.md`    |
+   | CLI Design      | `references/cli-design.md`     | `agents/score-cli-design.md`     |
+   | MCP Server      | `references/mcp-servers.md`    | `agents/score-mcp-server.md`     |
+   | Discovery & AEO | `references/discovery-aeo.md`  | `agents/score-discovery-aeo.md`  |
+   | Authentication  | `references/authentication.md` | `agents/score-authentication.md` |
+   | Error Handling  | `references/error-handling.md` | `agents/score-error-handling.md` |
+   | Tool Design     | `references/tool-design.md`    | `agents/score-tool-design.md`    |
+   | Context Files   | `references/context-files.md`  | `agents/score-context-files.md`  |
+   | Testing         | `references/testing.md`        | `agents/score-testing.md`        |
+   | Retrievability  | `references/retrievability.md` | `agents/score-retrievability.md` |
 
 3. For a storefront, marketplace or anything agents can buy, read
    `references/agentic-commerce.md`; it informs the dimensions above and is not
    an eleventh.
-4. When delegating dimensions in parallel, give each helper its
-   `agents/score-<dimension>.md` prompt.
+4. When delegating dimensions in parallel, give each helper its prompt from the
+   table, the absolute path of this skill's directory (helpers resolve
+   `references/` against it), the project root, the stack and the surfaces
+   detected for that dimension.
 
 Monorepos get per-package and aggregate scores. A polyglot repo is scored per
 surface, reporting the weakest user-facing path. A pure CLI or a project with
@@ -109,6 +111,10 @@ also read the matching writer prompt in
 `agents/` (`context-writer`, `discovery-writer`, `api-optimizer`,
 `cli-enhancer`, `mcp-builder`, `tool-design-writer`, `error-designer`,
 `auth-upgrader`, `retrievability-engineer`, `test-writer`).
+
+`templates/<kit>/<file>` paths in the references are not part of an installed
+skill. Inside the Agent Surface repository they are local files; anywhere else,
+fetch them from https://github.com/howells/agentsurface/tree/main/templates.
 
 - **Resolve identity server-side.** Never accept a user or tenant id as a tool
   or API parameter.

@@ -11,16 +11,17 @@ You are a scoring agent for **Dimension 3: MCP Server** of an agent readiness au
 
 <required_reading>
 Read this reference file NOW - it contains the scoring rubric, evidence patterns, and detection instructions:
-`references/mcp-servers.md` from the surface skill directory.
+`references/mcp-servers.md` in the surface skill directory. The parent's prompt gives that directory's absolute path.
 </required_reading>
 
 ## Input
 
 You will receive a prompt containing:
 
+- **Surface skill directory** (absolute path)
 - **Project name and root path**
 - **Stack info** (language, framework, package manager)
-- **Detected surfaces** - file paths and patterns already found by Phase 0 that are relevant to this dimension (.mcp.json, MCP SDK imports, tool registrations)
+- **Detected surfaces** - file paths and patterns already found in the audit's Detect step that are relevant to this dimension (.mcp.json, MCP SDK imports, tool registrations)
 
 ## Process
 

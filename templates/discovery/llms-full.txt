@@ -2,9 +2,9 @@
 llms-full.txt - Full documentation concatenation for token-constrained agents or offline crawling.
 
 This is an auto-generated file. Regenerate periodically by running:
-  node scripts/generate-llms-full.js > public/llms-full.txt
+  npx ts-node scripts/generate-llms-full.ts > public/llms-full.txt
 
-See llms-full-generator.ts (bottom of this file) for the script.
+See scripts/generate-llms-full.ts (bottom of this file) for the script.
 -->
 
 # Acme Agent Tools - Full Documentation
@@ -154,10 +154,10 @@ type ToolResult =
   | {
       success: false;
       error: {
-        type: string;           // RFC 9457: 'validation_error', 'not_found', 'auth_required'
-        status: number;         // HTTP status code
-        detail: string;         // Human-readable error
-        instance?: string;      // URI identifying the specific occurrence
+        code: string;           // Stable code to branch on: 'ERR_VALIDATION', 'ERR_NOT_FOUND'
+        message: string;        // Human-readable explanation
+        is_retriable: boolean;  // Safe to retry the same call unchanged
+        suggestions: string[];  // Concrete next steps, most likely fix first
       };
     };
 ```
@@ -168,10 +168,10 @@ Example error response:
 {
   success: false,
   error: {
-    type: 'validation_error',
-    status: 400,
-    detail: 'Email is required and must be valid format.',
-    instance: '/api/users/create#email',
+    code: 'ERR_VALIDATION',
+    message: 'Email is required and must be valid format.',
+    is_retriable: false,
+    suggestions: ['Pass email as a full address, e.g. ada@example.com'],
   }
 }
 ```
@@ -260,9 +260,14 @@ server.auth.oauth2({
   tokenEndpoint: 'https://example.com/oauth/token',
   requiredScopes: ['agent:execute', 'agent:read'],
   validateToken: async (token) => {
-    // Verify JWT: iss, aud, exp
-    const claims = jwt.verify(token, PUBLIC_KEY);
-    return claims.aud === 'agents' && claims.exp > Date.now();
+    // jwt.verify checks the signature, exp, iss and aud (a string or an array) and
+    // throws on any failure. Pin the algorithm: never accept whatever the token names.
+    jwt.verify(token, PUBLIC_KEY, {
+      algorithms: ['RS256'],
+      issuer: 'https://example.com',
+      audience: 'agents',
+    });
+    return true;
   },
 });
 
@@ -287,7 +292,7 @@ const agent = new Agent({
 
 ### REST endpoints
 
-All responses follow RFC 9457 `Problem+JSON` for errors.
+Errors are RFC 9457 problem details, served as `application/problem+json`.
 
 #### POST /agents/:agentId/query
 
@@ -309,13 +314,18 @@ Content-Type: application/json
   "tokensUsed": 1234
 }
 
-400 Bad Request:
+422 Unprocessable Content:
 {
   "type": "https://example.com/errors/validation",
   "title": "Validation Error",
-  "status": 400,
+  "status": 422,
   "detail": "Prompt is required and must be non-empty.",
-  "instance": "/agents/my-agent/query"
+  "instance": "/agents/my-agent/query",
+  "code": "ERR_VALIDATION",
+  "is_retriable": false,
+  "invalid_fields": [
+    { "field": "/prompt", "reason": "Required field is missing", "expected": "A non-empty string" }
+  ]
 }
 ```
 
@@ -437,28 +447,30 @@ Spec: https://a2a-protocol.org/latest/specification/
 
 ### robots.txt (AI crawlers)
 
-Allow AI training and search bots; block admin paths:
+Allow search bots and user-initiated fetches; block model-training crawlers. A named bot
+obeys only its own group and ignores `*`, so bots that share a policy share one group:
 
 ```
-# Allow AI training bots
-User-agent: GPTBot
-Disallow: /admin
-Disallow: /private
-
-User-agent: ClaudeBot
-Disallow: /admin
-Disallow: /private
-
-User-agent: PerplexityBot
-Disallow: /admin
-
-# Block all other bots
+# Everyone, including search bots and user-initiated fetchers
 User-agent: *
-Disallow: /admin
+User-agent: OAI-SearchBot
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: ChatGPT-User
+User-agent: Claude-User
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Disallow: /admin/
+Disallow: /private/
 Allow: /llms.txt
+
+# Training crawlers
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+Disallow: /
 ```
 
-Spec: https://agents.md (Robots.txt section)
+Spec: https://www.rfc-editor.org/rfc/rfc9309.html
 
 ---
 
@@ -515,18 +527,21 @@ Spec: https://github.com/microsoft/NLWeb
 
 ### Error handling (RFC 9457)
 
-All errors follow `Problem+JSON` format:
+All errors are problem details, served as `application/problem+json`:
 
 ```typescript
 // Validation error
 {
   "type": "https://example.com/errors/validation",
   "title": "Validation Error",
-  "status": 400,
+  "status": 422,
   "detail": "Email must be valid format.",
-  "instance": "/api/users/create#email",
-  "errors": [
-    { "field": "email", "message": "Invalid format" }
+  "instance": "/api/users/create",
+  "code": "ERR_VALIDATION",
+  "is_retriable": false,
+  "suggestions": ["Send email as a full address and retry"],
+  "invalid_fields": [
+    { "field": "/email", "reason": "Not an email address", "expected": "An address such as name@example.com" }
   ]
 }
 
@@ -536,16 +551,20 @@ All errors follow `Problem+JSON` format:
   "title": "Not Found",
   "status": 404,
   "detail": "User with id=123 does not exist.",
-  "instance": "/api/users/123"
+  "instance": "/api/users/123",
+  "code": "ERR_NOT_FOUND",
+  "is_retriable": false
 }
 
 // Rate limit
 {
-  "type": "https://example.com/errors/rate-limit",
+  "type": "https://example.com/errors/rate-limited",
   "title": "Too Many Requests",
   "status": 429,
   "detail": "Rate limit exceeded. Retry after 60 seconds.",
-  "retry_after": 60
+  "code": "ERR_RATE_LIMITED",
+  "is_retriable": true,
+  "retry_after_ms": 60000
 }
 ```
 

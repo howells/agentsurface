@@ -1,8 +1,7 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { NextResponse } from "next/server";
 
 export const revalidate = false;
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 // The owner allows every crawler, including AI training crawlers: search, agent
 // (user-initiated) and training use are all permitted. Named entries below document

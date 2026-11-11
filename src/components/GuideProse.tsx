@@ -3,8 +3,8 @@ import { Term } from "@/components/Term";
 
 /**
  * MDX tag overrides for the /guide/<area> essays: plain Markdown rendered in the
- * site's `type-*` roles, not the docs shell's `.prose` styling (see AGENTS.md - the
- * essay layout matches the homepage, not the docs shell).
+ * site's `type-*` roles, not the docs shell's `.prose` styling: the essay layout
+ * matches the homepage, not the docs shell.
  */
 export const guideMdxComponents: MDXComponents = {
   h2: ({ children, ...props }) => (

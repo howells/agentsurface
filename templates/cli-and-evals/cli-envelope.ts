@@ -1,183 +1,214 @@
 /**
- * CLI Response Envelope - Standard envelope for agent-consumable CLI output
+ * CLI Output Contract - Result on stdout, structured error on stderr
  *
- * **What it is:** Reusable TS helpers for emitting structured JSON responses from CLI commands.
- * Shape: `{version, ok, data?, error?, meta: {trace_id, took_ms, command}}`.
- * Includes pretty-print + JSON modes, exit-code mapping (0 ok, 1 failure, 2 usage, 3 not found, 4 permission denied, 5 conflict).
+ * **What it is:** Helpers for the output contract in the Agent Surface CLI guide. There is
+ * no wrapper object: stdout carries the data itself, the object the API would return.
+ * - Success: the data as JSON on stdout under `--json`, and automatically when stdout is
+ *   not a TTY. Exit 0.
+ * - Failure: nothing on stdout; one object on stderr,
+ *   `{error, message, suggestions, failing_input?, invalid_args?, trace_id?}`, and a
+ *   non-zero exit code (1 failure, 2 usage, 3 not found, 4 permission denied, 5 conflict).
+ * - Progress, spinners, warnings and logs go to stderr, never stdout.
+ *
+ * The file keeps its name because the guide and the surface skill cite it; "envelope" here
+ * means the error object and exit codes, not a wrapper around the data.
  *
  * **When to use:**
  * - Every CLI command that returns data or errors
- * - When you need consistent response shapes across multiple commands
  * - When agents will consume the CLI output programmatically
  *
- * **Canonical URL:** https://code.claude.com/docs/en/cli-reference
+ * **Canonical URLs:**
+ * - https://agentsurface.dev/docs/cli-design/machine-readable-output
+ * - https://agentsurface.dev/docs/error-handling/cli-errors
  *
  * **Customisation checklist:**
- * - [ ] Update envelope version if schema changes
- * - [ ] Add domain-specific error codes to ExitCode enum
- * - [ ] Integrate with your logger (pino, winston, etc.)
- * - [ ] Add request/response middleware to commander hooks
- * - [ ] Test with `--json` and pretty modes
+ * - [ ] Give every failure a stable, domain-prefixed snake_case code (`invoice_not_found`)
+ * - [ ] Make `suggestions` runnable commands, most likely fix first
+ * - [ ] Return every field on every run: `null` for an absent optional field, `[]` for an
+ *       empty collection, so the shape never changes between calls
+ * - [ ] Replace `printHuman` with your table or text rendering
+ * - [ ] Send the unhandled-error log line to your logger
+ * - [ ] Publish the exit-code contract in `--help --json` and your skill file
  *
  * **References:**
- * - Exit codes: this template uses the per-CLI 0-5 contract from the Agent Surface CLI guide;
- *   only 0 (success) and non-zero (failure) are universal, so publish yours in `--help --json`.
- *   BSD sysexits is an optional alternative vocabulary: https://man.freebsd.org/cgi/man.cgi?query=sysexits
- * - RFC 9457 Problem+JSON: https://www.rfc-editor.org/rfc/rfc9457.html
+ * - Exit codes: only 0 (success) and non-zero (failure) are universal. The 0-5 meanings
+ *   are this guide's contract, so publish them.
+ * - NO_COLOR: https://no-color.org
  */
 
-import { z } from "zod";
-import { exit } from "node:process";
-import { isatty } from "node:tty";
+import { randomUUID } from "node:crypto";
 
-// Schema: Base envelope structure
-const CLIEnvelopeSchema = z.object({
-  data: z.unknown().optional(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-      details: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
-  meta: z.object({
-    trace_id: z.string(),
-    took_ms: z.number(),
-    command: z.string(),
-  }),
-  ok: z.boolean(),
-  version: z.literal("1.0").default("1.0"),
-});
+/** This CLI's exit-code contract. */
+export const ExitCode = {
+  SUCCESS: 0,
+  FAILURE: 1,
+  USAGE_ERROR: 2,
+  NOT_FOUND: 3,
+  PERMISSION_DENIED: 4,
+  CONFLICT: 5,
+} as const;
+export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];
 
-export type CLIEnvelope<T = unknown> = z.infer<typeof CLIEnvelopeSchema> & {
-  data?: T;
-};
-
-// Exit codes: this CLI's own contract. Only 0 and non-zero are universal, so
-// document these in `--help --json` and your skill file. Swap in BSD sysexits
-// (64 usage, 69 unavailable, 70 software, 77 no permission) if you prefer that vocabulary.
-export enum ExitCode {
-  SUCCESS = 0,
-  GENERAL_ERROR = 1,
-  USAGE_ERROR = 2,
-  NOT_FOUND = 3,
-  PERMISSION_DENIED = 4,
-  CONFLICT = 5,
+/** One invalid argument in a validation failure. */
+export interface InvalidArg {
+  arg: string;
+  reason: string;
+  received?: string;
+  expected?: string;
 }
 
-// Builder for responses
-export class CLIResponse {
-  private readonly startTime = Date.now();
-  private readonly traceId: string;
-  private readonly command: string;
-  private readonly useJson: boolean;
+/** The object written to stderr on failure. */
+export interface CliErrorBody {
+  /** Stable snake_case code agents branch on. Never a human-readable phrase. */
+  error: string;
+  /** Explanation of this occurrence. May change between releases. */
+  message: string;
+  /** Concrete next steps, most likely fix first. */
+  suggestions: string[];
+  /** The input values that caused the failure. */
+  failing_input?: Record<string, unknown>;
+  /** Validation failures only. */
+  invalid_args?: InvalidArg[];
+  /** Unhandled failures only; the details stay in the log. */
+  trace_id?: string;
+}
 
-  constructor(command: string, useJson: boolean = false) {
-    this.command = command;
-    this.useJson = useJson;
-    this.traceId = this.generateTraceId();
+/** Throw this from a command for any failure the CLI understands. */
+export class CliError extends Error {
+  readonly code: string;
+  readonly exitCode: ExitCode;
+  readonly suggestions: string[];
+  readonly failingInput?: Record<string, unknown>;
+  readonly invalidArgs?: InvalidArg[];
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      exitCode?: ExitCode;
+      suggestions?: string[];
+      failingInput?: Record<string, unknown>;
+      invalidArgs?: InvalidArg[];
+    } = {},
+  ) {
+    super(message);
+    this.name = "CliError";
+    this.code = code;
+    this.exitCode = options.exitCode ?? ExitCode.FAILURE;
+    this.suggestions = options.suggestions ?? [];
+    this.failingInput = options.failingInput;
+    this.invalidArgs = options.invalidArgs;
   }
 
-  private generateTraceId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(7)}`;
-  }
-
-  private getTookMs(): number {
-    return Date.now() - this.startTime;
-  }
-
-  private format(envelope: CLIEnvelope): string {
-    if (this.useJson) {
-      return JSON.stringify(envelope);
-    }
-    return JSON.stringify(envelope, null, 2);
-  }
-
-  /**
-   * Emit success response with optional data
-   */
-  success<T>(data?: T): string {
-    const envelope: CLIEnvelope<T> = {
-      data,
-      meta: {
-        command: this.command,
-        took_ms: this.getTookMs(),
-        trace_id: this.traceId,
-      },
-      ok: true,
-      version: "1.0",
+  toBody(): CliErrorBody {
+    return {
+      error: this.code,
+      message: this.message,
+      suggestions: this.suggestions,
+      ...(this.failingInput ? { failing_input: this.failingInput } : {}),
+      ...(this.invalidArgs ? { invalid_args: this.invalidArgs } : {}),
     };
-    return this.format(envelope);
   }
+}
 
-  /**
-   * Emit error response
-   */
-  error(code: string, message: string, details?: Record<string, unknown>): string {
-    const envelope: CLIEnvelope = {
-      error: {
-        code,
-        details,
-        message,
-      },
-      meta: {
-        command: this.command,
-        took_ms: this.getTookMs(),
-        trace_id: this.traceId,
-      },
-      ok: false,
-      version: "1.0",
-    };
-    return this.format(envelope);
-  }
+/** JSON mode: `--json` was passed, or stdout is not a terminal. */
+export function wantsJson(jsonFlag: boolean | undefined): boolean {
+  return Boolean(jsonFlag) || !process.stdout.isTTY;
 }
 
 /**
- * Helper: Output and exit with code
+ * Colour only for a terminal, never under `--json`, and never when NO_COLOR is set to
+ * any non-empty value. Pass `process.stderr` when colouring error text.
  */
-export function outputAndExit(message: string, exitCode: ExitCode = ExitCode.SUCCESS): never {
-  if (exitCode === ExitCode.SUCCESS) {
-    console.log(message);
+export function shouldUseColor(
+  jsonFlag: boolean | undefined,
+  stream: NodeJS.WriteStream = process.stdout,
+): boolean {
+  return !jsonFlag && Boolean(stream.isTTY) && !process.env.NO_COLOR;
+}
+
+/**
+ * Write a command's result to stdout. In JSON mode this is the data itself on one line,
+ * with no wrapper. Resolves once the write has flushed.
+ */
+export async function writeResult<T>(
+  data: T,
+  options: { json?: boolean; printHuman: (data: T) => string },
+): Promise<void> {
+  const text = wantsJson(options.json) ? JSON.stringify(data) : options.printHuman(data);
+  await new Promise<void>((resolve, reject) => {
+    process.stdout.write(`${text}\n`, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+/** Progress, warnings and logs: stderr only, so they never mix with the data on stdout. */
+export function writeProgress(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
+
+/**
+ * Write a failure to stderr and exit with its code. Structured JSON under `--json` or when
+ * stderr is not a terminal; readable text otherwise. Exits from the write callback, because
+ * exiting straight after a write to a pipe can cut the output short.
+ */
+export function exitWithError(error: CliError, jsonFlag?: boolean): void {
+  writeErrorAndExit(error.toBody(), error.exitCode, jsonFlag);
+}
+
+function writeErrorAndExit(body: CliErrorBody, exitCode: ExitCode, jsonFlag?: boolean): void {
+  let text: string;
+  if (jsonFlag || !process.stderr.isTTY) {
+    text = JSON.stringify(body);
   } else {
-    console.error(message);
+    const label = shouldUseColor(jsonFlag, process.stderr) ? "\u001B[31mError:\u001B[0m" : "Error:";
+    text = [`${label} ${body.message}`, ...body.suggestions.map((s) => `  → ${s}`)].join("\n");
   }
-  exit(exitCode);
+  process.stderr.write(`${text}\n`, () => {
+    process.exit(exitCode);
+  });
 }
 
 /**
- * Helper: Validate envelope before output (optional, for strict mode)
+ * Run a command and apply the contract to whatever it throws. A `CliError` is reported as
+ * thrown. Anything else is an unhandled failure: the exception is logged with a trace ID
+ * and the caller gets a generic `internal_error` carrying only that ID, never a stack trace.
  */
-export function validateEnvelope(data: unknown): CLIEnvelope {
-  return CLIEnvelopeSchema.parse(data);
-}
-
-/**
- * Example: Integration with commander
- */
-export function setupCLIWithEnvelope(program: any, opts: { json?: boolean; command: string }) {
-  const response = new CLIResponse(opts.command, opts.json);
-
-  return {
-    exitError: (
-      code: string,
-      message: string,
-      details?: Record<string, unknown>,
-      exitCode: ExitCode = ExitCode.GENERAL_ERROR,
-    ) => {
-      outputAndExit(response.error(code, message, details), exitCode);
-    },
-    exitSuccess: (data?: unknown) => {
-      outputAndExit(response.success(data), ExitCode.SUCCESS);
-    },
-    response,
-  };
-}
-
-/**
- * Helper: Suppress color when not a TTY or when --json is set
- */
-export function shouldUseColor(jsonMode: boolean): boolean {
-  return !jsonMode && isatty(process.stdout.fd) && process.env.NO_COLOR !== "1";
+export async function runCommand(
+  jsonFlag: boolean | undefined,
+  command: () => Promise<void>,
+): Promise<void> {
+  try {
+    await command();
+  } catch (error) {
+    if (error instanceof CliError) {
+      exitWithError(error, jsonFlag);
+      return;
+    }
+    const traceId = randomUUID();
+    // <CUSTOMISE>: send this line to your logger instead of stderr.
+    process.stderr.write(
+      `${JSON.stringify({ level: "error", message: "Unhandled CLI error", trace_id: traceId, cause: String(error) })}\n`,
+    );
+    writeErrorAndExit(
+      {
+        error: "internal_error",
+        message: "An unexpected error occurred.",
+        suggestions: [
+          "Check the command syntax and try again",
+          `Contact support with trace ID: ${traceId}`,
+        ],
+        trace_id: traceId,
+      },
+      ExitCode.FAILURE,
+      jsonFlag,
+    );
+  }
 }
 
 /**
@@ -186,30 +217,34 @@ export function shouldUseColor(jsonMode: boolean): boolean {
  * ```typescript
  * import { Command } from 'commander';
  *
- * const program = new Command();
+ * const program = new Command('mytool');
  *
  * program
- *   .command('list-users')
- *   .option('--json', 'Output as JSON')
- *   .action((opts) => {
- *     const { response, exitSuccess, exitError } = setupCLIWithEnvelope(program, {
- *       json: opts.json,
- *       command: 'list-users',
- *     });
+ *   .command('invoice-send <id>')
+ *   .option('--json', 'Output JSON (automatic when piped)')
+ *   .action((id, opts) =>
+ *     runCommand(opts.json, async () => {
+ *       const invoice = await api.getInvoice(id);
+ *       if (!invoice) {
+ *         throw new CliError('invoice_not_found', `Invoice ${id} does not exist.`, {
+ *           exitCode: ExitCode.NOT_FOUND,
+ *           suggestions: ['Run: mytool invoice-list'],
+ *           failingInput: { invoice_id: id },
+ *         });
+ *       }
+ *       if (invoice.status !== 'finalized') {
+ *         throw new CliError('invoice_not_finalized', `Invoice ${id} is in '${invoice.status}' status.`, {
+ *           exitCode: ExitCode.CONFLICT,
+ *           suggestions: [`Run: mytool invoice-finalize ${id}`, `Then retry: mytool invoice-send ${id}`],
+ *           failingInput: { invoice_id: id, current_status: invoice.status, required_status: 'finalized' },
+ *         });
+ *       }
+ *       const sent = await api.sendInvoice(id);
+ *       // stdout: {"id":"inv_01HV","status":"sent","sent_at":"2026-09-25T10:22:01Z"}
+ *       await writeResult(sent, { json: opts.json, printHuman: (i) => `Sent ${i.id}` });
+ *     }),
+ *   );
  *
- *     try {
- *       const users = await db.users.list();
- *       exitSuccess(users);
- *     } catch (err) {
- *       exitError(
- *         'DB_ERROR',
- *         (err as Error).message,
- *         { stack: (err as Error).stack },
- *         ExitCode.GENERAL_ERROR
- *       );
- *     }
- *   });
- *
- * program.parse(process.argv);
+ * await program.parseAsync(process.argv);
  * ```
  */

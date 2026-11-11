@@ -1,222 +1,77 @@
 /**
- * CLI NDJSON Streaming Helper — For long-running CLI commands with event progress
+ * CLI NDJSON Streaming - One record per line for `--all --json`
  *
- * **What it is:** Newline Delimited JSON (NDJSON) streaming helpers for emitting ordered events.
- * Each line is one event: `{ts, level, kind, ...payload}`. Typed event kinds: `progress`,
- * `tool_call`, `tool_result`, `log`, `final`.
+ * **What it is:** Helpers for the streaming half of the output contract in the Agent Surface
+ * CLI guide. A list command run with `--all --json` (or `--all` when piped) writes one JSON
+ * record per line to stdout, each as soon as it is fetched. The lines are the records
+ * themselves: no array, no wrapper and no trailing summary line, so `wc -l` counts records
+ * and `jq -c` filters them. Progress goes to stderr.
+ *
+ * A stream that fails part-way keeps the lines already written, then reports the failure the
+ * same way as any other command: a structured error on stderr and a non-zero exit code
+ * (see `cli-envelope.ts`). A consumer must check the exit code before trusting the count.
  *
  * **When to use:**
- * - Long-running commands (> 5s) that need progress feedback
- * - Multi-step workflows where agents need intermediate results
- * - Log tailing, streaming search results, bulk operations
+ * - List and search commands over large or paginated result sets
+ * - Log tailing and bulk reads an agent may stop consuming early
  *
- * **Canonical URL:** https://jsonlines.org
+ * **Canonical URLs:**
+ * - https://agentsurface.dev/docs/cli-design/machine-readable-output
+ * - https://agentsurface.dev/docs/cli-design/context-window-discipline
  *
  * **Customisation checklist:**
- * - [ ] Add domain-specific event kinds to EventKind enum
- * - [ ] Tune flush frequency for your latency budget
- * - [ ] Add request tracing (trace_id) to event payloads
- * - [ ] Implement backpressure handling for high-volume streams
- * - [ ] Test StreamParser with agent JSON consumers
+ * - [ ] Replace the page fetcher in the example with your API's cursor pagination
+ * - [ ] Apply `--fields` to each record before writing it
+ * - [ ] Document a cap on `--all` and say so in `--help`
  *
  * **References:**
- * - NDJSON spec: https://jsonlines.org
- * - NDJSON GitHub: https://github.com/ndjson/ndjson-spec
- * - CLI design guide: https://code.claude.com/docs/en/cli-reference
+ * - NDJSON: https://github.com/ndjson/ndjson-spec
  */
 
-import { z } from "zod";
-import type { WriteStream } from "node:fs";
-import { createWriteStream } from "node:fs";
+import { once } from "node:events";
 import { createInterface } from "node:readline";
 
-// Event schema
-const NDJSONEventSchema = z.object({
-  duration_ms: z.number().optional(),
-  kind: z.enum(["progress", "tool_call", "tool_result", "log", "final"]),
-  level: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  payload: z.record(z.string(), z.unknown()),
-  trace_id: z.string().optional(),
-  ts: z.string().datetime(), // ISO 8601,
-});
-
-export type NDJSONEvent = z.infer<typeof NDJSONEventSchema>;
-
-export class NDJSONStream {
-  private readonly stream: WriteStream;
-  private buffer: NDJSONEvent[] = [];
-  private readonly bufferSize = 50; // Flush after N events
-  private readonly traceId: string;
-
-  constructor(output?: string, traceId?: string) {
-    this.stream = output ? createWriteStream(output, { flags: "a" }) : process.stdout;
-    this.traceId = traceId || this.generateTraceId();
-  }
-
-  private generateTraceId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(7)}`;
-  }
-
-  /**
-   * Emit a progress event
-   */
-  progress(message: string, current: number, total: number, metadata?: Record<string, unknown>) {
-    const event: NDJSONEvent = {
-      kind: "progress",
-      level: "info",
-      payload: {
-        current,
-        message,
-        percent: Math.round((current / total) * 100),
-        total,
-        ...metadata,
-      },
-      trace_id: this.traceId,
-      ts: new Date().toISOString(),
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Emit a tool invocation event
-   */
-  toolCall(toolName: string, callId: string, args: Record<string, unknown>) {
-    const event: NDJSONEvent = {
-      kind: "tool_call",
-      level: "debug",
-      payload: {
-        arguments: args,
-        call_id: callId,
-        tool_name: toolName,
-      },
-      trace_id: this.traceId,
-      ts: new Date().toISOString(),
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Emit a tool result event
-   */
-  toolResult(callId: string, result: unknown, durationMs?: number) {
-    const event: NDJSONEvent = {
-      duration_ms: durationMs,
-      kind: "tool_result",
-      level: "debug",
-      payload: {
-        call_id: callId,
-        result,
-      },
-      trace_id: this.traceId,
-      ts: new Date().toISOString(),
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Emit a log event
-   */
-  log(
-    message: string,
-    level: "debug" | "info" | "warn" | "error" = "info",
-    details?: Record<string, unknown>,
-  ) {
-    const event: NDJSONEvent = {
-      kind: "log",
-      level,
-      payload: {
-        message,
-        ...details,
-      },
-      trace_id: this.traceId,
-      ts: new Date().toISOString(),
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Emit the final event (success or failure)
-   */
-  final(success: boolean, data?: unknown, error?: string) {
-    const event: NDJSONEvent = {
-      kind: "final",
-      level: success ? "info" : "error",
-      payload: {
-        data,
-        error,
-        success,
-      },
-      trace_id: this.traceId,
-      ts: new Date().toISOString(),
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Internal: emit event to buffer, flush if threshold reached
-   */
-  private emit(event: NDJSONEvent) {
-    this.buffer.push(event);
-    if (this.buffer.length >= this.bufferSize) {
-      this.flush();
+/**
+ * Write each record as one line of JSON the moment it arrives. Nothing is buffered, so a
+ * consumer sees records live and a crash cannot lose records held in memory. Waits for
+ * `drain` when the consumer is slower than the producer. Returns the number written.
+ */
+export async function writeNdjson<T>(
+  records: AsyncIterable<T> | Iterable<T>,
+  output: NodeJS.WritableStream = process.stdout,
+): Promise<number> {
+  let count = 0;
+  for await (const record of records) {
+    if (!output.write(`${JSON.stringify(record)}\n`)) {
+      await once(output, "drain");
     }
+    count += 1;
   }
+  return count;
+}
 
-  /**
-   * Flush buffered events to stream
-   */
-  flush() {
-    for (const event of this.buffer) {
-      this.stream.write(`${JSON.stringify(event)}\n`);
-    }
-    this.buffer = [];
-  }
-
-  /**
-   * Close stream and flush remaining events
-   */
-  close() {
-    this.flush();
-    if (this.stream !== process.stdout) {
-      this.stream.end();
-    }
-  }
+/** Walk every page of a cursor-paginated endpoint, yielding one record at a time. */
+export async function* allPages<T>(
+  fetchPage: (cursor: string | null) => Promise<{ items: T[]; next_cursor: string | null }>,
+): AsyncGenerator<T> {
+  let cursor: string | null = null;
+  do {
+    const page = await fetchPage(cursor);
+    yield* page.items;
+    cursor = page.next_cursor;
+  } while (cursor);
 }
 
 /**
- * Client-side parser for consuming NDJSON streams
+ * Read an NDJSON stream one record at a time. A line that is not valid JSON throws:
+ * skipping it would hide a broken stream.
  */
-export class StreamParser {
-  async *parseStream(input: NodeJS.ReadableStream): AsyncGenerator<NDJSONEvent> {
-    const rl = createInterface({
-      crlfDelay: Infinity,
-      input,
-    });
-
-    for await (const line of rl) {
-      if (line.trim()) {
-        try {
-          const event = NDJSONEventSchema.parse(JSON.parse(line));
-          yield event;
-        } catch (error) {
-          console.error(`Failed to parse NDJSON line: ${line}`, error);
-        }
-      }
+export async function* readNdjson(input: NodeJS.ReadableStream): AsyncGenerator {
+  const lines = createInterface({ crlfDelay: Infinity, input });
+  for await (const line of lines) {
+    if (line.trim()) {
+      yield JSON.parse(line) as unknown;
     }
-  }
-
-  /**
-   * Collect events until 'final' event
-   */
-  async collectUntilFinal(input: NodeJS.ReadableStream): Promise<NDJSONEvent[]> {
-    const events: NDJSONEvent[] = [];
-    for await (const event of this.parseStream(input)) {
-      events.push(event);
-      if (event.kind === "final") {
-        break;
-      }
-    }
-    return events;
   }
 }
 
@@ -224,25 +79,30 @@ export class StreamParser {
  * Example usage:
  *
  * ```typescript
- * const stream = new NDJSONStream(undefined, 'trace-123');
+ * import { runCommand, wantsJson, writeProgress, writeResult } from './cli-envelope';
  *
- * stream.progress('Downloading files', 0, 100);
- * stream.toolCall('download_file', 'call-1', { url: 'https://example.com/file.zip' });
- *
- * for (let i = 1; i <= 100; i++) {
- *   // ... do work ...
- *   stream.progress('Downloading files', i, 100);
- * }
- *
- * stream.toolResult('call-1', { size_bytes: 51200 }, 2000);
- * stream.final(true, { total_downloaded: 51200 });
- * stream.close();
+ * program
+ *   .command('users-list')
+ *   .option('--json', 'Output JSON (automatic when piped)')
+ *   .option('--all', 'Fetch every page')
+ *   .action((opts) =>
+ *     runCommand(opts.json, async () => {
+ *       if (opts.all && wantsJson(opts.json)) {
+ *         writeProgress('Fetching all users...'); // stderr
+ *         await writeNdjson(allPages((cursor) => api.listUsers({ cursor, limit: 100 })));
+ *         return;
+ *       }
+ *       // First page only: one JSON document carrying the pagination metadata.
+ *       const page = await api.listUsers({ cursor: null, limit: 20 });
+ *       await writeResult(page, { json: opts.json, printHuman: renderUsersTable });
+ *     }),
+ *   );
  * ```
  *
- * Client-side consumption:
+ * Consumption:
  *
  * ```bash
- * my-cli download --ndjson | jq -r 'select(.kind=="progress") | "\(.payload.percent)%"'
- * # Output: 10%, 20%, ... 100%
+ * mytool users-list --all --json | wc -l
+ * mytool users-list --all --json | jq -c 'select(.status == "active")'
  * ```
  */

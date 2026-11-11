@@ -4,13 +4,13 @@
  * Use: Validate access tokens from OAuth 2.0 or OIDC providers
  *
  * <CUSTOMISE>
- * - Update JWKS_URI, EXPECTED_ISSUER, EXPECTED_AUDIENCE to your IdP
- * - Configure algorithm whitelist per your security posture
- * - Adjust cache TTL
+ * - Set JWKS_URI, EXPECTED_ISSUER and EXPECTED_AUDIENCE to your IdP
+ * - Configure the algorithm allowlist per your security posture
+ * - If your IdP issues RFC 9068 access tokens, also pass `typ: "at+jwt"` to jwtVerify
  * </CUSTOMISE>
  */
 
-import { jwtVerify, createRemoteJWKSet, importSPKI } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 import type { JWTPayload } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -33,107 +33,105 @@ interface AgentJWTPayload extends JWTPayload {
 }
 
 /**
- * JWT validator with JWKS caching
+ * JWT validator. createRemoteJWKSet fetches, caches and refreshes the key set
+ * itself, so one instance is kept for the life of the validator.
  */
 export class JWTValidator {
-  private readonly jwksUri: string;
   private readonly expectedIssuer: string;
   private readonly expectedAudience: string | string[];
   private readonly allowedAlgorithms: string[];
-  private readonly jwksCacheTtlMs: number;
-  private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-  private jwksCacheExpiry: number = 0;
+  private readonly jwks: ReturnType<typeof createRemoteJWKSet>;
 
   constructor(opts: {
     jwksUri: string;
     expectedIssuer: string;
     expectedAudience: string | string[];
     allowedAlgorithms?: string[];
-    jwksCacheTtlMs?: number;
   }) {
-    this.jwksUri = opts.jwksUri;
     this.expectedIssuer = opts.expectedIssuer;
     this.expectedAudience = opts.expectedAudience;
-    this.allowedAlgorithms = opts.allowedAlgorithms || ["RS256", "ES256"];
-    this.jwksCacheTtlMs = opts.jwksCacheTtlMs || 3_600_000; // 1 hour
+    this.allowedAlgorithms = opts.allowedAlgorithms ?? ["RS256", "ES256"];
+    this.jwks = createRemoteJWKSet(new URL(opts.jwksUri));
   }
 
   /**
-   * Get or refresh JWKS (with caching)
-   */
-  private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
-    if (this.jwks && this.jwksCacheExpiry > Date.now()) {
-      return this.jwks;
-    }
-
-    this.jwks = createRemoteJWKSet(new URL(this.jwksUri));
-    this.jwksCacheExpiry = Date.now() + this.jwksCacheTtlMs;
-    console.log(`[JWT] Refreshed JWKS cache from ${this.jwksUri}`);
-
-    return this.jwks;
-  }
-
-  /**
-   * Validate a JWT token
+   * Validate a JWT. jwtVerify checks the signature, the algorithm allowlist,
+   * `iss`, `aud`, `exp` and `nbf`, and throws on any failure.
    */
   async validateToken(token: string): Promise<AgentJWTPayload> {
-    try {
-      const jwks = this.getJWKS();
-
-      const verified = await jwtVerify(token, jwks, {
-        algorithms: this.allowedAlgorithms,
-        audience: this.expectedAudience,
-        issuer: this.expectedIssuer,
-      });
-
-      const payload = verified.payload as AgentJWTPayload;
-
-      // Additional checks
-      if (!payload.sub) {
-        throw new Error('JWT missing "sub" (subject) claim');
-      }
-
-      if (!payload.exp) {
-        throw new Error('JWT missing "exp" (expiry) claim');
-      }
-
-      if (payload.exp < Math.floor(Date.now() / 1000)) {
-        throw new Error("JWT is expired");
-      }
-
-      if (payload.nbf && payload.nbf > Math.floor(Date.now() / 1000)) {
-        throw new Error('JWT "nbf" (not before) claim is in the future');
-      }
-
-      return payload;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`JWT validation failed: ${message}`, { cause: error });
-    }
+    const { payload } = await jwtVerify(token, this.jwks, {
+      algorithms: this.allowedAlgorithms,
+      audience: this.expectedAudience,
+      issuer: this.expectedIssuer,
+      requiredClaims: ["sub", "exp"],
+    });
+    return payload as AgentJWTPayload;
   }
 }
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set`);
+  }
+  return value;
+}
+
 /**
- * Singleton validator instance
+ * Singleton validator instance, configured from JWKS_URI, EXPECTED_ISSUER and
+ * EXPECTED_AUDIENCE. A missing variable throws: a validator that silently
+ * trusted a placeholder issuer would be worse than one that does not start.
  */
 let globalValidator: JWTValidator | null = null;
 
-export function getJWTValidator(opts?: {
-  jwksUri?: string;
-  expectedIssuer?: string;
-  expectedAudience?: string | string[];
-}): JWTValidator {
-  if (!globalValidator) {
-    globalValidator = new JWTValidator({
-      expectedAudience:
-        opts?.expectedAudience || process.env.EXPECTED_AUDIENCE || "https://api.example.com",
-      expectedIssuer:
-        opts?.expectedIssuer || process.env.EXPECTED_ISSUER || "https://auth.example.com",
-      jwksUri:
-        opts?.jwksUri || process.env.JWKS_URI || "https://auth.example.com/.well-known/jwks.json",
-    });
-  }
+export function getJWTValidator(): JWTValidator {
+  globalValidator ??= new JWTValidator({
+    expectedAudience: requireEnv("EXPECTED_AUDIENCE"),
+    expectedIssuer: requireEnv("EXPECTED_ISSUER"),
+    jwksUri: requireEnv("JWKS_URI"),
+  });
   return globalValidator;
+}
+
+/** RFC 6750 challenge for a missing or rejected bearer token. */
+function unauthorized(detail: string, error?: "invalid_token"): NextResponse {
+  return NextResponse.json(
+    {
+      code: "ERR_UNAUTHORIZED",
+      detail,
+      is_retriable: false,
+      status: 401,
+      title: "Unauthorized",
+      type: "https://api.example.com/errors/unauthorized",
+    },
+    {
+      headers: {
+        "Content-Type": "application/problem+json",
+        "WWW-Authenticate": error ? `Bearer error="${error}"` : "Bearer",
+      },
+      status: 401,
+    },
+  );
+}
+
+/** The token from an `Authorization: Bearer <token>` header; the scheme is case-insensitive. */
+function bearerToken(req: NextRequest): string | null {
+  const match = /^Bearer +(\S+)$/i.exec(req.headers.get("Authorization") ?? "");
+  return match?.[1] ?? null;
+}
+
+/** Validate the request's token, or return the 401 to send. The reason is logged, not returned. */
+async function authenticate(req: NextRequest): Promise<AgentJWTPayload | NextResponse> {
+  const token = bearerToken(req);
+  if (!token) {
+    return unauthorized("Authorization header with a Bearer token is required");
+  }
+  try {
+    return await getJWTValidator().validateToken(token);
+  } catch (error) {
+    console.warn("[JWT] token rejected", error);
+    return unauthorized("The access token is invalid or expired", "invalid_token");
+  }
 }
 
 /**
@@ -157,49 +155,24 @@ export async function jwtProxy(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  const authHeader = req.headers.get("Authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json(
-      {
-        detail: "Authorization header with Bearer token required",
-        status: 401,
-        title: "Unauthorized",
-        type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
-      },
-      { headers: { "Content-Type": "application/problem+json" }, status: 401 },
-    );
+  const claims = await authenticate(req);
+  if (claims instanceof NextResponse) {
+    return claims;
   }
 
-  const token = authHeader.slice(7);
-  const validator = getJWTValidator();
-
-  try {
-    const claims = await validator.validateToken(token);
-
-    // Attach validated claims to request headers for downstream routes
-    const requestHeaders = new Headers(req.headers);
-    requestHeaders.set("x-user-claims", JSON.stringify(claims));
-    requestHeaders.set("x-user-id", claims.sub);
-    if (claims.azp) {
-      requestHeaders.set("x-agent-id", claims.azp);
-    }
-
-    return NextResponse.next({ request: { headers: requestHeaders } });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[JWT] Validation error: ${message}`);
-
-    return NextResponse.json(
-      {
-        detail: message,
-        status: 401,
-        title: "Invalid Token",
-        type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
-      },
-      { headers: { "Content-Type": "application/problem+json" }, status: 401 },
-    );
+  // Attach validated claims to request headers for downstream routes. Every
+  // identity header is set or deleted here, so a value the client sent never
+  // reaches a route handler.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-user-claims", JSON.stringify(claims));
+  requestHeaders.set("x-user-id", claims.sub);
+  if (claims.azp) {
+    requestHeaders.set("x-agent-id", claims.azp);
+  } else {
+    requestHeaders.delete("x-agent-id");
   }
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 /**
@@ -220,39 +193,8 @@ export function withJWTValidation(
   handler: (req: NextRequest, claims: AgentJWTPayload) => Promise<NextResponse>,
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
-    const authHeader = req.headers.get("Authorization");
-
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        {
-          detail: "Authorization header required",
-          status: 401,
-          title: "Unauthorized",
-          type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
-        },
-        { status: 401 },
-      );
-    }
-
-    const token = authHeader.slice(7);
-    const validator = getJWTValidator();
-
-    try {
-      const claims = await validator.validateToken(token);
-      return handler(req, claims);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-
-      return NextResponse.json(
-        {
-          detail: message,
-          status: 401,
-          title: "Invalid Token",
-          type: "https://api.example.com/errors/ERR_UNAUTHORIZED",
-        },
-        { status: 401 },
-      );
-    }
+    const claims = await authenticate(req);
+    return claims instanceof NextResponse ? claims : handler(req, claims);
   };
 }
 

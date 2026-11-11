@@ -86,8 +86,9 @@ function createTestServer(): McpServer {
         priority: z.enum(["low", "medium", "high"]).default("medium"),
         title: z.string().min(1),
       }),
-      // Each call creates a new issue, so the tool is not idempotent.
-      annotations: { destructiveHint: true, idempotentHint: false },
+      // It only adds, so it is not destructive; each call creates a new issue,
+      // so it is not idempotent.
+      annotations: { destructiveHint: false, idempotentHint: false, readOnlyHint: false },
     },
     async (input) => {
       const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
@@ -194,6 +195,7 @@ describe("MCP Client Tests", () => {
 
   afterEach(async () => {
     await client.close();
+    await server.close();
   });
 
   describe("search_docs tool", () => {
@@ -294,12 +296,13 @@ describe("MCP Client Tests", () => {
       expect(parsed.priority).toBe("medium");
     });
 
-    it("should declare destructiveHint and a non-idempotent write", async () => {
+    it("should declare a non-destructive, non-idempotent write", async () => {
       const tools = await client.listTools();
       const createIssueRef = tools.tools.find((t) => t.name === "create_issue");
 
       expect(createIssueRef).toBeDefined();
-      expect(createIssueRef?.annotations?.destructiveHint).toBe(true);
+      expect(createIssueRef?.annotations?.readOnlyHint).toBe(false);
+      expect(createIssueRef?.annotations?.destructiveHint).toBe(false);
       expect(createIssueRef?.annotations?.idempotentHint).toBe(false);
     });
   });

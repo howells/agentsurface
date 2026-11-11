@@ -19,6 +19,8 @@ if (hide) {
   }
   renameSync(localEnv, parked);
 }
+// Set instead of calling process.exit(), which would skip the finally that puts .env back.
+let exitCode = 0;
 try {
   const build = spawnSync("vercel", ["build", "--prod", "--scope", "danielhowells"], {
     cwd: repoRoot,
@@ -27,25 +29,30 @@ try {
   if (build.error) {
     throw build.error;
   }
-  if (build.status !== 0) {
-    process.exit(build.status ?? 1);
-  }
-  let patched = 0;
-  for (const configPath of negotiatedPrerenderConfigs(join(repoRoot, ".vercel/output/functions"))) {
-    const prerender = JSON.parse(readFileSync(configPath, "utf-8"));
-    const vary = prerender.initialHeaders?.vary;
-    if (!variesOnAccept(vary)) {
-      prerender.initialHeaders = {
-        ...prerender.initialHeaders,
-        vary: vary ? `${vary}, Accept` : "Accept",
-      };
-      writeFileSync(configPath, JSON.stringify(prerender));
-      patched += 1;
+  if (build.status === 0) {
+    let patched = 0;
+    for (const configPath of negotiatedPrerenderConfigs(
+      join(repoRoot, ".vercel/output/functions"),
+    )) {
+      const prerender = JSON.parse(readFileSync(configPath, "utf-8"));
+      const vary = prerender.initialHeaders?.vary;
+      if (!variesOnAccept(vary)) {
+        prerender.initialHeaders = {
+          ...prerender.initialHeaders,
+          vary: vary ? `${vary}, Accept` : "Accept",
+        };
+        writeFileSync(configPath, JSON.stringify(prerender));
+        patched += 1;
+      }
     }
+    process.stdout.write(`Added Vary: Accept to ${patched} negotiated prerenders\n`);
+  } else {
+    // Null status means the build was killed by a signal.
+    exitCode = build.status ?? 1;
   }
-  process.stdout.write(`Added Vary: Accept to ${patched} negotiated prerenders\n`);
 } finally {
   if (hide) {
     renameSync(parked, localEnv);
   }
 }
+process.exitCode = exitCode;

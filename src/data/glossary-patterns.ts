@@ -9,7 +9,7 @@ export interface GlossaryPattern {
 }
 
 // One line-field composition per glossary category, rendered to src/assets/glossary/*.svg by
-// `pnpm patterns:render`. Wave height stays under the line spacing so lines never cross.
+// `pnpm generate:patterns`. Wave height stays under the line spacing so lines never cross.
 const BASE: RileyParams = { ...RILEY_DEFAULTS, weight: 2 };
 
 export const GLOSSARY_PATTERNS: GlossaryPattern[] = [

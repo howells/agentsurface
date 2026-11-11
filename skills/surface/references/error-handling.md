@@ -40,7 +40,7 @@ and adds:
 | `recovery_hint`  | The single primary action                                               |
 | `doc_uri`        | Page explaining the error; the `type` URI should resolve to one too     |
 | `trace_id`       | Matches server logs, `X-Request-ID` or the OpenTelemetry trace          |
-| `fields`         | Validation only: `[{ path, rule, message }]`                            |
+| `invalid_fields` | Validation only: `[{ field, reason, received?, expected? }]`            |
 | `errors`         | Nested problems for batch operations                                    |
 
 An explicit `is_retriable` overrides any status-code heuristic. Retrying a

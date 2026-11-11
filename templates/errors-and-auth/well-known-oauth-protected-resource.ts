@@ -12,8 +12,7 @@
  * below.
  *
  * <CUSTOMISE>
- * - Update resource to your service domain
- * - Add your authorization_server URL
+ * - Set API_URL to this resource's identifier and AUTH_SERVER to its authorization server
  * - Define scopes relevant to your API
  * - Set DPOP_REQUIRED=true if every access token must be DPoP-bound
  * </CUSTOMISE>
@@ -49,13 +48,22 @@ interface ProtectedResourceMetadata {
  * identifier has a path (https://api.example.com/mcp), RFC 9728 places the
  * document at /.well-known/oauth-protected-resource/mcp instead.
  */
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    // A placeholder here would tell clients to fetch tokens from the wrong server
+    throw new Error(`${name} is not set`);
+  }
+  return value;
+}
+
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   const metadata: ProtectedResourceMetadata = {
-    // <CUSTOMISE> Update to your domain - this resource's own identifier
-    resource: process.env.API_URL || "https://api.example.com",
+    // This resource's own identifier, e.g. https://api.example.com
+    resource: requireEnv("API_URL"),
 
-    // <CUSTOMISE> Auth server(s) that can issue tokens for this resource
-    authorization_servers: [process.env.AUTH_SERVER || "https://auth.example.com"],
+    // Auth server(s) that can issue tokens for this resource
+    authorization_servers: [requireEnv("AUTH_SERVER")],
 
     // <CUSTOMISE> Define scopes your API supports
     scopes_supported: [
@@ -138,11 +146,10 @@ export async function OPTIONS(_req: NextRequest): Promise<NextResponse> {
  *
  * ```
  * POST https://auth.example.com/token
+ * Authorization: Basic <base64(client_id:client_secret)>
  * Content-Type: application/x-www-form-urlencoded
  *
  * grant_type=client_credentials
- * &client_id=example-agent
- * &client_secret=...
  * &scope=agent:read+agent:write
  * &resource=https://api.example.com
  *

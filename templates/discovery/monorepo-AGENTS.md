@@ -22,7 +22,8 @@ Citation: https://code.claude.com/docs/en/memory
 
 # ROOT: packages/AGENTS.md
 
-````markdown
+<!-- BEGIN TEMPLATE: AGENTS.md (repo root) -->
+
 # Acme Agent Tools - Monorepo
 
 Pnpm workspaces. Three packages: @acme/sdk (client library), @acme/api (Fastify backend),
@@ -37,7 +38,6 @@ pnpm dev          # All packages (SDK playground + API + dashboard)
 pnpm test         # All tests
 pnpm lint && pnpm type-check
 ```
-````
 
 **Build:**
 
@@ -60,7 +60,7 @@ pnpm --filter=@acme/dashboard dev    # http://localhost:3000
 packages/
   sdk/          SDK client library (ESM + CJS)
   api/          Fastify backend (Node.js)
-  dashboard/    Next.js 15 SPA
+  dashboard/    Next.js 16 app
 ```
 
 Each package has its own AGENTS.md with scoped commands and boundaries.
@@ -113,7 +113,7 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 
 - `packages/sdk/AGENTS.md` - SDK-specific setup, exports, testing
 - `packages/api/AGENTS.md` - API server routes, database, environment
-- `packages/dashboard/AGENTS.md` - Next.js build, TypeScript paths, export strategy
+- `packages/dashboard/AGENTS.md` - Next.js build, TypeScript paths, content negotiation
 - `docs/ARCHITECTURE.md` - Cross-package dataflow
 - `CONTRIBUTING.md` - Pull request process (includes changesets walkthrough)
 
@@ -123,13 +123,14 @@ turbo run test --parallel -- --coverage            # Parallel, all packages
 - [Turbo documentation](https://turbo.build)
 - [Changesets CLI](https://github.com/changesets/changesets)
 
-````
+<!-- END TEMPLATE -->
 
 ---
 
 # PACKAGE TEMPLATE 1: packages/sdk/AGENTS.md
 
-```markdown
+<!-- BEGIN TEMPLATE: packages/sdk/AGENTS.md -->
+
 # @acme/sdk (Client Library)
 
 TypeScript client library for agent integration. Exports via pkg.json `exports` field
@@ -144,13 +145,14 @@ Dependency: None. Requires Node 24+.
 ## Commands (SDK-specific)
 
 **Development (playground + docs):**
+
 ```sh
 pnpm --filter=@acme/sdk dev      # Vite dev server (http://localhost:5173)
 pnpm --filter=@acme/sdk test     # Vitest
 pnpm --filter=@acme/sdk test:watch
 pnpm --filter=@acme/sdk lint
 pnpm --filter=@acme/sdk type-check
-````
+```
 
 **Build:**
 
@@ -230,13 +232,14 @@ Test with: `pnpm --filter=@acme/sdk test` after shared updates.
 - `docs/api/sdk.md` - Public API reference
 - `src/agent.ts` - Agent class implementation
 
-````
+<!-- END TEMPLATE -->
 
 ---
 
 # PACKAGE TEMPLATE 2: packages/api/AGENTS.md
 
-```markdown
+<!-- BEGIN TEMPLATE: packages/api/AGENTS.md -->
+
 # @acme/api (Backend Server)
 
 Fastify Node.js server. Exposes REST API for dashboard and SDK consumers.
@@ -250,7 +253,7 @@ Requirements: Node 24, PostgreSQL 14+ (local dev: docker-compose up -d).
 ```sh
 pnpm --filter=@acme/api install
 # Copy .env.example to .env.local and fill in DATABASE_URL
-````
+```
 
 ## Commands (API-specific)
 
@@ -345,33 +348,35 @@ changes require coordination with dashboard team.
 - `docs/api/routes.md` - REST endpoint reference
 - `docs/ARCHITECTURE.md` - API dataflow + agent integration points
 
-````
+<!-- END TEMPLATE -->
 
 ---
 
 # PACKAGE TEMPLATE 3: packages/dashboard/AGENTS.md
 
-```markdown
+<!-- BEGIN TEMPLATE: packages/dashboard/AGENTS.md -->
+
 # @acme/dashboard (Frontend)
 
-Next.js 15 SPA (Static Export). Consumes @acme/sdk + REST API from @acme/api.
+Next.js 16 app, server-rendered (it has route handlers and a proxy, so it is not a static export). Consumes @acme/sdk + REST API from @acme/api.
 
 See `AGENTS.md` in repo root for global commands and boundaries.
 
 ## Commands (Dashboard-specific)
 
 **Development:**
+
 ```sh
 pnpm --filter=@acme/dashboard dev       # http://localhost:3000
 pnpm --filter=@acme/dashboard test      # Vitest
 pnpm --filter=@acme/dashboard test:watch
 pnpm --filter=@acme/dashboard lint
-````
+```
 
 **Build:**
 
 ```sh
-pnpm --filter=@acme/dashboard build     # Static export to out/
+pnpm --filter=@acme/dashboard build     # Production build to .next/
 pnpm --filter=@acme/dashboard start     # Local preview of build
 ```
 
@@ -387,15 +392,18 @@ app/
       page.tsx        # Agent detail + tool explorer
   docs/
     [slug]/
-      page.tsx        # Content negotiation (Accept: text/markdown)
+      page.tsx        # Docs page (HTML)
+  md/
+    [...slug]/
+      route.ts        # Markdown twin of each docs page
   api/
     ask/              # POST /api/ask (NLWeb-style)
-    mcp/              # /.well-known/mcp.json handler
   __tests__/          # Vitest + React Testing Library
 public/
   llms.txt            # Agent discovery index
   robots.txt          # AI crawler policy
-next.config.ts        # TypeScript, static export config
+proxy.ts              # Content negotiation: Accept: text/markdown -> /md/...
+next.config.ts        # Next.js config
 ```
 
 ## Environment (.env.local)
@@ -419,7 +427,7 @@ Dashboard supports `Accept: text/markdown` on docs pages (`/docs/*`).
 Request: `GET /docs/getting-started -H "Accept: text/markdown"`
 Response: Markdown version + `Content-Type: text/markdown`
 
-Implemented in `app/docs/[slug]/page.tsx` via `headers()` API.
+Implemented in `proxy.ts` (Next.js 16's name for middleware), which rewrites requests that prefer Markdown to `app/md/[...slug]/route.ts`.
 
 ## JSON-LD schemas
 
@@ -464,9 +472,9 @@ See `app/layout.tsx` for implementation pattern.
 - Root AGENTS.md
 - `docs/api/dashboard.md` - Routes + endpoints
 - `app/layout.tsx` - JSON-LD implementation
-- `app/docs/[slug]/page.tsx` - Content negotiation pattern
+- `proxy.ts` - Content negotiation pattern
 
-```
+<!-- END TEMPLATE -->
 
 ---
 
@@ -479,6 +487,7 @@ When an agent reads a monorepo:
 3. **Agent in packages/shared/** (no AGENTS.md) → reads root `AGENTS.md`
 
 Example: Agent working in packages/api sees:
+
 - Commands from packages/api/AGENTS.md (e.g., `pnpm --filter=@acme/api db:migrate`)
 - Global conventions from root (filenames, import order)
 - Boundaries from packages/api/AGENTS.md; if not specified, falls back to root
@@ -494,4 +503,3 @@ This scales: each package can override without repeating root guidance.
 - [Changesets CLI](https://github.com/changesets/changesets)
 - Root `AGENTS.md` (global context)
 - Root `CONTRIBUTING.md` (pull request workflow with changesets)
-```

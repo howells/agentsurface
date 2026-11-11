@@ -141,6 +141,6 @@ Emit agent-consumable OpenAPI specs and Arazzo workflows that expose API semanti
 - Do NOT write descriptions for humans (no "Please note…", "Feel free to…").
 - Do NOT omit error responses; assume the agent hits every error path.
 - Do NOT carry OpenAPI 3.0-only schema features into 3.1 (such as `nullable: true` instead of adding `null` to the schema's `type`).
-- Do NOT create tools from every HTTP endpoint; curate <20 tools per dimension.
+- Do NOT create tools from every HTTP endpoint; aim for under about 10 tools per agent context; about 20 is the house review threshold.
 - Do NOT forget Idempotency-Key on POST /resources; it is not optional.
 - Do NOT nest request bodies >2 levels; flatten or split into separate operations.

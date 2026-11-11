@@ -36,10 +36,10 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - **Stdio only**: Local dev tool, no multi-client need
    - **Streamable HTTP only**: Cloud service, multi-tenant
    - **Both (recommended)**: Flexibility for deployment + local testing
-   - Use the TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23): `StdioServerTransport` from `@modelcontextprotocol/server/stdio` and `createMcpHandler` for per-request Streamable HTTP, registering with `registerTool`/`registerResource`/`registerPrompt`. The monolithic `@modelcontextprotocol/sdk` 1.x (1.32.2) is maintained for v1 compatibility
+   - Use the TypeScript SDK v2 packages (`@modelcontextprotocol/server`, 2.4.0 as of 2026-10-23): `serveStdio` from `@modelcontextprotocol/server/stdio` and `createMcpHandler` (a web-standard `fetch` handler) for per-request Streamable HTTP, registering with `registerTool`/`registerResource`/`registerPrompt`. The monolithic `@modelcontextprotocol/sdk` 1.x (1.32.2) is maintained for v1 compatibility
 
 2. **Tool curation** (domain-driven):
-   - Do NOT expose every endpoint; keep the server's tool set under the house review threshold of about 20, and smaller where the tools load into one agent context
+   - Do NOT expose every endpoint; aim for under about 10 tools per agent context; about 20 is the house review threshold
    - Group by domain verb (list, get, create, update, delete, search)
    - Use verb_noun format: `create_project`, `list_users`, `search_invoices`
    - Include tool input + output schemas (Zod)
@@ -74,12 +74,13 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
    - Errors: what can fail and recovery suggestion
 
 5. **Implement HTTP authorization metadata when protected**:
-   - Publish OAuth protected-resource metadata:
+   - Publish OAuth protected-resource metadata. RFC 9728 appends the resource's path, so a server at `/mcp` serves:
      ```text
-     /.well-known/oauth-protected-resource
+     /.well-known/oauth-protected-resource/mcp
      ```
+   - Set `resource` to the server's own URL, and return that metadata URL as `resource_metadata` in the `WWW-Authenticate` challenge on 401 and 403.
    - Include `authorization_servers` so MCP clients can discover the correct authorization server.
-   - Validate bearer tokens on every protected HTTP request.
+   - Validate bearer tokens on every protected HTTP request, and check a scope per tool: a read-only token must not reach a write tool.
    - Ensure tokens are audience-bound to this MCP server resource.
    - Support OAuth Client ID Metadata Documents only when the authorization server advertises `client_id_metadata_document_supported`.
 
@@ -172,7 +173,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
     - All schema fields have .describe()
     - All relevant annotations set explicitly (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`)
     - Error responses use RFC 9457 + trace_id
-    - Tool count ≤20 per server
+    - Under about 10 tools per agent context; about 20 is the house review threshold
     - Tests pass with InMemoryTransport
     - No secrets in schemas or descriptions
     - Async operations negotiate the Tasks extension and use `tasks/get` / `tasks/update`
@@ -204,7 +205,7 @@ Emit production-ready MCP servers that curate domain operations as tools. Every 
 
 ## Anti-patterns
 
-- Do NOT expose all HTTP endpoints as tools; curate 10-15 per domain.
+- Do NOT expose all HTTP endpoints as tools; aim for under about 10 tools per agent context; about 20 is the house review threshold.
 - Do NOT forget tool annotations; they guide agent routing.
 - Do NOT use nested request objects >2 levels (flatten for agent clarity).
 - Do NOT skip error examples in descriptions; agents will hit all paths.

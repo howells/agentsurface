@@ -8,8 +8,9 @@
 #
 # **IMPORTANT: This is a structure template, not a ready-to-run suite.**
 # Fill in `providers`, replace every <ATTACK_PAYLOAD> placeholder with test cases
-# specific to your agent's tool surface, and replace each <STRING_...> marker with
-# text that would only appear if the attack worked. Generic payloads miss
+# specific to your agent's tool surface, and replace each <STRING_...> and <OUTPUT_...>
+# marker with text that would only appear if the attack worked. Until a payload is
+# replaced, its test fails (see `defaultTest`). Generic payloads miss
 # agent-specific risks. The config follows the Promptfoo config schema
 # (promptfoo 0.125): prompts, providers and tests at the root, test inputs bound
 # through `vars`.
@@ -58,6 +59,14 @@ prompts:
 providers:
   - id: anthropic:messages:claude-opus-5-5
     label: Agent under test
+
+# Applied to every test: a case whose payload is still a placeholder fails, so an unfilled
+# suite cannot go green by having a judge grade the literal placeholder text.
+defaultTest:
+  assert:
+    - type: javascript
+      metric: placeholder_filled
+      value: "!String(context.vars.input).includes('<ATTACK_PAYLOAD')"
 
 # Derived metrics are computed from named assertion metrics. Each needs a name and a value.
 derivedMetrics:

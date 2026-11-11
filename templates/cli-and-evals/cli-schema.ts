@@ -1,280 +1,276 @@
 /**
- * CLI Schema Generator - Machine-readable CLI introspection
+ * CLI Schema Introspection - `--help --json` and a `describe` command
  *
- * **What it is:** `commander` or `yargs` helpers to emit a `--schema` flag that prints the
- * machine-readable command tree as JSON. Names, flags, types, defaults, descriptions.
- * Agents use this to self-serve on input validation.
+ * **What it is:** `commander` helpers that let an agent ask the installed CLI what it
+ * accepts, in the shapes the Agent Surface CLI guide documents:
+ * - `<cli> <command> --help --json` prints one command:
+ *   `{command, description, flags: [{name, type, required, default?, description}], args}`.
+ * - `<cli> describe` prints the whole tree: `{name, version, commands: [...], exit_codes}`,
+ *   with command groups nested under `commands`.
+ * Both write JSON to stdout and exit 0.
+ *
+ * `exit_codes` is the contract from `cli-envelope.ts`. Exit-code meanings beyond 0 and
+ * non-zero are per-CLI, so the CLI publishes its own here.
  *
  * **When to use:**
- * - When you want agents to discover CLI capabilities without reading docs
- * - When you have 5+ commands with complex flags
- * - When you want to generate help text, client libraries, or OpenAPI specs from your CLI
+ * - When you want agents to discover CLI capabilities without pre-loaded docs
+ * - When flags change between versions and docs can go stale
  *
- * **Canonical URL:** https://code.claude.com/docs/en/cli-reference
+ * **Canonical URL:** https://agentsurface.dev/docs/cli-design/schema-introspection
  *
  * **Customisation checklist:**
- * - [ ] Add `--schema` flag to each command or global
- * - [ ] Provide rich descriptions for every flag/argument
- * - [ ] Test `--schema` output against JSON Schema 2020-12
- * - [ ] Document schema URL in AGENTS.md or SKILL.md
- * - [ ] Version your schema (add `schema_version` field)
+ * - [ ] Give every flag and argument a description
+ * - [ ] Add `enum`, `format` and `returns` (a JSON Schema for the result on stdout) where
+ *       commander cannot know them: pass them through `extras`
+ * - [ ] Use placeholders that state the type: `--limit <int>`, `--ratio <number>`
+ * - [ ] Point your SKILL.md or AGENTS.md at `describe`
  *
  * **References:**
- * - Zod 4 JSON Schema: https://zod.dev/json-schema
+ * - Zod 4 JSON Schema (`z.toJSONSchema()`), for `returns`: https://zod.dev/json-schema
  * - JSON Schema 2020-12: https://json-schema.org/
- * - OpenAPI 3.1: https://spec.openapis.org/oas/v3.1.0
  */
 
 import type { Command, Option } from "commander";
-import { z } from "zod";
 
-/**
- * Describes a single CLI command with input/output schemas
- */
+export interface FlagSchema {
+  name: string;
+  type: "boolean" | "integer" | "number" | "string";
+  required: boolean;
+  description: string;
+  default?: unknown;
+  enum?: string[];
+  format?: string;
+}
+
+export interface ArgSchema {
+  name: string;
+  type: "string";
+  required: boolean;
+  description: string;
+}
+
+/** What commander cannot infer for a command, keyed by its full name ("user create"). */
+export type CommandExtras = Record<
+  string,
+  {
+    /** Per-flag additions such as `enum` or `format`, keyed by flag name. */
+    flags?: Record<string, Partial<FlagSchema>>;
+    /** JSON Schema of the data the command writes to stdout. */
+    returns?: Record<string, unknown>;
+  }
+>;
+
+/** One command, as printed by `<command> --help --json`. */
 export interface CommandSchema {
-  name: string;
-  description?: string;
-  usage?: string;
-  input: {
-    type: "object";
-    properties: Record<string, any>;
-    required?: string[];
-    additionalProperties: boolean;
-  };
-  output: {
-    type: "object";
-    properties: Record<string, any>;
-    description?: string;
-  };
+  command: string;
+  description: string;
+  flags: FlagSchema[];
+  args: ArgSchema[];
+  returns?: Record<string, unknown>;
 }
 
-/**
- * Build complete CLI schema from commander program
- */
-export function generateCLISchema(program: Command): {
+/** A node in the `describe` tree: a command, or a group with nested commands. */
+export interface CommandNode {
+  name: string;
+  description: string;
+  flags: FlagSchema[];
+  args: ArgSchema[];
+  returns?: Record<string, unknown>;
+  commands?: CommandNode[];
+}
+
+export interface CliSchema {
+  name: string;
   version: string;
-  name: string;
-  schema_version: string;
-  commands: CommandSchema[];
-} {
-  const commands: CommandSchema[] = [];
-
-  function traverseCommands(cmd: Command, parentPath: string = "") {
-    const cmdName = parentPath ? `${parentPath} ${cmd.name()}` : cmd.name();
-
-    // Extract options/arguments as schema
-    const properties: Record<string, any> = {};
-    const required: string[] = [];
-
-    cmd.options.forEach((opt: Option) => {
-      const propName = opt.attributeName();
-      const isRequired = opt.required ?? false;
-
-      properties[propName] = {
-        default: opt.defaultValue,
-        description: opt.description || `Option: ${opt.flags}`,
-        type: inferTypeFromOption(opt),
-      };
-
-      if (isRequired) {
-        required.push(propName);
-      }
-    });
-
-    cmd.registeredArguments.forEach((arg) => {
-      properties[arg.name()] = {
-        description: arg.description,
-        type: "string",
-      };
-
-      if (arg.required) {
-        required.push(arg.name());
-      }
-    });
-
-    // <CUSTOMISE>: Add output schema based on your domain
-    const outputProperties = {
-      data: {
-        description: "Command result (varies by command)",
-        type: "object",
-      },
-      error: {
-        description: "Error details if command failed",
-        properties: {
-          code: { type: "string" },
-          message: { type: "string" },
-        },
-        type: "object",
-      },
-      success: {
-        description: "Whether the command succeeded",
-        type: "boolean",
-      },
-    };
-
-    commands.push({
-      description: cmd.description(),
-      input: {
-        additionalProperties: false,
-        properties,
-        required: required.length > 0 ? required : undefined,
-        type: "object",
-      },
-      name: cmdName,
-      output: {
-        description: "Standard CLI response envelope",
-        properties: outputProperties,
-        type: "object",
-      },
-      usage: cmd.usage() || `${cmdName} [options]`,
-    });
-
-    // Recurse into subcommands
-    cmd.commands.forEach((subcmd) => {
-      traverseCommands(subcmd, cmdName);
-    });
-  }
-
-  program.commands.forEach((cmd) => {
-    traverseCommands(cmd);
-  });
-
-  return {
-    commands,
-    name: program.name?.() || "cli",
-    schema_version: "1.0",
-    version: program.version?.() || "1.0.0",
-  };
+  commands: CommandNode[];
+  exit_codes: Record<string, string>;
 }
 
+/** The contract from cli-envelope.ts, published so agents need not guess it. */
+const EXIT_CODES: Record<string, string> = {
+  "0": "Success",
+  "1": "Failure; read the structured error on stderr",
+  "2": "Usage error; fix the input and retry",
+  "3": "Not found",
+  "4": "Permission denied",
+  "5": "Conflict with current state",
+};
+
 /**
- * Infer JSON Schema type from commander Option
+ * Infer a type from the flag's placeholder, the only type hint commander keeps:
+ * `--limit <int>`. No placeholder (`--verbose`, `-q, --quiet`, `--no-color`) is a boolean.
  */
-function inferTypeFromOption(opt: Option): string {
-  const { flags } = opt;
-
-  // Heuristics
-  if (flags.includes("no-")) {
+function inferType(opt: Option): FlagSchema["type"] {
+  const placeholder = /[<[]([^>\]]+)[>\]]/.exec(opt.flags)?.[1]?.replace(/\.\.\.$/, "");
+  if (placeholder === undefined) {
     return "boolean";
   }
-  if (opt.short === undefined && !flags.includes("<")) {
-    return "boolean";
-  }
-
-  // <value> pattern: string, int, float
-  if (flags.includes("<string>") || flags.includes("<url>") || flags.includes("<path>")) {
-    return "string";
-  }
-  if (flags.includes("<number>") || flags.includes("<int>")) {
+  if (placeholder === "int" || placeholder === "integer" || placeholder === "n") {
     return "integer";
   }
-  if (flags.includes("<float>")) {
+  if (placeholder === "number" || placeholder === "float") {
     return "number";
   }
-
-  // Default to string
+  // <CUSTOMISE>: any other placeholder is reported as a string.
   return "string";
 }
 
-/**
- * Build schema from Zod types (alternative approach)
- */
-export function generateZodCommandSchema(
-  name: string,
-  description: string,
-  inputSchema: z.ZodType,
-  outputSchema: z.ZodType,
-): CommandSchema {
+/** Path of a command below the program: "user create". */
+function commandPath(cmd: Command): string {
+  const names: string[] = [];
+  for (let current: Command | null = cmd; current?.parent; current = current.parent) {
+    names.unshift(current.name());
+  }
+  return names.join(" ");
+}
+
+function describeFlags(cmd: Command, extras: CommandExtras): FlagSchema[] {
+  const overrides = extras[commandPath(cmd)]?.flags ?? {};
+  return cmd.options.map((opt) => {
+    const name = opt.attributeName();
+    return {
+      name,
+      type: inferType(opt),
+      // `opt.required` only means "this flag takes a value". `opt.mandatory` is what
+      // `requiredOption()` sets when the flag itself must be supplied.
+      required: opt.mandatory,
+      description: opt.description,
+      ...(opt.defaultValue === undefined ? {} : { default: opt.defaultValue }),
+      ...overrides[name],
+    };
+  });
+}
+
+function describeArgs(cmd: Command): ArgSchema[] {
+  return cmd.registeredArguments.map((arg) => ({
+    name: arg.name(),
+    type: "string",
+    required: arg.required,
+    description: arg.description,
+  }));
+}
+
+/** Schema for one command: the `--help --json` output. */
+export function describeCommand(cmd: Command, extras: CommandExtras = {}): CommandSchema {
+  const returns = extras[commandPath(cmd)]?.returns;
   return {
-    description,
-    input: z.toJSONSchema(inputSchema) as CommandSchema["input"],
-    name,
-    output: z.toJSONSchema(outputSchema) as CommandSchema["output"],
+    command: commandPath(cmd),
+    description: cmd.description(),
+    flags: describeFlags(cmd, extras),
+    args: describeArgs(cmd),
+    ...(returns ? { returns } : {}),
   };
 }
 
-/**
- * Middleware: Add `--schema` to any command
- */
-export function addSchemaFlag(cmd: Command, schema: CommandSchema): void {
-  cmd.option("--schema", "Print command schema as JSON and exit", function (this: Command) {
-    console.log(JSON.stringify(schema, null, 2));
+function describeNode(cmd: Command, extras: CommandExtras): CommandNode {
+  const returns = extras[commandPath(cmd)]?.returns;
+  return {
+    name: cmd.name(),
+    description: cmd.description(),
+    flags: describeFlags(cmd, extras),
+    args: describeArgs(cmd),
+    ...(returns ? { returns } : {}),
+    ...(cmd.commands.length > 0
+      ? { commands: cmd.commands.map((sub) => describeNode(sub, extras)) }
+      : {}),
+  };
+}
+
+/** Schema for the whole CLI: the `describe` output. */
+export function describeProgram(program: Command, extras: CommandExtras = {}): CliSchema {
+  const version = program.version();
+  if (!version) {
+    throw new Error("Set program.version() before describing the CLI");
+  }
+  return {
+    name: program.name(),
+    version,
+    commands: program.commands.map((cmd) => describeNode(cmd, extras)),
+    exit_codes: EXIT_CODES,
+  };
+}
+
+/** Write JSON to stdout and exit 0 once it has flushed. */
+function printAndExit(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(value)}\n`, () => {
     process.exit(0);
   });
 }
 
+/** Register `<cli> describe`. */
+export function addDescribeCommand(program: Command, extras: CommandExtras = {}): void {
+  program
+    .command("describe")
+    .description("Print every command, flag and type as JSON")
+    .action(() => {
+      printAndExit(describeProgram(program, extras));
+    });
+}
+
 /**
- * Example: Full integration with commander
+ * Answer `--help --json` before commander prints its text help. Call this ahead of
+ * `program.parseAsync(argv)`; it returns true when it has handled the request.
+ * With no command named, it prints the whole tree.
+ */
+export function handleJsonHelp(
+  program: Command,
+  argv: string[] = process.argv.slice(2),
+  extras: CommandExtras = {},
+): boolean {
+  if (!argv.includes("--json") || !(argv.includes("--help") || argv.includes("-h"))) {
+    return false;
+  }
+  let target = program;
+  for (const word of argv) {
+    const next = target.commands.find((cmd) => cmd.name() === word);
+    if (next) {
+      target = next;
+    }
+  }
+  printAndExit(
+    target === program ? describeProgram(program, extras) : describeCommand(target, extras),
+  );
+  return true;
+}
+
+/**
+ * Example:
  *
  * ```typescript
  * import { Command } from 'commander';
- * import { generateCLISchema, addSchemaFlag } from './cli-schema';
+ * import { z } from 'zod';
+ * import { addDescribeCommand, handleJsonHelp } from './cli-schema';
  *
- * const program = new Command('my-cli');
- * program.version('1.0.0');
+ * const User = z.object({ id: z.string(), name: z.string(), email: z.email().nullable() });
  *
- * // Global --schema to dump entire CLI schema
- * program.option('--schema', 'Dump full CLI schema', () => {
- *   const schema = generateCLISchema(program);
- *   console.log(JSON.stringify(schema, null, 2));
- *   process.exit(0);
- * });
+ * const program = new Command('mytool').version('2.4.1');
+ * const user = program.command('user').description('Manage user accounts');
+ * user
+ *   .command('create')
+ *   .description('Create a new user account')
+ *   .requiredOption('--name <string>', 'Display name for the user')
+ *   .requiredOption('--email <string>', 'Email address')
+ *   .option('--role <string>', 'User role', 'member')
+ *   .option('--json', 'Output JSON (automatic when piped)');
  *
- * // Per-command schema
- * const createUserCmd = program.command('create-user');
- * createUserCmd
- *   .description('Create a new user')
- *   .requiredOption('--name <string>', 'User name')
- *   .requiredOption('--email <string>', 'User email')
- *   .option('--role <string>', 'User role', 'user');
- *
- * const createUserSchema: CommandSchema = {
- *   name: 'create-user',
- *   description: 'Create a new user',
- *   input: {
- *     type: 'object',
- *     properties: {
- *       name: { type: 'string', description: 'User name' },
- *       email: { type: 'string', format: 'email', description: 'User email' },
- *       role: { type: 'string', enum: ['admin', 'user', 'guest'], default: 'user' },
- *     },
- *     required: ['name', 'email'],
- *     additionalProperties: false,
- *   },
- *   output: {
- *     type: 'object',
- *     properties: {
- *       id: { type: 'string' },
- *       created_at: { type: 'string', format: 'date-time' },
- *     },
+ * const extras = {
+ *   'user create': {
+ *     flags: { email: { format: 'email' }, role: { enum: ['admin', 'member', 'viewer'] } },
+ *     returns: z.toJSONSchema(User),
  *   },
  * };
  *
- * addSchemaFlag(createUserCmd, createUserSchema);
- *
- * createUserCmd.action((opts) => {
- *   console.log(JSON.stringify({ success: true, data: { id: '123', created_at: new Date().toISOString() } }));
- * });
- *
- * program.parse(process.argv);
+ * addDescribeCommand(program, extras);
+ * if (!handleJsonHelp(program, process.argv.slice(2), extras)) {
+ *   await program.parseAsync(process.argv);
+ * }
  * ```
  *
- * Usage:
- *
  * ```bash
- * $ my-cli --schema
- * {
- *   "version": "1.0.0",
- *   "name": "my-cli",
- *   "schema_version": "1.0",
- *   "commands": [...]
- * }
+ * $ mytool user create --help --json
+ * {"command":"user create","description":"Create a new user account","flags":[{"name":"name","type":"string","required":true,"description":"Display name for the user"}, ...],"args":[],"returns":{...}}
  *
- * $ my-cli create-user --schema
- * {
- *   "name": "create-user",
- *   "input": {...},
- *   "output": {...}
- * }
+ * $ mytool describe
+ * {"name":"mytool","version":"2.4.1","commands":[{"name":"user","description":"Manage user accounts","flags":[],"args":[],"commands":[...]}],"exit_codes":{...}}
  * ```
  */

@@ -2,7 +2,7 @@
 #
 # Canonical spec: https://spec.openapis.org/arazzo/v1.1.0.html
 # Aligned with: OpenAPI 3.2.x
-# Use case: Compose multi-step agent workflows (create → validate → notify)
+# Use case: Compose multi-step agent workflows (create → activate → verify)
 #
 # When to use this:
 # - Multi-step operations that must occur in sequence
@@ -22,7 +22,8 @@
 #
 # Customization checklist:
 # ✓ Update sourceDescriptions[] with your API spec URLs
-# ✓ Update workflow steps with actual operationIds from spec
+# ✓ Update workflow steps with actual operationIds from spec (every operationId here exists in
+#   openapi-skeleton.yaml; keep it that way when you swap in your own API)
 # ✓ Set successCriteria based on real response conditions
 # ✓ Configure retry actions for flaky operations
 # ✓ Add onFailure actions (rollback, notify, etc.)
@@ -34,7 +35,7 @@ info:
   title: Agent Onboarding Workflow
   version: 1.0.0
   description: |
-    Multi-step workflow to create a new agent, validate configuration, and send notification.
+    Multi-step workflow to create a new agent, activate it and verify the result.
 
     Demonstrates:
     - Sequential step orchestration
@@ -46,21 +47,22 @@ info:
     Spec: https://spec.openapis.org/arazzo/v1.1.0.html
 
 sourceDescriptions:
+  # The description this workflow's operationIds come from (openapi-skeleton.yaml)
   - name: agentApi
-    url: https://api.example.com/v1/openapi.json
+    url: https://api.example.com/v1/openapi.yaml
     type: openapi
 
 workflows:
   - workflowId: agentOnboarding
-    summary: Create and onboard a new agent
+    summary: Create and activate a new agent
     description: |
-      End-to-end workflow: create agent → validate config → trigger welcome notification.
+      End-to-end workflow: create agent (starts as draft) → set it active → read it back.
 
       Demonstrates agent-ready workflow composition with explicit success/failure handling.
 
     inputs:
       type: object
-      required: [agent_name, agent_model, admin_email]
+      required: [agent_name, agent_model, idempotency_key]
       properties:
         agent_name:
           type: string
@@ -68,16 +70,22 @@ workflows:
         agent_model:
           type: string
           description: Model to use (claude-opus-5-5 | claude-sonnet-5-5 | claude-haiku-5-5)
-        admin_email:
+        idempotency_key:
           type: string
-          format: email
-          description: Email to notify of creation
+          description: |
+            One random value per run of this workflow (a UUID). Each write sends it as
+            Idempotency-Key with a per-step suffix, because a key identifies one request: re-running
+            the workflow after a network failure then cannot create a second agent.
 
     steps:
       # Step 1: Create the agent
       - stepId: create_agent
         description: Create agent with specified configuration
         operationId: $sourceDescriptions.agentApi.create_agent
+        parameters:
+          - name: Idempotency-Key
+            in: header
+            value: "{$inputs.idempotency_key}-create"
         requestBody:
           contentType: application/json
           payload:
@@ -96,17 +104,23 @@ workflows:
           model: $response.body#/model
           created_at: $response.body#/created_at
 
-      # Step 2: Validate the agent configuration
-      - stepId: validate_agent
-        description: Validate that the new agent can be retrieved and is in active state
-        operationId: $sourceDescriptions.agentApi.get_agent_by_id
+      # Step 2: Activate the agent (new agents start as draft)
+      - stepId: activate_agent
+        description: Move the new agent from draft to active
+        operationId: $sourceDescriptions.agentApi.update_agent
         parameters:
           - name: agent_id
             in: path
             value: $steps.create_agent.outputs.id
+          - name: Idempotency-Key
+            in: header
+            value: "{$inputs.idempotency_key}-activate"
+        requestBody:
+          contentType: application/json
+          payload:
+            status: active
         successCriteria:
           - condition: $statusCode == 200
-          - condition: $response.body#/status == 'active'
         onFailure:
           # Not found right after creation is usually a timing issue: retry with a delay
           - name: retryWhileNotVisible
@@ -120,40 +134,38 @@ workflows:
             type: goto
             stepId: rollback_agent
 
-      # Step 3: Send welcome notification (best effort: a failure here does not fail the workflow)
-      - stepId: notify_admin
-        description: Send notification email to admin
-        operationId: $sourceDescriptions.agentApi.send_notification
-        requestBody:
-          contentType: application/json
-          payload:
-            to: $inputs.admin_email
-            subject: "New Agent Created"
-            template: "agent-welcome"
-            variables:
-              agent_name: $steps.create_agent.outputs.name
-              agent_id: $steps.create_agent.outputs.id
-              model: $steps.create_agent.outputs.model
-              created_at: $steps.create_agent.outputs.created_at
+      # Step 3: Read the agent back and confirm it is active
+      - stepId: verify_agent
+        description: Confirm the agent can be retrieved and is in active state
+        operationId: $sourceDescriptions.agentApi.get_agent_by_id
+        parameters:
+          - name: agent_id
+            in: path
+            value: $steps.create_agent.outputs.id
         successCriteria:
-          - condition: $statusCode >= 200 && $statusCode < 300
+          - condition: $statusCode == 200
+          - condition: $response.body#/status == 'active'
         outputs:
-          delivered: $statusCode
+          status: $response.body#/status
         onSuccess:
           - name: done
             type: end
         onFailure:
-          - name: continueWithoutNotification
-            type: end
+          - name: rollbackAndStop
+            type: goto
+            stepId: rollback_agent
 
-      # Rollback target. Only reached through the goto action in validate_agent.
+      # Rollback target. Only reached through the goto actions above.
       - stepId: rollback_agent
-        description: Validation failed - delete the created agent
+        description: Activation or verification failed - delete the created agent
         operationId: $sourceDescriptions.agentApi.delete_agent
         parameters:
           - name: agent_id
             in: path
             value: $steps.create_agent.outputs.id
+          - name: Idempotency-Key
+            in: header
+            value: "{$inputs.idempotency_key}-rollback"
         successCriteria:
           - condition: $statusCode == 204
         onSuccess:
@@ -165,22 +177,28 @@ workflows:
       agent_name: $steps.create_agent.outputs.name
       agent_model: $steps.create_agent.outputs.model
       created_at: $steps.create_agent.outputs.created_at
-      notification_status: $steps.notify_admin.outputs.delivered
+      agent_status: $steps.verify_agent.outputs.status
 
-  # Second workflow: read-only health check
-  - workflowId: agentHealthCheck
-    summary: Verify agent configuration and recent execution status
+  # Second workflow: run an agent once and read the execution back
+  - workflowId: agentSmokeRun
+    summary: Verify an agent's configuration, start one execution and read its status
     description: |
       Steps run in the order listed; Arazzo does not define parallel steps. Independent steps can
       be split into separate workflows and started concurrently by the orchestrator.
 
+      run_agent is asynchronous: this workflow reads the execution once. Poll get_execution from
+      the orchestrator until the status is completed, failed or cancelled.
+
     inputs:
       type: object
-      required: [agent_id]
+      required: [agent_id, idempotency_key]
       properties:
         agent_id:
           type: string
-          description: Agent ID to health-check
+          description: Agent ID to run
+        idempotency_key:
+          type: string
+          description: One random value per run of this workflow (a UUID), sent as Idempotency-Key with a per-step suffix
 
     steps:
       # Step 1: Get agent metadata
@@ -192,26 +210,44 @@ workflows:
             value: $inputs.agent_id
         successCriteria:
           - condition: $statusCode == 200
+          - condition: $response.body#/status == 'active'
         outputs:
           name: $response.body#/name
           status: $response.body#/status
 
-      # Step 2: Get recent executions
-      - stepId: get_recent_executions
-        operationId: $sourceDescriptions.agentApi.list_executions
+      # Step 2: Start an execution
+      - stepId: start_execution
+        operationId: $sourceDescriptions.agentApi.run_agent
         parameters:
           - name: agent_id
-            in: query
+            in: path
             value: $inputs.agent_id
-          - name: limit
-            in: query
-            value: 5
+          - name: Idempotency-Key
+            in: header
+            value: "{$inputs.idempotency_key}-run"
+        requestBody:
+          contentType: application/json
+          payload:
+            input: {}
+        successCriteria:
+          - condition: $statusCode == 202
+        outputs:
+          execution_id: $response.body#/execution_id
+
+      # Step 3: Read the execution's status
+      - stepId: get_execution_status
+        operationId: $sourceDescriptions.agentApi.get_execution
+        parameters:
+          - name: execution_id
+            in: path
+            value: $steps.start_execution.outputs.execution_id
         successCriteria:
           - condition: $statusCode == 200
         outputs:
-          executions: $response.body#/data
+          status: $response.body#/status
 
     outputs:
       agent_name: $steps.get_agent_config.outputs.name
       agent_status: $steps.get_agent_config.outputs.status
-      recent_executions: $steps.get_recent_executions.outputs.executions
+      execution_id: $steps.start_execution.outputs.execution_id
+      execution_status: $steps.get_execution_status.outputs.status

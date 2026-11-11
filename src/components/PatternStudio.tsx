@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Download, Link2, RotateCcw, Shuffle } from "lucide-react";
 import { GLOSSARY_PATTERNS } from "@/data/glossary-patterns";
-import { RILEY_DEFAULTS as HATCH } from "@/lib/riley";
 import {
   KIND_LABELS,
   RILEY_DEFAULTS,
@@ -128,7 +127,7 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          {[{ category: "Hatch", params: HATCH, slug: "hatch" }, ...GLOSSARY_PATTERNS].map(
+          {[{ category: "Hatch", params: RILEY_DEFAULTS, slug: "hatch" }, ...GLOSSARY_PATTERNS].map(
             (preset) => {
               const active = samePreset(preset.params, params);
               return (
@@ -207,15 +206,14 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
           >
             <RotateCcw aria-hidden="true" className="size-3.5" /> Reset
           </button>
-          <span
-            role="status"
+          <output
             className={cn(
               "ml-1 inline-flex items-center gap-1 type-small text-fd-muted-foreground transition-opacity",
               notice ? "opacity-100" : "opacity-0",
             )}
           >
             <Check aria-hidden="true" className="size-3.5" /> {notice}
-          </span>
+          </output>
         </div>
       </div>
 

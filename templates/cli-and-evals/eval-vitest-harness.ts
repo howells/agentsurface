@@ -1,9 +1,9 @@
 /**
- * Vitest Eval Harness - In-process agent testing with retry-on-flake
+ * Vitest Eval Harness - In-process agent testing with repeated trials
  *
  * **What it is:** Vitest suite that runs the same eval set in-process (so it runs in CI).
  * Fixtures are JSON files; each test case is one entry. Emits JUnit-compatible output for CI.
- * Includes retry-on-flake and an optional seed for providers that support one (Claude has none).
+ * Each case can be repeated; every repeat must pass, so a flaky case fails instead of hiding.
  *
  * **When to use:**
  * - Running evals in GitHub Actions / GitLab CI / other CI pipelines
@@ -21,12 +21,13 @@
  * - [ ] Add to package.json: `"test:eval": "vitest run --reporter=junit"`
  *
  * **Environment variables:**
- * - `VITEST_REPEAT` - Run each test N times (default: 1). Set to 5 for flake detection.
- * - `SEED` - Fixed random seed for reproducibility (default: current timestamp)
+ * - `VITEST_REPEAT` - Run each test N times (default: 1); all N runs must pass. Set to 5 for
+ *   flake detection. This uses Vitest's `repeats`, not `retry`: `retry` re-runs a failing test
+ *   until it passes, which hides flakes.
  *
  * **References:**
  * - Vitest docs: https://vitest.dev/
- * - Vitest retry config: https://vitest.dev/config/retry
+ * - Vitest test options (`repeats`, `timeout`): https://vitest.dev/api/
  * - JUnit reporter: https://vitest.dev/guide/reporters.html
  * - pass@k metrics: https://arxiv.org/abs/2107.03374
  */
@@ -60,9 +61,10 @@ const fixtures: FixtureCase[] = (
   JSON.parse(readFileSync("./fixtures/eval-cases.json", "utf-8")) as unknown[]
 ).map((f) => FixtureCaseSchema.parse(f));
 
-// Seed for reproducibility
-const seed = Number.parseInt(process.env.SEED || `${Date.now()}`, 10);
-console.log(`Using seed: ${seed}`);
+// Every repeat must pass. `repeats` is the number of extra runs after the first.
+const repeats = process.env.VITEST_REPEAT ? Number.parseInt(process.env.VITEST_REPEAT, 10) - 1 : 0;
+// Real agent calls take longer than Vitest's 5s default.
+const AGENT_TIMEOUT_MS = 60_000;
 
 /**
  * Your agent function - integrate your actual agent here
@@ -70,13 +72,9 @@ console.log(`Using seed: ${seed}`);
  * <CUSTOMISE>: Replace with your agent implementation
  */
 async function agentTask(prompt: string): Promise<AgentResult> {
-  // Example stub; replace with actual agent SDK call
-  // You might call Claude Agent SDK, OpenAI SDK, or your own HTTP service
-  return {
-    text: `Response to: ${prompt}`,
-    tokens: { input: 100, output: 150 },
-    tool_calls: [{ name: "search_docs", arguments: { query: "auth" } }],
-  };
+  // Call your agent here (an agent SDK, or your own HTTP service) and map its result
+  // to AgentResult. Until then every test fails, so an unfilled harness cannot go green.
+  throw new Error(`agentTask() is not implemented; cannot evaluate: ${prompt}`);
 }
 
 /**
@@ -133,28 +131,24 @@ describe("agent tool routing", { concurrent: false }, () => {
   const testCases = fixtures.filter((f) => !f.category || f.category === "happy_path");
 
   testCases.forEach((testCase) => {
-    it(
-      testCase.prompt,
-      { retry: process.env.VITEST_REPEAT ? Number.parseInt(process.env.VITEST_REPEAT) - 1 : 0 },
-      async () => {
-        // Run agent
-        const result = await agentTask(testCase.prompt);
+    it(testCase.prompt, { repeats, timeout: AGENT_TIMEOUT_MS }, async () => {
+      // Run agent
+      const result = await agentTask(testCase.prompt);
 
-        // Grade: tool order
-        const toolOrder = gradeToolOrder(testCase.expected_tools, result);
-        expect(toolOrder.pass, `Tool order: ${toolOrder.details}`).toBe(true);
+      // Grade: tool order
+      const toolOrder = gradeToolOrder(testCase.expected_tools, result);
+      expect(toolOrder.pass, `Tool order: ${toolOrder.details}`).toBe(true);
 
-        // Grade: output
-        if (testCase.expected_output) {
-          const output = gradeOutput(testCase.expected_output, result);
-          expect(output.pass, `Output: ${output.details}`).toBe(true);
-        }
+      // Grade: output
+      if (testCase.expected_output) {
+        const output = gradeOutput(testCase.expected_output, result);
+        expect(output.pass, `Output: ${output.details}`).toBe(true);
+      }
 
-        // Grade: token usage (sanity check)
-        expect(result.tokens.input).toBeGreaterThan(0);
-        expect(result.tokens.output).toBeGreaterThan(0);
-      },
-    );
+      // Grade: token usage (sanity check)
+      expect(result.tokens.input).toBeGreaterThan(0);
+      expect(result.tokens.output).toBeGreaterThan(0);
+    });
   });
 });
 
@@ -167,7 +161,8 @@ describe("agent adversarial resilience", { concurrent: false }, () => {
   adversarialCases.forEach((testCase) => {
     it(
       `rejects: ${testCase.prompt}`,
-      { retry: 1 }, // Retry once on flake
+      // Never retry a safety test: one dangerous tool call is a failure.
+      { repeats, timeout: AGENT_TIMEOUT_MS },
       async () => {
         const result = await agentTask(testCase.prompt);
 
@@ -191,43 +186,24 @@ describe("agent edge case handling", { concurrent: false }, () => {
   const edgeCases = fixtures.filter((f) => f.category === "edge_case");
 
   edgeCases.forEach((testCase) => {
-    it(
-      `handles: ${testCase.prompt}`,
-      { timeout: 10_000 }, // Longer timeout for potentially slow cases
-      async () => {
-        const result = await agentTask(testCase.prompt);
+    it(`handles: ${testCase.prompt}`, { repeats, timeout: AGENT_TIMEOUT_MS }, async () => {
+      const result = await agentTask(testCase.prompt);
 
-        // Must produce valid response (not crash)
-        expect(result.text).toBeTruthy();
-        expect(Array.isArray(result.tool_calls)).toBe(true);
+      // Must produce valid response (not crash)
+      expect(result.text).toBeTruthy();
+      expect(Array.isArray(result.tool_calls)).toBe(true);
 
-        // Grade if expected output provided
-        if (testCase.expected_output) {
-          const output = gradeOutput(testCase.expected_output, result);
-          expect(output.pass).toBe(true);
-        }
-      },
-    );
+      // Grade if expected output provided
+      if (testCase.expected_output) {
+        const output = gradeOutput(testCase.expected_output, result);
+        expect(output.pass).toBe(true);
+      }
+    });
   });
 });
 
-/**
- * Aggregated metrics
- */
-describe("eval metrics", () => {
-  it("placeholder for pass@k and pass^k aggregation", () => {
-    // This test does not compute pass@k or pass^k. Run each case k times (for example with
-    // `retry` disabled and a loop, or a custom reporter), record every attempt, then compute:
-    // pass@k = at least one of k attempts succeeds; pass^k = all k attempts succeed.
-
-    const totalTests = fixtures.length;
-    const expectedPassRate = 0.85; // Baseline
-
-    // Assertions would reference actual test results
-    expect(totalTests).toBeGreaterThan(0);
-    // expect(computedPassRate).toBeGreaterThanOrEqual(expectedPassRate);
-  });
-});
+// This harness reports pass^k (all k repeats pass) per case when VITEST_REPEAT=k. It does not
+// compute pass@k (at least one of k passes); record every attempt in a custom reporter for that.
 
 /**
  * Example fixture file (fixtures/eval-cases.json):
@@ -237,7 +213,7 @@ describe("eval metrics", () => {
  *   {
  *     "id": "doc-search-1",
  *     "prompt": "Find the authentication documentation for MCP",
- *     "expected_tools": ["docs_search"],
+ *     "expected_tools": ["search_docs"],
  *     "expected_output": "authentication",
  *     "category": "happy_path"
  *   },
@@ -271,7 +247,7 @@ describe("eval metrics", () => {
  * # Run single test
  * pnpm vitest run eval-vitest-harness.ts
  *
- * # Run with retry for flake detection
+ * # Run every case 5 times; all 5 must pass
  * VITEST_REPEAT=5 pnpm vitest run
  *
  * # CI mode (JUnit output)

@@ -37,54 +37,36 @@
 # These three map directly onto how Cloudflare classifies AI bot traffic:
 # Search (indexes content to answer questions later), Agent (acts in real time
 # on a person's behalf - chat fetch bots, browser-use agents), and Training
-# (crawls to train or fine-tune a model). The three sections below - search
-# bots, user-agent bots, training bots - follow that same split.
+# (crawls to train or fine-tune a model). Search and agent bots share the default
+# group below; training bots get their own groups after it.
 # ---------------------------------------------------------------------------
+# One group for the default policy and the bots that follow it. A crawler obeys only
+# the most specific group that names it and ignores `*` when it has its own group
+# (RFC 9309, section 2.2.1), so a named bot given a short group of its own would lose
+# every Disallow below. Consecutive User-agent lines share the rules that follow, which
+# keeps the search bots and the user-initiated fetchers on the full list.
 User-agent: *
+# Search bots (real-time search indexing)
+User-agent: OAI-SearchBot
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+# User-agent bots (fetching on behalf of a person)
+User-agent: ChatGPT-User
+User-agent: Claude-User
 Content-Signal: search=yes, ai-input=yes, ai-train=no
 Disallow: /admin/
 Disallow: /private/
-Disallow: /.env*
 Disallow: /secrets/
-Disallow: /*.json$
+Disallow: /.env
 Disallow: /*.sql$
-Disallow: *.pem
+Disallow: /*.pem$
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /robots.txt
 Allow: /sitemap.xml
 Allow: /AGENTS.md
-# Keep this Allow: the Disallow: /*.json$ rule above would otherwise block the
-# discovery endpoints (compatibility server-card.json, agent-skills index, api-catalog).
-# Longest-match precedence lets this Allow win for /.well-known/ paths.
+Allow: /openapi.json
 Allow: /.well-known/
-
-# Search bots (real-time search indexing) - allowed
-User-agent: OAI-SearchBot
-Disallow: /admin
-Disallow: /private
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: Claude-SearchBot
-Disallow: /admin
-Disallow: /private
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-User-agent: PerplexityBot
-Disallow: /admin
-Disallow: /private
-Allow: /llms.txt
-Allow: /llms-full.txt
-
-# User-agent bots (AI browsing on behalf of users). An empty Disallow allows everything.
-# Comments and blank lines do not end a group, and consecutive User-agent lines share
-# the rules that follow, so these two lines need their own rule or they would inherit
-# the next group's Disallow: / (RFC 9309, section 2.2).
-User-agent: ChatGPT-User
-User-agent: Claude-User
-Disallow:
 
 # OpenAI also lists OAI-AdsBot, which checks pages submitted for ads. It is not a
 # training or search crawler; add an explicit group for it if you want a policy.
@@ -113,34 +95,18 @@ Disallow: /
 #
 # If your project actively wants to appear in model training data (open-source
 # libraries and public documentation often do), replace the training-bot block
-# above with the rules below and change the Content-Signal line to
+# above as described below and change the Content-Signal line to
 # `search=yes, ai-input=yes, ai-train=yes`.
 #
+# Delete the training-bot groups above and add each training bot's User-agent line
+# to the shared group at the top, so it gets the same Disallow list:
+#
 # User-agent: GPTBot
-# Disallow: /admin
-# Disallow: /private
-# Disallow: /.env*
-# Disallow: /secrets
-# Allow: /llms.txt
-# Allow: /llms-full.txt
-#
 # User-agent: ClaudeBot
-# Disallow: /admin
-# Disallow: /private
-# Disallow: /.env*
-# Disallow: /secrets
-# Allow: /llms.txt
-# Allow: /llms-full.txt
-#
 # User-agent: Google-Extended
-# Disallow: /admin
-# Disallow: /private
-# Disallow: /.env*
-# Disallow: /secrets
-# Allow: /llms.txt
-# Allow: /llms-full.txt
-#
-# ...and the same shape for Meta-ExternalAgent, CCBot, and Bytespider.
+# User-agent: Meta-ExternalAgent
+# User-agent: CCBot
+# User-agent: Bytespider
 # ---------------------------------------------------------------------------
 
 # Crawl delay (optional: slow down if expensive)
@@ -159,7 +125,8 @@ Sitemap: https://example.com/sitemap-agents.xml
 # [ ] Add paths specific to your project that should be private (/api-internal, /billing, etc.)
 # [ ] Remove any DISALLOW rules if your project has no private areas
 # [ ] Add ALLOW exceptions if needed (e.g., Allow: /api/public/*); keep
-#     Allow: /.well-known/ so discovery JSON survives the /*.json$ block
+#     /openapi.json and /.well-known/ crawlable so discovery files stay reachable
+# [ ] Give a bot its own group only with the full Disallow list repeated in it
 # [ ] Set Crawl-delay if your server struggles under crawler load
 # [ ] Update Sitemap URLs to match your sitemap locations
 # [ ] Test with: curl -I https://example.com/robots.txt

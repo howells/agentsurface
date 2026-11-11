@@ -10,7 +10,9 @@
  * the Mcp-Session-Id concept everywhere, including stdio - every request now
  * carries its own protocol version in `_meta`. Servers must implement
  * `server/discover` (McpServer answers it for you) so a client can probe
- * supported versions up front; clients may skip calling it.
+ * supported versions up front; clients may skip calling it. `serveStdio` owns
+ * that decision per connection: it serves 2026-07-28 clients and, by default,
+ * clients that still open with the 2025 handshake, from the same factory.
  *
  * When to use:
  * - Local development and testing
@@ -25,28 +27,19 @@
  *
  * Customization checklist:
  * ✓ Update server name and version
- * ✓ Add/remove tools in setupToolHandlers()
- * ✓ Update resource URIs and MIME types in setupResourceHandlers()
+ * ✓ Add/remove tools in createServer()
+ * ✓ Update resource URIs and MIME types in createServer()
  * ✓ Add prompts if needed
  * ✓ Implement actual tool handlers (currently stubs)
  * ✓ Add structured logging
  * ✓ Test with InMemoryTransport.createLinkedPair()
  */
 
+import { setTimeout as sleep } from "node:timers/promises";
 import { McpServer } from "@modelcontextprotocol/server";
-import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
-import type { TextContent } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import type { ServerContext, TextContent } from "@modelcontextprotocol/server";
 import { z } from "zod";
-
-// ===== Server Initialization =====
-
-// Tasks moved out of core into the io.modelcontextprotocol/tasks extension;
-// declare it under `extensions` rather than a core `tasks` capability, and
-// only when you actually implement tasks/get + tasks/update polling.
-const server = new McpServer({
-  name: "example-agent-api",
-  version: "1.0.0",
-});
 
 // ===== Structured Logging =====
 
@@ -103,9 +96,18 @@ const createIssueSchema = z.object({
   title: z.string().min(1).describe("Issue title"),
 });
 
+// Clients give up on a request after 60 seconds by default, so the wait is
+// capped below that. A build that needs longer returns "still running" and the
+// model calls again; use the tasks extension for anything it should not poll.
 const waitForBuildSchema = z.object({
   build_id: z.string().describe("Build identifier"),
-  timeout_seconds: z.number().int().min(10).default(600).describe("Maximum seconds to wait"),
+  timeout_seconds: z
+    .number()
+    .int()
+    .min(5)
+    .max(50)
+    .default(45)
+    .describe("Maximum seconds to wait, at most 50"),
 });
 
 // ===== Tool Handlers =====
@@ -149,12 +151,21 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
       ],
     };
   } catch (error) {
+    // The cause goes to the log; the model gets something it can act on
     logger.error("search_docs failed", error as Error);
     return {
       content: [
         {
           type: "text",
-          text: `Search failed: ${(error as Error).message}`,
+          text: JSON.stringify({
+            type: "https://api.example.com/errors/unavailable",
+            title: "Search Unavailable",
+            status: 503,
+            detail: "The documentation index could not be searched.",
+            code: "ERR_UNAVAILABLE",
+            is_retriable: true,
+            retry_after_ms: 5000,
+          }),
         },
       ],
       isError: true,
@@ -166,7 +177,7 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
  * create_issue: Non-idempotent write tool
  *
  * Demonstrates:
- * - destructiveHint annotation
+ * - destructiveHint: false (it only adds; nothing is deleted or overwritten)
  * - idempotentHint: false (each call creates a new issue; only advertise
  *   idempotentHint: true if the handler really deduplicates repeat calls)
  * - Validation before execution
@@ -183,7 +194,7 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
 
   try {
     // Stub: in production, persist to issue tracker
-    const issueId = `ISSUE-${Math.floor(Math.random() * 10_000)}`;
+    const issueId = `ISSUE-${crypto.randomUUID()}`;
 
     return {
       content: [
@@ -204,12 +215,15 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
       content: [
         {
           type: "text",
+          // The cause is in the log. Not retriable: the issue may have been created.
           text: JSON.stringify({
-            type: "https://api.example.com/errors/issue-creation-failed",
+            type: "https://api.example.com/errors/internal",
             title: "Issue Creation Failed",
             status: 500,
-            detail: (error as Error).message,
-            instance: `req-${Date.now()}`,
+            detail:
+              "The issue tracker failed part-way. Check whether the issue exists before trying again.",
+            code: "ERR_INTERNAL",
+            is_retriable: false,
           }),
         },
       ],
@@ -228,8 +242,14 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
  * tasks/update. Reach for that extension when a client needs to observe
  * progress or cancel independently; this in-handler loop is the simpler
  * option when the client is content to just wait for the final result.
+ *
+ * The loop stops as soon as the client cancels the request, so an abandoned
+ * call does not keep polling the build system.
  */
-async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Promise<{
+async function handleWaitForBuild(
+  input: z.infer<typeof waitForBuildSchema>,
+  ctx: ServerContext,
+): Promise<{
   content: TextContent[];
   isError?: boolean;
 }> {
@@ -238,14 +258,15 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
     timeout_seconds: input.timeout_seconds,
   });
 
+  const { signal } = ctx.mcpReq;
   const startTime = Date.now();
-  const timeoutMs = input.timeout_seconds * 1000;
+  const deadline = startTime + input.timeout_seconds * 1000;
 
-  // Stub: poll build status until completion or timeout
+  // Stub: poll build status until completion, timeout or cancellation
   let pollCount = 0;
   let backoffMs = 500;
 
-  while (Date.now() - startTime < timeoutMs) {
+  while (Date.now() < deadline && !signal.aborted) {
     pollCount++;
     logger.info("build_poll", {
       build_id: input.build_id,
@@ -277,21 +298,32 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
       };
     }
 
-    // Exponential backoff: 500ms, 1s, 2s, 4s, max 30s
-    backoffMs = Math.min(backoffMs * 1.5, 30_000);
-    await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    // Wait, doubling each time (500ms, 1s, 2s ... capped at 10s), never past
+    // the deadline, and wake at once if the client cancels.
+    const waitMs = Math.min(backoffMs, deadline - Date.now());
+    backoffMs = Math.min(backoffMs * 2, 10_000);
+    try {
+      await sleep(waitMs, undefined, { signal });
+    } catch (error) {
+      // Cancellation ends the wait early; anything else is a real failure.
+      if (!signal.aborted) {
+        throw error;
+      }
+    }
   }
 
-  // Timeout
+  // Still running: not a failure of the build, so say what to do next
   return {
     content: [
       {
         text: JSON.stringify({
-          type: "https://api.example.com/errors/build-timeout",
-          title: "Build Timeout",
+          type: "https://api.example.com/errors/timeout",
+          title: "Build Still Running",
           status: 504,
-          detail: `Build did not complete within ${input.timeout_seconds}s`,
-          instance: `req-${Date.now()}`,
+          detail: `Build ${input.build_id} did not complete within ${input.timeout_seconds}s.`,
+          code: "ERR_TIMEOUT",
+          is_retriable: true,
+          suggestions: ["Call wait_for_build again with the same build_id."],
         }),
         type: "text",
       },
@@ -300,61 +332,75 @@ async function handleWaitForBuild(input: z.infer<typeof waitForBuildSchema>): Pr
   };
 }
 
-// ===== Tool Registration =====
+// ===== Server Factory =====
 
-server.registerTool(
-  "search_docs",
-  {
-    description:
-      "Search project documentation by keyword. Use when you need to find relevant docs or API references. Accepts any search term. Returns up to 50 results ranked by relevance.",
-    inputSchema: searchDocsSchema,
-    annotations: {
-      openWorldHint: true,
-      readOnlyHint: true,
+// `serveStdio` calls this once per connection.
+// Tasks moved out of core into the io.modelcontextprotocol/tasks extension;
+// declare it under `extensions` rather than a core `tasks` capability, and
+// only when you actually implement tasks/get + tasks/update polling.
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "example-agent-api",
+    version: "1.0.0",
+  });
+
+  // ===== Tool Registration =====
+
+  server.registerTool(
+    "search_docs",
+    {
+      description:
+        "Search project documentation by keyword. Use when you need to find relevant docs or API references. Accepts any search term. Returns up to 50 results ranked by relevance.",
+      inputSchema: searchDocsSchema,
+      annotations: {
+        openWorldHint: true,
+        readOnlyHint: true,
+      },
     },
-  },
-  handleSearchDocs,
-);
+    handleSearchDocs,
+  );
 
-server.registerTool(
-  "create_issue",
-  {
-    description:
-      "Create a new issue in the project tracker. Use when you need to report a bug, request a feature, or log a task. Do not use for general communication. All issues are immutable once created; use update_issue for modifications.",
-    inputSchema: createIssueSchema,
-    annotations: {
-      destructiveHint: true,
-      idempotentHint: false,
+  server.registerTool(
+    "create_issue",
+    {
+      description:
+        "Create a new issue in the project tracker. Use when you need to report a bug, request a feature, or log a task. Do not use for general communication. Each call creates a new issue; issues cannot be edited through this server.",
+      inputSchema: createIssueSchema,
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: false,
+        readOnlyHint: false,
+      },
     },
-  },
-  handleCreateIssue,
-);
+    handleCreateIssue,
+  );
 
-server.registerTool(
-  "wait_for_build",
-  {
-    description:
-      "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout. This tool polls internally rather than using the io.modelcontextprotocol/tasks extension - reach for that extension instead when a client should be able to check progress independently.",
-    inputSchema: waitForBuildSchema,
-    annotations: {
-      openWorldHint: true,
+  server.registerTool(
+    "wait_for_build",
+    {
+      description:
+        "Poll and wait for a CI/CD build to complete. Use when you need to monitor long-running build processes. Returns build status, duration, and artifact URLs. Blocks until completion or timeout (at most 50 seconds); on timeout, call it again with the same build_id. This tool polls internally rather than using the io.modelcontextprotocol/tasks extension - reach for that extension instead when a client should be able to check progress independently.",
+      inputSchema: waitForBuildSchema,
+      annotations: {
+        openWorldHint: true,
+        readOnlyHint: true,
+      },
     },
-  },
-  handleWaitForBuild,
-);
+    handleWaitForBuild,
+  );
 
-// ===== Resource Handlers =====
+  // ===== Resource Handlers =====
 
-/**
- * Resources: Static data exposed via stable URIs.
- * Agents can query these without tool invocation.
- */
-server.registerResource(
-  "api-docs",
-  "config://api-docs",
-  { description: "API Documentation Overview", mimeType: "text/markdown" },
-  async () => {
-    const docs = `# API Documentation
+  /**
+   * Resources: Static data exposed via stable URIs.
+   * Agents can query these without tool invocation.
+   */
+  server.registerResource(
+    "api-docs",
+    "config://api-docs",
+    { description: "API Documentation Overview", mimeType: "text/markdown" },
+    async () => {
+      const docs = `# API Documentation
 
 ## Tools
 
@@ -379,99 +425,78 @@ Monitor CI/CD builds.
 See https://modelcontextprotocol.io/specification/2026-07-28 for spec details.
 `;
 
-    return {
-      contents: [
+      return {
+        contents: [
+          {
+            mimeType: "text/markdown",
+            text: docs,
+            uri: "config://api-docs",
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "schemas",
+    "config://schemas",
+    { description: "Tool input schemas (JSON Schema)", mimeType: "application/json" },
+    async () => {
+      // Generated from the Zod schemas the tools validate with, so they cannot drift
+      const schemas = {
+        CreateIssueInput: z.toJSONSchema(createIssueSchema),
+        SearchDocsInput: z.toJSONSchema(searchDocsSchema),
+        WaitForBuildInput: z.toJSONSchema(waitForBuildSchema),
+      };
+
+      return {
+        contents: [
+          {
+            mimeType: "application/json",
+            text: JSON.stringify(schemas, null, 2),
+            uri: "config://schemas",
+          },
+        ],
+      };
+    },
+  );
+
+  // ===== Prompt Handlers =====
+
+  /**
+   * Prompts: Re-usable workflow templates parameterized by client.
+   */
+  server.registerPrompt(
+    "analyze_thread",
+    {
+      description:
+        "Analyze a discussion thread for sentiment, consensus, and action items. Use when you need to summarize multi-person conversations.",
+      argsSchema: z.object({
+        max_messages: z.string().optional().describe("Maximum messages to analyze (default 100)"),
+        thread_id: z.string().describe("The unique identifier of the thread"),
+      }),
+    },
+    async (args) => ({
+      messages: [
         {
-          mimeType: "text/markdown",
-          text: docs,
-          uri: "config://api-docs",
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Analyze thread ${args.thread_id} (up to ${args.max_messages ?? "100"} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
+          },
         },
       ],
-    };
-  },
-);
-
-server.registerResource(
-  "schemas",
-  "config://schemas",
-  { description: "Tool Input Schemas (JSON-LD)", mimeType: "application/ld+json" },
-  async () => {
-    const schemas = {
-      "@context": "https://schema.org",
-      "@type": "DataType",
-      definitions: {
-        CreateIssueInput: {
-          properties: {
-            description: { type: "string" },
-            priority: { enum: ["low", "medium", "high", "critical"] },
-            title: { type: "string" },
-          },
-          required: ["title"],
-          type: "object",
-        },
-        SearchDocsInput: {
-          properties: {
-            limit: { maximum: 50, minimum: 1, type: "integer" },
-            query: { type: "string" },
-          },
-          required: ["query"],
-          type: "object",
-        },
-      },
-    };
-
-    return {
-      contents: [
-        {
-          mimeType: "application/ld+json",
-          text: JSON.stringify(schemas, null, 2),
-          uri: "config://schemas",
-        },
-      ],
-    };
-  },
-);
-
-// ===== Prompt Handlers =====
-
-/**
- * Prompts: Re-usable workflow templates parameterized by client.
- */
-server.registerPrompt(
-  "analyze_thread",
-  {
-    description:
-      "Analyze a discussion thread for sentiment, consensus, and action items. Use when you need to summarize multi-person conversations.",
-    argsSchema: z.object({
-      max_messages: z.string().optional().describe("Maximum messages to analyze (default 100)"),
-      thread_id: z.string().describe("The unique identifier of the thread"),
     }),
-  },
-  async (args) => ({
-    messages: [
-      {
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: `Analyze thread ${args.thread_id} (up to ${args.max_messages ?? "100"} messages) for: 1) overall sentiment, 2) consensus points, 3) open action items, 4) key blockers. Format as markdown with sections.`,
-        },
-      },
-    ],
-  }),
-);
+  );
+
+  return server;
+}
 
 // ===== Connection & Transport =====
 
-async function main(): Promise<void> {
-  const transport = new StdioServerTransport();
-  logger.info("stdio transport initialized");
-
-  await server.connect(transport);
-  logger.info("server connected to transport");
-}
-
-// Run server
-main().catch((error) => {
-  logger.error("server error", error);
-  process.exit(1);
+serveStdio(createServer, {
+  onerror: (error) => {
+    logger.error("server error", error);
+  },
 });
+logger.info("serving on stdio");

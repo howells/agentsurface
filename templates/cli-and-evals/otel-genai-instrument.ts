@@ -28,7 +28,9 @@
  *
  * **Environment variables:**
  * - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` - full OTLP traces URL (default: http://localhost:4318/v1/traces)
- * - `OTEL_EXPORTER_OTLP_HEADERS` - Additional headers
+ * - `OTEL_EXPORTER_OTLP_HEADERS` - Additional headers, in the standard `key1=value1,key2=value2` form
+ * - `OTEL_GENAI_CAPTURE_CONTENT` - set to 1 to record prompts and responses on spans. They are
+ *   stored unredacted, so leave it off unless your privacy policy allows it.
  * - `LANGFUSE_SECRET_KEY` - Langfuse API secret
  * - `LANGFUSE_PUBLIC_KEY` - Langfuse public key
  * - `LANGFUSE_BASE_URL` - Langfuse instance (default: https://cloud.langfuse.com)
@@ -72,14 +74,9 @@ export async function initializeTracing(): Promise<NodeTracerProvider> {
     spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
   }
 
-  // OTLP exporter (production)
-  const otlpExporter = new OTLPTraceExporter({
-    headers: process.env.OTEL_EXPORTER_OTLP_HEADERS
-      ? JSON.parse(process.env.OTEL_EXPORTER_OTLP_HEADERS)
-      : {},
-    url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || "http://localhost:4318/v1/traces",
-  });
-  spanProcessors.push(new BatchSpanProcessor(otlpExporter));
+  // OTLP exporter (production). The exporter reads OTEL_EXPORTER_OTLP_TRACES_ENDPOINT and
+  // OTEL_EXPORTER_OTLP_HEADERS itself, in their standard formats, so nothing is parsed here.
+  spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporter()));
 
   // Langfuse integration (optional): @langfuse/otel provides a span processor
   // that reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL.
@@ -292,12 +289,16 @@ export function logSpanContext(): void {
  * import { initializeTracing, InstrumentedAgent } from './otel-genai-instrument';
  *
  * // Initialize at startup
- * await initializeTracing();
+ * const provider = await initializeTracing();
  *
  * const agent = new InstrumentedAgent();
  *
  * // Spans are created and exported: invoke_agent > execute_tool + chat
  * const response = await agent.run({ prompt: 'Find documentation on MCP' });
+ *
+ * // Spans are batched. Flush them before the process exits, or a short-lived
+ * // CLI loses its last batch.
+ * await provider.shutdown();
  * ```
  *
  * Environment setup for local tracing:

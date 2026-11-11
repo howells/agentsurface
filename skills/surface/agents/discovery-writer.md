@@ -72,7 +72,7 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Helps agents access docs without second HTTP request
 
 3. **Create AGENTS.md** (universal agent boundaries):
-   - Location: project root or `/docs/AGENTS.md`
+   - Location: `AGENTS.md` at the project root. Coding agents don't read one under `docs/`
    - Structure:
 
      ```markdown
@@ -117,31 +117,11 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    - Test: "Can agent discover this from code? If yes, delete it."
 
 4. **Create/update robots.txt and Content Signals**:
-
-   ```
-   User-agent: *
-   Content-Signal: search=yes, ai-input=yes, ai-train=no
-   Allow: /docs
-   Disallow: /admin
-
-   User-agent: OAI-SearchBot
-   Allow: /docs
-
-   User-agent: Claude-SearchBot
-   Allow: /docs
-
-   User-agent: GPTBot
-   Disallow: /
-
-   User-agent: ClaudeBot
-   Disallow: /
-
-   Sitemap: https://example.com/sitemap.xml
-   ```
-
-   - Decide separately for search/retrieval (`search`, `ai-input`) and model training (`ai-train`)
-   - For public developer docs, usually allow retrieval and search while blocking training
-   - Reference sitemap and llms.txt
+   - Decide search, user-initiated retrieval and model training separately, and follow the owner's stated policy for each. Ask when it is unknown; blocking or allowing training is the owner's choice, not a default
+   - Without a matching rule a path is allowed (RFC 9309), so silence is a policy
+   - A crawler obeys only its most specific group. A named group does not inherit the `*` group's rules, so repeat every `Disallow` it still needs
+   - Make `Content-Signal` say the same thing as the allow and block rules
+   - Reference the sitemap
 
 5. **Add AI crawler groups to robots.txt** (RFC 9309 defines `/robots.txt` as the only location crawlers read; a separate `robots-ai.txt` is not a standard, so keep AI groups in the real file and use `templates/discovery/robots-ai.txt` as the starting content):
 
@@ -153,13 +133,15 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
    Allow: /llms-full.txt
    Allow: /.well-known/
 
-   # Search and user-initiated fetchers: allowed. An empty Disallow allows everything,
-   # and consecutive User-agent lines share the rules after them.
+   # Search and user-initiated fetchers: allowed. Consecutive User-agent lines share
+   # the rules after them. A named group replaces the * group for that crawler, so
+   # the private paths are repeated here.
    User-agent: OAI-SearchBot
    User-agent: Claude-SearchBot
+   User-agent: PerplexityBot
    User-agent: ChatGPT-User
    User-agent: Claude-User
-   Disallow:
+   Disallow: /admin/
 
    # Training crawlers: blocked in this example; follow the project's actual policy.
    # Google-Extended also covers grounding in Gemini Apps and Vertex AI, not only training.
@@ -259,13 +241,13 @@ Guide LLM agents to your docs, APIs, capabilities, authentication metadata, and 
 ## Outputs
 
 - `public/llms.txt` or `app/llms.txt/route.ts`
-- `/public/llms-full.txt` (if applicable)
-- `/docs/AGENTS.md` or `/AGENTS.md`
-- `/public/robots.txt` (updated with AI crawler groups)
+- `public/llms-full.txt` (if applicable)
+- `AGENTS.md` at the project root
+- `public/robots.txt` (updated with AI crawler groups)
 - `.well-known` metadata files for API Catalog, MCP, Agent Skills, OAuth, or Web Bot Auth where applicable
 - Middleware for content negotiation (if Next.js/Express)
 - Layout template updates (JSON-LD <script> tags)
-- `docs/discovery-validation.md` (checklist + validation results)
+- The validation checklist and its results, reported in the reply rather than written to a file
 
 ## Spec References
 

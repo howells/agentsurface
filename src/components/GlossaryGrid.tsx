@@ -21,7 +21,7 @@ import { glossaryCategories } from "@/data/glossary";
 import type { GlossaryTerm } from "@/data/glossary";
 
 // ── Line fields by category ─────────────────────────────────────────────────
-// Drawn by src/lib/riley.ts from src/data/glossary-patterns.ts; `pnpm patterns:render` rewrites them.
+// Drawn by src/lib/riley.ts from src/data/glossary-patterns.ts; `pnpm generate:patterns` rewrites them.
 
 const CATEGORY_ART: Record<string, StaticImageData> = {
   "Agent infrastructure": agentInfrastructureArt,

@@ -4,13 +4,13 @@
  * Use: Exchange user token + agent token for narrowly-scoped delegated token
  *
  * <CUSTOMISE>
- * - Set TOKEN_EXCHANGE_ENDPOINT to your IdP's token endpoint
- * - Configure expected audiences and issuer
+ * - Set the token endpoint, JWKS URI and issuer of your IdP
+ * - Pass this service's OAuth client credentials; the exchange is an authenticated request
  * - Adjust scope restrictions per your security policy
  * </CUSTOMISE>
  */
 
-import { jwtVerify, createRemoteJWKSet, SignJWT } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
 /** RFC 8693 section 3 token-type identifier for access tokens. */
 const TOKEN_TYPE_ACCESS_TOKEN = "urn:ietf:params:oauth:token-type:access_token";
@@ -47,38 +47,41 @@ interface TokenExchangeResponse {
  */
 export class TokenExchangeClient {
   private readonly tokenExchangeEndpoint: string;
-  private readonly jwksUri: string;
   private readonly expectedIssuer: string;
-  private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+  private readonly allowedAlgorithms: string[];
+  private readonly authorization: string;
+  private readonly jwks: ReturnType<typeof createRemoteJWKSet>;
 
-  constructor(opts: { tokenExchangeEndpoint: string; jwksUri: string; expectedIssuer: string }) {
+  constructor(opts: {
+    tokenExchangeEndpoint: string;
+    jwksUri: string;
+    expectedIssuer: string;
+    /** This service's OAuth client. RFC 8693 section 2.1 uses normal client authentication. */
+    clientId: string;
+    clientSecret: string;
+    allowedAlgorithms?: string[];
+  }) {
     this.tokenExchangeEndpoint = opts.tokenExchangeEndpoint;
-    this.jwksUri = opts.jwksUri;
     this.expectedIssuer = opts.expectedIssuer;
+    this.allowedAlgorithms = opts.allowedAlgorithms ?? ["RS256", "ES256"];
+    this.jwks = createRemoteJWKSet(new URL(opts.jwksUri));
+    // RFC 6749 section 2.3.1: form-encode each credential, then base64 the pair
+    this.authorization = `Basic ${Buffer.from(
+      `${encodeURIComponent(opts.clientId)}:${encodeURIComponent(opts.clientSecret)}`,
+    ).toString("base64")}`;
   }
 
   /**
-   * Validate a JWT before sending to token exchange endpoint
+   * Validate a JWT before sending it to the token exchange endpoint. This is an
+   * early local check; the authorization server validates both tokens again.
    */
-  private async validateJWT(
-    token: string,
-    expectedAudience?: string,
-  ): Promise<Record<string, unknown>> {
-    if (!this.jwks) {
-      this.jwks = createRemoteJWKSet(new URL(this.jwksUri));
-    }
-
-    try {
-      const verified = await jwtVerify(token, this.jwks, {
-        issuer: this.expectedIssuer,
-        ...(expectedAudience && { audience: expectedAudience }),
-      });
-
-      return verified.payload as Record<string, unknown>;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`JWT validation failed: ${message}`, { cause: error });
-    }
+  private async validateJWT(token: string): Promise<string> {
+    const { payload } = await jwtVerify(token, this.jwks, {
+      algorithms: this.allowedAlgorithms,
+      issuer: this.expectedIssuer,
+      requiredClaims: ["sub"],
+    });
+    return payload.sub as string;
   }
 
   /**
@@ -97,11 +100,8 @@ export class TokenExchangeClient {
     scope?: string,
   ): Promise<TokenExchangeResponse> {
     // Validate input tokens
-    const subjectPayload = await this.validateJWT(subjectToken);
-    const actorPayload = await this.validateJWT(actorToken);
-
-    const userId = subjectPayload.sub as string;
-    const agentId = actorPayload.sub as string;
+    const userId = await this.validateJWT(subjectToken);
+    const agentId = await this.validateJWT(actorToken);
 
     console.log(
       `[TokenExchange] Exchanging token: user=${userId}, agent=${agentId}, audience=${audience}`,
@@ -126,6 +126,7 @@ export class TokenExchangeClient {
     const response = await fetch(this.tokenExchangeEndpoint, {
       body: body.toString(),
       headers: {
+        Authorization: this.authorization,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       method: "POST",
@@ -187,6 +188,8 @@ export class TokenExchangeClient {
  *   tokenExchangeEndpoint: 'https://auth.example.com/token',
  *   jwksUri: 'https://auth.example.com/.well-known/jwks.json',
  *   expectedIssuer: 'https://auth.example.com',
+ *   clientId: process.env.OAUTH_CLIENT_ID,
+ *   clientSecret: process.env.OAUTH_CLIENT_SECRET,
  * });
  *
  * // User has authorized this agent to act on their behalf

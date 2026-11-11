@@ -1,8 +1,7 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { docs } from "@/.source/server";
 import { glossaryMarkdown } from "@/lib/glossary-markdown";
 import { llms, loader } from "fumadocs-core/source";
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 export const source = loader({
   baseUrl: "/docs",
@@ -11,7 +10,7 @@ export const source = loader({
 
 type SourcePage = ReturnType<typeof source.getPages>[number];
 
-/** YAML-ish scalar, quoted only when it needs to be. */
+/** A JSON string is a valid YAML double-quoted scalar, so every value is quoted and escaped. */
 function yamlString(value: string): string {
   return JSON.stringify(value);
 }

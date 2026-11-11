@@ -1,9 +1,8 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { estimateTokens } from "@/lib/markdown";
 import { NextResponse } from "next/server";
 
 export const revalidate = false;
-
-const SITE_ORIGIN = "https://agentsurface.dev";
 
 const CONTENT = [
   "# Agent Surface API",

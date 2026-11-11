@@ -45,11 +45,13 @@ const SoftwareApplicationSchema = BaseSchemaShape.extend({
     name: z.string(),
     url: z.string().url().optional(),
   }),
-  codeRepository: z.string().url().optional().describe("GitHub repo URL"),
   description: z.string().describe("One-sentence description"),
   downloadUrl: z.string().url().optional().describe("npm package URL"),
-  issueTracker: z.string().url().optional().describe("GitHub issues URL"),
-  license: z.string().url().optional().describe("License URL (MIT, Apache 2.0, etc.)"),
+  license: z
+    .string()
+    .url()
+    .optional()
+    .describe("License URL, e.g. https://opensource.org/licenses/MIT"),
   name: z.string().describe("Project name"),
   offers: z
     .object({
@@ -60,7 +62,10 @@ const SoftwareApplicationSchema = BaseSchemaShape.extend({
     })
     .optional(),
   operatingSystem: z.string().optional().describe('e.g., "Any", "Linux", "macOS"'),
-  screenshots: z
+  // codeRepository belongs to SoftwareSourceCode, not SoftwareApplication, so the
+  // repository is linked through sameAs.
+  sameAs: z.array(z.string().url()).optional().describe("Repository and profile URLs"),
+  screenshot: z
     .array(
       z.object({
         "@type": z.literal("ImageObject"),
@@ -84,10 +89,9 @@ export function createSoftwareApplication({
   organizationName,
   organizationUrl,
   repositoryUrl,
-  issueTrackerUrl,
   npmPackageUrl,
   version,
-  license = "MIT",
+  licenseUrl,
 }: {
   name: string;
   description: string;
@@ -95,10 +99,10 @@ export function createSoftwareApplication({
   organizationName: string;
   organizationUrl?: string;
   repositoryUrl?: string;
-  issueTrackerUrl?: string;
   npmPackageUrl?: string;
   version?: string;
-  license?: string;
+  /** A URL, e.g. https://opensource.org/licenses/MIT - not a bare name like "MIT". */
+  licenseUrl?: string;
 }): SoftwareApplication {
   const schema: SoftwareApplication = {
     "@context": "https://schema.org",
@@ -116,10 +120,7 @@ export function createSoftwareApplication({
   };
 
   if (repositoryUrl) {
-    schema.codeRepository = repositoryUrl;
-  }
-  if (issueTrackerUrl) {
-    schema.issueTracker = issueTrackerUrl;
+    schema.sameAs = [repositoryUrl];
   }
   if (npmPackageUrl) {
     schema.downloadUrl = npmPackageUrl;
@@ -127,8 +128,8 @@ export function createSoftwareApplication({
   if (version) {
     schema.version = version;
   }
-  if (license) {
-    schema.license = license;
+  if (licenseUrl) {
+    schema.license = licenseUrl;
   }
 
   // Validate before returning
@@ -141,13 +142,6 @@ export function createSoftwareApplication({
  */
 const WebAPISchema = BaseSchemaShape.extend({
   "@type": z.literal("WebAPI"),
-  contact: z
-    .object({
-      "@type": z.literal("ContactPoint"),
-      contactType: z.string(),
-      email: z.string().email().optional(),
-    })
-    .optional(),
   description: z.string(),
   documentation: z.string().url().optional(),
   name: z.string(),
@@ -164,13 +158,11 @@ export function createWebAPI({
   description,
   url,
   documentationUrl,
-  contactEmail,
 }: {
   name: string;
   description: string;
   url: string;
   documentationUrl?: string;
-  contactEmail?: string;
 }): WebAPI {
   const schema: WebAPI = {
     "@context": "https://schema.org",
@@ -182,13 +174,6 @@ export function createWebAPI({
 
   if (documentationUrl) {
     schema.documentation = documentationUrl;
-  }
-  if (contactEmail) {
-    schema.contact = {
-      "@type": "ContactPoint",
-      contactType: "Support",
-      email: contactEmail,
-    };
   }
 
   return WebAPISchema.parse(schema);
@@ -246,7 +231,7 @@ export function createFAQPage(
 const HowToSchema = BaseSchemaShape.extend({
   "@type": z.literal("HowTo"),
   description: z.string().optional(),
-  estimatedTime: z.string().optional().describe("ISO 8601 duration (e.g., PT30M)"),
+  totalTime: z.string().optional().describe("ISO 8601 duration (e.g., PT30M)"),
   image: z.string().url().optional(),
   name: z.string(),
   step: z.array(
@@ -270,14 +255,14 @@ export function createHowTo({
   name,
   description,
   steps,
-  estimatedTime,
+  totalTime,
   tools,
   imageUrl,
 }: {
   name: string;
   description?: string;
   steps: { name: string; text: string; imageUrl?: string }[];
-  estimatedTime?: string;
+  totalTime?: string;
   tools?: string[];
   imageUrl?: string;
 }): HowTo {
@@ -287,7 +272,7 @@ export function createHowTo({
     name,
     ...(description && { description }),
     ...(imageUrl && { image: imageUrl }),
-    ...(estimatedTime && { estimatedTime }),
+    ...(totalTime && { totalTime }),
     ...(tools && { tool: tools }),
     step: steps.map((step, i) => ({
       "@type": "HowToStep" as const,
@@ -307,7 +292,7 @@ export function createHowTo({
  */
 const OrganizationSchema = BaseSchemaShape.extend({
   "@type": z.literal("Organization"),
-  contact: z
+  contactPoint: z
     .object({
       "@type": z.literal("ContactPoint"),
       contactType: z.string(),
@@ -352,7 +337,7 @@ export function createOrganization({
     schema.sameAs = socialMediaUrls;
   }
   if (contactEmail) {
-    schema.contact = {
+    schema.contactPoint = {
       "@type": "ContactPoint",
       contactType: "Support",
       email: contactEmail,
@@ -387,6 +372,7 @@ export function createOrganization({
  *     repositoryUrl: 'https://github.com/acme/agent-tools',
  *     npmPackageUrl: 'https://www.npmjs.com/package/@acme/sdk',
  *     version: '1.0.0',
+ *     licenseUrl: 'https://opensource.org/licenses/MIT',
  *   });
  *
  *   const orgSchema = createOrganization({
@@ -420,22 +406,22 @@ export function createOrganization({
  * Call during build to ensure all schemas conform.
  */
 export function validateAllSchemas(): void {
-  // Example: validate a complete set
-  const app = createSoftwareApplication({
+  // Each generator parses its own output and throws on a schema mismatch.
+  createSoftwareApplication({
     description: "Example app",
     name: "Example",
     organizationName: "Example Inc.",
     url: "https://example.com",
   });
 
-  const org = createOrganization({
+  createOrganization({
     name: "Example Inc.",
     url: "https://example.com",
   });
 
-  const faq = createFAQPage([{ answer: "Run npm install", question: "How do I install?" }]);
+  createFAQPage([{ answer: "Run npm install", question: "How do I install?" }]);
 
-  const howto = createHowTo({
+  createHowTo({
     name: "Getting Started",
     steps: [{ name: "Install", text: "Run npm install" }],
   });

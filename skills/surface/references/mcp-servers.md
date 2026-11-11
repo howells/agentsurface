@@ -22,10 +22,11 @@ Dimension 3: whether the product exposes an MCP server, and how well.
 ## Evidence to gather
 
 - `.mcp.json`, server entry points, tool, resource and prompt registrations
-- Transport: `StdioServerTransport`; `createMcpHandler` (v2) or
+- Transport: `serveStdio` or `StdioServerTransport`; `createMcpHandler` (v2) or
   `StreamableHTTPServerTransport` (v1); `SSEServerTransport` is legacy
 - Annotations, `outputSchema`/`structuredContent`, `isError` returns
-- `/.well-known/oauth-protected-resource` and the token-validation code
+- `/.well-known/oauth-protected-resource` (plus the server's path, such as
+  `/mcp`, per RFC 9728) and the token-validation code
 - Tests using `InMemoryTransport`, and any run against a deployed URL
 - Session IDs, `initialize` handling, roots, sampling or logging: migration
   findings against 2026-07-28

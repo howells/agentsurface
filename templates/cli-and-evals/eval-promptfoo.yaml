@@ -28,7 +28,10 @@
 
 ---
 # The prompt sent to every provider. {{input}} is filled from each test's vars.
-# <CUSTOMISE>: Replace with your agent's system prompt and message format.
+# <CUSTOMISE>: Replace with your agent's system prompt and message format, and point
+# `providers` at your agent (or give each model your tool definitions). As shipped, the
+# models get a bare prompt and no tools, so the tool-routing rubrics below have nothing
+# real to judge until you do.
 prompts:
   - "{{input}}"
 
@@ -158,7 +161,7 @@ outputPath: ./eval-results/results.json
 #   value: "^\\d{3}$"
 #   → Regex match (JavaScript)
 #
-# - type: js
+# - type: javascript
 #   value: "output.length > 10 && output.includes('success')"
 #   → JavaScript expression (output is available as variable)
 #

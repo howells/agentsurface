@@ -71,16 +71,35 @@ import { execute } from "./execute";
 
 ### Error handling (RFC 9457)
 
-Return errors as data, never throw:
+HTTP handlers throw typed errors, and one error handler maps them to RFC 9457 problem
+details served as `application/problem+json`. Validation failures are 422:
+
+```json
+{
+  "type": "https://example.com/errors/validation",
+  "title": "Validation Error",
+  "status": 422,
+  "detail": "Email is required.",
+  "instance": "/api/users/create",
+  "code": "ERR_VALIDATION",
+  "is_retriable": false,
+  "suggestions": ["Send email as a full address and retry"],
+  "invalid_fields": [
+    { "field": "/email", "reason": "Required field is missing", "expected": "An email address" }
+  ]
+}
+```
+
+Tool handlers return errors as data instead of throwing, with the same member names:
 
 ```typescript
 {
   success: false,
   error: {
-    type: 'validation_error',
-    status: 400,
-    detail: 'Email is required.',
-    instance: '/api/users/create#email',
+    code: 'ERR_VALIDATION',
+    message: 'Email is required.',
+    is_retriable: false,
+    suggestions: ['Pass email as a full address'],
   }
 }
 ```

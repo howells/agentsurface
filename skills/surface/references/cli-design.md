@@ -9,11 +9,11 @@ keyboard.
   bypass, no machine-readable path.
 - **1**: `--json` on some commands, with shapes that differ between commands.
   Non-zero exit codes without distinct meanings.
-- **2**: One JSON envelope on every command; structured errors; a documented
+- **2**: One consistent JSON shape on every command; structured errors; a documented
   exit-code contract with distinct codes; `--dry-run` on every mutation; TTY
   detection; no prompts when flags are given.
 - **3**: Level 2, plus NDJSON streaming for large or paginated results, a
-  `--schema`/`--describe` command dumping parameters, types and required fields,
+  `--help --json` or `describe` output listing parameters, types and required flags,
   input hardening, and a shipped SKILL.md or AGENTS.md. Also required: raw
   payload input (`--payload` or stdin JSON using the API's field names), context
   discipline (`--fields` on reads, default projections smaller than the full
@@ -38,26 +38,37 @@ click, typer, cobra, clap), then:
 <cli> <cmd> --json                   # every command, dry-run for mutations
 <cli> bad-command; echo $?           # usage error code
 <cli> list | cat                     # piped: no ANSI codes or spinner frames
-<cli> --schema; <cli> <cmd> --schema
-<cli> list --ndjson | head -3        # one JSON value per line in the raw output
+<cli> describe; <cli> <cmd> --help --json
+<cli> list --all --json | head -3    # one JSON value per line in the raw output
 ```
 
 Piping `--json` through `jq -c` proves nothing about NDJSON support.
 
 ## The house way
 
-**Envelope.** One shape on every command, one line per object under `--json`:
+**Output.** `--json` on every command, and the same JSON automatically when
+stdout isn't a TTY. Stdout carries the data object itself, the one the API would
+return, with no wrapper: optional fields present as `null`, empty collections as
+`[]`. `--all --json` streams one record per line (NDJSON): records only, no
+array and no summary line, so a failed stream is known by its exit code. A failure writes
+nothing to stdout and one object to stderr:
 
 ```ts
-{ success: boolean; data?: T;
-  error?: { code: string; message: string; details?: object };
-  metadata?: { duration_ms: number; timestamp: string } }
+{ error: string;            // stable snake_case code to branch on
+  message: string;
+  suggestions: string[];    // runnable next commands, most likely first
+  failing_input?: object;
+  invalid_args?: { arg: string; reason: string; received?: string; expected?: string }[];
+  trace_id?: string }       // unhandled failures only
 ```
+
+Canonical: https://agentsurface.dev/docs/cli-design/machine-readable-output and
+https://agentsurface.dev/docs/error-handling/cli-errors.
 
 **Exit codes.** Only 0 (success) and non-zero (failure) are universal. `gh`
 uses 2 for cancellation and 4 for auth; BSD `sysexits.h` (64 usage, 66 no
 input, 69 unavailable, 77 no permission) is a convention some tools borrow. So
-each CLI must publish its own contract in `--help --json` and its skill file.
+each CLI must publish its own contract in its `describe` output and skill file.
 The house contract:
 
 | Code | Meaning                              |
@@ -85,9 +96,12 @@ prompt.
 process listings and shell history. Secrets come from environment variables
 listed in `--help` (`--token <value>  API token (or set $API_TOKEN)`).
 
-**Schema.** `--schema` prints JSON Schema for a command's input and output.
-Zod 4's `z.toJSONSchema()` does this natively; `zod-to-json-schema` is
-unmaintained and Zod 3 only.
+**Schema.** `<cmd> --help --json` prints one command as
+`{ command, description, flags: [{ name, type, required, default?, description }], args }`;
+`<cli> describe` prints the whole tree with groups nested under `commands`. Put
+the result's JSON Schema in `returns`: Zod 4's `z.toJSONSchema()` produces it
+natively; `zod-to-json-schema` is unmaintained and Zod 3 only. Canonical:
+https://agentsurface.dev/docs/cli-design/schema-introspection.
 
 **Hardening.** Resolve paths with `fs.realpath` against the allowed root;
 string checks for `..` miss symlinks. Reject encoded separators (`%2e`, `%2f`,

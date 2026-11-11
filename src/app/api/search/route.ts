@@ -11,15 +11,20 @@ const { GET: searchGET } = searchServer;
  * Wrapped only to attach the site-wide Content-Signal header.
  */
 export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const instance = url.pathname + url.search;
   let response: Response;
   try {
     response = await searchGET(request);
-  } catch {
+  } catch (error) {
+    console.error("Search dialog request failed", error);
     return apiError(
       500,
       "SEARCH_FAILED",
       "Search is temporarily unavailable",
       "Retry later or read /llms.txt.",
+      instance,
+      true,
     );
   }
   if (!response.ok) {
@@ -28,6 +33,7 @@ export async function GET(request: Request): Promise<Response> {
       "SEARCH_REQUEST_FAILED",
       "Search request failed",
       "Use /api/docs/search?query=discovery for the documented search API.",
+      instance,
     );
   }
   const headers = new Headers(response.headers);

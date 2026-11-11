@@ -28,6 +28,10 @@ _Avoid_: Agent generator, application scaffolder
 A diagnostic summary of evidence and judgment about a system's agent surface.
 _Avoid_: Certification, conformance report
 
+**Markdown twin**:
+The Markdown representation of a page, served at `<path>.md` or for `Accept: text/markdown`, with the same content as the HTML.
+_Avoid_: Markdown mirror, text version
+
 **agent-building inventory**:
 The secondary part of the site: condensed current practice and a curated list of tools for teams building their own agents. It sits outside the guide and the surface skill.
 _Avoid_: Core guidance, agent framework

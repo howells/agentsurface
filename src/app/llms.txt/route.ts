@@ -1,3 +1,4 @@
+import { FULL_EXPORT_SIZE, SITE_ORIGIN } from "@/lib/site";
 import { estimateTokens } from "@/lib/markdown";
 import { guideSource } from "@/lib/guide-source";
 import { source } from "@/lib/source";
@@ -5,9 +6,6 @@ import { NextResponse } from "next/server";
 
 export const revalidate = false;
 
-const SITE_ORIGIN = "https://agentsurface.dev";
-
-// Hand-curated summary carried over from the previous static public/llms.txt.
 const SUMMARY =
   "Agent Surface is a practical guide and implementation kit for making software readable by AI agents and for building production-grade agent systems. It covers agent-readable surfaces, discovery, APIs, tools, MCP, auth, errors, retrieval, multi-agent orchestration, evaluation, runtime boundaries, UI, and current agent protocols.";
 
@@ -33,7 +31,7 @@ const ENTRY_POINTS: string[] = [
   `- [Docs index](${SITE_ORIGIN}/docs/llms.txt): The docs page tree on its own, without these entry points.`,
   `- [API index](${SITE_ORIGIN}/api/llms.txt): The documentation API's two operations, with examples.`,
   `- [Build agents index](${SITE_ORIGIN}/docs/agents/llms.txt): Only the pages for teams building agents of their own.`,
-  `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Opt-in bulk export for offline indexing, roughly 1.9 MB and 470,000 estimated tokens (characters / 4). Prefer search or individual pages for normal reading.`,
+  `- [Full docs export](${SITE_ORIGIN}/llms-full.txt): Opt-in bulk export for offline indexing, ${FULL_EXPORT_SIZE} (characters / 4). Prefer search or individual pages for normal reading.`,
   `- [Homepage as Markdown](${SITE_ORIGIN}/index.md): The homepage guide (also served for \`Accept: text/markdown\` or \`/?mode=agent\`).`,
   `- [Any docs page as Markdown](${SITE_ORIGIN}/docs.md): Append \`.md\` to a docs URL, e.g. \`/docs/discovery/llms-txt.md\`, or send \`Accept: text/markdown\`.`,
   `- [Markdown API](${SITE_ORIGIN}/api/md/index): Raw Markdown endpoint. Replace \`index\` with any docs slug, for example \`discovery/llms-txt\`.`,
@@ -57,8 +55,7 @@ export async function GET() {
     )
     .join("\n");
 
-  // Only essays that have actually been written land here; the other writer
-  // finishes them one at a time, so this list can be a subset of the eight areas.
+  // Only published essays are listed, so this can be a subset of the guide areas.
   const guidePages = guideSource
     .getPages()
     .map((page) => `- [${page.data.title}](${SITE_ORIGIN}${page.url}.md): ${page.data.description}`)

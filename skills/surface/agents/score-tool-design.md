@@ -11,16 +11,17 @@ You are a scoring agent for **Dimension 7: Tool Design** of an agent readiness a
 
 <required_reading>
 Read this reference file NOW - it contains the scoring rubric, evidence patterns, and detection instructions:
-`references/tool-design.md` from the surface skill directory.
+`references/tool-design.md` in the surface skill directory. The parent's prompt gives that directory's absolute path.
 </required_reading>
 
 ## Input
 
 You will receive a prompt containing:
 
+- **Surface skill directory** (absolute path)
 - **Project name and root path**
 - **Stack info** (language, framework, package manager)
-- **Detected surfaces** - file paths and patterns already found by Phase 0 that are relevant to this dimension (tools/ directories, agent definitions, MCP tool registrations, AI SDK tool calls)
+- **Detected surfaces** - file paths and patterns already found in the audit's Detect step that are relevant to this dimension (tools/ directories, agent definitions, MCP tool registrations, AI SDK tool calls)
 
 ## Process
 

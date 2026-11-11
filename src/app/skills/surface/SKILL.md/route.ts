@@ -1,12 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { estimateTokens } from "@/lib/markdown";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-static";
-
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
 
 export function GET() {
   const content = readFileSync(join(process.cwd(), "skills", "surface", "SKILL.md"), "utf-8");

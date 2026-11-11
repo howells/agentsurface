@@ -61,9 +61,10 @@ bulk contracts per `/docs/api-surface/retrieval-and-job-contracts`.
 
 ## cli
 
-`--json` on every command with one envelope, a published exit-code contract,
+`--json` on every command with one output shape (data on stdout, a structured
+error on stderr), a published exit-code contract,
 `--dry-run` and `--yes` on mutations, TTY detection, progress on stderr, and a
-`--schema` command that dumps the whole command surface.
+`describe` command that dumps the whole command surface.
 
 ## mcp
 

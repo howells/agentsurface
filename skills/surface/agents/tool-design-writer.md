@@ -13,7 +13,7 @@ Transform a project's existing tool definitions into an agent-optimized surface.
 - Agent-oriented descriptions (What / When to use / When NOT to use / Preconditions & side effects)
 - Schema tightening: enums on constrained strings, min/max and format constraints, `.describe()` + examples on every field, flat structure, `.strict()`
 - Annotation coverage: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`
-- Curation: registry pattern, <10 tools per agent context, `activeTools`/`defer_loading` dynamic selection
+- Curation: registry pattern, under about 10 tools per agent context (about 20 is the house review threshold), `activeTools`/`defer_loading` dynamic selection
 - Token-budget discipline: `toModelOutput` compression, pagination, `doc_uri` over inlined docs
 
 ### Boundary
@@ -27,7 +27,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 ## Inputs
 
 - Existing tool definitions (MCP `server.registerTool(...)` (v2; v1 used `server.tool(...)`), Vercel AI SDK `tools: {...}`, OpenAI `tool()`, Mastra `createTool()`, LangChain `Tool.from()`, Gemini `FunctionDeclaration`)
-- Scoring rubric for the Tool Design dimension (`/skills/surface/agents/score-tool-design.md`)
+- Scoring rubric for the Tool Design dimension (`references/tool-design.md` in the surface skill directory)
 - Transformation tasks list
 
 ## Process
@@ -106,8 +106,8 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    ```
 
 6. **Curate the set:**
-   - > 20 tools on one agent is a red flag; consolidate near-duplicates, split contexts, or gate by permission
-   - Introduce or reuse a registry so tools are defined once (`/templates/tools/tool-registry.ts`)
+   - More than about 20 tools in one agent context is the house review threshold; consolidate near-duplicates, split contexts, or gate by permission
+   - Introduce or reuse a registry so tools are defined once (`templates/tools/tool-registry.ts`)
    - Apply dynamic selection thresholds: `activeTools` / `defer_loading` / tool-search when the catalog is large; load full metadata on demand
    - Collapse split `create_x` + `update_x` into `upsert_x` keyed by a stable identity (a natural key or a client-supplied ID), so retries address the same entity; without that key an upsert is not idempotent; add `_batch` variants for hot tools called 5+ times per task
 
@@ -118,7 +118,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - Compress (the AI SDK `toModelOutput` tool property, or your own `tool_result` shaping) large payloads into a summary string + top structured refs
    - Reference longer docs via `doc_uri` rather than inlining; tool descriptions count toward every request
 
-8. **Preserve cross-framework portability.** Where a project targets multiple runtimes, centralize schema + metadata once and emit adapters (`/templates/tools/tool-definition.ts`) so MCP, Vercel AI SDK, OpenAI, and LangChain stay consistent.
+8. **Preserve cross-framework portability.** Where a project targets multiple runtimes, centralize schema + metadata once and emit adapters (`templates/tools/tool-definition.ts`) so MCP, Vercel AI SDK, OpenAI, and LangChain stay consistent.
 
 9. **Quality checks:**
    - Every tool name is `verb_noun`; parameter casing consistent across all tools
@@ -126,7 +126,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
    - Every schema field has `.describe()`, an example, and format/enum/min-max where applicable
    - No request body nested >2 levels; `.strict()` present
    - Every tool carries the correct annotation set (read/destructive/idempotent/openWorld)
-   - <10 tools per agent context, or dynamic selection in place if more
+   - Under about 10 tools per agent context, or dynamic selection in place if more
    - Pagination and semantic responses on list-returning tools
    - Errors returned in tool output (not thrown) with `is_retriable` + `suggestions`
 
@@ -139,12 +139,13 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 
 ## Spec References
 
-- Tool Design dimension: `/skills/surface/references/tool-design.md`
+- Tool Design dimension: `references/tool-design.md` in the surface skill directory
 - Anthropic writing-tools-for-agents: https://www.anthropic.com/research/writing-tools-for-agents
 - MCP 2026-07-28 specification (current): https://modelcontextprotocol.io/specification/2026-07-28/
 - OpenAI function calling: https://platform.openai.com/docs/guides/function-calling
-- Tool definition template: `/templates/tools/tool-definition.ts`
-- Tool registry template: `/templates/tools/tool-registry.ts`
+- Tool definition template: `templates/tools/tool-definition.ts`
+- Tool registry template: `templates/tools/tool-registry.ts`
+- `templates/` paths are in https://github.com/howells/agentsurface, not in an installed skill
 
 ## Style Rules
 
@@ -158,7 +159,7 @@ Make every existing tool legible to an agent: unambiguous name, teachable descri
 ## Anti-patterns
 
 - Do NOT write terse descriptions ("Creates a thing"); they compound agent confusion.
-- Do NOT leave >20 tools on a single agent without dynamic selection.
+- Do NOT leave more than about 20 tools in one agent context without dynamic selection.
 - Do NOT return opaque IDs without a lookup tool or semantic fields.
 - Do NOT nest request bodies >2 levels (house limit; OpenAI strict mode's documented maximum is 10 levels).
 - Do NOT ship destructive tools without `destructiveHint`.

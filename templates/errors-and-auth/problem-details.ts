@@ -4,30 +4,33 @@
  * Use: Define structured error responses for HTTP APIs and CLI tools
  *
  * <CUSTOMISE>
- * - Extend `type` URI to your domain: "https://api.yourservice.com/errors/..."
- * - Set `doc_uri` to your error documentation landing page
+ * - Set ERROR_TYPE_BASE and ERROR_DOC_BASE to your own domain
  * - Add domain-specific error codes to the `code` enum
  * </CUSTOMISE>
  */
 
 import { z } from "zod";
 
+/** <CUSTOMISE> Base of the `type` URIs. Each code maps to one stable URI under it. */
+const ERROR_TYPE_BASE = "https://api.example.com/errors";
+/** <CUSTOMISE> Page that documents each error code. */
+const ERROR_DOC_BASE = "https://api.example.com/docs/errors";
+
+/** One failed input field in a validation error. */
+const InvalidFieldSchema = z.object({
+  field: z.string().describe('JSON Pointer to the failing field (e.g., "/email", "/address/zip")'),
+  reason: z.string().describe("Why the value was rejected"),
+  received: z.unknown().optional().describe("The value that was sent, when safe to echo"),
+  expected: z.string().optional().describe("What a correct value looks like"),
+});
+
+export type InvalidField = z.infer<typeof InvalidFieldSchema>;
+
 /**
  * RFC 9457 core fields: type, title, status, detail, instance
  * Plus agent-oriented extensions: is_retriable, retry_after_ms, doc_uri, trace_id, suggestions,
- * fields (field-level validation errors) and errors (nested Problem Details for batches)
+ * invalid_fields (field-level validation errors) and errors (nested Problem Details for batches)
  */
-const ErrorSuggestion = z.object({
-  action: z.string().describe("Recovery action the agent can take"),
-  payload: z.unknown().optional().describe("Structured data for the action"),
-});
-
-const ErrorField = z.object({
-  code: z.string().describe("Validation error code"),
-  field: z.string().describe('Field path (e.g., "email", "address.zipCode")'),
-  message: z.string().describe("Human-readable error message"),
-});
-
 export const ProblemDetails = z.strictObject({
   // RFC 9457 core (5 members)
   type: z
@@ -64,8 +67,14 @@ export const ProblemDetails = z.strictObject({
   doc_uri: z.string().url().optional().describe("Link to detailed error documentation"),
   trace_id: z.string().optional().describe("Correlation ID for server logs"),
 
-  suggestions: z.array(ErrorSuggestion).optional().describe("Recovery actions the agent can take"),
-  fields: z.array(ErrorField).optional().describe("Validation errors for individual fields"),
+  suggestions: z
+    .array(z.string())
+    .optional()
+    .describe("Ordered recovery steps; the first is the most likely fix"),
+  invalid_fields: z
+    .array(InvalidFieldSchema)
+    .optional()
+    .describe("Validation errors for individual fields"),
   // Zod 4 recursive schema: a getter keeps z.infer working under strict TypeScript
   get errors() {
     return z
@@ -80,6 +89,16 @@ export type ProblemDetailsType = z.infer<typeof ProblemDetails>;
 /** Machine-readable domain codes accepted in the `code` member. */
 export type ProblemCode = NonNullable<ProblemDetailsType["code"]>;
 
+/** Stable `type` URI for a code: ERR_RATE_LIMITED -> <base>/rate-limited. */
+export function problemType(code: ProblemCode): string {
+  return `${ERROR_TYPE_BASE}/${code.slice("ERR_".length).toLowerCase().replaceAll("_", "-")}`;
+}
+
+/** Documentation link for a code. */
+export function problemDocUri(code: ProblemCode): string {
+  return `${ERROR_DOC_BASE}#${code}`;
+}
+
 /**
  * Helper to construct a ProblemDetails response
  */
@@ -89,7 +108,7 @@ export function problemDetails(init: Partial<ProblemDetailsType>): ProblemDetail
     detail: init.detail ?? "",
     doc_uri: init.doc_uri,
     errors: init.errors,
-    fields: init.fields,
+    invalid_fields: init.invalid_fields,
     instance: init.instance,
     is_retriable: init.is_retriable,
     retry_after_ms: init.retry_after_ms,
@@ -105,41 +124,27 @@ export function problemDetails(init: Partial<ProblemDetailsType>): ProblemDetail
  * Type guard: is this object a valid ProblemDetails?
  */
 export function isProblemDetails(x: unknown): x is ProblemDetailsType {
-  try {
-    ProblemDetails.parse(x);
-    return true;
-  } catch {
-    return false;
-  }
+  return ProblemDetails.safeParse(x).success;
 }
 
 /**
- * Convert a thrown Error to a RFC 9457 response
- * <CUSTOMISE> Map your domain errors to appropriate status codes and is_retriable flags
+ * Problem for an error the service did not anticipate.
+ *
+ * The body never carries the exception text: database, upstream and library
+ * messages leak internals. Log the error server-side under `traceId` and let the
+ * caller quote that id. It is not marked retriable, because an unknown failure on
+ * a non-idempotent request may already have taken effect.
  */
-export function toProblemResponse(
-  err: Error | unknown,
-  options?: {
-    status?: number;
-    traceId?: string;
-    docUri?: string;
-  },
-): ProblemDetailsType {
-  const message = err instanceof Error ? err.message : String(err);
-  const isNetworkError = message.includes("timeout") || message.includes("ECONNREFUSED");
-  const isValidationError = message.includes("validation") || message.includes("invalid");
-
+export function internalProblem(traceId?: string): ProblemDetailsType {
   return problemDetails({
-    detail: message,
-    doc_uri: options?.docUri,
-    is_retriable: isNetworkError,
-    retry_after_ms: isNetworkError ? 1000 : undefined,
-    status: options?.status ?? (isValidationError ? 422 : 500),
-    title: isValidationError ? "Validation Error" : "Internal Server Error",
-    trace_id: options?.traceId,
-    type: isValidationError
-      ? "https://api.example.com/errors/validation"
-      : "https://api.example.com/errors/internal",
+    code: "ERR_INTERNAL",
+    detail: "The server hit an unexpected error. Quote trace_id when reporting it.",
+    doc_uri: problemDocUri("ERR_INTERNAL"),
+    is_retriable: false,
+    status: 500,
+    title: "Internal Server Error",
+    trace_id: traceId,
+    type: problemType("ERR_INTERNAL"),
   });
 }
 
@@ -147,26 +152,22 @@ export function toProblemResponse(
  * Helper to build a 429 Rate Limited response
  */
 export function rateLimitError(opts: {
-  remaining: number;
   limit: number;
+  /** Epoch milliseconds at which the quota resets. */
   resetAt: number;
   traceId?: string;
 }): ProblemDetailsType {
   const waitMs = Math.max(100, opts.resetAt - Date.now());
   return problemDetails({
     code: "ERR_RATE_LIMITED",
-    detail: `You have exceeded your ${opts.limit} requests-per-minute quota.`,
+    detail: `You have exceeded your quota of ${opts.limit} requests.`,
+    doc_uri: problemDocUri("ERR_RATE_LIMITED"),
     is_retriable: true,
     retry_after_ms: waitMs,
     status: 429,
-    suggestions: [
-      {
-        action: "wait_and_retry",
-        payload: { wait_ms: waitMs },
-      },
-    ],
+    suggestions: [`Wait ${Math.ceil(waitMs / 1000)} seconds, then retry the same request.`],
     title: "Rate Limit Exceeded",
     trace_id: opts.traceId,
-    type: "https://api.example.com/errors/rate-limited",
+    type: problemType("ERR_RATE_LIMITED"),
   });
 }

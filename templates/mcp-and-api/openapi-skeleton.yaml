@@ -5,7 +5,9 @@
 # Error format: application/problem+json per RFC 9457
 # Authentication: OAuth 2.1 Bearer + DPoP (RFC 9449)
 # Pagination: cursor-based (token), not offset
-# Rate limits: RateLimit-* headers (draft-ietf-httpapi-ratelimit-headers-11), not X-RateLimit-*
+# Rate limits: RateLimit and RateLimit-Policy (draft-ietf-httpapi-ratelimit-headers-11) plus
+#   Retry-After, not X-RateLimit-*
+# Idempotency: Idempotency-Key header on every POST, PATCH and DELETE
 #
 # When to use this:
 # - New REST APIs targeting agent consumers
@@ -17,7 +19,7 @@
 # ✓ Set servers[] to actual endpoint URLs
 # ✓ Replace Agent resource with your domain entity
 # ✓ Add per-operation examples in x-agent-examples
-# ✓ Implement error responses (400, 401, 403, 404, 409, 429, 500)
+# ✓ Implement error responses (400, 401, 403, 404, 409, 422, 429, 500)
 # ✓ Add x-rate-limit vendor extension with actual limits
 # ✓ Validate YAML with Redocly linter: redocly lint openapi.yaml
 
@@ -113,8 +115,7 @@ paths:
                     example: 42
                     description: Total number of agents matching filters
                   page_token:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     example: "cursor_def456"
                     description: Opaque token for next page, null if no more results
                   has_more:
@@ -122,10 +123,10 @@ paths:
                     example: true
                     description: True if more results available
                 required: [data, total, has_more]
-        "400":
-          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
         "429":
           $ref: "#/components/responses/TooManyRequests"
       x-agent-examples:
@@ -152,10 +153,12 @@ paths:
         **Use when:** you need to create a new agent to handle a specific task or workflow.
         **Do not use for:** updating an existing agent (use `update_agent` instead).
         **Prerequisites:** Bearer token with `agents:write` scope.
-        **Idempotency:** Idempotent for 24 hours using `idempotency_key` header.
-        **Returns:** 201 Created with full agent object.
+        **Idempotency:** Send an `Idempotency-Key` header. A retry with the same key and body within 24 hours returns the first response instead of creating a second agent.
+        **Returns:** 201 Created with full agent object. New agents start in `draft` status.
       tags:
         - Agents
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -175,6 +178,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
         "429":
           $ref: "#/components/responses/TooManyRequests"
       x-agent-examples:
@@ -236,7 +241,7 @@ paths:
         **Use when:** you need to modify an agent's name, description, or settings.
         **Do not use for:** replacing the entire agent (use DELETE + POST instead).
         **Prerequisites:** Bearer token with `agents:write` scope and ownership of agent.
-        **Idempotency:** Idempotent for 24 hours using `idempotency_key` header.
+        **Idempotency:** Send an `Idempotency-Key` header. A retry with the same key and body within 24 hours returns the first response.
       tags:
         - Agents
       parameters:
@@ -246,6 +251,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -269,6 +275,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
       x-openai-isConsequential: false
 
     delete:
@@ -280,7 +288,7 @@ paths:
         **Use when:** an agent is no longer needed.
         **Prerequisites:** Bearer token with `agents:delete` scope and ownership.
         **Caution:** Deleted agents cannot be recovered after 30 days.
-        **Idempotent:** Subsequent deletes of already-deleted agents return 404.
+        **Idempotency:** Send an `Idempotency-Key` header. A retry with the same key within 24 hours returns the first response (204). A delete under a new key of an already-deleted agent returns 404.
       tags:
         - Agents
       parameters:
@@ -290,6 +298,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
           description: Agent deleted successfully
@@ -312,6 +321,7 @@ paths:
         **Prerequisites:** Bearer token with `agents:execute` scope. Agent must be in 'active' status.
         **Execution model:** Asynchronous. Returns immediately with execution ID; poll status with `get_execution`.
         **Timeout:** Executions timeout after 1 hour.
+        **Idempotency:** Send an `Idempotency-Key` header. A retry with the same key and body within 24 hours returns the first execution instead of starting another.
       tags:
         - Agents
       parameters:
@@ -321,6 +331,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -370,6 +381,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
         "429":
           $ref: "#/components/responses/TooManyRequests"
       x-agent-examples:
@@ -421,21 +434,19 @@ paths:
                     type: string
                     enum: [pending, running, completed, failed, cancelled]
                   result:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     description: Output from the agent (null if not completed)
                   error:
-                    type: object
-                    nullable: true
-                    $ref: "#/components/schemas/ErrorResponse"
+                    description: Why the execution failed (null unless status is failed)
+                    oneOf:
+                      - $ref: "#/components/schemas/ErrorResponse"
+                      - type: "null"
                   started_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                   completed_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 required: [execution_id, status, started_at, completed_at]
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -445,6 +456,21 @@ paths:
           $ref: "#/components/responses/NotFound"
 
 components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: "8e03978e-40d5-43e8-bc93-6894a57f9324"
+      description: |
+        A random value (a UUID) generated once per logical operation and sent on every attempt.
+        Same key and same request within 24 hours: the first response is replayed. Same key with a
+        different request: 422. A duplicate while the first is still running: 409.
+
   schemas:
     Agent:
       type: object
@@ -548,53 +574,117 @@ components:
 
     ErrorResponse:
       type: object
-      description: RFC 9457 Problem Details for HTTP APIs
+      description: RFC 9457 Problem Details, with the extension members agents use to recover
       properties:
         type:
           type: string
-          format: uri
-          example: "https://api.example.com/errors/validation-failed"
-          description: Machine-readable error type URI
+          format: uri-reference
+          example: "https://api.example.com/errors/validation"
+          description: Stable URI identifying the error type; branch on this, not on title or detail
         title:
           type: string
           example: "Validation Failed"
         status:
           type: integer
-          enum: [400, 401, 403, 404, 409, 429, 500, 503]
-          example: 400
+          minimum: 400
+          maximum: 599
+          example: 422
         detail:
           type: string
           example: "The 'name' field is required and must be 1-100 characters"
         instance:
           type: string
+          example: "/agents"
+          description: URI reference identifying this occurrence
+        code:
+          type: string
+          example: "ERR_VALIDATION"
+          description: Machine-readable domain code
+        is_retriable:
+          type: boolean
+          example: false
+          description: True if retrying the same request unchanged might succeed
+        retry_after_ms:
+          type: integer
+          minimum: 1
+          description: Milliseconds to wait before retrying
+        doc_uri:
+          type: string
+          format: uri
+          description: Link to documentation for this error
+        trace_id:
+          type: string
           example: "req-abc123"
-          description: Request or occurrence identifier for debugging
+          description: Correlation ID to quote when reporting the error
         suggestions:
           type: array
           items:
             type: string
           example:
-            - "Ensure the agent name is provided"
-            - "Try again in 60 seconds"
-          description: Actionable suggestions for recovery
+            - "Provide a name between 1 and 100 characters"
+          description: Ordered recovery steps; the first is the most likely fix
+        invalid_fields:
+          type: array
+          description: Validation errors for individual fields (422 only)
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "/name"
+                description: JSON Pointer to the failing field
+              reason:
+                type: string
+                example: "Required field is missing"
+              received:
+                description: The value that was sent, when safe to echo
+              expected:
+                type: string
+                example: "A name between 1 and 100 characters"
+            required: [field, reason]
       required: [type, title, status, detail]
 
   responses:
     BadRequest:
-      description: Invalid request parameters or body
+      description: The request could not be read (malformed JSON, missing Idempotency-Key)
       content:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            type: "https://api.example.com/errors/validation-failed"
-            title: "Validation Failed"
+            type: "https://api.example.com/errors/missing-idempotency-key"
+            title: "Missing Idempotency Key"
             status: 400
-            detail: "Parameter 'limit' must be between 1 and 100"
-            instance: "req-123"
+            detail: "The Idempotency-Key header is required for POST requests"
+            is_retriable: false
+
+    ValidationFailed:
+      description: The request was read but a parameter or body field is invalid
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            type: "https://api.example.com/errors/validation"
+            title: "Validation Failed"
+            status: 422
+            detail: "One or more validation errors occurred"
+            code: "ERR_VALIDATION"
+            is_retriable: false
+            trace_id: "req-123"
+            invalid_fields:
+              - field: "/limit"
+                reason: "Must be between 1 and 100"
+                received: 500
+                expected: "An integer from 1 to 100"
 
     Unauthorized:
       description: Missing or invalid authentication token
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          description: Bearer challenge (RFC 6750), with resource_metadata (RFC 9728)
       content:
         application/problem+json:
           schema:
@@ -604,7 +694,9 @@ components:
             title: "Unauthorized"
             status: 401
             detail: "Bearer token missing or expired"
-            instance: "req-456"
+            code: "ERR_UNAUTHORIZED"
+            is_retriable: false
+            trace_id: "req-456"
 
     Forbidden:
       description: Authenticated but lacks permission for this resource
@@ -617,7 +709,9 @@ components:
             title: "Forbidden"
             status: 403
             detail: "You do not have permission to modify this agent"
-            instance: "req-789"
+            code: "ERR_FORBIDDEN"
+            is_retriable: false
+            trace_id: "req-789"
 
     NotFound:
       description: Resource not found
@@ -630,10 +724,12 @@ components:
             title: "Not Found"
             status: 404
             detail: "Agent with ID 550e8400-e29b-41d4-a716-446655440000 not found"
-            instance: "req-999"
+            code: "ERR_NOT_FOUND"
+            is_retriable: false
+            trace_id: "req-999"
 
     Conflict:
-      description: Resource already exists or version conflict
+      description: Resource already exists, version conflict, or a request with the same Idempotency-Key is still running
       content:
         application/problem+json:
           schema:
@@ -643,23 +739,23 @@ components:
             title: "Conflict"
             status: 409
             detail: "Agent with name 'Support Analyzer' already exists"
-            instance: "req-111"
+            code: "ERR_CONFLICT"
+            is_retriable: false
+            trace_id: "req-111"
 
     TooManyRequests:
       description: Rate limit exceeded
       headers:
-        RateLimit-Limit:
+        RateLimit:
           schema:
-            type: integer
-          description: Maximum requests per minute
-        RateLimit-Remaining:
+            type: string
+          example: '"default";r=0;t=30'
+          description: Remaining quota (r) and seconds until it resets (t), per draft-ietf-httpapi-ratelimit-headers-11
+        RateLimit-Policy:
           schema:
-            type: integer
-          description: Requests remaining in this minute
-        RateLimit-Reset:
-          schema:
-            type: integer
-          description: Seconds until the current window resets (delta-seconds, per draft-ietf-httpapi-ratelimit-headers-11)
+            type: string
+          example: '"default";q=100;w=60'
+          description: Quota (q) and window in seconds (w)
         Retry-After:
           schema:
             type: integer
@@ -669,14 +765,16 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            type: "https://api.example.com/errors/rate-limit"
-            title: "Too Many Requests"
+            type: "https://api.example.com/errors/rate-limited"
+            title: "Rate Limit Exceeded"
             status: 429
-            detail: "Rate limit exceeded: 100 requests per minute"
-            instance: "req-222"
+            detail: "You have exceeded your quota of 100 requests."
+            code: "ERR_RATE_LIMITED"
+            is_retriable: true
+            retry_after_ms: 30000
+            trace_id: "req-222"
             suggestions:
-              - "Wait at least 30 seconds before retrying"
-              - "Consider batching requests"
+              - "Wait 30 seconds, then retry the same request."
 
   securitySchemes:
     BearerAuth:
@@ -689,7 +787,10 @@ components:
         Obtain via Client Credentials flow:
         ```
         POST /oauth/token
-        grant_type=client_credentials&client_id=...&client_secret=...
+        Authorization: Basic <base64(client_id:client_secret)>
+        Content-Type: application/x-www-form-urlencoded
+
+        grant_type=client_credentials
         ```
 
         Include in request:

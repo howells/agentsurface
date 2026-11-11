@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { apiError } from "@/lib/api-error";
 import { searchInput } from "@/lib/retrieval-contract";
 import { retrieveDocs } from "@/lib/search";
@@ -25,12 +26,13 @@ export async function GET(request: Request) {
   }
   try {
     return Response.json(await retrieveDocs(input.data));
-  } catch {
+  } catch (error) {
+    console.error("Documentation search failed", error);
     return apiError(
       500,
       "SEARCH_FAILED",
       "Search is temporarily unavailable",
-      "Retry later or read https://agentsurface.dev/llms.txt to find documentation pages.",
+      `Retry later or read ${SITE_ORIGIN}/llms.txt to find documentation pages.`,
       instance,
       true,
     );

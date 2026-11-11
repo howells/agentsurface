@@ -1,19 +1,19 @@
 ---
 name: error-designer
-description: Implement RFC 9457 Problem Details + agent extensions (is_retriable, retry_after_ms, doc_uri, trace_id, suggestions, errors[]) with idempotency middleware
+description: Implement RFC 9457 Problem Details + agent extensions (code, is_retriable, retry_after_ms, suggestions, invalid_fields, doc_uri, trace_id) with idempotency middleware
 model: sonnet
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Transform error handling into structured agent recovery guidance. Implement RFC 9457 Problem Details format with agent-specific extensions: is_retriable, retry_after_ms, suggestions[], errors[], doc_uri, and trace_id. Add idempotency middleware to prevent duplicate side effects.
+Transform error handling into structured agent recovery guidance. Implement RFC 9457 Problem Details format with agent-specific extensions: code, is_retriable, retry_after_ms, suggestions[], invalid_fields[], doc_uri, and trace_id. Add idempotency middleware to prevent duplicate side effects.
 
 - RFC 9457 Problem Details (Content-Type: application/problem+json)
-- Agent extensions: is_retriable, retry_after_ms, suggestions[], errors[], trace_id, doc_uri
+- Agent extensions: code, is_retriable, retry_after_ms, suggestions[], invalid_fields[], trace_id, doc_uri (flat at the root, never under `error`)
 - Idempotency middleware (Idempotency-Key header, IETF draft-ietf-httpapi-idempotency-key-header, not yet an RFC)
 - Rate-limit headers on all responses (X-RateLimit-\*, Retry-After)
-- Semantic exit codes (CLI): 0=ok, 2=usage, 3=notfound, 4=perm, 5=conflict
+- Semantic exit codes (CLI): 0=ok, 1=failure, 2=usage, 3=notfound, 4=perm, 5=conflict
 - No stack traces, internal paths, or sensitive data in responses
 
 ## Mission
@@ -36,7 +36,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      // profile requires these four.
      type: string; // URI identifying error type (e.g., https://example.com/errors/invalid-user)
      title: string; // Short summary (e.g., "User Not Found")
-     status: number; // HTTP status code (400, 404, 429, etc.)
+     status: number; // HTTP status code (404, 422, 429, etc.)
      detail: string; // Specific explanation with context
 
      // Optional RFC 9457
@@ -46,16 +46,17 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      is_retriable: boolean; // Should agent retry?
      retry_after_ms?: number; // When to retry (milliseconds)
      suggestions: string[]; // Concrete recovery steps
-     fields?: Array<{
+     invalid_fields?: Array<{
        // Field-level validation errors
-       path: string; // JSON path: "users[0].email"
-       message: string;
-       constraint?: string; // "format:email", "length:1-100"
+       field: string; // JSON Pointer: "/users/0/email"
+       reason: string; // Why the value was rejected
+       received?: unknown; // The value sent, when safe to echo
+       expected?: string; // What a correct value looks like
      }>;
      errors?: ProblemDetails[]; // Nested problems for batch operations
      doc_uri?: string; // Link to error docs
      trace_id: string; // Correlation ID, e.g. the W3C trace ID (32 lowercase hex characters)
-     code?: string; // Domain-specific code (e.g., "USER_NOT_FOUND")
+     code: string; // Short domain code for switch statements (e.g., "ERR_USER_NOT_FOUND")
    }
    ```
 
@@ -78,17 +79,17 @@ Make every error actionable for agents. Each error is a prompt containing the ag
        problem = {
          type: "https://example.com/errors/validation-failed",
          title: "Validation Failed",
-         status: 400,
+         status: 422,
          detail: "Request did not match schema",
+         code: "ERR_VALIDATION",
          is_retriable: false,
          suggestions: [
            "Check field types against schema",
-           "See error details for per-field constraints",
+           "See invalid_fields for the reason each value was rejected",
          ],
-         fields: err.issues.map((i) => ({
-           path: i.path.join("."),
-           message: i.message,
-           constraint: i.code,
+         invalid_fields: err.issues.map((i) => ({
+           field: `/${i.path.join("/")}`,
+           reason: i.message,
          })),
          doc_uri: "https://docs.example.com/api/validation",
          trace_id: traceId,
@@ -99,6 +100,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          title: "Resource Not Found",
          status: 404,
          detail: `${err.resource} with id ${err.id} not found`,
+         code: "ERR_NOT_FOUND",
          is_retriable: false,
          suggestions: [
            "Use list endpoint to find valid IDs",
@@ -118,7 +120,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          suggestions: [`Wait ${err.retryAfter}ms and retry`, "Reduce request frequency"],
          doc_uri: "https://docs.example.com/api/rate-limiting",
          trace_id: traceId,
-         code: "RATE_LIMITED",
+         code: "ERR_RATE_LIMITED",
        };
      } else {
        // Fallback: 500 with no internal details. Not marked retriable: the outcome
@@ -128,6 +130,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          title: "Internal Server Error",
          status: 500,
          detail: "An unexpected error occurred",
+         code: "ERR_INTERNAL",
          is_retriable: false,
          suggestions: [
            "Check whether the operation took effect before retrying",
@@ -161,10 +164,10 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 4. **Implement idempotency middleware** (prevent duplicate side effects):
    - Accept `Idempotency-Key: "<uuid>"` on non-idempotent mutations (POST, and PATCH where needed). draft-ietf-httpapi-idempotency-key-header-08 makes the value a quoted Structured Field String; document whether you also accept unquoted keys
    - Reserve the key atomically before running the handler, namespaced by authenticated principal and operation
-   - Store the response with a request-body fingerprint for a published retention window (24h is common)
+   - Store the response with a request-body fingerprint for a published retention window (24 hours is typical)
    - Same key, same body: return cached response + `Idempotency-Replayed: true`. Same key, different body: `422`. Still in flight: `409`
    - Authorise the request before looking up the key, and preserve the original status and headers on replay
-   - Starting point: [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) implements atomic reservation, a renewed and fenced in-flight lease, fingerprinting, recorded failures (a thrown error is stored as outcome-unknown, not released) and byte-exact replay. Decide per endpoint which failures certainly had no effect and call `releaseIdempotencyKey` for those. Do not ship a simpler unscoped cache: atomic reservation and body matching are correctness properties, not production polish.
+   - Starting point: [`templates/errors-and-auth/idempotency-middleware.ts`](https://github.com/howells/agentsurface/blob/main/templates/errors-and-auth/idempotency-middleware.ts) exports `withIdempotency(handler, { getPrincipalId })`, where `getPrincipalId` resolves the caller from verified auth, and needs `REDIS_URL`. It implements atomic reservation, a renewed and fenced in-flight lease, fingerprinting, recorded failures (a thrown error is stored as outcome-unknown, not released) and byte-exact replay. Decide per endpoint which failures certainly had no effect and call `releaseIdempotencyKey` for those. Do not ship a simpler unscoped cache: atomic reservation and body matching are correctness properties, not production polish.
 
 5. **Recovery-oriented error messages** (suggestions as prompts):
    - **Tool order**: "Cannot delete active subscription. Call cancel_subscription first."
@@ -200,14 +203,14 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      ## Validation Failed
 
      **Type:** `https://example.com/errors/validation-failed`
-     **Status:** 400
+     **Status:** 422
      **Retriable:** No
 
      Occurs when request body/params don't match schema.
 
      **Suggestions:**
 
-     - Check field types (see fields[] for details)
+     - Check field types (see invalid_fields[] for details)
      - Validate against schema: /api/schema
 
      **Example:**
@@ -216,8 +219,14 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      {
        "type": "https://example.com/errors/validation-failed",
        "title": "Validation Failed",
-       "status": 400,
-       "fields": [{ "path": "email", "message": "Invalid email format" }]
+       "status": 422,
+       "invalid_fields": [
+         {
+           "field": "/email",
+           "reason": "Not an email address",
+           "expected": "An address such as user@example.com"
+         }
+       ]
      }
      ```
      ````
@@ -230,7 +239,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
    - Rate-limit headers on all responses (even success)
    - No stack traces, internal paths, or sensitive data
    - trace_id on all errors
-   - Idempotency retention window published (house minimum: 3 minutes)
+   - Idempotency retention window published (24 hours is typical) and enforced by the store's TTL
    - Error docs generated and linked from type URI
 
 ## Outputs

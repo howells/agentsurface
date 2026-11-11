@@ -1,3 +1,4 @@
+import { FULL_EXPORT_SIZE, SITE_ORIGIN } from "@/lib/site";
 import { searchOutput } from "@/lib/retrieval-contract";
 import { z } from "zod";
 
@@ -14,7 +15,7 @@ const specification = {
     description:
       "Public read-only documentation retrieval, without credentials. Search to discover pages, then fetch the canonical Markdown. Compatibility: these unversioned URLs and existing operationIds are stable within API version 1. Additive fields may appear; clients should ignore unknown fields. Breaking changes require a new major version and a documented migration period before retiring an existing route. There is no application quota or rate-limit policy; query and response bounds below apply. Remote MCP uses POST /mcp with protocol 2026-07-28.",
   },
-  servers: [{ url: "https://agentsurface.dev" }],
+  servers: [{ url: SITE_ORIGIN }],
   security: [],
   paths: {
     "/api/docs/search": {
@@ -63,8 +64,7 @@ const specification = {
       get: {
         operationId: "getPage",
         summary: "Read a documentation page as Markdown",
-        description:
-          "Use after searchDocs to read one complete authoritative page. The processed Markdown includes canonical URL, description and freshness metadata where available. Use the result slug verbatim, or index for the documentation home. Missing slugs return a 404 Problem Details document with recovery hints; they do not return an HTML shell. For offline indexing only, the opt-in /llms-full.txt export is roughly 1.9 MB or 470,000 estimated tokens (characters / 4); prefer single pages for normal reading.",
+        description: `Use after searchDocs to read one complete authoritative page. The processed Markdown includes canonical URL, description and freshness metadata where available. Use the result slug verbatim, or index for the documentation home. Missing slugs return a 404 Problem Details document with recovery hints; they do not return an HTML shell. For offline indexing only, the opt-in /llms-full.txt export is ${FULL_EXPORT_SIZE} (characters / 4); prefer single pages for normal reading.`,
         parameters: [
           {
             name: "slug",

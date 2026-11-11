@@ -4,24 +4,32 @@
  * Use: Exchange client_id + client_secret for short-lived access token
  *
  * <CUSTOMISE>
- * - Set TOKEN_ENDPOINT to your IdP's token URL
- * - Configure OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET env vars
- * - Adjust TOKEN_CACHE_TTL and retry parameters
+ * - Set OAUTH_TOKEN_URL, OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET
+ * - Adjust EXPIRY_MARGIN_MS and the retry parameters
+ * - If your IdP only accepts client_secret_post, move the credentials into the body
  * </CUSTOMISE>
  */
 
 interface TokenResponse {
   access_token: string;
   token_type: string;
-  expires_in: number;
+  expires_in?: number;
   scope?: string;
 }
 
 interface CachedToken {
   token: string;
+  /** Epoch milliseconds after which the token is no longer handed out. */
   expiresAt: number;
-  scope?: string;
 }
+
+/** A response that is not worth retrying: the request itself is wrong. */
+class TokenRequestRejected extends Error {}
+
+/** Stop using a token this long before the server says it expires. */
+const EXPIRY_MARGIN_MS = 30_000;
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_MS = 200;
 
 /**
  * OAuth 2.0 Client Credentials client
@@ -31,163 +39,155 @@ export class ClientCredentialsClient {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly scopes: string[];
-  private readonly tokenCache = new Map<string, CachedToken>();
-  private readonly maxRetries: number = 3;
-  private readonly retryBackoffMs: number = 100;
+  private cached: CachedToken | null = null;
+  private pending: Promise<string> | null = null;
 
   constructor(opts: {
     tokenEndpoint: string;
-    clientId?: string;
-    clientSecret?: string;
+    clientId: string;
+    clientSecret: string;
     scopes?: string[];
   }) {
     this.tokenEndpoint = opts.tokenEndpoint;
-    this.clientId = opts.clientId || process.env.OAUTH_CLIENT_ID || "";
-    this.clientSecret = opts.clientSecret || process.env.OAUTH_CLIENT_SECRET || "";
-    this.scopes = opts.scopes || process.env.OAUTH_SCOPE?.split(" ") || [];
-
-    if (!this.clientId || !this.clientSecret) {
-      throw new Error("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET required");
-    }
+    this.clientId = opts.clientId;
+    this.clientSecret = opts.clientSecret;
+    this.scopes = opts.scopes ?? [];
   }
 
   /**
-   * Get a valid access token, using cache if available
+   * Get a valid access token, using the cache if available. Concurrent callers
+   * share one token request.
    */
   async getAccessToken(): Promise<string> {
-    const cacheKey = this.scopes.join(" ") || "default";
-
-    // Check cache
-    const cached = this.tokenCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now() + 30_000) {
-      // If >30s left, use cached token
-      return cached.token;
+    if (this.cached && this.cached.expiresAt > Date.now()) {
+      return this.cached.token;
     }
-
-    // Fetch new token with exponential backoff retry
-    const token = await this.fetchTokenWithRetry();
-    const expiresAt = Date.now() + token.expires_in * 1000 - 30_000; // Refresh 30s early
-
-    this.tokenCache.set(cacheKey, {
-      expiresAt,
-      scope: token.scope,
-      token: token.access_token,
+    this.pending ??= this.refresh().finally(() => {
+      this.pending = null;
     });
+    return this.pending;
+  }
 
+  private async refresh(): Promise<string> {
+    const token = await this.fetchTokenWithRetry();
+    // RFC 6749 makes expires_in optional. Without it the lifetime is unknown, so
+    // the token is used once and not cached.
+    this.cached =
+      token.expires_in === undefined
+        ? null
+        : {
+            expiresAt: Date.now() + token.expires_in * 1000 - EXPIRY_MARGIN_MS,
+            token: token.access_token,
+          };
     return token.access_token;
   }
 
   /**
-   * Fetch token with exponential backoff + jitter
+   * Fetch a token, retrying network failures, 429 and 5xx with exponential
+   * backoff and jitter. A 4xx such as invalid_client fails at once.
    */
   private async fetchTokenWithRetry(): Promise<TokenResponse> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+    for (let attempt = 1; ; attempt++) {
       try {
         return await this.fetchToken();
       } catch (error) {
-        lastError = error as Error;
-        const waitMs = this.retryBackoffMs * 2 ** attempt + Math.random() * 1000;
+        if (error instanceof TokenRequestRejected || attempt === MAX_ATTEMPTS) {
+          throw error;
+        }
+        const backoff = RETRY_BASE_MS * 2 ** (attempt - 1);
+        const waitMs = backoff + Math.random() * backoff;
         console.warn(
-          `[OAuth] Token fetch attempt ${attempt + 1} failed, retrying in ${waitMs}ms: ${lastError.message}`,
+          `[OAuth] Token fetch attempt ${attempt} failed, retrying in ${Math.round(waitMs)}ms`,
+          error,
         );
         await new Promise((resolve) => setTimeout(resolve, waitMs));
       }
     }
-
-    throw new Error(
-      `Failed to fetch access token after ${this.maxRetries} attempts: ${lastError?.message}`,
-    );
   }
 
   /**
-   * POST to token endpoint
+   * POST to the token endpoint. The client authenticates with HTTP Basic, the
+   * method RFC 6749 section 2.3.1 requires servers to support; sending the
+   * secret in the body is NOT RECOMMENDED there.
    */
   private async fetchToken(): Promise<TokenResponse> {
-    const body = new URLSearchParams({
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      grant_type: "client_credentials",
-    });
-
+    const body = new URLSearchParams({ grant_type: "client_credentials" });
     if (this.scopes.length > 0) {
       body.append("scope", this.scopes.join(" "));
     }
 
+    // RFC 6749 section 2.3.1: form-encode each credential, then base64 the pair
+    const credentials = Buffer.from(
+      `${encodeURIComponent(this.clientId)}:${encodeURIComponent(this.clientSecret)}`,
+    ).toString("base64");
+
     const response = await fetch(this.tokenEndpoint, {
       body: body.toString(),
       headers: {
+        Authorization: `Basic ${credentials}`,
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "oauth-client-credentials/1.0",
       },
       method: "POST",
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Token endpoint returned ${response.status}: ${errorBody.slice(0, 200)}`);
+      const message = `Token endpoint returned ${response.status}: ${(await response.text()).slice(0, 200)}`;
+      throw response.status === 429 || response.status >= 500
+        ? new Error(message)
+        : new TokenRequestRejected(message);
     }
 
-    return await (response.json() as Promise<TokenResponse>);
+    return (await response.json()) as TokenResponse;
   }
 
   /**
    * Make an authenticated HTTP request with Authorization header
    */
-  async request<T = unknown>(url: string, options?: RequestInit & { method?: string }): Promise<T> {
-    const token = await this.getAccessToken();
+  async request<T = unknown>(url: string, options?: RequestInit): Promise<T> {
+    const send = async () => {
+      const headers = new Headers(options?.headers);
+      headers.set("Authorization", `Bearer ${await this.getAccessToken()}`);
+      return fetch(url, { ...options, headers });
+    };
 
-    const headers = new Headers(options?.headers || {});
-    headers.set("Authorization", `Bearer ${token}`);
-
-    // Add X-Forwarded-For for tracing (if available)
-    if (process.env.X_FORWARDED_FOR) {
-      headers.set("X-Forwarded-For", process.env.X_FORWARDED_FOR);
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      // Token may have expired server-side; invalidate cache and retry once
-      const cacheKey = this.scopes.join(" ") || "default";
-      this.tokenCache.delete(cacheKey);
-
-      const newToken = await this.getAccessToken();
-      headers.set("Authorization", `Bearer ${newToken}`);
-
-      return await fetch(url, { ...options, headers }).then(async (r) => await r.json());
+    let response = await send();
+    if (response.status === 401) {
+      // The token may have been revoked or expired server-side: drop it and retry
+      // once. A 403 is a permission answer, which a new token does not change.
+      this.cached = null;
+      response = await send();
     }
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
+      throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 200)}`);
     }
 
-    return await (response.json() as Promise<T>);
+    return (await response.json()) as T;
   }
 }
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set`);
+  }
+  return value;
+}
+
 /**
- * Singleton instance for module-level use
+ * Singleton instance for module-level use, configured from OAUTH_TOKEN_URL,
+ * OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET and (optionally) OAUTH_SCOPE.
+ * A missing variable throws.
  */
 let globalClient: ClientCredentialsClient | null = null;
 
-export function getOAuthClient(opts?: {
-  tokenEndpoint?: string;
-  clientId?: string;
-  clientSecret?: string;
-  scopes?: string[];
-}): ClientCredentialsClient {
-  if (!globalClient) {
-    globalClient = new ClientCredentialsClient({
-      tokenEndpoint: process.env.OAUTH_TOKEN_URL || "https://auth.example.com/token",
-      ...opts,
-    });
-  }
+export function getOAuthClient(): ClientCredentialsClient {
+  globalClient ??= new ClientCredentialsClient({
+    clientId: requireEnv("OAUTH_CLIENT_ID"),
+    clientSecret: requireEnv("OAUTH_CLIENT_SECRET"),
+    scopes: process.env.OAUTH_SCOPE?.split(" ").filter(Boolean),
+    tokenEndpoint: requireEnv("OAUTH_TOKEN_URL"),
+  });
   return globalClient;
 }
 
@@ -209,7 +209,7 @@ export function getOAuthClient(opts?: {
  * const data = await client.request<{ users: any[] }>('https://api.example.com/users');
  * console.log(data.users);
  *
- * // Or use singleton
+ * // Or use the singleton, configured from the environment
  * const globalClient = getOAuthClient();
  * const result = await globalClient.request('https://api.example.com/data');
  * ```

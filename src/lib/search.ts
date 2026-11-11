@@ -1,8 +1,7 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { ranking, searchInput } from "@/lib/retrieval-contract";
 import { source } from "@/lib/source";
 import { createFromSource } from "fumadocs-core/search/server";
-
-const BASE_URL = "https://agentsurface.dev";
 
 /**
  * Canonical search server built from the docs source. Indexes title,
@@ -96,7 +95,7 @@ export async function retrieveDocs(input: { query: string; limit?: number; secti
       slug: page.slugs.join("/") || "index",
       snippet: snippet.slice(0, 600),
       title: page.data.title,
-      url: `${BASE_URL}${page.url}`,
+      url: `${SITE_ORIGIN}${page.url}`,
     });
 
     if (results.length > limit) {

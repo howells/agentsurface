@@ -2,7 +2,7 @@
  * tool-definition.ts
  *
  * Canonical pattern for a single, agent-grade tool in TypeScript.
- * Demonstrates one tool exported three ways: (a) raw MCP format, (b) Claude Agent SDK,
+ * Demonstrates one tool exported three ways: (a) an MCP server, (b) the Vercel AI SDK,
  * (c) @openai/agents with strict: true.
  *
  * When to use: Define any tool that an agent will call. Follow this pattern for
@@ -109,6 +109,12 @@ const searchDocsResponseSchema = z.object({
 async function searchDocsHandler(input: SearchDocsInput) {
   const { query, limit, offset, response_format } = input;
 
+  // Missing configuration is a deployment bug, not something the agent can recover from.
+  const apiKey = process.env.DOCS_API_KEY;
+  if (!apiKey) {
+    throw new Error("DOCS_API_KEY is not set");
+  }
+
   try {
     // <CUSTOMISE> Call your actual search backend
     const response = await fetch("https://api.example.com/docs/search", {
@@ -118,7 +124,7 @@ async function searchDocsHandler(input: SearchDocsInput) {
         offset,
       }),
       headers: {
-        Authorization: `Bearer ${process.env.DOCS_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "X-Trace-Id": crypto.randomUUID(), // Propagate trace for observability
       },
@@ -159,11 +165,13 @@ async function searchDocsHandler(input: SearchDocsInput) {
       success: true,
       total_count: data.total_count,
     };
-  } catch (error: any) {
+  } catch (error) {
+    // Log the exception for operators; the model gets a stable message, not raw exception text.
+    console.error("search_docs failed", error);
     return {
       success: false,
       error: {
-        message: error.message || "Unknown error during search",
+        message: "The documentation search could not be completed",
         code: "SEARCH_ERROR",
         is_retriable: true,
         suggestions: [
@@ -245,23 +253,8 @@ export function createMCPServer() {
   return server;
 }
 
-// ============================================================================
-// EXPORT: Claude Agent SDK (Anthropic)
-// ============================================================================
-
-export const claudeSearchDocsTool = {
-  _meta: toolMetadata._meta,
-  description: toolMetadata.description,
-  handler: searchDocsHandler,
-  input_schema: z.toJSONSchema(searchDocsSchema),
-  name: toolMetadata.name,
-};
-
-// For use with @anthropic-ai/claude-agent-sdk:
-// const agent = await query(
-//   { prompt: 'Find docs on authentication' },
-//   { tools: [claudeSearchDocsTool], allowedTools: ['search_docs'] }
-// );
+// The Claude Agent SDK consumes tools as MCP servers: pass the server above to it
+// following the SDK's own custom-tools documentation, rather than a separate tool object.
 
 // ============================================================================
 // EXPORT: Vercel AI SDK

@@ -13,14 +13,14 @@
  *   `RateLimit-Policy: "default";q=100;w=60` (quota, window seconds). Older drafts and many
  *   gateways send discrete `RateLimit-Limit/Remaining/Reset` or `X-RateLimit-*`; those are
  *   read below as compatibility paths.
- * - Treat `reset` as delta-seconds. If your server sends epoch seconds,
- *   flip RESET_IS_EPOCH to true.
+ * - `t` and `RateLimit-Reset` are delta-seconds by definition. The vendor
+ *   `X-RateLimit-Reset` is delta-seconds on some APIs and epoch seconds on others
+ *   (GitHub, for one); a value past 1e9 is read as epoch seconds.
  * </CUSTOMISE>
  */
 
 const DEFAULT_RETRY_MS = 1_000;
-const MAX_WAIT_MS = 300_000; // never advise waiting longer than 5 minutes
-const RESET_IS_EPOCH = false;
+const MAX_WAIT_MS = 300_000; // a longer wait than this is reported as not retryable
 const POLICY_NAME = "default"; // quota policy name used in the draft-11 structured fields
 
 /**
@@ -48,9 +48,14 @@ export interface RateLimitSnapshot {
  * Structured, agent-actionable retry advice derived from a response.
  */
 export interface RetryGuidance {
-  /** True if the agent should retry the request. */
+  /** True if the agent should wait `waitMs` and retry the request. */
   retryable: boolean;
-  /** How long to wait before retrying, in milliseconds (0 when not retryable). */
+  /**
+   * How long the server asks the caller to wait, in milliseconds. When that is
+   * longer than MAX_WAIT_MS, `retryable` is false and this still carries the
+   * server's wait, so the caller can schedule the work for later. 0 for a status
+   * that is never retried.
+   */
   waitMs: number;
   /** Human/machine-readable explanation of the decision. */
   reason: string;
@@ -97,11 +102,15 @@ function parseStructuredRateLimit(value: string): Partial<Record<string, number>
   return out;
 }
 
+/** Delta-seconds can never be this large (over 31 years), so a bigger value is epoch seconds. */
+const EPOCH_SECONDS_THRESHOLD = 1_000_000_000;
+
 /**
- * Convert a raw `reset` value into an absolute epoch-ms timestamp.
+ * Convert the vendor `X-RateLimit-Reset` value, which is delta-seconds on some
+ * APIs and epoch seconds on others, into an absolute epoch-ms timestamp.
  */
-function resetToEpochMs(reset: number, nowMs: number): number {
-  return RESET_IS_EPOCH ? reset * 1_000 : nowMs + reset * 1_000;
+function vendorResetToEpochMs(reset: number, nowMs: number): number {
+  return reset > EPOCH_SECONDS_THRESHOLD ? reset * 1_000 : nowMs + reset * 1_000;
 }
 
 /**
@@ -131,14 +140,15 @@ export function parseRateLimit(source: HeaderSource, nowMs = Date.now()): RateLi
       snapshot.remaining = parsed.r;
     }
     if (parsed.t !== undefined) {
-      snapshot.resetAtMs = resetToEpochMs(parsed.t, nowMs);
+      snapshot.resetAtMs = nowMs + parsed.t * 1_000;
     }
   }
 
   const limit = readHeader(source, "RateLimit-Limit") ?? readHeader(source, "X-RateLimit-Limit");
   const remaining =
     readHeader(source, "RateLimit-Remaining") ?? readHeader(source, "X-RateLimit-Remaining");
-  const reset = readHeader(source, "RateLimit-Reset") ?? readHeader(source, "X-RateLimit-Reset");
+  const draftReset = readHeader(source, "RateLimit-Reset");
+  const vendorReset = readHeader(source, "X-RateLimit-Reset");
 
   if (snapshot.limit === undefined && limit !== null) {
     const n = Number.parseInt(limit, 10);
@@ -152,10 +162,16 @@ export function parseRateLimit(source: HeaderSource, nowMs = Date.now()): RateLi
       snapshot.remaining = n;
     }
   }
-  if (snapshot.resetAtMs === undefined && reset !== null) {
-    const n = Number.parseInt(reset, 10);
+  if (snapshot.resetAtMs === undefined && draftReset !== null) {
+    const n = Number.parseInt(draftReset, 10);
     if (!Number.isNaN(n)) {
-      snapshot.resetAtMs = resetToEpochMs(n, nowMs);
+      snapshot.resetAtMs = nowMs + n * 1_000;
+    }
+  }
+  if (snapshot.resetAtMs === undefined && vendorReset !== null) {
+    const n = Number.parseInt(vendorReset, 10);
+    if (!Number.isNaN(n)) {
+      snapshot.resetAtMs = vendorResetToEpochMs(n, nowMs);
     }
   }
 
@@ -209,7 +225,6 @@ export function computeRetryGuidance(
 ): RetryGuidance {
   const nowMs = options.nowMs ?? Date.now();
   const retryableStatuses = options.retryableStatuses ?? [408, 425, 429, 500, 502, 503, 504];
-  const clamp = (ms: number) => Math.min(MAX_WAIT_MS, Math.max(0, ms));
 
   if (!retryableStatuses.includes(options.status)) {
     return {
@@ -219,40 +234,46 @@ export function computeRetryGuidance(
     };
   }
 
+  // Retrying sooner than the server allows only gets the caller throttled harder,
+  // so a wait past the cap is reported as not retryable, never shortened.
+  const advise = (waitMs: number, reason: string): RetryGuidance =>
+    waitMs > MAX_WAIT_MS
+      ? {
+          reason: `${reason} That is longer than the ${MAX_WAIT_MS / 1_000}s cap; stop and reschedule.`,
+          retryable: false,
+          waitMs,
+        }
+      : { reason, retryable: true, waitMs };
+
   const retryAfterMs = parseRetryAfter(readHeader(source, "Retry-After"), nowMs);
   if (retryAfterMs !== null) {
-    return {
-      reason: `Server sent Retry-After; wait ${Math.round(retryAfterMs / 1_000)}s before retrying.`,
-      retryable: true,
-      waitMs: clamp(retryAfterMs),
-    };
+    return advise(
+      retryAfterMs,
+      `Server sent Retry-After; wait ${Math.round(retryAfterMs / 1_000)}s before retrying.`,
+    );
   }
 
   const { remaining, resetAtMs } = parseRateLimit(source, nowMs);
   if (remaining === 0 && resetAtMs !== undefined) {
-    const waitMs = clamp(resetAtMs - nowMs);
-    return {
-      reason: `Rate limit exhausted; window resets in ${Math.round(waitMs / 1_000)}s.`,
-      retryable: true,
-      waitMs,
-    };
+    const waitMs = Math.max(0, resetAtMs - nowMs);
+    return advise(waitMs, `Rate limit exhausted; window resets in ${Math.round(waitMs / 1_000)}s.`);
   }
 
   return {
     reason: `Retryable status ${options.status} with no explicit hint; backing off.`,
     retryable: true,
-    waitMs: clamp(DEFAULT_RETRY_MS),
+    waitMs: DEFAULT_RETRY_MS,
   };
 }
 
 /**
  * Build RateLimit response headers to emit from your server.
  *
- * Emits the draft-11 structured fields (`RateLimit` and `RateLimit-Policy`), the discrete
- * `RateLimit-*` fields many clients and gateways still read, and, when the window is
- * exhausted, a `Retry-After` in delta-seconds so simple clients can act without parsing.
+ * Emits the draft-11 structured fields (`RateLimit` and `RateLimit-Policy`) and, when the
+ * window is exhausted, a `Retry-After` in delta-seconds so simple clients can act without
+ * parsing structured fields.
  *
- * <CUSTOMISE> Set POLICY_NAME and drop the discrete fields once your clients read the draft form.
+ * <CUSTOMISE> Set POLICY_NAME.
  */
 export function emitRateLimitHeaders(
   snapshot: RateLimitSnapshot,
@@ -265,20 +286,13 @@ export function emitRateLimitHeaders(
       ? undefined
       : Math.max(0, Math.ceil((snapshot.resetAtMs - nowMs) / 1_000));
 
-  if (snapshot.limit !== undefined) {
-    headers["RateLimit-Limit"] = String(snapshot.limit);
-    if (windowSeconds !== undefined) {
-      headers["RateLimit-Policy"] = `"${POLICY_NAME}";q=${snapshot.limit};w=${windowSeconds}`;
-    }
+  if (snapshot.limit !== undefined && windowSeconds !== undefined) {
+    headers["RateLimit-Policy"] = `"${POLICY_NAME}";q=${snapshot.limit};w=${windowSeconds}`;
   }
   if (snapshot.remaining !== undefined) {
     const remaining = Math.max(0, snapshot.remaining);
-    headers["RateLimit-Remaining"] = String(remaining);
     headers.RateLimit = `"${POLICY_NAME}";r=${remaining}${resetSeconds === undefined ? "" : `;t=${resetSeconds}`}`;
-  }
-  if (resetSeconds !== undefined) {
-    headers["RateLimit-Reset"] = String(resetSeconds);
-    if (snapshot.remaining === 0) {
+    if (remaining === 0 && resetSeconds !== undefined) {
       headers["Retry-After"] = String(resetSeconds);
     }
   }
@@ -297,6 +311,6 @@ export function emitRateLimitHeaders(
  * 3. If `retryable`, sleep `waitMs` (respecting the server's Retry-After / reset), then retry.
  * 4. If not retryable, surface `reason` instead of blindly looping.
  *
- * Server-side, emit consistent `RateLimit-*` headers with `emitRateLimitHeaders(...)` so
+ * Server-side, emit `RateLimit` and `RateLimit-Policy` with `emitRateLimitHeaders(...)` so
  * well-behaved agents can pace themselves before they ever hit a 429.
  */

@@ -1,59 +1,44 @@
 /*
  * content-negotiation.ts - Next.js 16 proxy (formerly middleware) for agent content negotiation.
  *
- * What: Route handler that detects Accept headers and User-Agent, returning either HTML or
- * markdown-formatted responses. Allows agents to get optimized content for their context windows.
+ * What: Serves the Markdown twin of a documentation page when the request's Accept header
+ * prefers text/markdown, and the normal HTML page otherwise. The decision uses the Accept
+ * header only, never the User-Agent, so any client that asks for Markdown gets it and
+ * `Vary: Accept` describes the response correctly.
  *
- * When to use: On documentation routes (/docs/*, /api/*, /guides/*) where agents may want
- * markdown-formatted versions instead of HTML.
+ * When to use: On documentation routes (/docs/*, /guides/*) that have a Markdown version.
+ * Do not match API routes or anything per-user: this proxy is for public documents.
  *
  * What to customize:
- * 1. DOCUMENTATION_PATHS regex to match your doc routes
- * 2. Add handlers for your markdown sources (generateMarkdownFromHtml, fetchMarkdownFile, etc.)
- * 3. Update AGENT_PATTERNS to recognize additional crawlers
- * 4. Customize token budgets and headers
+ * 1. NEGOTIATED_PATHS and `config.matcher` to match your doc routes (keep the two in step)
+ * 2. MARKDOWN_ROUTE_PREFIX, and write the route handler that serves the Markdown (example below)
+ *
+ * Caching: this proxy sets no Cache-Control on pages it passes through. Set cache headers
+ * where each response is produced, where you know whether it is public.
  *
  * Spec:
  * - Content negotiation (HTTP Accept header): https://www.rfc-editor.org/rfc/rfc9110.html#name-accept (RFC 9110, which obsoletes RFC 7231)
  * - MIME type text/markdown: https://www.iana.org/assignments/media-types/media-types.xhtml
- * - Agent discovery: https://agents.md
  *
  * Usage in Next.js 16:
  * 1. Save this file as proxy.ts in the project root (or src/ if you use it). Next.js 16
  *    renamed the middleware.ts convention to proxy.ts and the exported function to `proxy`.
- * 2. Add matcher config to specify which routes this applies to
- * 3. Test: curl -H "Accept: text/markdown" https://localhost:3000/docs/api
+ * 2. Add the Markdown route handler shown at the bottom of this file
+ * 3. Test: curl -H "Accept: text/markdown" http://localhost:3000/docs/api
  */
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * Documentation paths that support content negotiation.
- * Customize to match your route structure.
+ * Paths that have a Markdown twin. Must cover the same routes as `config.matcher`.
  */
-const DOCUMENTATION_PATHS = /^\/docs\/.+/;
-const API_PATHS = /^\/api\/(reference|endpoints)\/.+/;
+const NEGOTIATED_PATHS = /^\/(docs|guides)\/.+/;
 
 /**
- * User-Agent patterns to identify AI agents.
+ * Where the Markdown route handler lives: /docs/setup is served from /md/docs/setup.
  */
-const AGENT_PATTERNS = {
-  search: /OAI-SearchBot|Claude-SearchBot|PerplexityBot/i,
-  training: /GPTBot|ClaudeBot|Google-Extended|Meta-ExternalAgent|CCBot|Bytespider/i,
-  user: /ChatGPT-User|Claude-User/i,
-};
-
-/**
- * Token budget hints for different content types.
- * Helps agents decide how much content to ingest.
- */
-const TOKEN_BUDGETS = {
-  "api-reference": 3000,
-  "full-docs": 10000,
-  guide: 1500,
-  overview: 500,
-} as const;
+const MARKDOWN_ROUTE_PREFIX = "/md";
 
 /**
  * Quality of the most specific Accept range that matches `type`
@@ -83,141 +68,29 @@ function qualityFor(accept: string, type: string): number {
  * Do not use accept.includes("text/markdown") - it ignores q=0 and relative weights.
  * A bare "*\/*" ranks both equally, so those clients still get HTML.
  */
-function prefersMarkdown(request: NextRequest): boolean {
+export function prefersMarkdown(request: NextRequest): boolean {
   const accept = request.headers.get("accept") || "";
   const markdown = qualityFor(accept, "text/markdown");
   return markdown > 0 && markdown > qualityFor(accept, "text/html");
 }
 
 /**
- * Detect if request is from an AI agent.
- */
-function isAgent(request: NextRequest): boolean {
-  const userAgent = request.headers.get("user-agent") || "";
-  return (
-    AGENT_PATTERNS.training.test(userAgent) ||
-    AGENT_PATTERNS.search.test(userAgent) ||
-    AGENT_PATTERNS.user.test(userAgent)
-  );
-}
-
-/**
- * Classify agent type.
- */
-function classifyAgent(request: NextRequest): "training" | "search" | "user" | null {
-  const userAgent = request.headers.get("user-agent") || "";
-  if (AGENT_PATTERNS.training.test(userAgent)) {
-    return "training";
-  }
-  if (AGENT_PATTERNS.search.test(userAgent)) {
-    return "search";
-  }
-  if (AGENT_PATTERNS.user.test(userAgent)) {
-    return "user";
-  }
-  return null;
-}
-
-/**
- * Convert HTML content to markdown (placeholder).
- * In production, use a library like turndown or marked-ts.
- */
-function htmlToMarkdown(html: string): string {
-  // Placeholder: in real implementation, use turndown or similar
-  // For now, return a note + HTML
-  return `> This page is optimized for markdown output. For HTML formatting, visit the web browser version.\n\n${html}`;
-}
-
-/**
- * Fetch markdown version of a page from filesystem or dynamic generation.
- *
- * Pattern:
- * - If docs/[slug].md exists, serve it
- * - Otherwise, generate from page content
- */
-async function getMarkdownContent(pathname: string): Promise<string | null> {
-  // <CUSTOMISE>: Implement your content source
-  // Example: read from file system
-  // const fs = await import('fs').then(m => m.promises);
-  // const markdownPath = path.join(process.cwd(), 'docs', `${slug}.md`);
-  // try {
-  //   return await fs.readFile(markdownPath, 'utf-8');
-  // } catch {
-  //   return null;
-  // }
-
-  // For now, return null to fall back to HTML conversion
-  return null;
-}
-
-/**
- * Estimate token count (rough approximation: ~4 chars per token).
- */
-function estimateTokens(content: string): number {
-  return Math.ceil(content.length / 4);
-}
-
-/**
- * Get appropriate token budget for content type.
- */
-function getTokenBudget(pathname: string): number {
-  if (pathname.includes("api") || pathname.includes("reference")) {
-    return TOKEN_BUDGETS["api-reference"];
-  }
-  if (pathname.includes("guide")) {
-    return TOKEN_BUDGETS.guide;
-  }
-  return TOKEN_BUDGETS.overview;
-}
-
-/**
  * Main proxy function (Next.js 16; was `middleware` before the rename).
  */
-export async function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isDocPath = DOCUMENTATION_PATHS.test(pathname) || API_PATHS.test(pathname);
 
-  // Only apply negotiation to documentation paths
-  if (!isDocPath) {
-    const response = NextResponse.next();
-    response.headers.set("Vary", "Accept");
-    return response;
+  if (NEGOTIATED_PATHS.test(pathname) && prefersMarkdown(request)) {
+    const rewritten = NextResponse.rewrite(
+      new URL(`${MARKDOWN_ROUTE_PREFIX}${pathname}`, request.url),
+    );
+    rewritten.headers.set("Vary", "Accept");
+    return rewritten;
   }
 
-  // If agent requests markdown, try to serve it
-  if (prefersMarkdown(request) && isAgent(request)) {
-    const agentType = classifyAgent(request);
-
-    // Fetch markdown content (from file or generate)
-    const markdown = await getMarkdownContent(pathname);
-
-    if (markdown) {
-      const tokens = estimateTokens(markdown);
-      const budget = getTokenBudget(pathname);
-
-      // Build markdown response
-      const response = new NextResponse(markdown, {
-        headers: {
-          "Content-Type": "text/markdown; charset=utf-8",
-          Vary: "Accept",
-          "x-markdown-tokens": tokens.toString(),
-          "x-token-budget": budget.toString(),
-          "x-agent-type": agentType || "unknown",
-          // Cache for agents (not as aggressive as HTML)
-          "Cache-Control": "public, max-age=3600",
-        },
-        status: 200,
-      });
-
-      return response;
-    }
-  }
-
-  // Default: serve HTML with Vary header
+  // HTML: pass through untouched apart from Vary, so caches keep the two apart.
   const response = NextResponse.next();
   response.headers.set("Vary", "Accept");
-  response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
-
   return response;
 }
 
@@ -225,63 +98,50 @@ export async function proxy(request: NextRequest) {
  * Configure which routes this proxy applies to.
  */
 export const config = {
-  matcher: [
-    // Documentation routes
-    "/docs/:path*",
-    "/api/reference/:path*",
-    "/api/endpoints/:path*",
-    "/guides/:path*",
-  ],
+  matcher: ["/docs/:path*", "/guides/:path*"],
 };
 
 /**
- * Example: Next.js route handler (app/docs/[slug]/route.ts) that uses this logic.
- * In Next.js 16 route handler `params` is a promise. Reuse the q-value-aware
- * prefersMarkdown logic above rather than a substring check on the Accept header.
+ * The Markdown route handler the proxy rewrites to (app/md/[...slug]/route.ts).
+ * In Next.js 16 route handler `params` is a promise. A page with no Markdown is a 404,
+ * not a silent fall back to HTML.
  *
  * ```typescript
- * import { NextRequest, NextResponse } from 'next/server';
+ * import { readFile } from 'node:fs/promises';
+ * import path from 'node:path';
+ *
+ * const CONTENT_ROOT = path.join(process.cwd(), 'content');
  *
  * export async function GET(
- *   request: NextRequest,
- *   { params }: { params: Promise<{ slug: string }> }
+ *   _request: Request,
+ *   { params }: { params: Promise<{ slug: string[] }> }
  * ) {
  *   const { slug } = await params;
- *
- *   if (prefersMarkdown(request)) {
- *     // Fetch markdown content for this slug
- *     const markdown = await loadMarkdownDoc(slug);
- *     return new NextResponse(markdown, {
- *       headers: {
- *         'Content-Type': 'text/markdown; charset=utf-8',
- *         'Vary': 'Accept',
- *         'x-markdown-tokens': estimateTokens(markdown).toString(),
- *       },
- *     });
+ *   // Keep the resolved path inside the content directory
+ *   const file = path.join(CONTENT_ROOT, `${slug.join('/')}.md`);
+ *   if (!file.startsWith(`${CONTENT_ROOT}${path.sep}`)) {
+ *     return new Response('# Not found\n', { status: 404, headers: MARKDOWN_HEADERS });
  *   }
  *
- *   // Otherwise, render HTML via page.tsx
- *   const html = await renderPage(slug);
- *   return new NextResponse(html, {
+ *   let markdown: string;
+ *   try {
+ *     markdown = await readFile(file, 'utf-8');
+ *   } catch (error) {
+ *     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+ *     return new Response('# Not found\n', { status: 404, headers: MARKDOWN_HEADERS });
+ *   }
+ *
+ *   return new Response(markdown, {
  *     headers: {
- *       'Content-Type': 'text/html; charset=utf-8',
- *       'Vary': 'Accept',
+ *       ...MARKDOWN_HEADERS,
+ *       // Public documentation only; ~4 characters per token is a rough estimate
+ *       'Cache-Control': 'public, max-age=3600',
+ *       'x-markdown-tokens': String(Math.ceil(markdown.length / 4)),
  *     },
  *   });
  * }
- * ```
- */
-
-/**
- * Example: stripe-style agent notice on docs pages.
  *
- * Add to markdown response or HTML layout:
- *
- * ```markdown
- * > **For AI agents:** This page is optimized for machine reading.
- * > Use `Accept: text/markdown` header for markdown format.
- * > See [llms.txt](/llms.txt) for a full documentation index.
- * > For natural language queries, use POST `/api/ask`.
+ * const MARKDOWN_HEADERS = { 'Content-Type': 'text/markdown; charset=utf-8', Vary: 'Accept' };
  * ```
  */
 
@@ -289,12 +149,9 @@ export const config = {
  * Testing: curl commands
  *
  * Test HTML (default):
- *   curl -H "Accept: text/html" http://localhost:3000/docs/api
+ *   curl -I -H "Accept: text/html" http://localhost:3000/docs/api
  *
- * Test markdown:
- *   curl -H "Accept: text/markdown" -H "User-Agent: ClaudeBot" http://localhost:3000/docs/api
- *
- * Check headers:
+ * Test markdown (no special User-Agent needed):
  *   curl -I -H "Accept: text/markdown" http://localhost:3000/docs/api
  *   # Should include: Vary: Accept, Content-Type: text/markdown, x-markdown-tokens: ...
  */

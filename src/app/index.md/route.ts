@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site";
 import { homepageCopy, numberWord } from "@/data/homepage-copy";
 import { guideStages } from "@/data/homepage-guide";
 import type { GuideCard, GuideStage } from "@/data/homepage-guide";
@@ -7,7 +8,6 @@ import { NextResponse } from "next/server";
 
 export const revalidate = false;
 
-const SITE_ORIGIN = "https://agentsurface.dev";
 const TITLE = "Agent Surface";
 const START_HERE = "Start here";
 
@@ -75,10 +75,13 @@ function buildContent(): string {
     `${total} recommendations across ${numberWord(guideStages.length)} areas:`,
     "",
     guideStages
-      .map(
-        (stage, index) =>
-          `${index + 1}. [${stage.name}](#${stage.id}): ${stage.question} ${stage.cards.length} recommendations.`,
-      )
+      .map((stage, index) => {
+        // Link to the area's essay where one is published; heading anchors are not
+        // portable across Markdown readers.
+        const essay = guideSource.getPage([stage.id]);
+        const name = essay ? `[${stage.name}](${SITE_ORIGIN}${essay.url})` : stage.name;
+        return `${index + 1}. ${name}: ${stage.question} ${stage.cards.length} recommendations.`;
+      })
       .join("\n"),
     "",
     guideStages.map(renderStage).join("\n\n"),
@@ -112,7 +115,7 @@ function buildContent(): string {
     `- [Documentation](${SITE_ORIGIN}/docs)`,
     `- [llms.txt](${SITE_ORIGIN}/llms.txt)`,
     `- [llms-full.txt](${SITE_ORIGIN}/llms-full.txt)`,
-    `- [MCP endpoint](${SITE_ORIGIN}/mcp)`,
+    `- [MCP connection guide](${SITE_ORIGIN}/docs/mcp-servers/transports.md)`,
     `- [Glossary](${SITE_ORIGIN}/glossary)`,
     "",
   ].join("\n");
