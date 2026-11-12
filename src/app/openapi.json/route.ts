@@ -1,3 +1,5 @@
+import { PROBLEMS, problemType } from "@/lib/api-error";
+import type { ProblemKind } from "@/lib/api-error";
 import { FULL_EXPORT_SIZE, SITE_ORIGIN } from "@/lib/site";
 import { searchOutput } from "@/lib/retrieval-contract";
 import { z } from "zod";
@@ -56,6 +58,7 @@ const specification = {
             content: { "application/json": { schema: z.toJSONSchema(searchOutput) } },
           },
           "400": problemResponse,
+          "405": problemResponse,
           "500": problemResponse,
         },
       },
@@ -82,6 +85,7 @@ const specification = {
             content: { "text/markdown": { schema: { type: "string" } } },
           },
           "404": problemResponse,
+          "405": problemResponse,
         },
       },
     },
@@ -99,12 +103,15 @@ const specification = {
           "is_retriable",
           "suggestions",
           "trace_id",
-          "code",
-          "message",
-          "hint",
         ],
         properties: {
-          type: { type: "string", example: "about:blank" },
+          type: {
+            type: "string",
+            format: "uri",
+            description:
+              "Stable identifier of the problem kind; the URI resolves to its description.",
+            enum: Object.keys(PROBLEMS).map((kind) => problemType(kind as ProblemKind)),
+          },
           title: { type: "string" },
           status: { type: "integer" },
           detail: { type: "string" },
@@ -123,9 +130,6 @@ const specification = {
             type: "string",
             description: "Opaque request identifier, also returned in X-Request-Id.",
           },
-          code: { type: "string" },
-          message: { type: "string" },
-          hint: { type: "string" },
         },
       },
     },

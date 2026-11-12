@@ -3,9 +3,8 @@ import { apiError } from "@/lib/api-error";
 /** Any /api path without its own route, including bare /api, gets a problem document rather than the HTML 404. */
 function notFound(request: Request) {
   return apiError(
-    404,
-    "ENDPOINT_NOT_FOUND",
-    "API endpoint not found",
+    "not-found",
+    `No API endpoint at ${new URL(request.url).pathname}`,
     "Read /openapi.json for supported endpoints and methods.",
     new URL(request.url).pathname + new URL(request.url).search,
   );

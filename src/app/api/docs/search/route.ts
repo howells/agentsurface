@@ -1,5 +1,5 @@
 import { SITE_ORIGIN } from "@/lib/site";
-import { apiError } from "@/lib/api-error";
+import { apiError, methodNotAllowed } from "@/lib/api-error";
 import { searchInput } from "@/lib/retrieval-contract";
 import { retrieveDocs } from "@/lib/search";
 
@@ -17,8 +17,7 @@ export async function GET(request: Request) {
   const instance = url.pathname + url.search;
   if (!input.success) {
     return apiError(
-      400,
-      "INVALID_SEARCH",
+      "validation-error",
       "Invalid search parameters",
       "Use query with 2 to 500 characters, an integer limit from 1 to 20 and an optional section such as discovery.",
       instance,
@@ -29,8 +28,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Documentation search failed", error);
     return apiError(
-      500,
-      "SEARCH_FAILED",
+      "internal-error",
       "Search is temporarily unavailable",
       `Retry later or read ${SITE_ORIGIN}/llms.txt to find documentation pages.`,
       instance,
@@ -38,3 +36,10 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export {
+  methodNotAllowed as POST,
+  methodNotAllowed as PUT,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as DELETE,
+};

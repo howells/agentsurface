@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- The site's own API errors now follow the guide: each problem `type` is a resolvable
+  `/errors/<kind>` URL instead of `about:blank`, the duplicate `code`, `message` and `hint`
+  members are gone, and a wrong method returns a 405 problem document with an `Allow` header.
+  The MCP `get_page` error carries the same `type`
+- CI runs typecheck, lint and the contract tests on every push and pull request
 - Repositioned the site and skill around ADR 0002: Part 1 (the core guide) covers making an
   existing product agent-ready; Part 2 (the agent-building inventory) is a secondary,
   condensed reference for teams building their own agents. The `surface` skill's Guide,

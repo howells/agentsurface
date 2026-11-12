@@ -38,6 +38,7 @@ function isExcludedFromNegotiation(pathname: string): boolean {
     pathname.startsWith("/.well-known/") ||
     pathname === "/mcp" ||
     pathname.startsWith("/mcp/") ||
+    pathname.startsWith("/errors/") ||
     pathname === "/og" ||
     pathname.startsWith("/og/") ||
     pathname.startsWith("/_next") ||
@@ -116,8 +117,7 @@ export function proxy(request: NextRequest) {
     !accepts.includes("text/html")
   ) {
     return apiError(
-      404,
-      "PAGE_NOT_FOUND",
+      "not-found",
       "Page not found",
       `Browse ${SITE_ORIGIN}/llms.txt or search /api/docs/search?query=discovery.`,
       pathname + request.nextUrl.search,

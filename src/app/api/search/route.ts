@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api-error";
+import { apiError, methodNotAllowed } from "@/lib/api-error";
 import { searchServer } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,7 @@ export async function GET(request: Request): Promise<Response> {
   } catch (error) {
     console.error("Search dialog request failed", error);
     return apiError(
-      500,
-      "SEARCH_FAILED",
+      "internal-error",
       "Search is temporarily unavailable",
       "Retry later or read /llms.txt.",
       instance,
@@ -29,8 +28,7 @@ export async function GET(request: Request): Promise<Response> {
   }
   if (!response.ok) {
     return apiError(
-      response.status,
-      "SEARCH_REQUEST_FAILED",
+      response.status >= 500 ? "internal-error" : "validation-error",
       "Search request failed",
       "Use /api/docs/search?query=discovery for the documented search API.",
       instance,
@@ -44,3 +42,10 @@ export async function GET(request: Request): Promise<Response> {
     statusText: response.statusText,
   });
 }
+
+export {
+  methodNotAllowed as POST,
+  methodNotAllowed as PUT,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as DELETE,
+};

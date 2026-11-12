@@ -298,6 +298,10 @@ try {
       const missing = await call("get_page", { url: "/docs/contract-missing" });
       assert.equal(missing.isError, true);
       assert.match(JSON.stringify(missing), /llms.txt/);
+      assert.equal(
+        JSON.parse(missing.content[0].text).type,
+        "https://agentsurface.dev/errors/not-found",
+      );
       const recovered = await call("get_page", { url: live.results[0].url });
       assert.ok(recovered.structuredContent.markdown.length > 100);
     } finally {
@@ -335,7 +339,24 @@ try {
       }
       assert.equal(problem.is_retriable, false);
       assert.equal(problem.instance, path);
+      for (const field of ["code", "message", "hint"]) {
+        assert.ok(!(field in problem), field);
+      }
+      const kind = response.status === 400 ? "validation-error" : "not-found";
+      assert.equal(problem.type, `https://agentsurface.dev/errors/${kind}`);
+      const described = await get(`/errors/${kind}`, "application/json");
+      assert.equal(described.status, 200);
+      assert.match(await described.text(), new RegExp(problem.title));
     }
+    for (const path of ["/api/search", "/api/docs/search?query=content", "/api/md/index"]) {
+      const response = await fetch(`${origin}${path}`, { method: "POST" });
+      assert.equal(response.status, 405);
+      assert.equal(response.headers.get("allow"), "GET, HEAD, OPTIONS");
+      const problem = await response.json();
+      assert.equal(problem.type, "https://agentsurface.dev/errors/method-not-allowed");
+      assert.equal(problem.instance, path);
+    }
+    assert.equal((await get("/errors/contract-missing")).status, 404);
   });
   await test("informational twins and Markdown missing paths", async () => {
     for (const path of ["/about", "/contact", "/privacy", "/glossary", "/patterns"]) {

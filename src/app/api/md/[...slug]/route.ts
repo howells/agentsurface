@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api-error";
+import { apiError, methodNotAllowed } from "@/lib/api-error";
 import { markdownHeaders } from "@/lib/markdown";
 import { docsLlms, source } from "@/lib/source";
 import type { NextRequest } from "next/server";
@@ -23,8 +23,7 @@ export async function GET(
 
   if (!page) {
     return apiError(
-      404,
-      "PAGE_NOT_FOUND",
+      "not-found",
       "Documentation page not found",
       "Search /api/docs/search?query=discovery or use a slug from /llms.txt.",
       new URL(request.url).pathname + new URL(request.url).search,
@@ -34,3 +33,10 @@ export async function GET(
   const content = await docsLlms.page(page);
   return new NextResponse(content, { headers: markdownHeaders(content) });
 }
+
+export {
+  methodNotAllowed as POST,
+  methodNotAllowed as PUT,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as DELETE,
+};

@@ -1,4 +1,5 @@
 import { searchInput, searchOutput, pageSummary } from "./retrieval-contract.ts";
+import { problemType } from "./api-error.ts";
 import { SITE_ORIGIN } from "./site.ts";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
@@ -115,7 +116,7 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
     {
       title: "Read a documentation page",
       description:
-        "Use after search or list_pages to read the authoritative full Markdown of one page, including canonical URL and freshness metadata. This does not fetch external websites. On PAGE_NOT_FOUND, search again or browse the public index.",
+        "Use after search or list_pages to read the authoritative full Markdown of one page, including canonical URL and freshness metadata. This does not fetch external websites. When no page matches, the error result is a problem document whose suggestions name the next tool.",
       annotations,
       inputSchema: z.object({
         url: z
@@ -146,7 +147,8 @@ export function createDocsMcpServer(backend: DocumentationBackend, version: stri
             {
               type: "text",
               text: JSON.stringify({
-                code: "PAGE_NOT_FOUND",
+                type: problemType("not-found"),
+                title: "Resource not found",
                 detail: `No documentation page matches ${url}`,
                 is_retriable: false,
                 suggestions: [
