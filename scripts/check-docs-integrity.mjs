@@ -415,12 +415,11 @@ for (const file of mdxFiles) {
 
 // Release version parity check.
 //
-// The package, distributable skill, Claude plugin, MCP Registry entry and public
+// The package, Claude plugin, MCP Registry entry and public
 // MCP metadata are one release surface. Keep their versions aligned so installs and discovery
 // never advertise different releases.
 const packageJsonPath = path.join(repoRoot, "package.json");
 const serverCardPath = path.join(repoRoot, "public/.well-known/mcp/server-card.json");
-const skillManifestPath = path.join(repoRoot, ".skill.yaml");
 const pluginManifestPath = path.join(repoRoot, ".claude-plugin/plugin.json");
 
 const serverJsonPath = path.join(repoRoot, "server.json");
@@ -433,10 +432,6 @@ const manifestVersions = [
   ["public/.well-known/mcp/server-card.json version", serverCard.version],
   ["public/.well-known/mcp/server-card.json serverInfo.version", serverCard.serverInfo?.version],
   ["server.json version", JSON.parse(fs.readFileSync(serverJsonPath, "utf-8")).version],
-  [
-    ".skill.yaml version",
-    /^version:\s*([^\s#]+)\s*$/m.exec(fs.readFileSync(skillManifestPath, "utf-8"))?.[1],
-  ],
   [
     ".claude-plugin/plugin.json version",
     JSON.parse(fs.readFileSync(pluginManifestPath, "utf-8")).version,
@@ -452,7 +447,7 @@ for (const [label, value] of manifestVersions) {
 
 // Agent Skills discovery integrity check.
 //
-// The public v0.2 index is useful only when its digest identifies the exact
+// The public index is useful only when its digest identifies the exact
 // SKILL.md bytes served by this repository. Validate the required discovery
 // fields and map local agentsurface.dev skill URLs back to their source files.
 const agentSkillsIndexPath = path.join(repoRoot, "public/.well-known/agent-skills/index.json");

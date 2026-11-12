@@ -3,9 +3,9 @@
     {
       "name": "surface",
       "type": "skill-md",
-      "description": "Make software legible to agents. Guide, audit or scaffold AGENTS.md, llms.txt, discovery, APIs, CLIs, MCP servers, tools, auth, errors, retrieval and their tests. Use when asked for agent readiness, a scorecard or one of those surfaces. Not for building an agent itself.",
+      "description": "Audits, scores and scaffolds the surfaces AI agents use to reach existing software, such as AGENTS.md, llms.txt, discovery files, APIs, CLIs, MCP servers, tool contracts, auth, errors and retrieval. Use when asked for agent readiness, a scorecard, or to build or fix one of those surfaces for agents. Not for building an agent itself.",
       "url": "https://agentsurface.dev/skills/surface/SKILL.md",
-      "digest": "sha256:eacfd1ff35402d2aa3f49263847b5c1ef29501153a75bac7349b349ff11539e5"
+      "digest": "sha256:d5b7ae7a0564b3ade8f7bafa7bd55f8c9e38003422f0b3118857e7bcc8db4c2e"
     }
   ]
 }

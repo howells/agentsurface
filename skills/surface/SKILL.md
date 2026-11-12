@@ -1,6 +1,6 @@
 ---
 name: surface
-description: Make software legible to agents. Guide, audit or scaffold AGENTS.md, llms.txt, discovery, APIs, CLIs, MCP servers, tools, auth, errors, retrieval and their tests. Use when asked for agent readiness, a scorecard or one of those surfaces. Not for building an agent itself.
+description: Audits, scores and scaffolds the surfaces AI agents use to reach existing software, such as AGENTS.md, llms.txt, discovery files, APIs, CLIs, MCP servers, tool contracts, auth, errors and retrieval. Use when asked for agent readiness, a scorecard, or to build or fix one of those surfaces for agents. Not for building an agent itself.
 ---
 
 # Surface
@@ -12,11 +12,14 @@ product-side. For agent internals (frameworks, orchestration, memory, model
 routing, an agent's own RAG), say this skill doesn't cover them and point to
 https://agentsurface.dev/docs/agents and /docs/agent-retrieval.
 
+Paths below are relative to the directory holding this file. With no more
+specific request, run an audit in `plan` mode.
+
 - **Report audits in your reply, never into the repo.** Give the scorecard,
   findings and plan in the response. File them to a tracker only when the user
   asks and has one.
 - **Transform only after the user approves the plan.**
-- **Read each reference with its own command.** Long output is cut in the
+- **Read each reference whole, with its own read.** Long output is cut in the
   middle, so never concatenate several references in one read.
 - **Score what exists, not intent.** Mark a dimension N/A only when the project
   can't expose that surface, and never penalize an optional capability the
@@ -25,8 +28,7 @@ https://agentsurface.dev/docs/agents and /docs/agent-retrieval.
   flow).
 - **Check the content, not the file.** A `.well-known` file that returns 200
   but points at nothing scores as absent.
-- **Merge, don't replace,** existing AGENTS.md, CLAUDE.md, llms.txt and MCP
-  files.
+- **Merge into** existing AGENTS.md, CLAUDE.md, llms.txt and MCP files.
 - **A direct ask gets the artifact.** "Write our llms.txt" doesn't need a full
   audit: detect narrowly, make it, and say what wasn't audited. An ambiguous
   "make this agentic" starts with an audit.
@@ -54,34 +56,35 @@ calling anything current.
 
 ## Audit
 
-Modes: `score` (scorecard only), `plan` (scorecard, findings and plan),
+Modes: `score` (inventory and scorecard), `plan` (plus findings and plan),
 `transform` (plan, then execution), `--dimension=<name>`, `--format=json`.
 
 1. Read `references/audit-workflow.md` first. It holds detection,
-   applicability, scoring rules, product journeys and every output format.
+   applicability, scoring rules, delegation, product journeys and every output
+   format.
 2. Before scoring a dimension, read its reference. Each holds that dimension's
-   0-3 rubric, the evidence to gather and the fixes:
+   0-3 rubric, the evidence to gather and how to build the fix:
 
-   | Dimension       | Reference                      | Helper prompt                    |
-   | --------------- | ------------------------------ | -------------------------------- |
-   | API Surface     | `references/api-surface.md`    | `agents/score-api-surface.md`    |
-   | CLI Design      | `references/cli-design.md`     | `agents/score-cli-design.md`     |
-   | MCP Server      | `references/mcp-servers.md`    | `agents/score-mcp-server.md`     |
-   | Discovery & AEO | `references/discovery-aeo.md`  | `agents/score-discovery-aeo.md`  |
-   | Authentication  | `references/authentication.md` | `agents/score-authentication.md` |
-   | Error Handling  | `references/error-handling.md` | `agents/score-error-handling.md` |
-   | Tool Design     | `references/tool-design.md`    | `agents/score-tool-design.md`    |
-   | Context Files   | `references/context-files.md`  | `agents/score-context-files.md`  |
-   | Testing         | `references/testing.md`        | `agents/score-testing.md`        |
-   | Retrievability  | `references/retrievability.md` | `agents/score-retrievability.md` |
+   | Dimension       | Reference                      |
+   | --------------- | ------------------------------ |
+   | API Surface     | `references/api-surface.md`    |
+   | CLI Design      | `references/cli-design.md`     |
+   | MCP Server      | `references/mcp-servers.md`    |
+   | Discovery & AEO | `references/discovery-aeo.md`  |
+   | Authentication  | `references/authentication.md` |
+   | Error Handling  | `references/error-handling.md` |
+   | Tool Design     | `references/tool-design.md`    |
+   | Context Files   | `references/context-files.md`  |
+   | Testing         | `references/testing.md`        |
+   | Retrievability  | `references/retrievability.md` |
 
 3. For a storefront, marketplace or anything agents can buy, read
    `references/agentic-commerce.md`; it informs the dimensions above and is not
    an eleventh.
-4. When delegating dimensions in parallel, give each helper its prompt from the
-   table, the absolute path of this skill's directory (helpers resolve
-   `references/` against it), the project root, the stack and the surfaces
-   detected for that dimension.
+4. Score the dimensions yourself, or hand each to a child agent when the host
+   offers delegation, using the brief in `references/audit-workflow.md`. The
+   audit is done when every applicable dimension has a result or a recorded
+   failure.
 
 Monorepos get per-package and aggregate scores. A polyglot repo is scored per
 surface, reporting the weakest user-facing path. A pure CLI or a project with
@@ -106,11 +109,8 @@ reference for the mode:
 | `test-harness` | `references/testing.md`                                                                        |
 
 A search or retrieval surface needs `references/retrievability.md`; auth work
-needs `references/authentication.md`. For a targeted change in one specialty,
-also read the matching writer prompt in
-`agents/` (`context-writer`, `discovery-writer`, `api-optimizer`,
-`cli-enhancer`, `mcp-builder`, `tool-design-writer`, `error-designer`,
-`auth-upgrader`, `retrievability-engineer`, `test-writer`).
+needs `references/authentication.md`. Each reference's Build section ends its
+tasks on a check; the work is done when those checks pass.
 
 `templates/<kit>/<file>` paths in the references are not part of an installed
 skill. Inside the Agent Surface repository they are local files; anywhere else,

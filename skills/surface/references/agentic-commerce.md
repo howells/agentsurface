@@ -9,6 +9,17 @@ checkout it can complete, payment authority, trust and risk, after the order.
 A gap low down breaks everything above it: don't grade checkout when the feed
 has the wrong price.
 
+## Contents
+
+- Detect
+- Product data
+- Checkout
+- Payment authority
+- Trust and risk
+- After the order
+- Where findings go
+- Shopify
+
 ## Detect
 
 - `schema.org/Product` and `Offer` JSON-LD on product pages

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+
+- `.skill.yaml`, an invented manifest format no installer reads. `.claude-plugin/plugin.json`
+  drops its wrong `$schema` and its `skills` path, which escaped the plugin root
+
 ### Changed
 
 - Repositioned the site and skill around ADR 0002: Part 1 (the core guide) covers making an
@@ -28,6 +33,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   (`error`, `message`, `suggestions`, `failing_input`, optional `invalid_args` and `trace_id`),
   exit codes 0 to 5, and schema from `describe` or `--help --json`. Stray `--output json` and
   `--schema` wording is gone
+- The `surface` skill is one file per dimension and runs the same way in Claude Code and
+  Codex. The twenty Claude-only helper prompts in `skills/surface/agents/` are merged into
+  their dimension references (each now has Rubric, Evidence to gather and Build sections) and
+  deleted; `agents/` holds only `openai.yaml`. Delegation uses one brief and one result
+  format in `references/audit-workflow.md`, with a `failed` status beside scored and
+  not applicable
+- Every file of the skill is served under `/skills/surface/`, so `SKILL.md`'s relative
+  references resolve from its published URL
 - One HTTP error shape across the guide, skill and templates: RFC 9457 plus `is_retriable`,
   `retry_after_ms`, `suggestions`, `doc_uri`, `trace_id`, `errors`, `next_operation` with
   `next_operation_args`, and `invalid_fields` as `{ field, reason, received?, expected? }`.

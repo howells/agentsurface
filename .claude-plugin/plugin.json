@@ -1,18 +1,13 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "surface",
   "version": "2.3.0",
-  "description": "Make software legible to agents. Guide, audit or scaffold the surfaces agents use: discovery, context files, APIs, CLIs, tools, MCP servers, authentication, errors, retrieval and the tests that prove them.",
-  "skills": "../skills/",
+  "description": "Audit, score and scaffold the surfaces AI agents use to reach existing software: discovery, context files, APIs, CLIs, tools, MCP servers, authentication, errors and retrieval.",
   "author": {
     "name": "Daniel Howells"
   },
   "license": "MIT",
   "homepage": "https://github.com/howells/agentsurface",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/howells/agentsurface.git"
-  },
+  "repository": "https://github.com/howells/agentsurface",
   "keywords": [
     "agentic",
     "mcp",

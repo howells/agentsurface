@@ -410,6 +410,11 @@ try {
     const index = await (await get("/.well-known/agent-skills/index.json")).json();
     const skill = await (await get("/skills/surface/SKILL.md")).text();
     assert.ok(JSON.stringify(index).includes(createHash("sha256").update(skill).digest("hex")));
+    // SKILL.md points at its references by relative path, so they are served beside it.
+    for (const reference of skill.matchAll(/`(references\/[a-z-]+\.md)`/g)) {
+      assert.equal((await get(`/skills/surface/${reference[1]}`)).status, 200, reference[1]);
+    }
+    assert.equal((await get("/skills/surface/references/missing.md")).status, 404);
     const catalog = await (await get("/.well-known/ai-catalog.json")).json();
     assert.deepEqual(catalog, await (await get("/.well-known/ard.json")).json());
     for (const entry of catalog.entries) {

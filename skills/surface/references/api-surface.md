@@ -3,7 +3,18 @@
 Dimension 1: how well the HTTP API is described for an agent to generate tools
 from and call correctly.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- The house way (versions, operationId, descriptions, enums, shape, errors,
+  idempotency, Arazzo, extensions, spec to MCP, versioning, webhooks,
+  onboarding)
+- Provider schema translation
+- Build
+- Templates
+
+## Rubric
 
 - **0**: Endpoints but no machine-readable spec (no OpenAPI, Swagger or GraphQL
   schema).
@@ -48,7 +59,9 @@ snake_case `verb_noun` (`list_users`, `get_user_by_id`, `search_users`,
 the casing is the house convention. Keep them stable after release.
 
 **Descriptions**, in order: what it does; when to use it; what to use instead;
-prerequisites (scopes, rate limits); pagination and size limits; known gaps.
+prerequisites (scopes, rate limits, an operation to call first, by
+operationId); the key fields it returns; pagination and size limits; errors and
+how to recover; known gaps.
 
 ```yaml
 description: |
@@ -62,17 +75,27 @@ description: |
 (`x-enum-descriptions` or the description). Codes like `PEND_ACTN` with no
 explanation are a finding.
 
-**Shape.** Flat request bodies over nested objects; separate endpoints over one
-endpoint whose behaviour depends on parameter combinations; `oneOf`/`anyOf`
-avoided in inputs. Paginated responses carry `has_more` or a total.
+**Shape.** Flat request bodies over nested objects (two levels at most);
+four or fewer required parameters where the operation allows, about ten in
+total; separate endpoints over one endpoint whose behaviour depends on
+parameter combinations; `oneOf`/`anyOf` avoided in inputs. Every parameter has
+a description, an example, and a format or enum where one applies. Paginated
+responses carry `has_more` or a total.
 
 **Errors per operation.** Declare the statuses each operation can return, with
 `application/problem+json` bodies (see error-handling.md). A global error
 declaration hides which errors are possible where.
 
+**Idempotency.** Declare the `Idempotency-Key` header on POST, and on PATCH
+where it isn't naturally idempotent, and document the retention window. The
+server contract is in error-handling.md.
+
 **Arazzo 1.1.0** models multi-step workflows. It has no default success
 criterion, so declare `successCriteria` on every step you depend on. It isn't
-transactional: a failed later step doesn't roll back earlier ones.
+transactional: a failed later step doesn't roll back earlier ones. `workflows`
+is an array of objects with a `workflowId`; a step names its operation by
+`operationId`, qualified as `$sourceDescriptions.<name>.<operationId>` when
+there is more than one source description.
 
 **Extensions.** `x-agent-*`, `x-category` and `x-rate-limit` are house
 conventions; credit them only where the generator or gateway reads them.
@@ -85,13 +108,15 @@ has no first-party MCP output; FastMCP has `from_openapi()`. Generators differ
 in naming, collision handling, body merging and output schemas, so inspect the
 generated tools and curate the set. Keep the spec as the source of truth.
 
-**Versioning.** Breaking changes get a URL major version or date header.
+**Versioning.** Breaking changes get a URL major version or date header; a
+description change that makes agents pick the wrong operation is breaking.
 Deprecated operations are marked `deprecated: true` and answered with
 `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) headers.
 
 **Webhooks** go in the OpenAPI `webhooks` field, discriminated by `event_type`,
-deduplicated by `event_id`, signed per Standard Webhooks with a replay window,
-and carry state snapshots.
+deduplicated by `event_id`, with `created_at` and a `schema_version`, signed
+per Standard Webhooks with a replay window, and carry state snapshots so the
+receiver needs no follow-up call.
 
 **Onboarding.** An official SDK traceable to the API (npm `repository` and
 `homepage`), linked from the docs and `llms.txt`, and self-serve keys plus a
@@ -112,6 +137,28 @@ declarations stable within a session.
 
 Generate both from one source (the spec or Zod 4's `z.toJSONSchema()`).
 `zod-to-json-schema` is unmaintained and Zod 3 only.
+
+## Build
+
+Edit the project's existing spec; with none, derive one from the routes.
+
+1. **Move to OpenAPI 3.1** where the spec is 3.0, replacing `nullable: true`
+   with `null` in the schema's `type`. Done when the spec parses as 3.1 in the
+   project's validator.
+2. **operationIds and descriptions** on every operation, in the house form.
+   Released operationIds keep their names.
+3. **Parameters and enums**: descriptions, examples, formats, closed sets as
+   enums with a meaning per value.
+4. **Errors and idempotency** per operation.
+5. **Arazzo workflow** for each multi-step task agents perform, every step
+   with `successCriteria`.
+6. **Extensions and generated MCP tools** only where a generator or gateway in
+   the project reads them; inspect the generated tools.
+
+Done when the spec and any Arazzo file pass the project's linter, every
+operation has an operationId, a "use when" description and its error
+responses, every Arazzo `operationId` exists in the spec, and one real
+response per changed operation matches its declared schema.
 
 ## Templates
 

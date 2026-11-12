@@ -3,7 +3,16 @@
 Dimension 7: the quality of tool definitions an agent chooses between and
 calls, in any framework.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- Build: inventory, names, descriptions, schemas, output, shape, annotations,
+  curation, adapters
+- Provider gotchas
+- Templates
+
+## Rubric
 
 - **0**: Functions with no tool schema or description (no `registerTool`,
   `tool()`, `createTool()`, `@tool`).
@@ -29,27 +38,41 @@ calls, in any framework.
   `next_cursor`/`has_more`.
 - Tool count per agent context.
 
-## The house way
+## Build
 
-**Names.** Lowercase snake_case: a verb and the noun a user would say
+Create or improve the tool in the project's chosen framework, editing existing
+definitions in place. Add MCP exposure only when asked. Done when every tool in
+the inventory meets each part below and a routing test (testing.md) selects the
+right tool with the right arguments on representative tasks.
+
+**Inventory first.** List every registration site with its name, description
+word count, undescribed fields, annotations and response shape. That list is
+the work.
+
+**Names.** Lowercase `snake_case`: a verb and the noun a user would say
 (`find_palette_ideas`, `add_samples_to_cart`). This is the house convention;
 MCP allows other casings and some model adapters are stricter. Namespace only
 when the agent must tell real services or destinations apart, not to mirror a
 backend. Keep provider abbreviations, cache choices and connectivity checks out
-of tool names unless managing them is the agent's job. Rename registration
-keys and every executable reference together. Canonical:
+of tool names unless managing them is the agent's job. Use a `search_` prefix
+for queries and `create_`, `update_` or `delete_` for mutations. Rename registration keys and every
+executable reference together. Canonical:
 https://agentsurface.dev/docs/tool-design/naming-and-descriptions.
 
 **Descriptions** carry the most weight. Lead with what it does and when to use
 it, then what to use instead, then preconditions and side effects (auth,
-limits, mutations, pagination). 30 words suits a simple tool; add words only
-where they carry guidance. For near-siblings, state the choosing rule in each.
+limits, mutations, pagination). 30 words suits a simple tool and 200 is the
+house ceiling; add words only where they carry guidance. For near-siblings,
+state the choosing rule in each ("to create an issue use `create_issue`").
+Descriptions are sent with every request, so link longer documentation with a
+`doc_uri` rather than inlining it.
 
 **Schemas.** One or two levels of nesting at most (house advice; OpenAI strict
 allows 10 levels and 5,000 properties). Every field described, with example
-values. Enums wherever the server enforces a closed set, with meanings
-(`low=cosmetic, critical=outage`). The same name for the same thing everywhere
-(`user_id`, never `userId` in one tool).
+values, and bounds or a format (`uuid`, `email`, `date-time`, `uri`) where one
+applies. Enums wherever the server enforces a closed set, with meanings
+(`low=cosmetic, critical=outage`). Reject unknown properties. The same name
+for the same thing everywhere (`user_id`, never `userId` in one tool).
 
 **Output.** Names alongside IDs, so the agent needn't look each one up. Paginate
 by default with `next_cursor`/`has_more`; offer `response_format: concise |
@@ -58,13 +81,20 @@ structured refs (the AI SDK's `toModelOutput`; elsewhere do it in the tool
 result). Errors are returned, not thrown, with `is_retriable` false for
 validation failures (error-handling.md).
 
-**Shape.** Prefer one idempotent `upsert` over create-plus-update, and add a
-batch variant of a tool agents call five or more times per task.
+**Shape.** Prefer one `upsert` over create-plus-update, keyed by a stable
+identity (a natural key or a client-supplied ID) so a retry addresses the same
+entity; without that key it isn't idempotent. Add a batch variant of a tool
+agents call five or more times per task.
 
 **Annotations** (MCP): a create deduplicated by a client `request_id` is
 `readOnlyHint: false, destructiveHint: false, idempotentHint: true`; without
 the dedup key it isn't idempotent. Rules are in mcp-servers.md. Annotations are
 hints, never authorization.
+
+**Curation.** Under about 10 tools per agent context. Past about 20 (a house
+review threshold, not a limit), consolidate near-duplicates, split contexts or
+gate by permission, test routing on representative tasks, and load definitions
+on demand (`activeTools`, tool search).
 
 **One definition, many adapters.** Keep name, description, Zod schema, output
 schema and handler in a neutral registry and emit adapters: MCP
@@ -109,9 +139,6 @@ parameters, execute })`.
   function-call parts with their thought signatures unchanged.
 - **Zod to JSON Schema:** Zod 4's `z.toJSONSchema()`. `zod-to-json-schema` is
   unmaintained and Zod 3 only.
-
-About 20 tools in one agent context is a house review threshold, not a limit;
-beyond it, test routing on representative tasks and use dynamic selection.
 
 ## Templates
 

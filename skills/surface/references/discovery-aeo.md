@@ -3,7 +3,19 @@
 Dimension 4: whether agents can find, read, govern and call the product from
 the open web.
 
-## Score
+## Contents
+
+- Rubric
+- Which signals apply
+- Semantic validation
+- Evidence to gather
+- Facts and formats (llms.txt, Markdown negotiation, robots.txt, Content
+  Signals, Web Bot Auth, JSON-LD, API Catalog, MCP Server Card, Agent Skills
+  index, A2A, ARD and AI Catalog, DNS-AID, WebMCP, NLWeb)
+- Build
+- Templates
+
+## Rubric
 
 - **0**: No llms.txt, AGENTS.md or structured data; robots.txt blocks intended
   retrieval bots or hides public docs.
@@ -57,6 +69,8 @@ and lower confidence.
 - `application/ld+json` in layouts and page templates.
 - `curl -H 'Accept: text/markdown'` on a docs page: Markdown body,
   `Vary: Accept`, optional `x-markdown-tokens`. Also try the `.md` twin.
+- Live behaviour comes from dated command output. When none can be gathered,
+  record it as untested and lower confidence; never infer it from code.
 - Content that only renders on interaction: glossary terms inside `<button>`,
   tab panels mounted on demand, MDX components left as raw JSX in the Markdown.
 - AFDocs for docs sites: `npx afdocs check <url> --format json` (or `--urls`
@@ -177,10 +191,49 @@ entries), a status page linked from the API Catalog, and a standalone agent
 terms-of-use page linked from llms.txt and the API docs. No scanner checks
 these.
 
+## Build
+
+Build only the artifacts whose activating surface exists (Which signals
+apply). The formats are in Facts and formats; AGENTS.md belongs to
+context-files.md.
+
+1. **llms.txt.** Serve it at the web root: in Next.js, `public/llms.txt` or an
+   `app/llms.txt/route.ts` handler (a plain file under `app/` is not a route).
+   Write the `>` summary for an agent that reads nothing else, name sections
+   the way developers search (Guides, Concepts, API, Examples), give every
+   link a one-sentence description, and put lower-priority links under
+   `## Optional`. House budget: 5,000 tokens, aiming for 2,000 to 3,500. Add
+   llms-full.txt when the docs run past about ten pages. Done when every link
+   returns the described content without a redirect and the file is inside the
+   budget.
+2. **robots.txt.** Ask the owner for the policy on search, user-initiated
+   retrieval and training; none of the three has a default. Write the groups
+   into the real `/robots.txt`, the only file crawlers read. A crawler obeys
+   only its most specific group, so repeat each `Disallow` it still needs
+   inside every named group. Add the `Sitemap:` line. Done when the
+   `Content-Signal` line and the allow and block rules state the same policy.
+3. **Markdown twins.** Generate the Markdown from the same source as the
+   HTML: framework components (MDX callouts, tabs) become plain Markdown and
+   every link is absolute. Serve it on `Accept: text/markdown` and at the
+   `.md` URL, with `Vary: Accept` on both representations and
+   `x-markdown-tokens` on the Markdown. Put a pointer to `/llms.txt` near the
+   top of every HTML page (server-rendered, outside `<nav>`, may be visually
+   hidden) and at the start of every `.md` page. Render tab and disclosure
+   panels into the HTML and keep words out of `<button>`-only markup. Done
+   when the deployed response carries `Vary: Accept` both cached and uncached
+   (some hosts store `Vary` at build time and ignore the proxy), and
+   `npx afdocs check <url> --checks markdown-content-parity,content-start-position,llms-txt-directive-html,llms-txt-directive-md,markdown-link-portability`
+   passes.
+4. **`.well-known` files** for capabilities that exist: API Catalog, MCP
+   Server Card, Agent Skills index, OAuth protected-resource metadata, the
+   Web Bot Auth key directory. Done when each returns the right
+   `Content-Type`, parses, and every linked resource passes Semantic
+   validation.
+
 ## Templates
 
 - `templates/discovery/llms.txt`, `templates/discovery/llms-full.txt`
-- `templates/discovery/robots-ai.txt`
+- `templates/discovery/robots-ai.txt` (groups to merge into `/robots.txt`)
 - `templates/discovery/json-ld-softwareapp.ts`
 - `templates/discovery/content-negotiation.ts`
 - `templates/discovery/api-catalog.json`

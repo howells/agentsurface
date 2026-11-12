@@ -3,7 +3,16 @@
 Dimension 9: whether the product's agent surfaces are tested, and agent
 behaviour is measured, beyond a demo that worked once.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- Build
+- What good looks like: layers, metrics, non-determinism, model graders,
+  datasets, CI, red team, MCP tests, tracing, platforms
+- Templates
+
+## Rubric
 
 - **0**: Ordinary unit and integration tests only; nothing exercises tool
   selection, an MCP server or agent behaviour.
@@ -15,6 +24,11 @@ behaviour is measured, beyond a demo that worked once.
 - **3**: An eval suite with several runs per case and pass@k / pass^k, regression
   baselines, CI integration, and cases drawn from real failures.
 
+Always applicable: every project can test its agent surfaces, so a project
+with no such tests scores 0, never N/A. Scripted calls with fixed tool choices
+count as contract tests (level 1); levels 2 and 3 need selection made by a
+model.
+
 ## Evidence to gather
 
 - Test paths containing `agent`, `tool`, `mcp`, `eval`
@@ -23,6 +37,49 @@ behaviour is measured, beyond a demo that worked once.
 - CI workflows that run evals, and stored baselines per commit
 - Labelled datasets and grader code (code, model, human)
 - OpenTelemetry GenAI attributes in instrumentation
+
+## Build
+
+Use the project's package manager and existing test runner; add an eval
+platform only when the project already uses one or asks for it. Take the model
+from the project's configuration or an environment variable and check it
+against the provider's current model list. Put one agent loop behind a test
+helper that returns text, tool calls and tool results, and build every test on
+it; frameworks share no `generate` or retry contract. Use the project's own
+loop when it has one. A product that only exposes surfaces to outside agents
+gets a minimal loop inside the test harness, never in production code.
+
+Build in this order; each is done when the stated assertion fails on a
+deliberately broken surface and passes on the real one.
+
+1. **Handler and MCP tests.** Each tool handler and, for an MCP server, a
+   linked in-memory client and server: every tool listed with its annotations,
+   one successful call and one `isError` result per tool. Annotations in a test
+   prove the declaration, not enforcement.
+2. **Routing.** For each case, assert the actual tool-call names and arguments
+   the agent produced against the expected ones. Asserting on response text
+   proves nothing about routing. Every tool has at least one case, and
+   near-sibling tools have a case each way.
+3. **Error recovery.** Validation, not found, rate limit and auth: the agent
+   receives the structured error and the next call is the corrected one. A
+   retry test records consecutive invocation timestamps (or drives the
+   scheduler directly) and asserts both that a retry happened and that it
+   waited the advertised interval; elapsed wall time alone proves neither.
+4. **Multi-step and outcome.** A sequence whose final state is asserted, such
+   as the record existing or the file being gone.
+5. **Repeats.** Run each case k times (k of 3 or more) with the runner's repeat
+   option and record every attempt. A runner's `retry` option re-runs until a
+   pass and hides the failure, so evals and safety tests never set it; one
+   unsafe run fails a safety case.
+6. **Red team.** Active cases for each applicable risk, and each out-of-scope
+   category recorded with its reason.
+7. **Tracing** on agent, model and tool calls, flushed before a short-lived
+   process exits.
+8. **CI.** Deterministic tests (mocked tools, in-memory MCP) need no external
+   service and gate pull requests; credentialed live evals are a separate job.
+
+Report pass@k and pass^k where the project tracks evidence, such as the owning
+issue, rather than in a new repository document.
 
 ## What good looks like
 
@@ -85,9 +142,13 @@ per-prompt adaptive rubrics.
 
 ## Templates
 
-- `templates/cli-and-evals/mcp-test-harness.ts`
-- `templates/cli-and-evals/eval-vitest-harness.ts`
-- `templates/cli-and-evals/eval-braintrust.ts`
+- `templates/mcp-and-api/mcp-client-test.ts` (in-memory MCP client and server)
+- `templates/cli-and-evals/mcp-test-harness.ts` (generated inputs against a
+  stdio server)
+- `templates/cli-and-evals/eval-vitest-harness.ts` (routing on tool-call names,
+  adversarial cases, repeats without retries)
+- `templates/cli-and-evals/eval-braintrust.ts` (scorers and trials)
 - `templates/cli-and-evals/eval-promptfoo.yaml`
-- `templates/cli-and-evals/red-team-suite.yaml`
-- `templates/cli-and-evals/otel-genai-instrument.ts`
+- `templates/cli-and-evals/red-team-suite.yaml` (OWASP LLM Top 10 mapping)
+- `templates/cli-and-evals/otel-genai-instrument.ts` (agent, chat and tool
+  spans)

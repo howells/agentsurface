@@ -1,9 +1,18 @@
 # Context Files
 
 Dimension 8: AGENTS.md and any tool-specific overlays. A well-curated AGENTS.md
-alone can score 3.
+alone can score 3. Always applicable: a project with none scores 0.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- How the clients load these files
+- What a good AGENTS.md holds
+- Build
+- Templates
+
+## Rubric
 
 - **0**: No AGENTS.md, CLAUDE.md or equivalent.
 - **1**: A file exists but is generic, uncurated `/init` output, prose
@@ -26,13 +35,16 @@ generate. A 340-line file passes, but don't write one.
   `CLAUDE.local.md`; `.cursor/rules/*.mdc`; `.github/copilot-instructions.md`
   and `.github/instructions/*.instructions.md`; `GEMINI.md`;
   `.windsurf/rules/`.
-- Line counts, whether commands are exact and current (run one or two), and
+- Line counts, whether commands are exact and current (match them against the
+  project's script definitions), and
   whether boundaries are rules ("Never…") or aspirations ("We try not to…").
 - Duplication between AGENTS.md and the overlays.
 - Git history: edited over time, or generated once.
 
 ## How the clients load these files
 
+- **Codex** reads AGENTS.md natively: the root file, then nested ones down to
+  the working directory. It needs no overlay.
 - **Claude Code** (v2.1.277+) reads AGENTS.md only when no `CLAUDE.md`,
   `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the directory or above it.
   If one does, it reads that instead: one or the other, not both. A CLAUDE.md
@@ -47,7 +59,7 @@ generate. A 340-line file passes, but don't write one.
   load it twice. A personal `CLAUDE.local.md` hides AGENTS.md for that developer
   unless it imports it too.
 - Put `@AGENTS.md` on the first line (house rule; imports work anywhere), then
-  only Claude-specific lines. Check what loaded with `/context` → Memory files;
+  only Claude-specific lines. In Claude Code, check what loaded with `/context` → Memory files;
   `/memory` manages files but doesn't confirm loading.
 - Rules that must hold whatever the model decides belong in
   `.claude/settings.json` permissions or a `PreToolUse` hook, not prose. Model
@@ -88,6 +100,35 @@ Write imperatives and relative paths. Point to files instead of describing
 code. In a monorepo the root file maps packages and their filtered commands,
 and each package has its own AGENTS.md with its own boundaries. Which nested
 files load is up to each client, so check the clients the team uses.
+
+## Build
+
+Write for the clients the team uses; one AGENTS.md is enough when none of them
+needs more.
+
+1. **AGENTS.md at the project root.** Take every command from the project's own
+   scripts and package manager, then run the safe ones (install, typecheck,
+   lint, test) and keep only those that pass. Leave deploy, migration and
+   publish commands unrun and list them under Ask first or Never. Keep a line
+   only if an agent couldn't learn it from the code. Done when every listed
+   command has been run or is marked as unrun, the three boundary tiers are
+   filled, the file holds no secret values or production addresses, and it is
+   about 150 lines (300 at most).
+2. **Merge into an existing file.** Keep the team's rules, drop lines the code
+   already states, and move anything tool-specific to that tool's overlay.
+3. **CLAUDE.md** when Claude Code needs something no other tool should see
+   (its MCP servers, slash commands, hooks), or as a one-line `@AGENTS.md` file
+   for the older-version cases above. First line `@AGENTS.md`, then
+   Claude-only lines. Done when Claude Code's `/context` → Memory files lists
+   both files.
+4. **Cursor and Copilot overlays** only when the team uses them: one
+   always-applied Cursor rule that defers to AGENTS.md, plus glob-scoped rules
+   for conventions that hold in part of the tree; a Copilot file that defers to
+   AGENTS.md and adds only Copilot-specific lines. Done when no overlay repeats
+   a line of AGENTS.md.
+5. **Monorepo.** The root file lists each package, its filtered commands and
+   the build order; each package file holds only what differs from the root.
+   Done when every workspace package appears in the root map.
 
 ## Templates
 

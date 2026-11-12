@@ -2,7 +2,19 @@
 
 Dimension 3: whether the product exposes an MCP server, and how well.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- Revision 2026-07-28 (current)
+- Build: transport, tool set, tools, long operations
+- Resources, Skills and Apps
+- Authentication
+- Testing
+- Discovery and registration
+- Templates
+
+## Rubric
 
 - **0**: No MCP server: no `.mcp.json`, no imports of `@modelcontextprotocol/*`,
   `mcp-handler`, `@mastra/mcp`, `fastmcp` or Python `mcp`.
@@ -10,14 +22,23 @@ Dimension 3: whether the product exposes an MCP server, and how well.
   annotations, no resources, and thrown errors instead of `isError` results.
 - **2**: Annotations on every tool; descriptions that say when and when not to
   use each; recoverable errors returned with `isError: true`; `outputSchema`
-  with `structuredContent` on structured results; resources with MIME types for
-  static data; built against revision 2026-07-28.
+  with `structuredContent` on structured results; resources with MIME types
+  where the server has static data to offer; built against revision
+  2026-07-28.
 - **3**: Level 2 plus, for a protected HTTP server, RFC 9728 metadata and full
   token validation; cursor pagination on lists; progress on long operations;
   stdio and Streamable HTTP where both make sense; `InMemoryTransport` tests;
   about 20 tools or fewer per server; prompts or negotiated Tasks for
   workflows; consent gates on high-risk tools; no roots, sampling or logging in
   new designs.
+
+Caps: at most 2 when a protected HTTP server has no authorisation negative
+tests; at most 1 when any request can read another tenant's data. SDK defaults
+are not evidence that the deployed server behaves.
+
+Usually applicable: a product whose capabilities other agents should use can
+expose a server, so a missing one scores 0. N/A, with the reason recorded, for a
+project that only consumes MCP servers or a tiny internal script.
 
 ## Evidence to gather
 
@@ -27,7 +48,11 @@ Dimension 3: whether the product exposes an MCP server, and how well.
 - Annotations, `outputSchema`/`structuredContent`, `isError` returns
 - `/.well-known/oauth-protected-resource` (plus the server's path, such as
   `/mcp`, per RFC 9728) and the token-validation code
-- Tests using `InMemoryTransport`, and any run against a deployed URL
+- Tests using `InMemoryTransport`, wire-level tests, and any run of a real
+  client against a deployed URL
+- `Origin` and `Host` validation in front of the HTTP handler
+- Extensions declared before use; MCP Apps with `_meta.ui.csp` and a structured
+  fallback; a Server Card that lists no tools
 - Session IDs, `initialize` handling, roots, sampling or logging: migration
   findings against 2026-07-28
 
@@ -61,7 +86,10 @@ What changed, and what models still get wrong:
   `resultType` (`"complete"` or `"input_required"`); a missing one means
   complete.
 - **Headers.** Streamable HTTP POSTs carry `Mcp-Method` and `Mcp-Name`; custom
-  headers travel via `x-mcp-header`.
+  headers travel via `x-mcp-header`. To probe a deployed server by hand, POST
+  `server/discover` then `tools/list` with `MCP-Protocol-Version: 2026-07-28`
+  and `clientCapabilities` in the request's `_meta`; without both the server
+  rejects the request before reaching the method.
 - **Caching.** List and read results carry `ttlMs` and `cacheScope`. Keep
   `tools/list` order deterministic so prompt caches hit.
 - **Schemas.** `inputSchema`/`outputSchema` accept any JSON Schema 2020-12
@@ -85,7 +113,21 @@ Annotations, `outputSchema`/`structuredContent`, cursor pagination and `isError`
 carry over unchanged. Migration cost sits in session state, the handshake, and
 anything built on roots, sampling or logging.
 
-## Tools
+## Build
+
+**Transport.** stdio for a local developer tool; Streamable HTTP for a hosted,
+multi-tenant service; both when the product is used each way. In TypeScript v2,
+`serveStdio` comes from `@modelcontextprotocol/server/stdio` and
+`createMcpHandler` returns a web-standard `fetch` handler that builds a server
+per request. Keep stdout for protocol messages only; logs go to stderr.
+
+**Tool set.** Curate by task, never one tool per endpoint: under about 10 tools
+per agent context, about 20 per server as the house review threshold (not a
+protocol limit); past it, split servers or use client-side tool search. Actions
+are tools; context data is a resource. Names and descriptions follow
+tool-design.md.
+
+**Tools.**
 
 - TypeScript v2 registers with `server.registerTool(name, { description,
 inputSchema, outputSchema, annotations }, handler)`. The v1 positional
@@ -99,12 +141,26 @@ inputSchema, outputSchema, annotations }, handler)`. The v1 positional
   tenancy and approvals in the handler. Treat descriptions, resources and
   prompts from servers you don't pin as untrusted.
 - Return `structuredContent` alongside `outputSchema` on success, plus a short
-  text summary.
-- About 20 tools per server is a house review threshold, not a protocol limit;
-  split servers or use client-side tool search past it.
+  text summary for clients that read only `content`. Embedded resources and
+  resource links are a separate content type for documents the client may read;
+  they don't replace `structuredContent`.
+- A recoverable failure returns `isError: true` with the problem document as
+  text (shape in error-handling.md), including `is_retriable`, `suggestions`
+  naming the next tool, and `trace_id`. Throwing hides it from the model.
 - Approval or an allowlist for destructive, authenticated, production,
   payment, email-send, file-write, package-install and network-expanding tools.
   Never elicit secrets silently.
+
+**Long operations.** Holding a call open past about 5 seconds is a house
+review threshold, not a protocol limit. Send progress notifications, or
+negotiate the Tasks extension: mark the tool with `execution.taskSupport`,
+return task data rather than a pretended result, and serve `tasks/get` and
+`tasks/update` until a terminal state (`completed`, `failed`, `cancelled`).
+Check cancellation between steps so a cancelled call stops working.
+
+Done when `tools/list` shows every tool with a description, `inputSchema`,
+`outputSchema` and all four annotations set explicitly, and the tests under
+**Testing** pass.
 
 ## Resources, Skills and Apps
 
@@ -124,10 +180,15 @@ inputSchema, outputSchema, annotations }, handler)`. The v1 positional
 ## Authentication
 
 stdio servers inherit the OS user; no auth. A protected Streamable HTTP server
-publishes RFC 9728 metadata and validates every request: signature, issuer,
+publishes RFC 9728 metadata (the well-known path appends the server's own, so
+`/mcp` serves `/.well-known/oauth-protected-resource/mcp`, with `resource` set
+to the server's URL and `authorization_servers` listed) and validates every
+request: signature, issuer,
 audience equal to its own resource URL, expiry, scopes, and DPoP binding only if
 it implements RFC 9449. An unauthenticated request gets `401` with
-`WWW-Authenticate` naming `resource_metadata`. Check a scope per operation in
+`WWW-Authenticate` naming `resource_metadata`. Accept Client ID Metadata
+Documents only when the authorization server advertises
+`client_id_metadata_document_supported`. Check a scope per operation in
 each handler, not one per server; a valid token missing the scope gets `403`
 with a scope challenge. When a token carries `act`, check `act.sub` against the
 actors allowed for that subject; nested `act` claims are history, not
@@ -176,6 +237,10 @@ from `~/.claude.json` (`claude mcp add`); Gemini CLI uses `mcpServers` in
 
 ## Templates
 
-- `templates/mcp-and-api/mcp-server-ts-stdio.ts`
-- `templates/mcp-and-api/mcp-server-ts-http.ts`
-- `templates/mcp-and-api/mcp-client-test.ts`
+- `templates/mcp-and-api/mcp-server-ts-stdio.ts` (cancellable long operation)
+- `templates/mcp-and-api/mcp-server-ts-http.ts` (token validation, per-tool
+  scopes, `Origin`/`Host` checks, CORS, protected-resource metadata)
+- `templates/mcp-and-api/mcp-client-test.ts` (`InMemoryTransport` tests)
+- `templates/mcp-and-api/mcp-server-card.json`
+- `templates/cli-and-evals/mcp-test-harness.ts` (generated inputs against a
+  stdio server; read-only tools unless told otherwise)

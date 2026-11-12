@@ -1,10 +1,21 @@
 # Authentication
 
 Dimension 5: whether a client can get and use credentials that fit the acting
-identity. Public read-only capabilities may need none. Score the identity
-boundary the product actually has; don't demand every grant.
+identity. Score the identity boundary the product actually has; don't demand
+every grant. A product that is public and read-only by design has no boundary
+to score: report the dimension as not applicable and say so.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- Facts models get wrong (OAuth 2.1, RFC 9728 metadata, client registration,
+  JWT validation, claims, delegation, API keys, DPoP, auth.md, platforms,
+  libraries)
+- Build
+- Templates
+
+## Rubric
 
 - **0**: No usable path for the intended client and identity: protected requests
   return login HTML, need browser state, or token acquisition can't complete.
@@ -129,6 +140,37 @@ account or workload identity federation, not a key file.
 
 **Libraries.** `jose` for JWTs and JWKS, `openid-client` for discovery and token
 exchange. `lucia` was deprecated in March 2025; don't add it.
+
+## Build
+
+1. **Classify each protected capability** as user-delegated or service-owned
+   before choosing a grant. An agent caller doesn't make access
+   service-owned, and a service identity never stands in for user consent.
+   Done when every capability has an acting identity and a grant.
+2. **User-delegated:** authorization code with PKCE S256 (`code_verifier` from
+   32 random bytes, base64url). PKCE belongs to this flow only.
+3. **Service-owned:** client credentials at the `token_endpoint` from RFC 8414
+   metadata, with access tokens that live hours (a deployment policy, not an
+   OAuth rule) and no login page, CAPTCHA or human approval on the path.
+4. **Publish discovery** for what exists: RFC 8414 metadata on the
+   authorization server (endpoints, grants, client authentication methods,
+   scopes) and RFC 9728 metadata on each protected resource.
+5. **Validate every request** server-side: issuer, audience, expiry and the
+   scope for that operation.
+6. **Downstream calls** exchange the token (RFC 8693) for one bound to the
+   downstream audience; the inbound token stays at this service.
+7. **API keys**, where the product uses them: store only a hash, give each key
+   scopes and an expiry, and revoke on compromise.
+8. **DPoP**, where the product uses it: the server checks the proof's
+   signature, `typ`, `iat` window, `htm`, `htu`, `ath`, `jti` replay and the
+   token's `cnf.jkt` thumbprint; the `jti` store covers the whole `iat` window.
+9. **Audit log** per token request and validation: client, subject, actor,
+   scope, outcome and trace ID. Tokens and secrets stay out of logs.
+
+Done when: verify each flow selected for the acting identity; mark grants and
+extensions the product does not need as not applicable. Each selected flow has
+a test for a valid token, an expired token, the wrong audience and a missing
+scope.
 
 ## Templates
 

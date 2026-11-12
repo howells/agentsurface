@@ -3,7 +3,15 @@
 Dimension 2: whether an agent can drive the CLI without a human at the
 keyboard.
 
-## Score
+## Contents
+
+- Rubric
+- Evidence to gather
+- Build: output, exit codes, streams, non-interactive runs, mutations, input,
+  context budgets, schema, hardening, knowledge packaging
+- Templates
+
+## Rubric
 
 - **0**: Human-only output (tables, colour, prose), interactive prompts with no
   bypass, no machine-readable path.
@@ -44,22 +52,27 @@ click, typer, cobra, clap), then:
 
 Piping `--json` through `jq -c` proves nothing about NDJSON support.
 
-## The house way
+## Build
+
+Each part is done when the command under **Evidence to gather** that exercises
+it shows the stated behaviour on every command, not a sample.
 
 **Output.** `--json` on every command, and the same JSON automatically when
 stdout isn't a TTY. Stdout carries the data object itself, the one the API would
 return, with no wrapper: optional fields present as `null`, empty collections as
-`[]`. `--all --json` streams one record per line (NDJSON): records only, no
-array and no summary line, so a failed stream is known by its exit code. A failure writes
-nothing to stdout and one object to stderr:
+`[]`. `--all --json` streams one record per line (NDJSON), each written as soon
+as it is fetched: records only, no array and no summary line. A stream that
+fails part-way keeps the lines already written, writes the error to stderr and
+exits non-zero, so consumers check the exit code. A failure writes nothing more
+to stdout and one object to stderr:
 
 ```ts
 { error: string;            // stable snake_case code to branch on
-  message: string;
+  message: string;          // may change between releases
   suggestions: string[];    // runnable next commands, most likely first
-  failing_input?: object;
+  failing_input?: object;   // the values that caused the failure
   invalid_args?: { arg: string; reason: string; received?: string; expected?: string }[];
-  trace_id?: string }       // unhandled failures only
+  trace_id?: string }       // unhandled failures only, never a stack trace
 ```
 
 Canonical: https://agentsurface.dev/docs/cli-design/machine-readable-output and
@@ -80,41 +93,74 @@ The house contract:
 | 4    | Permission denied                    |
 | 5    | Conflict (exists, or state changed)  |
 
-Pair every non-zero exit with a structured error on stderr. Exit 0 on failure is
-a critical finding.
+Pair every non-zero exit with a structured error on stderr, including the
+argument parser's own usage errors (unknown command or flag, missing argument).
+Exit 0 on failure is a critical finding.
 
 **Streams.** Data goes to stdout, progress and logs to stderr. Disable colour
 under `--json`, when stdout isn't a TTY, and when `NO_COLOR` is set to any
-non-empty value. Gate spinners on `isatty`.
+non-empty value. Gate spinners on `isatty`. A reader that closes the pipe early
+(`| head -1`) ends the stream with exit 0, not a crash.
 
-**Mutations.** `--dry-run` returns a structured preview (action, target,
-cascade counts). Without `--yes`, a destructive command fails with
-`confirmation_required` and the preview in `details`; never a countdown or a
-prompt.
+**Non-interactive runs.** Decide output from stdout's TTY state and prompting
+from stdin's, separately. With every required flag given, never prompt. With
+flags missing and no terminal on stdin, fail with exit 2 and an error whose
+`failing_input` lists the missing flags and whose `suggestions` hold the
+complete command.
 
-**Input.** Accept stdin JSON for complex or sensitive input; argv shows up in
-process listings and shell history. Secrets come from environment variables
-listed in `--help` (`--token <value>  API token (or set $API_TOKEN)`).
+**Mutations.** `--dry-run` on every create, update and delete returns the same
+shape as the real run plus `"dry_run": true`, with the affected records, total
+count, cascades and warnings. Without `--yes`, a destructive command fails with
+`confirmation_required` and that preview; never a countdown or a prompt. A
+confirmation token, where used, is bound server-side to the previewed parameters
+and resolved targets and re-checked on execution.
+
+**Input.** Mutating commands accept `--payload <json>` and piped JSON on stdin
+(`-` as the explicit marker), using the API's field names unchanged and every
+API field, including ones with no convenience flag. One documented precedence
+rule: flags override payload fields. Invalid JSON is a usage error (exit 2); a
+type mismatch is a per-argument error, never a silent coercion. Secrets come
+from stdin or environment variables listed in `--help`
+(`--token <value>  API token (or set $API_TOKEN)`); argv shows up in process
+listings and shell history.
+
+**Context budgets.** List, get and search take `--fields` with dot notation,
+default to a projection smaller than the full record, and offer `--full`.
+Paginated output carries `total` (or `total_estimate`), a cursor and `has_more`;
+`--all` pages automatically within a documented cap. The schema output lists
+default and available fields.
 
 **Schema.** `<cmd> --help --json` prints one command as
-`{ command, description, flags: [{ name, type, required, default?, description }], args }`;
-`<cli> describe` prints the whole tree with groups nested under `commands`. Put
-the result's JSON Schema in `returns`: Zod 4's `z.toJSONSchema()` produces it
-natively; `zod-to-json-schema` is unmaintained and Zod 3 only. Canonical:
+`{ command, description, flags: [{ name, type, required, default?, enum?, description }], args, returns }`,
+with flag names as typed (`dry-run`, not the parser's `dryRun`). `<cli> describe`
+prints the whole tree with groups nested under `commands`, plus `name`,
+`version` and the exit-code contract. Put the result's JSON Schema in `returns`:
+Zod 4's `z.toJSONSchema()` produces it natively; `zod-to-json-schema` is
+unmaintained and Zod 3 only. Add required scopes and a destructive flag where
+the CLI knows them. Canonical:
 https://agentsurface.dev/docs/cli-design/schema-introspection.
 
-**Hardening.** Resolve paths with `fs.realpath` against the allowed root;
-string checks for `..` miss symlinks. Reject encoded separators (`%2e`, `%2f`,
-`%5c`), UNC paths and control characters (`\0`, `\n`, `\r`, `\x1b`). `--` ends
-option parsing but doesn't stop shell expansion, so agents should call with an
-argv array or stdin JSON.
+**Hardening**, per field, matched to what the field holds. Resolve paths with
+`fs.realpath` (on the nearest existing ancestor) against the allowed root;
+string checks for `..` miss symlinks. In identifiers and paths reject encoded
+separators (`%2e`, `%2f`, `%5c`, `%00`), UNC paths, control characters (`\0`,
+`\n`, `\r`, `\x1b`), and `?` or `#` in resource IDs; decode until the value
+stops changing before validating, so double encoding can't pass. Free-text and
+JSON fields may hold tabs and newlines. Report each rejection in `invalid_args`.
+`--` ends option parsing but doesn't stop shell expansion, so agents should call
+with an argv array or stdin JSON. Treat strings that came from the API as
+untrusted where they reach an agent's context; sanitising is not a guarantee, so
+authorisation stays in the CLI and the server.
 
-**Knowledge packaging.** A SKILL.md or AGENTS.md beside the CLI lists exact
-invocations, the exit-code contract, required environment variables and
-boundaries.
+**Knowledge packaging.** A versioned SKILL.md or AGENTS.md beside the CLI lists
+installation, authentication, exact invocations, the exit-code contract,
+required environment variables, permission boundaries and the invariants to
+always use (`--json`, `--fields`, `--dry-run`). The schema output points at it
+and the release pipeline updates it.
 
 ## Templates
 
-- `templates/cli-and-evals/cli-envelope.ts`
-- `templates/cli-and-evals/cli-ndjson.ts`
-- `templates/cli-and-evals/cli-schema.ts`
+- `templates/cli-and-evals/cli-envelope.ts` (output, structured errors, exit
+  codes, usage errors from the parser)
+- `templates/cli-and-evals/cli-ndjson.ts` (streaming, early pipe close)
+- `templates/cli-and-evals/cli-schema.ts` (`describe` and `--help --json`)
