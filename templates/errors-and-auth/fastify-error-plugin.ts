@@ -9,27 +9,34 @@
  * </CUSTOMISE>
  */
 
+import { STATUS_CODES } from "node:http";
 import fastifyPlugin from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from "fastify";
-import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
-import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
+import type { ProblemKind, ProblemDetailsType, InvalidField } from "./problem-details";
+import {
+  internalProblem,
+  problemDetails,
+  problemDocUri,
+  problemTitle,
+  problemType,
+} from "./problem-details";
 
 /**
  * Fastify error hierarchy
  */
-export class FastifyDomainError extends Error implements FastifyError {
+export class FastifyDomainError extends Error {
   public statusCode: number;
-  public code: ProblemCode;
+  public kind: ProblemKind;
 
   constructor(
-    code: ProblemCode,
+    kind: ProblemKind,
     statusCode: number,
     message: string,
     public context?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "FastifyDomainError";
-    this.code = code;
+    this.kind = kind;
     this.statusCode = statusCode;
   }
 }
@@ -39,7 +46,7 @@ export class ValidationErrorFastify extends FastifyDomainError {
     message: string,
     public invalidFields?: InvalidField[],
   ) {
-    super("ERR_VALIDATION", 422, message);
+    super("validation-error", 422, message);
     this.name = "ValidationErrorFastify";
   }
 }
@@ -60,36 +67,39 @@ function mapFastifyErrorToProblemDetails(
 ): ProblemDetailsType {
   // Handle validation errors from Fastify's built-in validator
   if ("validation" in err && Array.isArray(err.validation)) {
+    // Ajv reports a missing property against its parent, so the property name is appended
+    // to point at the field itself: "" + "email" -> "/email".
     const invalidFields: InvalidField[] = err.validation.map((v) => ({
-      field: v.instancePath || "/",
+      field:
+        v.keyword === "required"
+          ? `${v.instancePath}/${String(v.params.missingProperty).replaceAll("~", "~0").replaceAll("/", "~1")}`
+          : v.instancePath,
       reason: v.message ?? "Invalid value",
     }));
 
     return problemDetails({
-      code: "ERR_VALIDATION",
       detail: "One or more validation errors occurred",
-      doc_uri: problemDocUri("ERR_VALIDATION"),
+      doc_uri: problemDocUri("validation-error"),
       invalid_fields: invalidFields,
       is_retriable: false,
       status: 422,
-      title: "Validation Failed",
+      title: problemTitle("validation-error"),
       trace_id: traceId,
-      type: problemType("ERR_VALIDATION"),
+      type: problemType("validation-error"),
     });
   }
 
   // Handle custom domain errors. Their messages are written for callers, so they are safe to return.
   if (err instanceof FastifyDomainError) {
     return problemDetails({
-      code: err.code,
       detail: err.message,
-      doc_uri: problemDocUri(err.code),
+      doc_uri: problemDocUri(err.kind),
       invalid_fields: err instanceof ValidationErrorFastify ? err.invalidFields : undefined,
       is_retriable: false,
       status: err.statusCode,
-      title: err.code.replace("ERR_", "").replace(/_/g, " "),
+      title: problemTitle(err.kind),
       trace_id: traceId,
-      type: problemType(err.code),
+      type: problemType(err.kind),
     });
   }
 
@@ -100,7 +110,7 @@ function mapFastifyErrorToProblemDetails(
       detail: err.message,
       is_retriable: false,
       status: err.statusCode,
-      title: "Bad Request",
+      title: STATUS_CODES[err.statusCode] ?? "Bad Request",
       trace_id: traceId,
     });
   }
@@ -145,6 +155,26 @@ const errorPlugin = fastifyPlugin(
       return reply.status(status).send(problemDetail);
     });
 
+    // Unknown routes bypass the error handler, so they need their own problem document
+    fastify.setNotFoundHandler(async (request: FastifyRequest, reply: FastifyReply) => {
+      const traceId = getTraceId(request);
+      return reply
+        .status(404)
+        .header("Content-Type", "application/problem+json")
+        .header("X-Request-ID", traceId)
+        .send(
+          problemDetails({
+            detail: `No route matches ${request.method} ${request.url.split("?")[0]}`,
+            doc_uri: problemDocUri("not-found"),
+            is_retriable: false,
+            status: 404,
+            title: problemTitle("not-found"),
+            trace_id: traceId,
+            type: problemType("not-found"),
+          }),
+        );
+    });
+
     // Decorator: helper to throw domain errors
     fastify.decorate("throwValidationError", (message: string, invalidFields?: InvalidField[]) => {
       throw new ValidationErrorFastify(message, invalidFields);
@@ -152,8 +182,8 @@ const errorPlugin = fastifyPlugin(
 
     fastify.decorate(
       "throwDomainError",
-      (code: ProblemCode, statusCode: number, message: string) => {
-        throw new FastifyDomainError(code, statusCode, message);
+      (kind: ProblemKind, statusCode: number, message: string) => {
+        throw new FastifyDomainError(kind, statusCode, message);
       },
     );
   },
@@ -170,7 +200,7 @@ export default errorPlugin;
 declare module "fastify" {
   interface FastifyInstance {
     throwValidationError: (message: string, invalidFields?: InvalidField[]) => never;
-    throwDomainError: (code: ProblemCode, statusCode: number, message: string) => never;
+    throwDomainError: (kind: ProblemKind, statusCode: number, message: string) => never;
   }
 }
 

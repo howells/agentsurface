@@ -97,7 +97,6 @@ export function getJWTValidator(): JWTValidator {
 function unauthorized(detail: string, error?: "invalid_token"): NextResponse {
   return NextResponse.json(
     {
-      code: "ERR_UNAUTHORIZED",
       detail,
       is_retriable: false,
       status: 401,

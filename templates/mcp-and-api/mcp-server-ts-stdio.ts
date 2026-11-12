@@ -158,11 +158,10 @@ async function handleSearchDocs(input: z.infer<typeof searchDocsSchema>): Promis
         {
           type: "text",
           text: JSON.stringify({
-            type: "https://api.example.com/errors/unavailable",
+            type: "https://api.example.com/errors/service-unavailable",
             title: "Search Unavailable",
             status: 503,
             detail: "The documentation index could not be searched.",
-            code: "ERR_UNAVAILABLE",
             is_retriable: true,
             retry_after_ms: 5000,
           }),
@@ -217,12 +216,11 @@ async function handleCreateIssue(input: z.infer<typeof createIssueSchema>): Prom
           type: "text",
           // The cause is in the log. Not retriable: the issue may have been created.
           text: JSON.stringify({
-            type: "https://api.example.com/errors/internal",
+            type: "https://api.example.com/errors/internal-error",
             title: "Issue Creation Failed",
             status: 500,
             detail:
               "The issue tracker failed part-way. Check whether the issue exists before trying again.",
-            code: "ERR_INTERNAL",
             is_retriable: false,
           }),
         },
@@ -321,7 +319,6 @@ async function handleWaitForBuild(
           title: "Build Still Running",
           status: 504,
           detail: `Build ${input.build_id} did not complete within ${input.timeout_seconds}s.`,
-          code: "ERR_TIMEOUT",
           is_retriable: true,
           suggestions: ["Call wait_for_build again with the same build_id."],
         }),

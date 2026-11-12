@@ -45,10 +45,6 @@ info:
 servers:
   - url: https://api.example.com/v1
     description: Production API
-    variables:
-      region:
-        default: us-east-1
-        enum: [us-east-1, us-west-2, eu-west-1]
   - url: https://staging-api.example.com/v1
     description: Staging (for testing)
 
@@ -579,11 +575,11 @@ components:
         type:
           type: string
           format: uri-reference
-          example: "https://api.example.com/errors/validation"
+          example: "https://api.example.com/errors/validation-error"
           description: Stable URI identifying the error type; branch on this, not on title or detail
         title:
           type: string
-          example: "Validation Failed"
+          example: "Validation failed"
         status:
           type: integer
           minimum: 400
@@ -596,10 +592,6 @@ components:
           type: string
           example: "/agents"
           description: URI reference identifying this occurrence
-        code:
-          type: string
-          example: "ERR_VALIDATION"
-          description: Machine-readable domain code
         is_retriable:
           type: boolean
           example: false
@@ -665,11 +657,10 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            type: "https://api.example.com/errors/validation"
-            title: "Validation Failed"
+            type: "https://api.example.com/errors/validation-error"
+            title: "Validation failed"
             status: 422
             detail: "One or more validation errors occurred"
-            code: "ERR_VALIDATION"
             is_retriable: false
             trace_id: "req-123"
             invalid_fields:
@@ -694,7 +685,6 @@ components:
             title: "Unauthorized"
             status: 401
             detail: "Bearer token missing or expired"
-            code: "ERR_UNAUTHORIZED"
             is_retriable: false
             trace_id: "req-456"
 
@@ -709,7 +699,6 @@ components:
             title: "Forbidden"
             status: 403
             detail: "You do not have permission to modify this agent"
-            code: "ERR_FORBIDDEN"
             is_retriable: false
             trace_id: "req-789"
 
@@ -721,10 +710,9 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
           example:
             type: "https://api.example.com/errors/not-found"
-            title: "Not Found"
+            title: "Resource not found"
             status: 404
             detail: "Agent with ID 550e8400-e29b-41d4-a716-446655440000 not found"
-            code: "ERR_NOT_FOUND"
             is_retriable: false
             trace_id: "req-999"
 
@@ -739,7 +727,6 @@ components:
             title: "Conflict"
             status: 409
             detail: "Agent with name 'Support Analyzer' already exists"
-            code: "ERR_CONFLICT"
             is_retriable: false
             trace_id: "req-111"
 
@@ -765,11 +752,10 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            type: "https://api.example.com/errors/rate-limited"
-            title: "Rate Limit Exceeded"
+            type: "https://api.example.com/errors/rate-limit-exceeded"
+            title: "Rate limit exceeded"
             status: 429
             detail: "You have exceeded your quota of 100 requests."
-            code: "ERR_RATE_LIMITED"
             is_retriable: true
             retry_after_ms: 30000
             trace_id: "req-222"

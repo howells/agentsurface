@@ -45,10 +45,29 @@
   },
   "devDependencies": {
     "@howells/lint": "catalog:",
+    "@langfuse/otel": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
+    "@openai/agents": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
+    "@opentelemetry/otlp-exporter-base": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@types/node": "catalog:",
+    "ai": "catalog:",
+    "autoevals": "catalog:",
+    "braintrust": "catalog:",
+    "commander": "catalog:",
+    "fast-check": "catalog:",
+    "fastify": "catalog:",
+    "fastify-plugin": "catalog:",
     "husky": "catalog:",
+    "ioredis": "catalog:",
+    "jose": "catalog:",
     "lint-staged": "catalog:",
-    "oxlint-tsgolint": "catalog:"
+    "oxlint-tsgolint": "catalog:",
+    "vitest": "catalog:"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx,json,jsonc,css,md,mdx}": "howells-oxfmt --write"

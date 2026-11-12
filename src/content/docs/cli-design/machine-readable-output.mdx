@@ -10,7 +10,7 @@ Agents handle color codes, spinner characters, and variable-width tables unrelia
 
 - Separate data (stdout) from noise (stderr, progress, spinners)
 - Return consistent, typed JSON for every command
-- Use --json or --output json flags for structured output
+- Use a --json flag for structured output, on by default when stdout is not a TTY
 - Never interleave progress indicators with data streams
 - Ensure error responses also return structured JSON
 
@@ -267,7 +267,7 @@ Error: user not found
 # Right - structured error on stderr, non-zero exit code
 $ mytool user get usr_999 --json
 # stderr:
-{"error": "not_found", "message": "User usr_999 does not exist", "code": 404}
+{"error": "user_not_found", "message": "User usr_999 does not exist.", "suggestions": ["Use: mytool user list --json to find valid IDs"], "failing_input": {"user_id": "usr_999"}}
 # exit code: 3
 ```
 
@@ -280,7 +280,7 @@ This axis is part of the [Agent DX CLI Scale](./cli-scale).
 | Score | Criteria                                                                                              |
 | ----- | ----------------------------------------------------------------------------------------------------- |
 | 0     | Human-only output (tables, color codes, prose). No structured format available.                       |
-| 1     | `--output json` or equivalent exists but is incomplete or inconsistent across commands.               |
+| 1     | `--json` or equivalent exists but is incomplete or inconsistent across commands.                      |
 | 2     | Consistent JSON output across all commands. Errors also return structured JSON.                       |
 | 3     | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
 

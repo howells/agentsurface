@@ -146,12 +146,8 @@ export function PatternStudio({ initial }: { initial: RileyParams }) {
         </div>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-fd-border bg-fd-card text-fd-foreground shadow-sm">
-          <svg
-            viewBox={`0 0 ${SIZE} ${SIZE}`}
-            className="block aspect-square w-full"
-            role="img"
-            aria-label="Preview of the line field"
-          >
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="block aspect-square w-full">
+            <title>Preview of the line field</title>
             {paths.map(({ d, fill }, i) =>
               fill ? (
                 <path key={i} d={d} fill="currentColor" />

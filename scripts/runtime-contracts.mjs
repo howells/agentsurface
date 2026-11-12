@@ -224,6 +224,10 @@ try {
     ).json();
     assert.deepEqual(unknownSection.results, []);
     assert.equal(unknownSection.has_more, false);
+    const rootSection = await (
+      await get("/api/docs/search?query=agent%20surface&section=root")
+    ).json();
+    assert.equal(new URL(rootSection.results[0].url).pathname, "/docs");
   });
   await test("in-memory MCP executes real retrieval, an error and recovery", async () => {
     const live = await (await get("/api/docs/search?query=content%20negotiation&limit=2")).json();

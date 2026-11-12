@@ -127,7 +127,8 @@ function commandPath(cmd: Command): string {
 function describeFlags(cmd: Command, extras: CommandExtras): FlagSchema[] {
   const overrides = extras[commandPath(cmd)]?.flags ?? {};
   return cmd.options.map((opt) => {
-    const name = opt.attributeName();
+    // The flag as typed, without the dashes: "dry-run", not commander's `dryRun` key.
+    const name = opt.name();
     return {
       name,
       type: inferType(opt),
@@ -262,7 +263,7 @@ export function handleJsonHelp(
  *
  * addDescribeCommand(program, extras);
  * if (!handleJsonHelp(program, process.argv.slice(2), extras)) {
- *   await program.parseAsync(process.argv);
+ *   await parseCli(program); // from ./cli-envelope
  * }
  * ```
  *

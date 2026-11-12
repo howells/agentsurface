@@ -42,7 +42,8 @@
  * ✓ Add/remove tools, and give each one the scopes it needs
  * ✓ Replace the in-memory rate limiter with a shared store before running more
  *   than one instance
- * ✓ Add CORS in your host framework if browser-based clients will connect
+ * ✓ Set ALLOWED_ORIGIN_HOSTNAMES if browser-based clients will connect; those
+ *   origins get CORS headers and preflight answers, every other origin is refused
  * ✓ Test with the MCP client library
  */
 
@@ -78,9 +79,9 @@ const OAUTH_ISSUER = requireEnv("OAUTH_ISSUER");
 const jwks = createRemoteJWKSet(new URL(requireEnv("OAUTH_JWKS_URL")));
 // Hostnames this server answers to (no scheme, no port): DNS-rebinding protection.
 const ALLOWED_HOSTNAMES = requireEnv("ALLOWED_HOSTNAMES").split(",");
-// Hostnames of browser origins allowed to call the server. Requests with no
-// Origin header (every non-browser client) pass; with none listed here, every
-// browser origin is refused.
+// Hostnames of browser origins allowed to call the server; they also get CORS
+// headers. Requests with no Origin header (every non-browser client) pass; with
+// none listed here, every browser origin is refused.
 const ALLOWED_ORIGIN_HOSTNAMES = (process.env.ALLOWED_ORIGIN_HOSTNAMES ?? "")
   .split(",")
   .filter(Boolean);
@@ -300,15 +301,20 @@ const mcp = createMcpHandler(setupMcpServer, {
 
 // ===== HTTP Handler =====
 
+// <CUSTOMISE>: base of the problem `type` URIs, the same one your HTTP API uses
+const ERROR_TYPE_BASE = "https://api.example.com/errors";
+
 function problem(
   status: number,
+  // Slug of the stable `type` URI clients branch on
+  kind: string,
   title: string,
   detail: string,
   extra: Record<string, unknown> = {},
   headers: Record<string, string> = {},
 ): Response {
   return Response.json(
-    { detail, status, title, type: "about:blank", ...extra },
+    { detail, status, title, type: `${ERROR_TYPE_BASE}/${kind}`, ...extra },
     { headers: { "Content-Type": "application/problem+json", ...headers }, status },
   );
 }
@@ -336,7 +342,9 @@ export async function handleRequest(request: Request): Promise<Response> {
   }
 
   if (pathname !== SERVER_URL.pathname) {
-    return problem(404, "Not Found", `Nothing is served at ${pathname}.`, { is_retriable: false });
+    return problem(404, "not-found", "Resource not found", `Nothing is served at ${pathname}.`, {
+      is_retriable: false,
+    });
   }
 
   const rejected =
@@ -346,6 +354,36 @@ export async function handleRequest(request: Request): Promise<Response> {
     return rejected;
   }
 
+  const origin = request.headers.get("Origin");
+  if (!origin) {
+    return handleMcpRequest(request);
+  }
+
+  // A browser on an allowed origin. The preflight carries no token, so it is
+  // answered before authentication; every other response, the 401 challenge
+  // included, must be readable by the page.
+  const response =
+    request.method === "OPTIONS"
+      ? new Response(null, {
+          headers: {
+            "Access-Control-Allow-Headers":
+              request.headers.get("Access-Control-Request-Headers") ?? "",
+            "Access-Control-Allow-Methods": "POST",
+            "Access-Control-Max-Age": "600",
+          },
+          status: 204,
+        })
+      : await handleMcpRequest(request);
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set(
+    "Access-Control-Expose-Headers",
+    "WWW-Authenticate, RateLimit, RateLimit-Policy, Retry-After",
+  );
+  response.headers.append("Vary", "Origin");
+  return response;
+}
+
+async function handleMcpRequest(request: Request): Promise<Response> {
   const auth = await authenticate(request);
   if (auth instanceof Response) {
     return auth;
@@ -361,10 +399,10 @@ export async function handleRequest(request: Request): Promise<Response> {
     log("ERROR", "mcp_rate_limit_exceeded", { clientId: auth.clientId });
     return problem(
       429,
-      "Too Many Requests",
+      "rate-limit-exceeded",
+      "Rate limit exceeded",
       `Rate limit of ${RATE_LIMIT} requests per ${RATE_WINDOW_SECONDS} seconds exceeded.`,
       {
-        code: "ERR_RATE_LIMITED",
         is_retriable: true,
         retry_after_ms: resetSeconds * 1000,
         suggestions: [`Wait ${resetSeconds} seconds, then retry the same request.`],

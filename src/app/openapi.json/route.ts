@@ -44,7 +44,7 @@ const specification = {
             name: "section",
             in: "query",
             description:
-              "Optional top-level documentation section. Unknown sections return an empty result set.",
+              "Optional top-level documentation section; root is the docs index page. Unknown sections return an empty result set.",
             example: "discovery",
             schema: { type: "string", pattern: "^[a-z0-9-]+$" },
           },

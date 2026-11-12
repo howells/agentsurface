@@ -34,18 +34,36 @@ import { createInterface } from "node:readline";
 /**
  * Write each record as one line of JSON the moment it arrives. Nothing is buffered, so a
  * consumer sees records live and a crash cannot lose records held in memory. Waits for
- * `drain` when the consumer is slower than the producer. Returns the number written.
+ * `drain` when the consumer is slower than the producer. A consumer that closes the pipe
+ * early (`| head -1`) ends the stream without an error. Returns the number written.
  */
 export async function writeNdjson<T>(
   records: AsyncIterable<T> | Iterable<T>,
   output: NodeJS.WritableStream = process.stdout,
 ): Promise<number> {
   let count = 0;
-  for await (const record of records) {
-    if (!output.write(`${JSON.stringify(record)}\n`)) {
-      await once(output, "drain");
+  const failure: { error?: NodeJS.ErrnoException } = {};
+  const onError = (error: NodeJS.ErrnoException): void => {
+    failure.error = error;
+  };
+  output.on("error", onError);
+  try {
+    for await (const record of records) {
+      if (!output.write(`${JSON.stringify(record)}\n`) && !failure.error) {
+        // Rejects if the stream errors while waiting; `onError` has recorded why.
+        await once(output, "drain").catch(() => {});
+      }
+      if (failure.error) {
+        break;
+      }
+      count += 1;
     }
-    count += 1;
+  } finally {
+    output.off("error", onError);
+  }
+  // EPIPE means the reader stopped reading, which is its right; anything else is a failure.
+  if (failure.error && failure.error.code !== "EPIPE") {
+    throw failure.error;
   }
   return count;
 }

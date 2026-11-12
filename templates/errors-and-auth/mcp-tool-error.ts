@@ -10,8 +10,14 @@
  */
 
 import type { TextContent } from "@modelcontextprotocol/server";
-import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
-import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
+import type { ProblemKind, ProblemDetailsType, InvalidField } from "./problem-details";
+import {
+  internalProblem,
+  problemDetails,
+  problemDocUri,
+  problemTitle,
+  problemType,
+} from "./problem-details";
 
 /**
  * Tool result with error flag
@@ -35,27 +41,27 @@ function generateTraceId(): string {
   return `tool-${crypto.randomUUID().slice(0, 12)}`;
 }
 
-const STATUS_BY_CODE: Record<ProblemCode, number> = {
-  ERR_CONFLICT: 409,
-  ERR_FORBIDDEN: 403,
-  ERR_INTERNAL: 500,
-  ERR_NOT_FOUND: 404,
-  ERR_RATE_LIMITED: 429,
-  ERR_TIMEOUT: 504,
-  ERR_UNAUTHORIZED: 401,
-  ERR_UNAVAILABLE: 503,
-  ERR_UNPROCESSABLE: 422,
-  ERR_VALIDATION: 422,
+const STATUS_BY_KIND: Record<ProblemKind, number> = {
+  conflict: 409,
+  forbidden: 403,
+  "internal-error": 500,
+  "not-found": 404,
+  "rate-limit-exceeded": 429,
+  timeout: 504,
+  unauthorized: 401,
+  "service-unavailable": 503,
+  unprocessable: 422,
+  "validation-error": 422,
 };
 
 /**
  * An error the model can act on. Throw this from a tool handler; its message is
  * returned to the model, so write it for the caller and keep internals out of it.
- * The category comes from `code`, never from matching words in a message.
+ * The category comes from `kind`, which sets the problem `type`, never from matching words in a message.
  */
 export class ToolError extends Error {
   constructor(
-    public code: ProblemCode,
+    public kind: ProblemKind,
     message: string,
     public options: {
       invalidFields?: InvalidField[];
@@ -77,17 +83,16 @@ export class ToolError extends Error {
 function mapErrorToProblemDetails(err: unknown, traceId: string): ProblemDetailsType {
   if (err instanceof ToolError) {
     return problemDetails({
-      code: err.code,
       detail: err.message,
-      doc_uri: problemDocUri(err.code),
+      doc_uri: problemDocUri(err.kind),
       invalid_fields: err.options.invalidFields,
       is_retriable: err.options.retryAfterMs !== undefined,
       retry_after_ms: err.options.retryAfterMs,
-      status: STATUS_BY_CODE[err.code],
+      status: STATUS_BY_KIND[err.kind],
       suggestions: err.options.suggestions,
-      title: err.code.replace("ERR_", "").replace(/_/g, " "),
+      title: problemTitle(err.kind),
       trace_id: traceId,
-      type: problemType(err.code),
+      type: problemType(err.kind),
     });
   }
 
@@ -107,7 +112,7 @@ function mapErrorToProblemDetails(err: unknown, traceId: string): ProblemDetails
  *   execute: async (input: any) => {
  *     try {
  *       const user = await db.getUser(input.id);
- *       if (!user) throw new ToolError('ERR_NOT_FOUND', `No user has id ${input.id}`);
+ *       if (!user) throw new ToolError('not-found', `No user has id ${input.id}`);
  *       return toolOk({ user });
  *     } catch (err) {
  *       return toolError({ error: err });
@@ -196,7 +201,7 @@ export function withToolErrorHandling(
  *   // The wrapper builds the MCP content envelope itself: return plain data, not toolOk(...)
  *   withToolErrorHandling(async (input: { id: string }) => {
  *     const data = await fetchData(input.id);
- *     if (!data) throw new ToolError('ERR_NOT_FOUND', `Nothing has id ${input.id}`);
+ *     if (!data) throw new ToolError('not-found', `Nothing has id ${input.id}`);
  *     return { data };
  *   }),
  * );

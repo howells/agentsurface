@@ -21,8 +21,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   memory, model routing, browser/sandbox tool access); it scaffolds agent surfaces (API, CLI,
   MCP, tool contracts, retrieval endpoints) and their evaluation harnesses. Browser/sandbox
   scaffolding is in scope only to build a harness that validates a surface
-- Rewrote `README.md`, `INSTALL.md`, `skills/surface/SKILL.md`, and
+- Rewrote `README.md`, `skills/surface/SKILL.md`, and
   `skills/surface/references/scaffold-workflow.md` to match
+- One CLI contract across the guide, skill and templates: bare data on stdout under `--json`
+  (automatic when stdout is not a TTY), a structured error on stderr
+  (`error`, `message`, `suggestions`, `failing_input`, optional `invalid_args` and `trace_id`),
+  exit codes 0 to 5, and schema from `describe` or `--help --json`. Stray `--output json` and
+  `--schema` wording is gone
+- One HTTP error shape across the guide, skill and templates: RFC 9457 plus `is_retriable`,
+  `retry_after_ms`, `suggestions`, `doc_uri`, `trace_id`, `errors`, `next_operation` with
+  `next_operation_args`, and `invalid_fields` as `{ field, reason, received?, expected? }`.
+  Validation is 422 with type `/errors/validation-error`; the skill no longer shows a `code`
+  member or `recovery_hint`
+- The remote MCP server template is a web-standard `fetch` handler on the installed SDK with
+  per-tool scope checks; the stdio template uses `serveStdio`
+- `withIdempotency` takes a `getPrincipalId` resolver and requires `REDIS_URL`; templates throw
+  at startup on missing configuration instead of falling back to `example.com`
+- Templates are typechecked by `pnpm typecheck`, with the packages they import installed as
+  dev dependencies
+- The OpenTelemetry template uses `@opentelemetry/sdk-trace` 2.x with an explicit
+  `AsyncLocalStorageContextManager`, in place of the deprecated `@opentelemetry/sdk-trace-node`
 
 ### Removed
 
@@ -33,6 +51,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- `/og/<slug>` no longer returns 500 for a slug containing `%`, and is cached
+- `/api` returns the problem+json 404 and `/.md` the Markdown 404
+- `/index.md` links to the guide pages; `/docs/agents/llms.txt` links are absolute
+- MCP `get_page` accepts a URL with a trailing slash
+- Docs search with `section=root` returns the docs index page
+- A failed production build restores the parked `.env`
 - Corrected a claim that the MCP specification encourages DPoP (RFC 9449); DPoP is a general
   OAuth mechanism, not part of the MCP authorization spec
 - Corrected the CLAUDE.md/AGENTS.md relationship in Claude Code: by default Claude reads one

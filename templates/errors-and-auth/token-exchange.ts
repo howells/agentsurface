@@ -81,7 +81,7 @@ export class TokenExchangeClient {
       issuer: this.expectedIssuer,
       requiredClaims: ["sub"],
     });
-    return payload.sub as string;
+    return payload.sub!;
   }
 
   /**

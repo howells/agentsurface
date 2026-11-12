@@ -131,8 +131,8 @@ Per-field errors use JSON Pointer paths to identify the failing field within the
     {
       "field": "/currency",
       "reason": "Invalid value 'dollars'",
-      "expected": "A 3-letter ISO 4217 currency code",
-      "valid_values": ["USD", "EUR", "GBP", "JPY"]
+      "received": "dollars",
+      "expected": "A 3-letter ISO 4217 currency code: USD, EUR, GBP or JPY"
     },
     {
       "field": "/due_date",
@@ -152,22 +152,26 @@ Per-field errors use JSON Pointer paths to identify the failing field within the
 The agent now has everything needed to construct a corrected request without calling another tool or asking a human.
 
 ```typescript
-// Build corrected request using validation error details
-function correctRequest(
-  original: Record<string, unknown>,
-  errors: ValidationError[],
-): Record<string, unknown> {
-  const corrected = { ...original };
+interface InvalidField {
+  field: string; // JSON Pointer into the request body
+  reason: string;
+  received?: unknown;
+  expected?: string;
+}
 
-  for (const error of errors) {
-    const field = error.field.replace(/^\//, "");
-    if (error.valid_values?.length === 1) {
-      corrected[field] = error.valid_values[0];
-    }
-    // Other corrections depend on agent reasoning
-  }
-
-  return corrected;
+// Turn the validation details into a repair instruction for the model
+function repairInstruction(invalidFields: InvalidField[]): string {
+  return invalidFields
+    .map(({ field, reason, received, expected }) =>
+      [
+        `${field}: ${reason}.`,
+        received === undefined ? "" : `Sent: ${JSON.stringify(received)}.`,
+        expected ? `Expected: ${expected}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .join("\n");
 }
 ```
 

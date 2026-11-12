@@ -154,7 +154,7 @@ type ToolResult =
   | {
       success: false;
       error: {
-        code: string;           // Stable code to branch on: 'ERR_VALIDATION', 'ERR_NOT_FOUND'
+        code: string;           // Stable code to branch on: 'INVALID_INPUT', 'NOT_FOUND'
         message: string;        // Human-readable explanation
         is_retriable: boolean;  // Safe to retry the same call unchanged
         suggestions: string[];  // Concrete next steps, most likely fix first
@@ -168,7 +168,7 @@ Example error response:
 {
   success: false,
   error: {
-    code: 'ERR_VALIDATION',
+    code: 'INVALID_INPUT',
     message: 'Email is required and must be valid format.',
     is_retriable: false,
     suggestions: ['Pass email as a full address, e.g. ada@example.com'],
@@ -316,12 +316,11 @@ Content-Type: application/json
 
 422 Unprocessable Content:
 {
-  "type": "https://example.com/errors/validation",
-  "title": "Validation Error",
+  "type": "https://example.com/errors/validation-error",
+  "title": "Validation failed",
   "status": 422,
   "detail": "Prompt is required and must be non-empty.",
   "instance": "/agents/my-agent/query",
-  "code": "ERR_VALIDATION",
   "is_retriable": false,
   "invalid_fields": [
     { "field": "/prompt", "reason": "Required field is missing", "expected": "A non-empty string" }
@@ -532,12 +531,11 @@ All errors are problem details, served as `application/problem+json`:
 ```typescript
 // Validation error
 {
-  "type": "https://example.com/errors/validation",
-  "title": "Validation Error",
+  "type": "https://example.com/errors/validation-error",
+  "title": "Validation failed",
   "status": 422,
   "detail": "Email must be valid format.",
   "instance": "/api/users/create",
-  "code": "ERR_VALIDATION",
   "is_retriable": false,
   "suggestions": ["Send email as a full address and retry"],
   "invalid_fields": [
@@ -548,21 +546,19 @@ All errors are problem details, served as `application/problem+json`:
 // Not found
 {
   "type": "https://example.com/errors/not-found",
-  "title": "Not Found",
+  "title": "Resource not found",
   "status": 404,
   "detail": "User with id=123 does not exist.",
   "instance": "/api/users/123",
-  "code": "ERR_NOT_FOUND",
   "is_retriable": false
 }
 
 // Rate limit
 {
-  "type": "https://example.com/errors/rate-limited",
-  "title": "Too Many Requests",
+  "type": "https://example.com/errors/rate-limit-exceeded",
+  "title": "Rate limit exceeded",
   "status": 429,
   "detail": "Rate limit exceeded. Retry after 60 seconds.",
-  "code": "ERR_RATE_LIMITED",
   "is_retriable": true,
   "retry_after_ms": 60000
 }

@@ -163,10 +163,9 @@ Prove agent safety and correctness before production. Measure tool routing accur
                {
                  type: "text",
                  text: JSON.stringify({
-                   type: "https://example.com/errors/validation-failed",
+                   type: "https://example.com/errors/validation-error",
                    title: "Invalid Email",
                    status: 422,
-                   code: "ERR_VALIDATION",
                    is_retriable: false,
                    invalid_fields: [
                      { field: "/email", reason: "Must contain @", received: "invalid" },
@@ -196,7 +195,7 @@ Prove agent safety and correctness before production. Measure tool routing accur
            {
              type: "text",
              text: JSON.stringify({
-               type: "https://example.com/errors/rate-limited",
+               type: "https://example.com/errors/rate-limit-exceeded",
                status: 429,
                is_retriable: true,
                retry_after_ms: 5000,

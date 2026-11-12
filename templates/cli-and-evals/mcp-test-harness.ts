@@ -38,7 +38,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import fc from "fast-check";
+import * as fc from "fast-check";
 
 // Configuration
 const { MCP_SERVER_COMMAND } = process.env;

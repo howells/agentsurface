@@ -33,7 +33,7 @@ Can an agent parse the CLI's output without heuristics?
 | Score | Criteria                                                                                              |
 | ----- | ----------------------------------------------------------------------------------------------------- |
 | 0     | Human-only output (tables, color codes, prose). No structured format available.                       |
-| 1     | `--output json` or equivalent exists but is incomplete or inconsistent across commands.               |
+| 1     | `--json` or equivalent exists but is incomplete or inconsistent across commands.                      |
 | 2     | Consistent JSON output across all commands. Errors also return structured JSON.                       |
 | 3     | NDJSON streaming for paginated results. Structured output is the default in non-TTY (piped) contexts. |
 

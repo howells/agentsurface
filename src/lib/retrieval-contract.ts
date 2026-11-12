@@ -23,7 +23,7 @@ export const searchInput = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional()
     .describe(
-      "Optional top-level docs section, for example discovery, mcp-servers or retrievability. Unknown sections return no matches.",
+      "Optional top-level docs section, for example discovery, mcp-servers or retrievability; root is the docs index page. Unknown sections return no matches.",
     ),
 });
 export const pageSummary = z.object({

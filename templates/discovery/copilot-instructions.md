@@ -76,12 +76,11 @@ details served as `application/problem+json`. Validation failures are 422:
 
 ```json
 {
-  "type": "https://example.com/errors/validation",
-  "title": "Validation Error",
+  "type": "https://example.com/errors/validation-error",
+  "title": "Validation failed",
   "status": 422,
   "detail": "Email is required.",
   "instance": "/api/users/create",
-  "code": "ERR_VALIDATION",
   "is_retriable": false,
   "suggestions": ["Send email as a full address and retry"],
   "invalid_fields": [
@@ -90,13 +89,13 @@ details served as `application/problem+json`. Validation failures are 422:
 }
 ```
 
-Tool handlers return errors as data instead of throwing, with the same member names:
+Tool handlers return errors as data instead of throwing. A tool result carries a stable `code` to branch on (an HTTP problem is identified by its `type` instead):
 
 ```typescript
 {
   success: false,
   error: {
-    code: 'ERR_VALIDATION',
+    code: 'INVALID_INPUT',
     message: 'Email is required.',
     is_retriable: false,
     suggestions: ['Pass email as a full address'],

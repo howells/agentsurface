@@ -11,15 +11,21 @@
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import type { ProblemCode, ProblemDetailsType, InvalidField } from "./problem-details";
-import { internalProblem, problemDetails, problemDocUri, problemType } from "./problem-details";
+import type { ProblemKind, ProblemDetailsType, InvalidField } from "./problem-details";
+import {
+  internalProblem,
+  problemDetails,
+  problemDocUri,
+  problemTitle,
+  problemType,
+} from "./problem-details";
 
 /**
  * Domain error hierarchy for type-safe error handling
  */
 export class DomainError extends Error {
   constructor(
-    public code: ProblemCode,
+    public kind: ProblemKind,
     public statusCode: number,
     message: string,
     public details?: Record<string, unknown>,
@@ -31,28 +37,28 @@ export class DomainError extends Error {
 
 export class NotFoundError extends DomainError {
   constructor(message: string, details?: Record<string, unknown>) {
-    super("ERR_NOT_FOUND", 404, message, details);
+    super("not-found", 404, message, details);
     this.name = "NotFoundError";
   }
 }
 
 export class ConflictError extends DomainError {
   constructor(message: string, details?: Record<string, unknown>) {
-    super("ERR_CONFLICT", 409, message, details);
+    super("conflict", 409, message, details);
     this.name = "ConflictError";
   }
 }
 
 export class UnauthorizedError extends DomainError {
   constructor(message: string = "Unauthorized", details?: Record<string, unknown>) {
-    super("ERR_UNAUTHORIZED", 401, message, details);
+    super("unauthorized", 401, message, details);
     this.name = "UnauthorizedError";
   }
 }
 
 export class ForbiddenError extends DomainError {
   constructor(message: string = "Forbidden", details?: Record<string, unknown>) {
-    super("ERR_FORBIDDEN", 403, message, details);
+    super("forbidden", 403, message, details);
     this.name = "ForbiddenError";
   }
 }
@@ -63,7 +69,7 @@ export class RateLimitError extends DomainError {
     public retryAfterMs: number = 60_000,
     details?: Record<string, unknown>,
   ) {
-    super("ERR_RATE_LIMITED", 429, message, details);
+    super("rate-limit-exceeded", 429, message, details);
     this.name = "RateLimitError";
   }
 }
@@ -73,7 +79,7 @@ export class ValidationError extends DomainError {
     message: string,
     public invalidFields?: InvalidField[],
   ) {
-    super("ERR_VALIDATION", 422, message);
+    super("validation-error", 422, message);
     this.name = "ValidationError";
   }
 }
@@ -97,16 +103,15 @@ function getTraceId(req: NextRequest | Request): string {
 function mapErrorToProblemDetails(err: unknown, traceId: string): ProblemDetailsType {
   if (err instanceof DomainError) {
     return problemDetails({
-      code: err.code,
       detail: err.message,
-      doc_uri: problemDocUri(err.code),
+      doc_uri: problemDocUri(err.kind),
       invalid_fields: err instanceof ValidationError ? err.invalidFields : undefined,
       is_retriable: err instanceof RateLimitError,
       retry_after_ms: err instanceof RateLimitError ? err.retryAfterMs : undefined,
       status: err.statusCode,
-      title: err.code.replace("ERR_", "").replace(/_/g, " "),
+      title: problemTitle(err.kind),
       trace_id: traceId,
-      type: problemType(err.code),
+      type: problemType(err.kind),
     });
   }
 

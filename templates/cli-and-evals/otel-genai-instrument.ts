@@ -45,14 +45,15 @@
 
 import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Attributes } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import {
   BatchSpanProcessor,
   ConsoleSpanExporter,
-  NodeTracerProvider,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-node";
-import type { SpanProcessor } from "@opentelemetry/sdk-trace-node";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
+import type { SpanProcessor } from "@opentelemetry/sdk-trace";
 
 // <CUSTOMISE>: Update model, provider, agent name, system prompt
 const MODEL_NAME = "claude-opus-5-5";
@@ -63,20 +64,21 @@ const SYSTEM_PROMPT = "You are a helpful AI agent...";
 /**
  * Initialize OpenTelemetry tracing.
  *
- * In the JavaScript SDK 2.x, span processors are passed to the provider constructor
- * (`addSpanProcessor` was removed), and the OTLP HTTP exporter needs the full signal path.
+ * Written for the JavaScript SDK 2.x line (`@opentelemetry/sdk-trace` 2.x, exporters 0.2xx,
+ * `@opentelemetry/api` 1.9), which is what `@langfuse/otel` 6 accepts as peers. Span processors
+ * are passed to the provider constructor, and the OTLP HTTP exporter needs the full signal path.
  */
-export async function initializeTracing(): Promise<NodeTracerProvider> {
+export async function initializeTracing(): Promise<TracerProvider> {
   const spanProcessors: SpanProcessor[] = [];
 
   // Console exporter (for development)
   if (process.env.OTEL_DEBUG === "1") {
-    spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+    spanProcessors.push(new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() }));
   }
 
   // OTLP exporter (production). The exporter reads OTEL_EXPORTER_OTLP_TRACES_ENDPOINT and
   // OTEL_EXPORTER_OTLP_HEADERS itself, in their standard formats, so nothing is parsed here.
-  spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporter()));
+  spanProcessors.push(new BatchSpanProcessor({ exporter: new OTLPTraceExporter() }));
 
   // Langfuse integration (optional): @langfuse/otel provides a span processor
   // that reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL.
@@ -85,8 +87,10 @@ export async function initializeTracing(): Promise<NodeTracerProvider> {
     spanProcessors.push(new LangfuseSpanProcessor());
   }
 
-  const provider = new NodeTracerProvider({ spanProcessors });
-  provider.register(); // also installs the context manager that makes span parenting work
+  // The context manager is what makes span parenting work across awaits
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager());
+  const provider = new TracerProvider({ spanProcessors });
+  trace.setGlobalTracerProvider(provider);
   return provider;
 }
 

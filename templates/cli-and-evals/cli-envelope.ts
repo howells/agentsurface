@@ -37,6 +37,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { CommanderError } from "commander";
+import type { Command } from "commander";
 
 /** This CLI's exit-code contract. */
 export const ExitCode = {
@@ -211,6 +213,43 @@ export async function runCommand(
   }
 }
 
+/** Make a command and its subcommands throw instead of exiting, with no text on stderr. */
+function takeOverExit(command: Command): void {
+  command.exitOverride().configureOutput({ writeErr: () => {} });
+  command.commands.forEach(takeOverExit);
+}
+
+/**
+ * Parse the command line and apply the contract to commander's own usage errors (unknown
+ * command or flag, missing argument or required option). Left alone, commander prints plain
+ * text and exits 1; this reports `usage_error` on stderr and exits 2. Call it in place of
+ * `program.parseAsync()`, after every command is registered.
+ */
+export async function parseCli(program: Command, argv: string[] = process.argv): Promise<void> {
+  takeOverExit(program);
+
+  try {
+    await program.parseAsync(argv);
+  } catch (error) {
+    if (!(error instanceof CommanderError)) {
+      throw error;
+    }
+    // `--help` and `--version` have printed their output and "exit" with 0.
+    if (error.exitCode === 0) {
+      return;
+    }
+    writeErrorAndExit(
+      {
+        error: "usage_error",
+        message: error.message.replace(/^error: /, ""),
+        suggestions: [`Run: ${program.name()} --help --json`],
+      },
+      ExitCode.USAGE_ERROR,
+      argv.includes("--json"),
+    );
+  }
+}
+
 /**
  * Example commander integration
  *
@@ -245,6 +284,6 @@ export async function runCommand(
  *     }),
  *   );
  *
- * await program.parseAsync(process.argv);
+ * await parseCli(program);
  * ```
  */

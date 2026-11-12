@@ -15,6 +15,10 @@
  *
  * Caching: this proxy sets no Cache-Control on pages it passes through. Set cache headers
  * where each response is produced, where you know whether it is public.
+ * Next.js replaces the proxy's `Vary` on prerendered (static) HTML, so check a production
+ * build with `curl -I`: if the HTML response lacks `Vary: Accept`, a shared cache can serve
+ * it to a client that asked for Markdown. Render those pages dynamically or add the header
+ * at the CDN.
  *
  * Spec:
  * - Content negotiation (HTTP Accept header): https://www.rfc-editor.org/rfc/rfc9110.html#name-accept (RFC 9110, which obsoletes RFC 7231)

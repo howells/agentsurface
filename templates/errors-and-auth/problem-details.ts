@@ -5,15 +5,15 @@
  *
  * <CUSTOMISE>
  * - Set ERROR_TYPE_BASE and ERROR_DOC_BASE to your own domain
- * - Add domain-specific error codes to the `code` enum
+ * - Add your domain-specific problem kinds to PROBLEM_TITLES
  * </CUSTOMISE>
  */
 
 import { z } from "zod";
 
-/** <CUSTOMISE> Base of the `type` URIs. Each code maps to one stable URI under it. */
+/** <CUSTOMISE> Base of the `type` URIs. Each problem kind has one stable URI under it. */
 const ERROR_TYPE_BASE = "https://api.example.com/errors";
-/** <CUSTOMISE> Page that documents each error code. */
+/** <CUSTOMISE> Page that documents each problem kind. */
 const ERROR_DOC_BASE = "https://api.example.com/docs/errors";
 
 /** One failed input field in a validation error. */
@@ -29,36 +29,21 @@ export type InvalidField = z.infer<typeof InvalidFieldSchema>;
 /**
  * RFC 9457 core fields: type, title, status, detail, instance
  * Plus agent-oriented extensions: is_retriable, retry_after_ms, doc_uri, trace_id, suggestions,
- * invalid_fields (field-level validation errors) and errors (nested Problem Details for batches)
+ * invalid_fields (field-level validation errors), next_operation / next_operation_args (the call
+ * that satisfies an unmet precondition) and errors (nested Problem Details for batches)
  */
 export const ProblemDetails = z.strictObject({
   // RFC 9457 core (5 members)
   type: z
     .string()
-    .url()
     .default("about:blank")
-    .describe("URI reference identifying the error type"),
+    .describe("URI reference identifying the error type; clients branch on it"),
   title: z.string().describe("Short human-readable summary"),
   status: z.number().int().min(400).max(599).describe("HTTP status code"),
   detail: z.string().describe("Instance-specific explanation"),
   instance: z.string().optional().describe("URI reference identifying this occurrence"),
 
   // Agent extensions
-  code: z
-    .enum([
-      "ERR_VALIDATION",
-      "ERR_NOT_FOUND",
-      "ERR_CONFLICT",
-      "ERR_UNAUTHORIZED",
-      "ERR_FORBIDDEN",
-      "ERR_RATE_LIMITED",
-      "ERR_UNAVAILABLE",
-      "ERR_TIMEOUT",
-      "ERR_UNPROCESSABLE",
-      "ERR_INTERNAL",
-    ])
-    .optional()
-    .describe("Machine-readable domain code"),
   is_retriable: z
     .boolean()
     .optional()
@@ -75,6 +60,14 @@ export const ProblemDetails = z.strictObject({
     .array(InvalidFieldSchema)
     .optional()
     .describe("Validation errors for individual fields"),
+  next_operation: z
+    .string()
+    .optional()
+    .describe("Operation to call first when a precondition is unmet"),
+  next_operation_args: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Arguments for next_operation"),
   // Zod 4 recursive schema: a getter keeps z.infer working under strict TypeScript
   get errors() {
     return z
@@ -86,17 +79,38 @@ export const ProblemDetails = z.strictObject({
 
 export type ProblemDetailsType = z.infer<typeof ProblemDetails>;
 
-/** Machine-readable domain codes accepted in the `code` member. */
-export type ProblemCode = NonNullable<ProblemDetailsType["code"]>;
+/**
+ * <CUSTOMISE> Every problem kind this API returns: the slug of its `type` URI and its title.
+ * Published `type` URIs are a contract clients branch on: never rename a slug.
+ */
+const PROBLEM_TITLES = {
+  conflict: "Conflict",
+  forbidden: "Forbidden",
+  "internal-error": "Internal server error",
+  "not-found": "Resource not found",
+  "rate-limit-exceeded": "Rate limit exceeded",
+  "service-unavailable": "Service temporarily unavailable",
+  timeout: "Request timed out",
+  unauthorized: "Unauthorized",
+  unprocessable: "Unprocessable request",
+  "validation-error": "Validation failed",
+} as const;
 
-/** Stable `type` URI for a code: ERR_RATE_LIMITED -> <base>/rate-limited. */
-export function problemType(code: ProblemCode): string {
-  return `${ERROR_TYPE_BASE}/${code.slice("ERR_".length).toLowerCase().replaceAll("_", "-")}`;
+export type ProblemKind = keyof typeof PROBLEM_TITLES;
+
+/** Stable `type` URI for a kind: rate-limit-exceeded -> <base>/rate-limit-exceeded. */
+export function problemType(kind: ProblemKind): string {
+  return `${ERROR_TYPE_BASE}/${kind}`;
 }
 
-/** Documentation link for a code. */
-export function problemDocUri(code: ProblemCode): string {
-  return `${ERROR_DOC_BASE}#${code}`;
+/** Human-readable title for a kind. */
+export function problemTitle(kind: ProblemKind): string {
+  return PROBLEM_TITLES[kind];
+}
+
+/** Documentation link for a kind. */
+export function problemDocUri(kind: ProblemKind): string {
+  return `${ERROR_DOC_BASE}#${kind}`;
 }
 
 /**
@@ -104,13 +118,14 @@ export function problemDocUri(code: ProblemCode): string {
  */
 export function problemDetails(init: Partial<ProblemDetailsType>): ProblemDetailsType {
   return ProblemDetails.parse({
-    code: init.code,
     detail: init.detail ?? "",
     doc_uri: init.doc_uri,
     errors: init.errors,
     invalid_fields: init.invalid_fields,
     instance: init.instance,
     is_retriable: init.is_retriable,
+    next_operation: init.next_operation,
+    next_operation_args: init.next_operation_args,
     retry_after_ms: init.retry_after_ms,
     status: init.status ?? 500,
     suggestions: init.suggestions,
@@ -137,14 +152,13 @@ export function isProblemDetails(x: unknown): x is ProblemDetailsType {
  */
 export function internalProblem(traceId?: string): ProblemDetailsType {
   return problemDetails({
-    code: "ERR_INTERNAL",
     detail: "The server hit an unexpected error. Quote trace_id when reporting it.",
-    doc_uri: problemDocUri("ERR_INTERNAL"),
+    doc_uri: problemDocUri("internal-error"),
     is_retriable: false,
     status: 500,
-    title: "Internal Server Error",
+    title: problemTitle("internal-error"),
     trace_id: traceId,
-    type: problemType("ERR_INTERNAL"),
+    type: problemType("internal-error"),
   });
 }
 
@@ -159,15 +173,14 @@ export function rateLimitError(opts: {
 }): ProblemDetailsType {
   const waitMs = Math.max(100, opts.resetAt - Date.now());
   return problemDetails({
-    code: "ERR_RATE_LIMITED",
     detail: `You have exceeded your quota of ${opts.limit} requests.`,
-    doc_uri: problemDocUri("ERR_RATE_LIMITED"),
+    doc_uri: problemDocUri("rate-limit-exceeded"),
     is_retriable: true,
     retry_after_ms: waitMs,
     status: 429,
     suggestions: [`Wait ${Math.ceil(waitMs / 1000)} seconds, then retry the same request.`],
-    title: "Rate Limit Exceeded",
+    title: problemTitle("rate-limit-exceeded"),
     trace_id: opts.traceId,
-    type: problemType("ERR_RATE_LIMITED"),
+    type: problemType("rate-limit-exceeded"),
   });
 }

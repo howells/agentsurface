@@ -101,6 +101,8 @@ The RFC explicitly allows extension fields beyond the five core ones. For agent-
 | `suggestions`    | `string[]`  | Ordered recovery steps (first is the most likely)    |
 | `errors`         | `Problem[]` | Nested Problem Details for batch / multi-field cases |
 
+Two more extensions apply to specific failures and are covered in [Designing Errors for Agent Recovery](/docs/error-handling/errors-for-agents): `invalid_fields` (`{ field, reason, received?, expected? }[]`, validation failures only) and `next_operation` with `next_operation_args` (the operation that satisfies an unmet precondition).
+
 ### `is_retriable`
 
 A boolean that explicitly tells the agent whether retrying the same request unchanged might succeed. `false` marks a terminal error where the request itself is wrong - do not infer retriability from the status code alone:
@@ -231,6 +233,18 @@ const ProblemDetails = z.object({
   trace_id: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
   errors: z.array(z.lazy(() => ProblemDetails)).optional(),
+  invalid_fields: z
+    .array(
+      z.object({
+        field: z.string(), // JSON Pointer into the request body
+        reason: z.string(),
+        received: z.unknown().optional(),
+        expected: z.string().optional(),
+      }),
+    )
+    .optional(),
+  next_operation: z.string().optional(),
+  next_operation_args: z.record(z.string(), z.unknown()).optional(),
 });
 
 type ErrorResponse = z.infer<typeof ProblemDetails>;

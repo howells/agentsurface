@@ -9,6 +9,13 @@ import { createFromSource } from "fumadocs-core/search/server";
  * route handler (consumed by the Fumadocs RootProvider search dialog at
  * `/api/search`) and a programmatic `search()` method used by `searchDocs`.
  */
+type SourcePage = ReturnType<typeof source.getPages>[number];
+
+/** Top-level docs section of a page; the docs index page is in `root`. */
+function sectionOf(page: { slugs: string[] }): string {
+  return page.slugs[0] ?? "root";
+}
+
 export const searchServer = createFromSource(source, {
   buildIndex: (page) => ({
     id: page.url,
@@ -16,7 +23,7 @@ export const searchServer = createFromSource(source, {
     title: page.data.title,
     description: page.data.description,
     structuredData: page.data.structuredData,
-    tag: page.slugs[0] ?? "root",
+    tag: sectionOf(page),
   }),
 });
 
@@ -30,8 +37,6 @@ export interface DocSearchResult {
   slug: string;
   snippet: string;
 }
-
-type SourcePage = ReturnType<typeof source.getPages>[number];
 
 function pagesByUrl(): Map<string, SourcePage> {
   const map = new Map<string, SourcePage>();
@@ -72,7 +77,7 @@ export async function retrieveDocs(input: { query: string; limit?: number; secti
   const results: DocSearchResult[] = [];
   for (const baseUrl of order) {
     const page = pages.get(baseUrl);
-    if (!page || (section && page.slugs[0] !== section)) {
+    if (!page || (section && sectionOf(page) !== section)) {
       continue;
     }
 

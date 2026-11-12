@@ -1,16 +1,16 @@
 ---
 name: error-designer
-description: Implement RFC 9457 Problem Details + agent extensions (code, is_retriable, retry_after_ms, suggestions, invalid_fields, doc_uri, trace_id) with idempotency middleware
+description: Implement RFC 9457 Problem Details + agent extensions (is_retriable, retry_after_ms, suggestions, invalid_fields, doc_uri, trace_id) with idempotency middleware
 model: sonnet
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 ## Summary
 
-Transform error handling into structured agent recovery guidance. Implement RFC 9457 Problem Details format with agent-specific extensions: code, is_retriable, retry_after_ms, suggestions[], invalid_fields[], doc_uri, and trace_id. Add idempotency middleware to prevent duplicate side effects.
+Transform error handling into structured agent recovery guidance. Implement RFC 9457 Problem Details format with agent-specific extensions: is_retriable, retry_after_ms, suggestions[], invalid_fields[], doc_uri, and trace_id. Add idempotency middleware to prevent duplicate side effects.
 
 - RFC 9457 Problem Details (Content-Type: application/problem+json)
-- Agent extensions: code, is_retriable, retry_after_ms, suggestions[], invalid_fields[], trace_id, doc_uri (flat at the root, never under `error`)
+- Agent extensions: is_retriable, retry_after_ms, suggestions[], invalid_fields[], trace_id, doc_uri (flat at the root, never under `error`)
 - Idempotency middleware (Idempotency-Key header, IETF draft-ietf-httpapi-idempotency-key-header, not yet an RFC)
 - Rate-limit headers on all responses (X-RateLimit-\*, Retry-After)
 - Semantic exit codes (CLI): 0=ok, 1=failure, 2=usage, 3=notfound, 4=perm, 5=conflict
@@ -56,7 +56,6 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      errors?: ProblemDetails[]; // Nested problems for batch operations
      doc_uri?: string; // Link to error docs
      trace_id: string; // Correlation ID, e.g. the W3C trace ID (32 lowercase hex characters)
-     code: string; // Short domain code for switch statements (e.g., "ERR_USER_NOT_FOUND")
    }
    ```
 
@@ -77,11 +76,10 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 
      if (err instanceof z.ZodError) {
        problem = {
-         type: "https://example.com/errors/validation-failed",
+         type: "https://example.com/errors/validation-error",
          title: "Validation Failed",
          status: 422,
          detail: "Request did not match schema",
-         code: "ERR_VALIDATION",
          is_retriable: false,
          suggestions: [
            "Check field types against schema",
@@ -100,7 +98,6 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          title: "Resource Not Found",
          status: 404,
          detail: `${err.resource} with id ${err.id} not found`,
-         code: "ERR_NOT_FOUND",
          is_retriable: false,
          suggestions: [
            "Use list endpoint to find valid IDs",
@@ -111,7 +108,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
        };
      } else if (err instanceof RateLimitError) {
        problem = {
-         type: "https://example.com/errors/rate-limited",
+         type: "https://example.com/errors/rate-limit-exceeded",
          title: "Rate Limit Exceeded",
          status: 429,
          detail: `Too many requests. Retry after ${err.retryAfter}ms`,
@@ -120,7 +117,6 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          suggestions: [`Wait ${err.retryAfter}ms and retry`, "Reduce request frequency"],
          doc_uri: "https://docs.example.com/api/rate-limiting",
          trace_id: traceId,
-         code: "ERR_RATE_LIMITED",
        };
      } else {
        // Fallback: 500 with no internal details. Not marked retriable: the outcome
@@ -130,7 +126,6 @@ Make every error actionable for agents. Each error is a prompt containing the ag
          title: "Internal Server Error",
          status: 500,
          detail: "An unexpected error occurred",
-         code: "ERR_INTERNAL",
          is_retriable: false,
          suggestions: [
            "Check whether the operation took effect before retrying",
@@ -202,7 +197,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
      ````markdown
      ## Validation Failed
 
-     **Type:** `https://example.com/errors/validation-failed`
+     **Type:** `https://example.com/errors/validation-error`
      **Status:** 422
      **Retriable:** No
 
@@ -217,7 +212,7 @@ Make every error actionable for agents. Each error is a prompt containing the ag
 
      ```json
      {
-       "type": "https://example.com/errors/validation-failed",
+       "type": "https://example.com/errors/validation-error",
        "title": "Validation Failed",
        "status": 422,
        "invalid_fields": [

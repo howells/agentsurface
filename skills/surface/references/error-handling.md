@@ -33,11 +33,10 @@ and adds:
 
 | Field            | Meaning                                                                 |
 | ---------------- | ----------------------------------------------------------------------- |
-| `code`           | Short domain code for switch statements (`ERR_AUTH_EXPIRED`)            |
 | `is_retriable`   | The same request, unchanged, might succeed. Validation errors are false |
 | `retry_after_ms` | Body copy of `Retry-After`                                              |
 | `suggestions`    | Recovery steps                                                          |
-| `recovery_hint`  | The single primary action                                               |
+| `next_operation` | The operation that unblocks this one, with `next_operation_args`        |
 | `doc_uri`        | Page explaining the error; the `type` URI should resolve to one too     |
 | `trace_id`       | Matches server logs, `X-Request-ID` or the OpenTelemetry trace          |
 | `invalid_fields` | Validation only: `[{ field, reason, received?, expected? }]`            |

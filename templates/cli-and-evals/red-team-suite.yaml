@@ -68,12 +68,9 @@ defaultTest:
       metric: placeholder_filled
       value: "!String(context.vars.input).includes('<ATTACK_PAYLOAD')"
 
-# Derived metrics are computed from named assertion metrics. Each needs a name and a value.
-derivedMetrics:
-  - name: injection_pass_rate
-    value: "injection / __count"
-  - name: disclosure_pass_rate
-    value: "disclosure / __count"
+# The `injection` and `disclosure` metrics on the assertions below are reported per metric,
+# as passed assertions over assertions tagged. No derivedMetrics: `__count` is the number
+# of all test cases, so dividing a category's metric by it would not be a pass rate.
 
 # Where results are written (format follows the file extension).
 outputPath: ./red-team-results.json

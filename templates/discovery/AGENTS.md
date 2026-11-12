@@ -172,7 +172,7 @@ import { executeAgent } from "./execute";
 import { validateInput } from "../utils";
 ```
 
-**Error handling:** HTTP handlers throw typed errors; one error handler maps them to RFC 9457 problem details (`application/problem+json`) with `code`, `is_retriable`, `retry_after_ms`, `suggestions`, and `invalid_fields` (`[{ field, reason, received?, expected? }]`, `field` a JSON Pointer) on a 422 validation failure. Tool handlers return errors as data, not thrown, with the same member names:
+**Error handling:** HTTP handlers throw typed errors; one error handler maps them to RFC 9457 problem details (`application/problem+json`) with a stable `type` URI to branch on, `is_retriable`, `retry_after_ms`, `suggestions`, and `invalid_fields` (`[{ field, reason, received?, expected? }]`, `field` a JSON Pointer) on a 422 validation failure. Tool handlers return errors as data, not thrown, with a stable `code` to branch on:
 
 ```typescript
 type ToolResult =
