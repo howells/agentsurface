@@ -37,15 +37,15 @@ pnpm deploy:prod:publish  # deploys, checks the homepage, promotes
 
 ### Issue tracker
 
-Issues live in Linear (howells, AGE). See `docs/agents/issue-tracker.md`.
+Linear, workspace `howells`, team `AGE`. See `~/Sites/home/docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default triage labels. See `docs/agents/triage-labels.md`.
+Default triage labels. See `~/Sites/home/docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context. See `docs/agents/domain.md`.
+Single-context. See `~/Sites/home/docs/agents/domain.md`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
