@@ -44,7 +44,7 @@ catalog:
   "lint-staged": "^17.6.0"
   "lucide-react": "^1.63.0"
   "motion": "^13.5.1"
-  "next": "^16.4.3"
+  "next": "^16.4.5"
   "oxlint-tsgolint": "7.0.2002"
   "postcss": "^8.5.32"
   "react": "^19.3.1"
